@@ -556,7 +556,15 @@
             <div class="mbar"><i id="mHigh"></i><span>HIGH</span></div>
             <div class="mbeat" id="mBeat">● BEAT</div>
           </div>
-          <div class="dev-actions"><button class="btn small" id="sndRetry" hidden>Try again</button></div>
+          <div class="dev-actions">
+            <button class="btn small" id="sndRetry" hidden>Try again</button>
+            <button class="btn small" id="sndUseMic" hidden>Use Microphone or Stereo Mix</button>
+          </div>
+          <div class="ctl" id="micPick" hidden>
+            <label for="micSel" class="lbl">Listen to</label>
+            <select id="micSel"></select>
+            <span class="hint" id="micTip" hidden></span>
+          </div>
           <div class="ctl">
             <div class="ctl-head"><label for="sndAmt">Amount</label><output id="sndAmtOut" for="sndAmt"></output></div>
             <input type="range" id="sndAmt" min="0" max="100" step="1" value="60">
@@ -839,10 +847,12 @@
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
           </dl></div>
           <div class="g-card"><h3>React to sound</h3><dl>
-            <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: pick Entire screen and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
-            <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works.</dd>
+            <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: on the Entire Screen tab pick any screen (with two monitors, Screen 1 or Screen 2 both give the whole computer’s sound) and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
+            <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works. Listen to picks which input when there’s more than one.</dd>
+            <dt>Stereo Mix (Windows)</dt><dd>Hears the computer’s sound with no screen sharing at all: choose Microphone, then Stereo Mix under Listen to. If it isn’t listed, turn it on once in Windows Settings → System → Sound → More sound settings (Sound Control Panel on Windows 10) → Recording tab → right-click an empty spot → Show Disabled Devices → right-click Stereo Mix → Enable, then reload this page. Some computers don’t have it.</dd>
             <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
             <dt>Amount and What the music moves</dt><dd>How hard the picture reacts, and which settings follow the music: Zoom kick pumps on the bass, Input size swells, Spin follows the mids, Color follows the highs, Warp shakes and Flash brightens on beats.</dd>
+            <dt>Which browser</dt><dd>Computer sound works in Chrome and Edge. Firefox and Safari don’t pass sound through screen sharing, so use Microphone there (Stereo Mix on Windows hears the computer itself).</dd>
             <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on.</dd>
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
@@ -893,7 +903,7 @@
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
           <dt>The output window didn’t open</dt><dd>The browser blocked it. Click the blocked pop-up icon at the right of the address bar, choose to always allow pop-ups for this page, then press Output window again.</dd>
-          <dt>The picture doesn’t react to music</dt><dd>Check that the Low, Mid and High bars move. With Computer sound, share again and make sure Also share system audio is switched on (or Also share tab audio for a browser tab). Then raise Amount.</dd>
+          <dt>The picture doesn’t react to music</dt><dd>Check that the Low, Mid and High bars move. With Computer sound, share again and make sure Also share system audio is switched on under the screen you pick (or Also share tab audio for a browser tab). If that switch never appears, use Microphone with Stereo Mix instead. Then raise Amount.</dd>
           <dt>It’s choppy</dt><dd>Turn the Old TV look down, close other tabs, or choose 4:3 TV as the screen shape.</dd>
         </dl>
       </section>
@@ -1750,12 +1760,23 @@ const snd = {
   lastBeat: 0, amount: 60,
   map: { kick: true, size: false, spin: false, color: true, warp: false, flash: true },
 };
-const sndStatus = $('#sndStatus'), sndRetry = $('#sndRetry'), sndAmt = $('#sndAmt');
+const sndStatus = $('#sndStatus'), sndRetry = $('#sndRetry'), sndAmt = $('#sndAmt'), micSel = $('#micSel');
+let micDeviceId = '';
+// Firefox and Safari share screens without sound, so Computer sound only works in Chrome and Edge
+const UA = navigator.userAgent || '';
+const noScreenAudio = /Firefox\//.test(UA) || (/Safari\//.test(UA) && !/(Chrome|Chromium|Edg)\//.test(UA));
+const browserName = /Firefox\//.test(UA) ? 'Firefox' : 'Safari';
+if (noScreenAudio) {
+  $('#sndHint').innerHTML = `Computer sound needs Chrome or Edge. In ${browserName}, use <b>Microphone</b>; on Windows, pick <b>Stereo Mix</b> to hear the computer’s own sound.`;
+}
+// Inputs that carry the computer's own sound rather than a room microphone
+const LOOPBACK = /stereo mix|what u hear|wave out|cable output|loopback|voicemeeter|monitor of/i;
 if (inArtifact) $('#soundGroup').hidden = true;
-function sndSay(html, warn) { say(sndStatus, html, warn); sndRetry.hidden = !warn; }
+function sndSay(html, warn, offerMic) { say(sndStatus, html, warn); sndRetry.hidden = !warn; $('#sndUseMic').hidden = !offerMic; }
 function syncSoundUI() {
   $$('#soundSrc button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.snd === snd.src)));
   $('#soundRow').hidden = snd.src === 'off';
+  $('#micPick').hidden = snd.src !== 'mic' || micSel.options.length < 2;
   $$('#sndMap button').forEach((b) => b.setAttribute('aria-pressed', String(!!snd.map[b.dataset.map])));
   sndAmt.value = snd.amount;
   paintFill(sndAmt);
@@ -1800,43 +1821,71 @@ async function setSound(src) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { sndSay('This browser can’t use a microphone on this page.', true); return; }
     sndSay('Waiting for you to allow the microphone…');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false,
-      });
+      const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+      if (micDeviceId) audio.deviceId = { exact: micDeviceId };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
       if (snd.src !== 'mic') { stream.getTracks().forEach((t) => t.stop()); return; }
       listen(stream);
-      sndSay('<span class="live"></span><b>Listening through the microphone.</b> Play music nearby, or clap.');
+      const settings = stream.getAudioTracks()[0].getSettings ? stream.getAudioTracks()[0].getSettings() : {};
+      micDeviceId = settings.deviceId || micDeviceId;
+      const label = stream.getAudioTracks()[0].label || '';
+      sndSay(LOOPBACK.test(label)
+        ? `<span class="live"></span><b>Listening to this computer’s sound</b> through ${escapeHTML(label)}.`
+        : '<span class="live"></span><b>Listening through the microphone.</b> Play music nearby, or clap.');
+      listMics();
     } catch (err) {
       const n = err && err.name;
       if (n === 'NotAllowedError' || n === 'SecurityError') sndSay('Microphone access was blocked. Click the microphone icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
-      else if (n === 'NotFoundError') sndSay('No microphone was found. Plug one in, then press Try again.', true);
+      else if (n === 'NotFoundError' || n === 'OverconstrainedError') { micDeviceId = ''; sndSay('That input wasn’t found. Plug it in or pick another, then press Try again.', true); }
       else sndSay('The microphone couldn’t start. Press Try again.', true);
     }
     return;
   }
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    sndSay('This browser can’t listen to the computer’s sound. Use <b>Chrome</b> or <b>Edge</b> on a computer.', true);
+  if (noScreenAudio || !navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    sndSay(`${noScreenAudio ? browserName : 'This browser'} can’t pass the computer’s sound to web pages, so Computer sound needs <b>Chrome</b> or <b>Edge</b>. ` +
+      'Here you can use the microphone instead. On Windows, choose <b>Stereo Mix</b> when asked which microphone, and it hears the computer’s own sound.', false, true);
     return;
   }
-  sndSay('In the box that opens, choose <b>Entire screen</b>, switch on <b>Also share system audio</b>, then press <b>Share</b>.');
+  sndSay('In the box that opens, pick a screen on the <b>Entire Screen</b> tab (Screen 1 or Screen 2, either one gives the whole computer’s sound), switch on <b>Also share system audio</b>, then press <b>Share</b>.');
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
+      video: { displaySurface: 'monitor' },   // opens the box on the screens tab, where system audio lives
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
       systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
     });
     stream.getVideoTracks().forEach((t) => t.stop());   // only the sound is used
     if (snd.src !== 'system') { stream.getTracks().forEach((t) => t.stop()); return; }
     if (!stream.getAudioTracks().length) {
-      sndSay('No sound came through. Press Try again, and in the box switch on <b>Also share system audio</b> (or <b>Also share tab audio</b> for a browser tab).', true);
+      sndSay('No sound came through. Press Try again and switch on <b>Also share system audio</b> under the screen you pick. No switch there? Choose <b>Microphone</b> instead and pick <b>Stereo Mix</b> under Listen to (the Guide shows how to turn it on).', true);
       return;
     }
     listen(stream);
     sndSay('<span class="live"></span><b>Listening to this computer’s sound.</b> Chrome shows a sharing bar while it listens; only the sound is used.');
   } catch (err) {
-    sndSay('Sharing was cancelled. Press Try again, choose <b>Entire screen</b> and switch on <b>Also share system audio</b>.', true);
+    sndSay('Sharing was cancelled. Press Try again, pick <b>Screen 1</b> or <b>Screen 2</b>, and switch on <b>Also share system audio</b>.', true);
   }
 }
+async function listMics() {
+  try {
+    const ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    micSel.innerHTML = '';
+    ins.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = (d.label || `Input ${i + 1}`) + (LOOPBACK.test(d.label) ? ' (this computer’s sound)' : '');
+      micSel.appendChild(o);
+    });
+    if ([...micSel.options].some((o) => o.value === micDeviceId)) micSel.value = micDeviceId;
+    const loop = ins.find((d) => LOOPBACK.test(d.label));
+    const tip = $('#micTip');
+    const onLoop = loop && loop.deviceId === micSel.value;
+    tip.hidden = !loop || onLoop;
+    if (loop && !onLoop) tip.textContent = `Pick “${loop.label}” to hear everything this computer plays, with no screen sharing.`;
+    syncSoundUI();
+  } catch (_) {}
+}
+micSel.addEventListener('change', () => { micDeviceId = micSel.value; setSound('mic'); });
+$('#sndUseMic').addEventListener('click', () => setSound('mic'));
 $$('#soundSrc button').forEach((b) => b.addEventListener('click', () => setSound(b.dataset.snd)));
 sndRetry.addEventListener('click', () => setSound(snd.src === 'off' ? 'system' : snd.src));
 sndAmt.addEventListener('input', () => { snd.amount = +sndAmt.value; syncSoundUI(); });
@@ -2629,7 +2678,7 @@ const RECIPES = [
     patch: { A: { in1: 'wave', form: 3, zoom: 14, spin: 6, trails: 92, color: 14, mirror: 4, blur: 0.2 }, tv: 65 } },
   { name: 'Music visualizer', needs: 'sound', sound: 'system', soundAmount: 70,
     soundMap: { kick: true, size: true, spin: false, color: true, warp: false, flash: true },
-    after: 'Pick Entire screen, switch on “Also share system audio”, press Share, then play some music.',
+    after: 'Pick a screen, switch on “Also share system audio”, press Share, then play some music.',
     text: 'Play music on this computer and two mirrored loops pump on the bass, flash on the beats and shift color with the highs.',
     how: 'COMPUTER SOUND · ZOOM KICK · SIZE · COLOR · FLASH',
     sw: 'repeating-linear-gradient(90deg,#141210 0 4px,transparent 4px 10px),linear-gradient(0deg,#ffae3b,#ff4fa3 45%,#6a2bd9 80%,#1b0f3d)',

@@ -64,9 +64,17 @@ TIPS
   - Autopilot (next to Surprise me, or the P key) changes the settings slowly
     by itself. Touch any control to take over again.
   - Music visualizer: under "React to sound" choose Computer sound. In the
-    box Chrome opens, pick Entire screen, switch on "Also share system
-    audio" and press Share, then play Spotify or anything else. Microphone
-    listens to the room instead. Record keeps the sound in the video.
+    box Chrome opens, pick any screen on the Entire Screen tab (with two
+    monitors, Screen 1 or Screen 2 both give the whole computer's sound),
+    switch on "Also share system audio" and press Share, then play Spotify
+    or anything else. Microphone listens to the room instead. Record keeps
+    the sound in the video.
+  - Computer sound works in Chrome and Edge. Firefox and Safari don't pass
+    sound through screen sharing, so use Microphone there.
+  - No screen sharing on Windows: choose Microphone and pick Stereo Mix
+    under "Listen to". If it isn't listed, turn it on once: Settings >
+    System > Sound > More sound settings > Recording tab > right-click >
+    Show Disabled Devices > right-click Stereo Mix > Enable. Then reload.
   - Projector or second screen: press "Output window", drag the new window
     onto that screen and double-click it to fill it. The controls stay on
     your laptop. If nothing opens, allow pop-ups for the page.
