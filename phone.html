@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#191816">
+<title>Phosphor Loop Phone Camera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Michroma&family=VT323&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --chassis: #191816; --raise: #2b2824; --raise-2: #35312c; --well: #0f0e0d; --line: #3a3631;
+    --ink: #ece5d6; --dim: #a59d8e; --faint: #756e63; --amber: #ffae3b; --tally: #ff4b3e; --warn: #ffc98a;
+    --f-display: "Michroma", "Eurostile", "Arial Black", sans-serif;
+    --f-body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+    --f-osd: "VT323", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--chassis); color: var(--ink);
+    font: 16px/1.45 var(--f-body); -webkit-font-smoothing: antialiased;
+  }
+  [hidden] { display: none !important; }
+  main {
+    min-height: 100%; max-width: 560px; margin: 0 auto;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  header { display: flex; align-items: center; gap: 12px; }
+  .guns { position: relative; width: 22px; height: 20px; flex: none; }
+  .guns i { position: absolute; width: 9px; height: 9px; border-radius: 50%; }
+  .guns i:nth-child(1) { background: #ff4a4a; left: 0; top: 0; box-shadow: 0 0 8px #ff4a4a; }
+  .guns i:nth-child(2) { background: #3ddc84; right: 0; top: 0; box-shadow: 0 0 8px #3ddc84; }
+  .guns i:nth-child(3) { background: #4f86ff; left: 6.5px; bottom: 0; box-shadow: 0 0 8px #4f86ff; }
+  .wordmark { font-family: var(--f-display); font-size: 14px; letter-spacing: .2em; text-transform: uppercase; }
+  .sub { font-family: var(--f-osd); font-size: 20px; color: var(--dim); margin-left: auto; }
+
+  .bezel {
+    padding: 10px; border-radius: 18px;
+    background: linear-gradient(160deg, #34302b 0%, #221f1c 45%, #151412 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 36px rgba(0,0,0,.5);
+  }
+  .screen { position: relative; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 12px; overflow: hidden; background: #050505; }
+  .screen video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .screen video.mirror { transform: scaleX(-1); }
+  .screen .idle {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px;
+    font-family: var(--f-osd); font-size: 24px; color: #e9fbe9; text-shadow: 0 0 6px rgba(120,255,150,.6);
+  }
+  .onair {
+    position: absolute; right: 12px; top: 10px; font-family: var(--f-osd); font-size: 24px; color: var(--tally);
+    text-shadow: 0 0 8px rgba(255,75,62,.7), 2px 2px 0 rgba(0,0,0,.85);
+  }
+
+  .status { margin: 0; min-height: 3em; color: var(--dim); }
+  .status b { color: var(--ink); }
+  .status.warn, .status.warn b { color: var(--warn); }
+  .live { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+    min-height: 52px; padding: 10px 16px; border-radius: 10px;
+    border: 1px solid var(--line); border-bottom-color: #0c0b0a;
+    background: linear-gradient(var(--raise-2), var(--raise)); color: var(--ink);
+    font: 600 17px/1.2 var(--f-body); cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.4);
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.go { background: linear-gradient(#ffbe5c, #e8912a); color: #1b1206; border-color: #a7651a; min-height: 60px; font-size: 19px; }
+  .btn:disabled { opacity: .5; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .note { margin: 0; font-size: 14px; color: var(--faint); }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="guns" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="wordmark">Phosphor Loop</span>
+    <span class="sub">PHONE CAM</span>
+  </header>
+
+  <div class="bezel">
+    <div class="screen">
+      <video id="preview" playsinline muted autoplay></video>
+      <div class="idle" id="idle">Camera off</div>
+      <div class="onair" id="onair" hidden>● ON AIR</div>
+    </div>
+  </div>
+
+  <p class="status" id="status" role="status" aria-live="polite">Tap <b>Start camera</b> to send this camera to Phosphor Loop on your computer.</p>
+
+  <button class="btn go" id="start">Start camera</button>
+  <div class="row" id="controls" hidden>
+    <button class="btn" id="flip">Use front camera</button>
+    <button class="btn" id="stop">Stop</button>
+  </div>
+  <button class="btn" id="retry" hidden>Try again</button>
+
+  <p class="note">Keep this page open with the screen on. Your video goes to your computer and isn’t recorded or saved anywhere.</p>
+</main>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const deskId = params.get('id');
+const SIGNAL_URL = params.get('signal') || 'wss://0.peerjs.com:443/peerjs';
+const ICE = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+] };
+
+const statusEl = $('#status'), startBtn = $('#start'), controls = $('#controls'), retryBtn = $('#retry');
+const flipBtn = $('#flip'), stopBtn = $('#stop'), preview = $('#preview'), idle = $('#idle'), onair = $('#onair');
+
+let stream = null, pc = null, sig = null, dc = null, facing = 'environment', wakeLock = null;
+let myId = '', connId = '', cands = [], answerTimer = null, running = false;
+
+function say(html, warn, offerRetry) {
+  statusEl.innerHTML = html;
+  statusEl.classList.toggle('warn', !!warn);
+  retryBtn.hidden = !offerRetry;
+}
+function randId(n) {
+  const a = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const r = crypto.getRandomValues(new Uint8Array(n));
+  let s = '';
+  for (const x of r) s += a[x % a.length];
+  return s;
+}
+
+class Signal {
+  constructor(base, id, h) { this.base = base; this.id = id; this.h = h; this.ws = null; this.hb = null; this.closed = false; this.open = false; }
+  connect() {
+    let ws;
+    try { ws = new WebSocket(`${this.base}?key=peerjs&id=${encodeURIComponent(this.id)}&token=${randId(12)}&version=1.5.5`); }
+    catch (e) { setTimeout(() => this.h.lost && this.h.lost(false), 0); return; }
+    this.ws = ws;
+    ws.onmessage = (e) => {
+      let m;
+      try { m = JSON.parse(e.data); } catch (_) { return; }
+      if (m.type === 'OPEN') { this.open = true; this.h.open && this.h.open(); }
+      else if (m.type === 'ID-TAKEN' || m.type === 'ERROR') this.h.error && this.h.error(m.type);
+      else this.h.message && this.h.message(m);
+    };
+    ws.onclose = () => {
+      clearInterval(this.hb);
+      const was = this.open;
+      this.open = false; this.ws = null;
+      if (!this.closed && this.h.lost) this.h.lost(was);
+    };
+    this.hb = setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'HEARTBEAT' })); }, 5000);
+  }
+  send(type, dst, payload) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type, dst, payload })); }
+  close() { this.closed = true; clearInterval(this.hb); if (this.ws) { try { this.ws.close(); } catch (_) {} } }
+}
+
+if (!deskId) {
+  startBtn.disabled = true;
+  say('Open this page by scanning the QR code shown in Phosphor Loop on your computer (pick <b>Phone</b> as an input there).', true);
+}
+
+function getCam() {
+  return navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+    audio: false,
+  });
+}
+function camError(err) {
+  const n = err && err.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError') return 'Camera access was blocked. Tap the icon next to the address bar, allow the camera, then tap <b>Start camera</b> again.';
+  if (n === 'NotReadableError' || n === 'AbortError') return 'Another app is using the camera. Close it, then tap <b>Start camera</b> again.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No camera was found on this phone.';
+  return 'The camera couldn’t start. Tap <b>Start camera</b> again.';
+}
+function showPreview() {
+  preview.srcObject = stream;
+  preview.classList.toggle('mirror', facing === 'user');
+  idle.hidden = true;
+  flipBtn.textContent = facing === 'user' ? 'Use back camera' : 'Use front camera';
+}
+
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && running) wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+startBtn.addEventListener('click', async () => {
+  if (!deskId) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    say('This browser can’t use the camera on this page. Open the link in <b>Chrome</b>.', true);
+    return;
+  }
+  startBtn.disabled = true;
+  say('Waiting for you to allow the camera…');
+  try { stream = await getCam(); }
+  catch (err) { say(camError(err), true); startBtn.disabled = false; return; }
+  running = true;
+  showPreview();
+  startBtn.hidden = true;
+  controls.hidden = false;
+  keepAwake();
+  connect();
+});
+
+function cleanup() {
+  clearTimeout(answerTimer);
+  if (pc) { try { pc.close(); } catch (_) {} }
+  pc = null; dc = null; cands = [];
+  onair.hidden = true;
+}
+
+function connect() {
+  cleanup();
+  if (sig) sig.close();
+  myId = 'plphone-' + randId(10);
+  connId = 'mc_' + randId(12);
+  say('Connecting to your computer…');
+  sig = new Signal(SIGNAL_URL, myId, {
+    open: () => { makeOffer().catch(() => say('Couldn’t start the video link. Tap <b>Try again</b>.', true, true)); },
+    message: onSignal,
+    error: (kind) => {
+      if (kind === 'ID-TAKEN') { connect(); return; }
+      say('The connection service had a problem. Tap <b>Try again</b>.', true, true);
+    },
+    lost: () => {
+      if (!pc || pc.connectionState !== 'connected') say('Couldn’t reach the connection service. Check that this phone is online, then tap <b>Try again</b>.', true, true);
+    },
+  });
+  sig.connect();
+}
+
+async function makeOffer() {
+  pc = new RTCPeerConnection(ICE);
+  const mine = pc;
+  stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+  dc = pc.createDataChannel('ctl');
+  dc.onopen = () => dc.send(JSON.stringify({ facing }));
+  pc.onicecandidate = (e) => { if (e.candidate && sig) sig.send('CANDIDATE', deskId, { candidate: e.candidate, type: 'media', connectionId: connId }); };
+  pc.onconnectionstatechange = () => {
+    if (pc !== mine) return;
+    const s = pc.connectionState;
+    if (s === 'connected') {
+      clearTimeout(answerTimer);
+      onair.hidden = false;
+      say('<span class="live"></span><b>Connected.</b> Your camera is on the computer now. Point it at anything, even the computer’s screen.');
+    } else if (s === 'disconnected') {
+      say('The connection is unsteady. Stay close to your Wi-Fi…');
+    } else if (s === 'failed') {
+      onair.hidden = true;
+      say('The video link dropped. Tap <b>Try again</b>.', true, true);
+    }
+  };
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  sig.send('OFFER', deskId, { sdp: pc.localDescription, type: 'media', connectionId: connId, facing });
+  say('Found the connection service. Waiting for your computer…');
+  answerTimer = setTimeout(() => {
+    if (pc === mine && !pc.remoteDescription) {
+      say('Your computer didn’t answer. Make sure Phosphor Loop is still open with the phone code showing, then scan the code again.', true, true);
+    }
+  }, 15000);
+}
+
+async function onSignal(m) {
+  if (m.src !== deskId) return;
+  const p = m.payload || {};
+  if (m.type === 'ANSWER' && pc && p.connectionId === connId) {
+    try {
+      await pc.setRemoteDescription(p.sdp);
+      for (const c of cands) await pc.addIceCandidate(c).catch(() => {});
+      cands = [];
+      say('Your computer answered. Starting the picture…');
+    } catch (_) { say('The video link couldn’t be set up. Tap <b>Try again</b>.', true, true); }
+  } else if (m.type === 'CANDIDATE' && pc && p.connectionId === connId) {
+    if (pc.remoteDescription) pc.addIceCandidate(p.candidate).catch(() => {});
+    else cands.push(p.candidate);
+  } else if (m.type === 'EXPIRE') {
+    clearTimeout(answerTimer);
+    say('Couldn’t find Phosphor Loop on your computer. The code changes each time the page opens, so scan the code that’s showing now.', true, true);
+  } else if (m.type === 'LEAVE') {
+    cleanup();
+    say('Your computer ended the connection. Tap <b>Try again</b> to reconnect.', true, true);
+  }
+}
+
+flipBtn.addEventListener('click', async () => {
+  const before = facing;
+  facing = facing === 'environment' ? 'user' : 'environment';
+  flipBtn.disabled = true;
+  // Many phones can't open two cameras at once, so let go of the current one first
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  try {
+    stream = await getCam();
+  } catch (err) {
+    facing = before;
+    try { stream = await getCam(); } catch (_) { say(camError(err), true); flipBtn.disabled = false; return; }
+  }
+  showPreview();
+  if (pc) {
+    const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video') || pc.getSenders()[0];
+    if (sender) { try { await sender.replaceTrack(stream.getVideoTracks()[0]); } catch (_) {} }
+  }
+  if (dc && dc.readyState === 'open') dc.send(JSON.stringify({ facing }));
+  flipBtn.disabled = false;
+});
+
+function stopAll() {
+  running = false;
+  if (sig && deskId) sig.send('LEAVE', deskId, {});
+  cleanup();
+  if (sig) { sig.close(); sig = null; }
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null;
+  preview.srcObject = null;
+  idle.hidden = false;
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  controls.hidden = true;
+  startBtn.hidden = false;
+  startBtn.disabled = false;
+}
+stopBtn.addEventListener('click', () => { stopAll(); say('Stopped. Tap <b>Start camera</b> to send the camera again.'); });
+retryBtn.addEventListener('click', async () => {
+  retryBtn.hidden = true;
+  if (!stream || !stream.active) {
+    try { stream = await getCam(); showPreview(); } catch (err) { say(camError(err), true); return; }
+  }
+  connect();
+});
+window.addEventListener('pagehide', () => { if (sig && deskId) sig.send('LEAVE', deskId, {}); });
+})();
+</script>
+</body>
+</html>

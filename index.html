@@ -1,0 +1,2050 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#191816">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Phosphor Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Michroma&family=VT323&display=swap">
+<style>
+  /* Single dark look by choice: this is a piece of video gear. */
+  :root {
+    color-scheme: dark;
+    --chassis: #191816;
+    --panel: #201e1b;
+    --raise: #2b2824;
+    --raise-2: #35312c;
+    --well: #0f0e0d;
+    --line: #3a3631;
+    --ink: #ece5d6;
+    --dim: #a59d8e;
+    --faint: #756e63;
+    --loop-a: #ffae3b;
+    --loop-b: #4fd1c5;
+    --amber: var(--loop-a);
+    --amber-glow: rgba(255, 174, 59, .45);
+    --press-1: #4a3a22;
+    --press-2: #3a2d1a;
+    --press-ink: #ffe2b8;
+    --tally: #ff4b3e;
+    --gun-r: #ff4a4a;
+    --gun-g: #3ddc84;
+    --gun-b: #4f86ff;
+    --osd: #e9fbe9;
+    --f-display: "Michroma", "Eurostile", "Arial Black", sans-serif;
+    --f-body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+    --f-osd: "VT323", "Courier New", monospace;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--chassis);
+    color: var(--ink);
+    font: 15px/1.45 var(--f-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  .app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+
+  /* ---------- top bar ---------- */
+  .top {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(#1f1d1a, var(--chassis));
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .guns { position: relative; width: 22px; height: 20px; flex: none; }
+  .guns i { position: absolute; width: 9px; height: 9px; border-radius: 50%; }
+  .guns i:nth-child(1) { background: var(--gun-r); left: 0; top: 0; box-shadow: 0 0 8px var(--gun-r); }
+  .guns i:nth-child(2) { background: var(--gun-g); right: 0; top: 0; box-shadow: 0 0 8px var(--gun-g); }
+  .guns i:nth-child(3) { background: var(--gun-b); left: 6.5px; bottom: 0; box-shadow: 0 0 8px var(--gun-b); }
+  .wordmark {
+    font-family: var(--f-display); font-size: 15px; letter-spacing: .22em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .readout {
+    font-family: var(--f-osd); font-size: 20px; color: var(--dim); letter-spacing: .04em;
+    display: flex; gap: 10px; align-items: baseline; white-space: nowrap;
+  }
+  .readout .tc-label { color: var(--faint); }
+  .readout #tc { color: var(--loop-a); min-width: 11ch; }
+
+  /* ---------- main deck ---------- */
+  .deck { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+
+  .monitor { display: flex; flex-direction: column; gap: 14px; padding: 20px; min-height: 0; min-width: 0; }
+  .stage { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
+  .stage:fullscreen { background: #000; padding: 0; }
+  .stage:-webkit-full-screen { background: #000; }
+  .bezel {
+    padding: 16px;
+    border-radius: 22px;
+    background: linear-gradient(160deg, #34302b 0%, #221f1c 45%, #151412 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 0 rgba(0,0,0,.4), 0 24px 50px rgba(0,0,0,.5);
+  }
+  .screen {
+    position: relative; overflow: hidden; line-height: 0;
+    border-radius: 16px / 18px;
+    background: #030303;
+    box-shadow: 0 0 0 2px #0a0908, inset 0 0 40px rgba(0,0,0,.9);
+  }
+  .screen canvas { display: block; touch-action: none; cursor: crosshair; }
+  .screen::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(120% 90% at 30% 10%, rgba(255,255,255,.07), transparent 45%);
+    box-shadow: inset 0 0 60px rgba(0,0,0,.55);
+  }
+
+  .osd {
+    position: absolute; left: 5.5%; top: 6%; pointer-events: none;
+    display: grid; line-height: 1; gap: 2px;
+    font-family: var(--f-osd); color: var(--osd);
+    text-shadow: 0 0 6px rgba(120,255,150,.7), 2px 2px 0 rgba(0,0,0,.85);
+    opacity: 0; transition: opacity .5s ease;
+  }
+  .osd.on { opacity: 1; transition: none; }
+  .osd-a { font-size: clamp(28px, 4.4vw, 46px); }
+  .osd-b { font-size: clamp(18px, 2.4vw, 26px); letter-spacing: .08em; }
+
+  .rec-ind {
+    position: absolute; right: 5.5%; top: 6%; pointer-events: none;
+    font-family: var(--f-osd); font-size: clamp(20px, 2.6vw, 28px); line-height: 1; color: var(--tally);
+    text-shadow: 0 0 8px rgba(255,75,62,.7), 2px 2px 0 rgba(0,0,0,.85);
+  }
+  .rec-ind .dot { animation: blink 1s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+
+  .tip {
+    position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%);
+    pointer-events: none; line-height: 1.3; text-align: center;
+    max-width: 86%;
+    padding: 7px 14px; border-radius: 999px;
+    background: rgba(10,9,8,.72); color: var(--ink); font-size: 14px;
+    border: 1px solid rgba(255,255,255,.12);
+    transition: opacity .6s ease;
+  }
+  .tip.gone { opacity: 0; }
+
+  .drop, .screen-msg {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    padding: 24px; line-height: 1.4;
+    font-family: var(--f-osd); font-size: 26px; color: var(--osd);
+    background: rgba(5,5,5,.72);
+  }
+  .screen-msg { font-family: var(--f-body); font-size: 16px; color: var(--ink); background: #080807; }
+
+  .transport { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .transport .spacer { width: 12px; }
+
+  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; min-height: 22px; font-size: 13px; color: var(--faint); }
+  .foot kbd {
+    font: 12px/1 var(--f-body); color: var(--dim);
+    padding: 2px 5px; border-radius: 3px; border: 1px solid var(--line); background: var(--raise);
+  }
+  .toast { color: var(--loop-a); margin: 0; }
+  .keys { margin: 0; }
+  @media (hover: none) { .keys { display: none; } }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 38px; padding: 7px 14px;
+    border-radius: 6px; border: 1px solid var(--line); border-bottom-color: #0c0b0a;
+    background: linear-gradient(var(--raise-2), var(--raise));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.4);
+    font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { background: linear-gradient(#3d3832, #2f2c27); }
+  .btn:active { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
+  .led {
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+    background: #3c3530; box-shadow: inset 0 1px 1px rgba(0,0,0,.6);
+  }
+  .btn[aria-pressed="true"] .led { background: var(--amber); box-shadow: 0 0 8px var(--amber-glow), 0 0 2px var(--amber); }
+  .btn.rec[aria-pressed="true"] .led { background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); }
+  .btn.rec[aria-pressed="true"] { color: #ffd9d5; }
+  .btn.wide { width: 100%; }
+  .btn.small { min-height: 32px; padding: 5px 11px; font-size: 14px; }
+  .linkish {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    color: var(--amber); text-decoration: underline; text-underline-offset: 2px; font-weight: 600;
+  }
+
+  /* ---------- control panel ---------- */
+  .panel {
+    overflow-y: auto; min-height: 0;
+    border-left: 1px solid var(--line); background: var(--panel);
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 26px;
+  }
+  .lede { margin: 0; color: var(--dim); max-width: 60ch; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .group { display: flex; flex-direction: column; gap: 12px; }
+  .group h2 {
+    margin: 0; display: flex; align-items: center; gap: 10px;
+    font: 11px/1 var(--f-display); letter-spacing: .2em; text-transform: uppercase; color: var(--dim);
+  }
+  .group h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .hint { margin: 0; font-size: 13px; color: var(--faint); }
+
+  .channels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .ch {
+    display: flex; flex-direction: column; gap: 5px; padding: 4px 4px 6px;
+    border-radius: 7px; border: 1px solid var(--line); border-bottom-color: #0c0b0a;
+    background: linear-gradient(var(--raise-2), var(--raise));
+    cursor: pointer; text-align: left; min-width: 0;
+  }
+  .ch:hover { border-color: #564f47; }
+  .ch .sw { position: relative; display: block; height: 30px; border-radius: 4px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+  .ch .sw::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(20,18,16,.35); }
+  .ch .sw b {
+    position: absolute; left: 4px; top: 1px; z-index: 1;
+    font: 400 18px/1 var(--f-osd); color: #fff; text-shadow: 0 0 4px #000, 1px 1px 0 #000;
+  }
+  .ch .nm { font-size: 13px; line-height: 1.1; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ch[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a), 0 0 14px rgba(255,174,59,.18); }
+  .ch[aria-pressed="true"] .sw::before { background: transparent; }
+
+  .seg { display: grid; gap: 6px; }
+  .seg-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .seg button {
+    min-height: 36px; padding: 6px 2px; border-radius: 6px;
+    border: 1px solid var(--line); border-bottom-color: #0c0b0a;
+    background: linear-gradient(var(--raise-2), var(--raise));
+    cursor: pointer; font-size: 13.5px; font-weight: 500; min-width: 0;
+  }
+  .seg button:hover { border-color: #564f47; }
+  .seg button[aria-pressed="true"] {
+    background: linear-gradient(var(--press-1), var(--press-2)); border-color: var(--amber); color: var(--press-ink);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.4);
+  }
+
+  select {
+    width: 100%; min-height: 36px; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--raise); color: var(--ink); font-size: 14px; cursor: pointer;
+  }
+
+  /* loop editor: B swaps the accent to teal */
+  .editor { display: flex; flex-direction: column; gap: 18px; }
+  .editor[data-loop="B"] {
+    --amber: var(--loop-b); --amber-glow: rgba(79, 209, 197, .45);
+    --press-1: #1d4440; --press-2: #15312e; --press-ink: #cafff8;
+  }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border-radius: 9px; background: var(--well); border: 1px solid var(--line); }
+  .tabs button {
+    display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px;
+    border: 1px solid transparent; border-radius: 6px; background: transparent; cursor: pointer; font-weight: 600; color: var(--dim);
+  }
+  .tabs button .tag {
+    display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 4px;
+    font: 400 18px/1 var(--f-osd); color: #111;
+  }
+  #tabA .tag { background: var(--loop-a); }
+  #tabB .tag { background: var(--loop-b); }
+  .tabs button[aria-selected="true"] { background: linear-gradient(var(--raise-2), var(--raise)); border-color: var(--line); color: var(--ink); }
+  .tabs button { white-space: nowrap; }
+  .tabs .vis { width: 8px; height: 8px; border-radius: 50%; background: #3c3530; box-shadow: inset 0 1px 1px rgba(0,0,0,.6); }
+  .tabs .vis.on { background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); }
+
+  .dev { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 6px; background: var(--well); border: 1px solid var(--line); }
+  .dev-status { font-size: 14px; color: var(--dim); overflow-wrap: anywhere; }
+  .dev-status b { color: var(--ink); font-weight: 600; }
+  .dev-status.warn, .dev-status.warn b { color: #ffc98a; }
+  .dev-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .live { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); vertical-align: 1px; }
+  .qr-wrap { display: flex; gap: 12px; align-items: center; }
+  .qr-wrap canvas { flex: none; width: 128px; height: 128px; border-radius: 6px; background: #fff; image-rendering: pixelated; }
+  .qr-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 14px; }
+  .qr-url { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; user-select: all; }
+
+  .ctl { display: grid; gap: 2px; }
+  .ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .ctl-head label, .ctl-head .lbl { font-weight: 600; font-size: 15px; }
+  .ctl-head output { font-family: var(--f-osd); font-size: 19px; line-height: 1; color: var(--amber); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); letter-spacing: .02em; }
+  .ctl select { margin-top: 4px; }
+
+  /* fader */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 30px; margin: 0;
+    background: transparent; cursor: pointer; --a: 0%; --b: 50%;
+  }
+  input[type="range"]:focus-visible { outline: none; }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--well) 0 var(--a), var(--amber) var(--a) var(--b), var(--well) var(--b) 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.04);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--well) 0 var(--a), var(--amber) var(--a) var(--b), var(--well) var(--b) 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.7);
+  }
+  input[type="range"].bipolar::-webkit-slider-runnable-track {
+    background:
+      linear-gradient(90deg, transparent calc(50% - 1px), var(--dim) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+      linear-gradient(90deg, var(--well) 0 var(--a), var(--amber) var(--a) var(--b), var(--well) var(--b) 100%);
+  }
+  input[type="range"].bipolar::-moz-range-track {
+    background:
+      linear-gradient(90deg, transparent calc(50% - 1px), var(--dim) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+      linear-gradient(90deg, var(--well) 0 var(--a), var(--amber) var(--a) var(--b), var(--well) var(--b) 100%);
+  }
+  /* the A/B view fader: amber on the A side, teal on the B side */
+  input[type="range"].ab::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--loop-a), #7a6a50 50%, var(--loop-b)); }
+  input[type="range"].ab::-moz-range-track { background: linear-gradient(90deg, var(--loop-a), #7a6a50 50%, var(--loop-b)); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 28px; margin-top: -10px; border-radius: 4px;
+    border: 1px solid #0b0a09;
+    background: linear-gradient(90deg, transparent 6.5px, #26231f 6.5px 8.5px, transparent 8.5px), linear-gradient(#f1ebdf, #b4ac9d);
+    box-shadow: 0 2px 5px rgba(0,0,0,.55);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 26px; border-radius: 4px;
+    border: 1px solid #0b0a09;
+    background: linear-gradient(90deg, transparent 6px, #26231f 6px 8px, transparent 8px), linear-gradient(#f1ebdf, #b4ac9d);
+    box-shadow: 0 2px 5px rgba(0,0,0,.55);
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--amber); outline-offset: 2px; }
+  input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---------- narrow screens ---------- */
+  @media (max-width: 900px) {
+    html, body { height: auto; }
+    .app { height: auto; display: block; }
+    .deck { grid-template-columns: minmax(0, 1fr); }
+    .monitor { padding: 16px; }
+    .stage { flex: none; }
+    .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding: 20px 16px 32px; }
+    .top { padding: 10px 16px; }
+    .readout .lines { display: none; }
+    .bezel { padding: 10px; border-radius: 16px; }
+  }
+  @media (max-width: 420px) {
+    .wordmark { font-size: 13px; letter-spacing: .16em; }
+    .readout { font-size: 18px; }
+    .transport .btn { padding-inline: 11px; }
+    .seg button { font-size: 12.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .osd, .tip { transition: none; }
+    .rec-ind .dot { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="guns" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="wordmark">Phosphor Loop</span>
+    </div>
+    <div class="readout" aria-hidden="true">
+      <span class="tc-label">TC</span><span id="tc">00:00:00:00</span><span class="lines">· 576 lines</span>
+    </div>
+  </header>
+
+  <main class="deck">
+    <section class="monitor" aria-label="Screen">
+      <div class="stage" id="stage">
+        <div class="bezel" id="bezel">
+          <div class="screen" id="screenWrap">
+            <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to paint light."></canvas>
+            <div class="osd on" id="osd" aria-hidden="true"><span class="osd-a">CH 01</span><span class="osd-b">TUNNEL</span></div>
+            <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
+            <div class="tip" id="tip">Drag on the screen to paint light into the loop</div>
+            <div class="drop" id="drop" hidden>Drop to feed it into the loop</div>
+            <div class="screen-msg" id="msg" hidden></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button class="btn" id="freeze" aria-pressed="false"><span class="led"></span>Freeze</button>
+        <button class="btn" id="clear">Clear</button>
+        <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
+        <button class="btn" id="full">Full screen</button>
+        <span class="spacer" aria-hidden="true"></span>
+        <button class="btn" id="snap" hidden>Save picture</button>
+        <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
+      </div>
+      <div class="foot">
+        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd> channels · <kbd>Space</kbd> freeze · <kbd>R</kbd> surprise · <kbd>C</kbd> clear · <kbd>F</kbd> full screen</p>
+        <p class="toast" id="toast" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="Controls">
+      <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick a channel</b>, move a slider, or <b>drag on the screen</b> to paint.</p>
+
+      <section class="group" aria-labelledby="h-ch">
+        <h2 id="h-ch">Channels</h2>
+        <div class="channels" id="channels"></div>
+        <button class="btn wide" id="surprise">Surprise me</button>
+      </section>
+
+      <section class="group" aria-labelledby="h-mix">
+        <h2 id="h-mix">Mix the two loops</h2>
+        <div class="ctl">
+          <div class="ctl-head"><label for="view">What you see</label><output id="viewOut" for="view"></output></div>
+          <input type="range" id="view" class="ab" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Loop A</span><span>Both</span><span>Loop B</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="xfeed">Cross-feed</label><output id="xfeedOut" for="xfeed"></output></div>
+          <input type="range" id="xfeed" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Tangled</span></div>
+        </div>
+        <p class="hint">Cross-feed pours each loop into the other, so their shapes start to trade places.</p>
+      </section>
+
+      <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
+        <div class="tabs" role="tablist" aria-label="Which loop to edit">
+          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span>Loop A <span class="vis" id="visA" role="img"></span></button>
+          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span>Loop B <span class="vis" id="visB" role="img"></span></button>
+        </div>
+        <p class="hint" id="hiddenHint" hidden><span id="hiddenText">Loop B isn’t on screen right now.</span> <button class="linkish" id="showLoop">Show both loops</button></p>
+
+        <div class="group">
+          <h2 id="h-in">What feeds loop A</h2>
+          <div class="seg seg-5" id="inputs">
+            <button data-src="wave" aria-pressed="false">Wave</button>
+            <button data-src="shape" aria-pressed="false">Shape</button>
+            <button data-src="bars" aria-pressed="false">Bars</button>
+            <button data-src="sparks" aria-pressed="false">Sparks</button>
+            <button data-src="none" aria-pressed="false">Nothing</button>
+            <button data-src="picture" aria-pressed="false">Picture</button>
+            <button data-src="video" aria-pressed="false">Video</button>
+            <button data-src="camera" aria-pressed="false" data-device>Camera</button>
+            <button data-src="screen" aria-pressed="false" data-device>Screen</button>
+            <button data-src="phone" aria-pressed="false" data-device>Phone</button>
+          </div>
+
+          <div class="dev" id="row-picture" hidden>
+            <span class="dev-status">Picture: <b id="picName">the test card</b></span>
+            <div class="dev-actions">
+              <button class="btn small" id="pickPic">Choose a picture…</button>
+              <button class="btn small" id="useCard" hidden>Back to test card</button>
+            </div>
+          </div>
+
+          <div class="dev" id="row-video" hidden>
+            <span class="dev-status" id="vidStatus">No video chosen yet.</span>
+            <div class="dev-actions">
+              <button class="btn small" id="pickVid">Choose a video…</button>
+              <button class="btn small" id="vidPlay" hidden>Pause</button>
+            </div>
+          </div>
+
+          <div class="dev" id="row-camera" hidden>
+            <span class="dev-status" id="camStatus">Camera is off.</span>
+            <select id="camSel" aria-label="Which camera" hidden></select>
+            <div class="dev-actions">
+              <button class="btn small" id="camRetry" hidden>Try again</button>
+              <button class="btn small" id="camOff">Turn camera off</button>
+            </div>
+            <span class="hint">The camera picture stays on this computer.</span>
+          </div>
+
+          <div class="dev" id="row-screen" hidden>
+            <span class="dev-status" id="scrStatus">Not sharing.</span>
+            <div class="dev-actions">
+              <button class="btn small" id="scrSelf">Share this tab</button>
+              <button class="btn small" id="scrOther">Share another window…</button>
+              <button class="btn small" id="scrStop" hidden>Stop sharing</button>
+            </div>
+            <span class="hint">Sharing this tab points the screen back at itself, like a camera aimed at a TV.</span>
+          </div>
+
+          <div class="dev" id="row-phone" hidden>
+            <div class="qr-wrap" id="qrWrap" hidden>
+              <canvas id="qr" width="128" height="128" aria-label="QR code for connecting your phone"></canvas>
+              <div class="qr-text">
+                <b>Scan with your phone’s camera</b>
+                <span class="hint">Phone and computer both need internet. The code changes each time this page opens.</span>
+                <span class="qr-url" id="qrUrl"></span>
+              </div>
+            </div>
+            <span class="dev-status" id="phoStatus">Getting a connection code…</span>
+            <div class="dev-actions">
+              <button class="btn small" id="phoRetry" hidden>Try again</button>
+              <button class="btn small" id="phoOff" hidden>Disconnect phone</button>
+            </div>
+          </div>
+
+          <div class="ctl">
+            <label for="in2" class="lbl">Mix in a second input</label>
+            <select id="in2"></select>
+          </div>
+          <div class="ctl" id="blendCtl" hidden>
+            <div class="ctl-head"><label for="blend">Blend</label><output id="blendOut" for="blend"></output></div>
+            <input type="range" id="blend" class="bipolar" min="0" max="100" step="1" value="50">
+            <div class="ends"><span>Main input</span><span>Second input</span></div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="size">Input size</label><output id="sizeOut" for="size"></output></div>
+            <input type="range" id="size" min="0" max="100" step="1" value="50">
+            <div class="ends"><span>Small</span><span>Fills the screen</span></div>
+          </div>
+          <div class="ctl" id="motionCtl" hidden>
+            <button class="btn" id="motion" aria-pressed="false"><span class="led"></span>Only movement</button>
+            <span class="hint">Camera, phone, screen and video let in only what moves.</span>
+          </div>
+          <p class="hint">You can also drop a picture or video file onto the screen.</p>
+        </div>
+
+        <div class="group">
+          <h2 id="h-shape">Shape loop A</h2>
+          <div class="ctl">
+            <div class="ctl-head"><label for="zoom">Zoom</label><output id="zoomOut" for="zoom"></output></div>
+            <input type="range" id="zoom" class="bipolar" min="-100" max="100" step="1" value="0">
+            <div class="ends"><span>Out</span><span>In</span></div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="spin">Spin</label><output id="spinOut" for="spin"></output></div>
+            <input type="range" id="spin" class="bipolar" min="-100" max="100" step="1" value="0">
+            <div class="ends"><span>Left</span><span>Right</span></div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="trails">Trails</label><output id="trailsOut" for="trails"></output></div>
+            <input type="range" id="trails" min="0" max="100" step="1" value="88">
+            <div class="ends"><span>Short</span><span>Long</span></div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="color">Color shift</label><output id="colorOut" for="color"></output></div>
+            <input type="range" id="color" min="0" max="100" step="1" value="10">
+            <div class="ends"><span>Off</span><span>Fast</span></div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
+            <input type="range" id="warp" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Wobbly</span></div>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><span class="lbl" id="mirrorLbl">Mirror</span><output id="mirrorOut"></output></div>
+            <div class="seg seg-5" id="mirror" role="group" aria-labelledby="mirrorLbl">
+              <button data-mirror="0" aria-pressed="false">Off</button>
+              <button data-mirror="2" aria-pressed="false">2</button>
+              <button data-mirror="4" aria-pressed="false">4</button>
+              <button data-mirror="6" aria-pressed="false">6</button>
+              <button data-mirror="8" aria-pressed="false">8</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group" aria-labelledby="h-screen">
+        <h2 id="h-screen">Screen</h2>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tv">Old TV look</label><output id="tvOut" for="tv"></output></div>
+          <input type="range" id="tv" min="0" max="100" step="1" value="60">
+          <div class="ends"><span>Clean</span><span>Worn</span></div>
+        </div>
+        <p class="hint">Double-click a slider to put it back where the channel had it.</p>
+      </section>
+
+      <input type="file" id="picFile" accept="image/*" hidden>
+      <input type="file" id="vidFile" accept="video/*" hidden>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants ================= */
+const SIM_W = 768, SIM_H = 576, ASPECT = SIM_W / SIM_H;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+// Inside a Claude artifact the camera, screen sharing and network links are refused, so those inputs hide there.
+const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
+let params;
+try { params = new URLSearchParams(location.search); } catch (_) { params = new URLSearchParams(); }
+
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing' };
+const LIVE = ['video', 'camera', 'screen', 'phone'];
+const DEVICE = ['camera', 'screen', 'phone'];
+
+function loopDefaults() {
+  return { in1: 'wave', in2: 'none', blend: 50, size: 50, motion: false, form: 3,
+           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1 };
+}
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size'];
+const MIX_SLIDERS = ['view', 'xfeed', 'tv'];
+// What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
+const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
+
+const CHANNELS = [
+  { name: 'Tunnel', A: { in1: 'shape', form: 3, zoom: 45, spin: 14, trails: 86, color: 22, blur: -0.12 },
+    sw: 'linear-gradient(90deg,#1b0f3d,#7b3cff 40%,#ff4fa3 70%,#ffcf6b)' },
+  { name: 'Bloom', A: { in1: 'wave', form: 3, zoom: 18, trails: 90, color: 34, warp: 10, mirror: 6, blur: 0.2 },
+    sw: 'radial-gradient(circle at 50% 50%,#fff3b0 0 10%,#ff7ac6 28%,#6a2bd9 55%,#140a2a 85%)' },
+  { name: 'Vortex', A: { in1: 'bars', zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1 },
+    sw: 'conic-gradient(from 20deg,#ff3b3b,#ffd23b,#3bff9a,#3b8bff,#c43bff,#ff3b3b)' },
+  { name: 'Melt', A: { in1: 'picture', zoom: 4, trails: 95, color: 6, warp: 62, mirror: 2, blur: 0.35, shift: [0, -0.0035], gain: 0.9 },
+    sw: 'linear-gradient(180deg,#c0c0c0 0 18%,#c0c000 18% 34%,#00c0c0 34% 52%,#00a000 52% 70%,#a000a0 70% 86%,#a00000 86%)' },
+  { name: 'Lattice', A: { in1: 'shape', form: 2, zoom: -30, spin: 9, trails: 90, color: 18, mirror: 4, edge: 1 },
+    sw: 'repeating-linear-gradient(45deg,#0b2a3a 0 6px,#39d0ff 6px 8px),#0b2a3a' },
+  { name: 'Embers', A: { in1: 'sparks', zoom: 55, spin: -22, trails: 84, color: 9, warp: 28, blur: 0.15, shift: [0, 0.0025] },
+    sw: 'radial-gradient(circle at 25% 70%,#ffcf6b 0 7%,transparent 9%),radial-gradient(circle at 70% 35%,#ff7a3b 0 6%,transparent 8%),radial-gradient(circle at 55% 80%,#ff3b3b 0 5%,transparent 7%),linear-gradient(#2a0d05,#120604)' },
+  { name: 'Echo', A: { in1: 'picture', zoom: 22, spin: 12, trails: 96, color: 4, gain: 0.95 },
+    sw: 'repeating-radial-gradient(circle,#101418 0 5px,#4ad0c8 5px 7px)' },
+  { name: 'Calm', A: { in1: 'wave', form: 2, zoom: 7, spin: 4, trails: 95, color: 5, warp: 14, mirror: 2, blur: 0.35 },
+    sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)' },
+  { name: 'Twins',
+    A: { in1: 'shape', form: 3, zoom: 35, spin: 20, trails: 88, color: 12 },
+    B: { in1: 'wave', form: 3, zoom: -25, spin: -18, trails: 90, color: 26, mirror: 4, edge: 1, blur: 0.1 },
+    xfeed: 40, view: 50,
+    sw: 'linear-gradient(90deg,#ffae3b 0 46%,#0e0d0c 46% 54%,#4fd1c5 54%)' },
+  { name: 'Weave',
+    A: { in1: 'bars', in2: 'wave', blend: 45, zoom: 20, spin: 30, trails: 90, color: 10, mirror: 2 },
+    B: { in1: 'sparks', zoom: 50, spin: -40, trails: 86, color: 18, warp: 30 },
+    xfeed: 65, view: 35,
+    sw: 'repeating-linear-gradient(45deg,rgba(255,174,59,.95) 0 4px,transparent 4px 9px),repeating-linear-gradient(-45deg,rgba(79,209,197,.95) 0 4px,transparent 4px 9px),#101418' },
+];
+
+/* ================= state ================= */
+function mkLoop() { const d = loopDefaults(); return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0 }; }
+const loops = { A: mkLoop(), B: mkLoop() };
+const mixDefaults = { view: 0, xfeed: 0, tv: 60 };
+const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
+let edit = 'A';
+let channel = -1;
+let drift = !reduceMotion;
+let frozen = false;
+let staticAmt = 0;
+
+/* ================= DOM ================= */
+const canvas = $('#screen');
+const stage = $('#stage');
+const bezel = $('#bezel');
+const screenWrap = $('#screenWrap');
+const osd = $('#osd');
+const tip = $('#tip');
+const toastEl = $('#toast');
+const msg = $('#msg');
+
+/* ================= WebGL ================= */
+const gl = canvas.getContext('webgl2', {
+  antialias: false, alpha: false, depth: false, stencil: false,
+  premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance'
+});
+function fail(text) { msg.textContent = text; msg.hidden = false; tip.hidden = true; }
+if (!gl) {
+  fail('This screen needs WebGL 2, and your browser has it turned off or doesn’t support it. Try a current version of Chrome, Edge, Firefox or Safari.');
+  return;
+}
+
+const VS = `#version 300 es
+void main() {
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+const COMMON = `
+const float TAU = 6.28318531;
+mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+vec3 hsv(float h, float s, float v) {
+  vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return v * mix(vec3(1.0), k, s);
+}
+`;
+
+const FS_FEEDBACK = `#version 300 es
+precision highp float;
+uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1;
+uniform vec2 uSim;
+uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
+uniform float uBlend, uScale, uMotion, uXfeed;
+uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
+uniform int uIn1, uIn2;
+uniform vec2 uShift;
+uniform vec4 uBrush;
+uniform vec3 uBrushCol;
+out vec4 o;
+${COMMON}
+float sdSeg(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+vec2 fold(vec2 p, float n) {
+  if (n < 1.0) return p;
+  if (n < 3.0) { p.x = abs(p.x); return p; }
+  if (n < 5.0) return abs(p);
+  float seg = TAU / n;
+  float a = mod(atan(p.y, p.x), seg);
+  a = abs(a - seg * 0.5);
+  return length(p) * vec2(cos(a), sin(a));
+}
+vec3 hueRot(vec3 c, float a) {
+  const vec3 k = vec3(0.57735027);
+  float ca = cos(a);
+  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
+vec3 seedWave(vec2 p, float t) {
+  float A = floor(uForm + 0.5), B = A - 1.0;
+  float R = 0.27, ph = t * 0.5, ph2 = t * 0.17;
+  float d = 1e5;
+  vec2 prev = vec2(sin(ph) * 1.2, sin(ph2)) * R;
+  for (int i = 1; i <= 80; i++) {
+    float u = float(i) / 80.0 * TAU;
+    vec2 q = vec2(sin(A * u + ph) * 1.2, sin(B * u + ph2)) * R;
+    d = min(d, sdSeg(p, prev, q));
+    prev = q;
+  }
+  float w = 0.0045;
+  float g = exp(-d * d / (w * w)) + 0.16 * exp(-d / 0.012);
+  return hsv(fract(t * 0.04), 0.7, 1.0) * g;
+}
+vec3 seedShape(vec2 p, float t) {
+  float n = floor(uForm + 0.5) + 1.0;
+  vec2 q = rot(t * 0.35) * p;
+  float r = 0.17 + 0.025 * sin(t * 1.3);
+  float a = atan(q.x, q.y);
+  float seg = TAU / n;
+  float d = cos(floor(0.5 + a / seg) * seg - a) * length(q) - r;
+  float w = 0.005;
+  float g = exp(-d * d / (w * w)) + 0.14 * exp(-abs(d) / 0.01);
+  return hsv(fract(t * 0.06 + 0.5), 0.65, 1.0) * g;
+}
+vec3 seedBars(vec2 p, float t) {
+  vec2 q = rot(t * 0.12) * p;
+  float band = exp(-q.y * q.y / (0.035 * 0.035));
+  vec3 osc = 0.5 + 0.5 * vec3(sin(q.x * 9.0 + t * 2.1), sin(q.x * 13.0 - t * 1.7 + 2.0), sin(q.x * 6.0 + t * 1.3 + 4.0));
+  osc = pow(osc, vec3(2.5));
+  float len = smoothstep(0.5, 0.35, abs(q.x));
+  return osc * band * len * 1.3;
+}
+vec3 seedSparks(vec2 p, float t) {
+  vec2 g = p * 20.0;
+  vec2 id = floor(g);
+  vec2 f = fract(g) - 0.5;
+  float tb = mod(floor(t * 8.0), 997.0);
+  float on = step(0.955, hash(id + tb * 0.731));
+  vec2 off = (vec2(hash(id + tb * 1.37 + 3.1), hash(id + tb * 2.11 + 7.7)) - 0.5) * 0.6;
+  float d = length(f - off);
+  return hsv(hash(id * 1.7 + tb), 0.55, 1.0) * exp(-d * d / 0.01) * on;
+}
+vec2 edgeMask(vec2 q) { return smoothstep(vec2(0.0), vec2(0.012), q) * smoothstep(vec2(1.0), vec2(0.988), q); }
+vec3 still(sampler2D tex, float asp, vec2 p) {
+  vec2 hs = vec2(0.3 * uScale * asp, 0.3 * uScale);
+  vec2 q = p / (2.0 * hs) + 0.5;
+  vec2 e = edgeMask(q);
+  return texture(tex, clamp(q, 0.0, 1.0)).rgb * e.x * e.y;
+}
+vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p) {
+  vec2 hs = vec2(0.3 * uScale * asp, 0.3 * uScale);
+  vec2 q = p / (2.0 * hs) + 0.5;
+  if (flip > 0.5) q.x = 1.0 - q.x;
+  vec2 e = edgeMask(q);
+  vec2 qc = clamp(q, 0.0, 1.0);
+  vec3 c = texture(cur, qc).rgb;
+  if (uMotion > 0.5) {
+    // Only what changed since the previous frame of this source gets into the loop
+    float d = length(c - texture(prv, qc).rgb);
+    float m = smoothstep(0.07, 0.24, d);
+    c = (c * 1.6 + 0.3 * hsv(fract(uTime * 0.05 + d), 0.8, 1.0)) * m;
+  }
+  return c * e.x * e.y;
+}
+vec3 source(int id, vec2 p) {
+  vec2 g = p / uScale;
+  if (id == 0) return seedWave(g, uTime);
+  if (id == 1) return seedShape(g, uTime);
+  if (id == 2) return seedBars(g, uTime);
+  if (id == 3) return seedSparks(g, uTime);
+  if (id == 4) return still(uPic, uAspPic, p);
+  if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p);
+  if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p);
+  if (id == 7) return live(uScr0, uScr1, uAspScr, 0.0, p);
+  if (id == 8) return live(uPho0, uPho1, uAspPho, uFlipPho, p);
+  return vec3(0.0);
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  float asp = uSim.x / uSim.y;
+  vec2 p = (uv - 0.5) * vec2(asp, 1.0);
+  vec2 pf = fold(p, uMirror);
+
+  // Where this pixel was one frame ago
+  vec2 q = rot(uSpin) * pf * exp(-uZoom);
+  q -= uShift;
+  q += uWarp * vec2(sin(q.y * 7.0 + uTime * 1.1 + sin(q.x * 3.0 + uTime * 0.5)),
+                    cos(q.x * 7.0 - uTime * 0.9 + sin(q.y * 2.0 - uTime * 0.3)));
+  vec2 st = q / vec2(asp, 1.0) + 0.5;
+  float inside = 1.0;
+  if (uEdge > 0.5) {
+    vec2 m = mod(st, 2.0);
+    st = mix(m, 2.0 - m, step(1.0, m));
+  } else {
+    vec2 b = step(vec2(0.0), st) * step(st, vec2(1.0));
+    inside = b.x * b.y;
+  }
+  vec2 px = 1.0 / uSim;
+  vec3 c0 = texture(uPrev, st).rgb;
+  vec3 cb = 0.25 * (texture(uPrev, st + vec2(px.x, 0.0)).rgb + texture(uPrev, st - vec2(px.x, 0.0)).rgb +
+                    texture(uPrev, st + vec2(0.0, px.y)).rgb + texture(uPrev, st - vec2(0.0, px.y)).rgb);
+  vec3 fb = c0 + (cb - c0) * uBlur;
+  // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
+  if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
+  fb = max(hueRot(fb, uHue), 0.0);
+  fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
+
+  vec3 s = source(uIn1, pf);
+  if (uIn2 != 9) {
+    vec3 s2 = source(uIn2, pf);
+    float w1 = min(1.0, 2.0 * (1.0 - uBlend)), w2 = min(1.0, 2.0 * uBlend);
+    s = 1.0 - (1.0 - clamp(s * w1, 0.0, 1.0)) * (1.0 - clamp(s2 * w2, 0.0, 1.0));
+  }
+  s *= uGain;
+
+  float bd = sdSeg(pf, uBrush.xy, uBrush.zw);
+  s += uBrushCol * (exp(-bd * bd / (0.011 * 0.011)) + 0.25 * exp(-bd / 0.02)) * uBrushOn;
+
+  s = clamp(s, 0.0, 1.0);
+  o = vec4(1.0 - (1.0 - fb) * (1.0 - s), 1.0);
+}`;
+
+const FS_COMPOSITE = `#version 300 es
+precision highp float;
+uniform sampler2D uA, uB;
+uniform float uWA, uWB;
+uniform vec2 uSim;
+out vec4 o;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  vec3 a = texture(uA, uv).rgb * uWA;
+  vec3 b = texture(uB, uv).rgb * uWB;
+  o = vec4(1.0 - (1.0 - a) * (1.0 - b), 1.0);
+}`;
+
+const FS_DISPLAY = `#version 300 es
+precision highp float;
+uniform sampler2D uTex;
+uniform vec2 uRes;
+uniform float uTV, uTime, uStatic, uLines;
+out vec4 o;
+${COMMON}
+vec2 barrel(vec2 uv, float k) { vec2 c = uv * 2.0 - 1.0; c *= 1.0 + k * dot(c, c); return c * 0.5 + 0.5; }
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 cuv = barrel(uv, 0.11 * uTV);
+  float line = floor(uv.y * uLines);
+  cuv.x += (hash(vec2(line, floor(uTime * 60.0))) - 0.5) * 0.03 * uStatic;
+  vec2 c = cuv * 2.0 - 1.0;
+  vec2 ca = c * 0.0035 * uTV;
+  vec3 col;
+  col.r = texture(uTex, cuv + ca).r;
+  col.g = texture(uTex, cuv).g;
+  col.b = texture(uTex, cuv - ca).b;
+
+  vec3 g = vec3(0.0);
+  vec2 r1 = vec2(0.004, 0.0053), r2 = vec2(0.009, 0.012);
+  g += texture(uTex, cuv + vec2( r1.x,  r1.y)).rgb + texture(uTex, cuv + vec2(-r1.x,  r1.y)).rgb;
+  g += texture(uTex, cuv + vec2( r1.x, -r1.y)).rgb + texture(uTex, cuv + vec2(-r1.x, -r1.y)).rgb;
+  g += texture(uTex, cuv + vec2( r2.x, 0.0)).rgb + texture(uTex, cuv + vec2(-r2.x, 0.0)).rgb;
+  g += texture(uTex, cuv + vec2(0.0,  r2.y)).rgb + texture(uTex, cuv + vec2(0.0, -r2.y)).rgb;
+  col += g * 0.125 * 0.35 * uTV;
+
+  float scan = 0.5 + 0.5 * cos(cuv.y * uLines * TAU);
+  col *= 1.0 - uTV * 0.42 * (1.0 - scan);
+  float m = mod(floor(gl_FragCoord.x), 3.0);
+  vec3 mask = vec3(m == 0.0 ? 1.0 : 0.7, m == 1.0 ? 1.0 : 0.7, m == 2.0 ? 1.0 : 0.7);
+  col *= mix(vec3(1.0), mask, 0.5 * uTV);
+  col *= 1.0 + 0.45 * uTV;
+  col *= 1.0 - 0.28 * uTV * dot(c * 0.75, c * 0.75);
+  col *= 1.0 - 0.035 * uTV * (0.5 + 0.5 * sin((uv.y + uTime * 0.07) * TAU));
+  col += (hash(gl_FragCoord.xy + fract(uTime * 7.13) * 391.0) - 0.5) * 0.045 * uTV;
+  col = mix(col, vec3(hash(gl_FragCoord.xy * 0.5 + fract(uTime) * 113.0)), uStatic * 0.9);
+  vec2 e = smoothstep(vec2(0.0), vec2(0.006), cuv) * smoothstep(vec2(1.0), vec2(0.994), cuv);
+  col *= e.x * e.y;
+  o = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    const log = gl.getShaderInfoLog(s);
+    console.error(log);
+    throw new Error(log);
+  }
+  return s;
+}
+function program(fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(p)); throw new Error(gl.getProgramInfoLog(p)); }
+  const u = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) {
+    const info = gl.getActiveUniform(p, i);
+    u[info.name] = gl.getUniformLocation(p, info.name);
+  }
+  return { p, u };
+}
+
+let fbProg, compProg, dispProg;
+try {
+  fbProg = program(FS_FEEDBACK);
+  compProg = program(FS_COMPOSITE);
+  dispProg = program(FS_DISPLAY);
+} catch (err) {
+  fail('The screen couldn’t start on this graphics card. Try another browser, or update your graphics drivers.');
+  return;
+}
+
+const U = (prog, name) => prog.u[name] || null;
+function set1f(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1f(l, v); }
+function set2f(prog, name, a, b) { const l = U(prog, name); if (l) gl.uniform2f(l, a, b); }
+function set3f(prog, name, a, b, c) { const l = U(prog, name); if (l) gl.uniform3f(l, a, b, c); }
+function set4f(prog, name, a, b, c, d) { const l = U(prog, name); if (l) gl.uniform4f(l, a, b, c, d); }
+function set1i(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1i(l, v); }
+
+// Texture units for the feedback pass never change, so set them once
+const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1'];
+gl.useProgram(fbProg.p);
+UNITS.forEach((name, i) => set1i(fbProg, name, i));
+gl.useProgram(compProg.p);
+set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1);
+gl.useProgram(dispProg.p);
+set1i(dispProg, 'uTex', 0);
+
+let useFloat = !!gl.getExtension('EXT_color_buffer_float');
+function makeTarget() {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  if (useFloat) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, SIM_W, SIM_H, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, SIM_W, SIM_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  return { tex, fbo, ok };
+}
+function makeAllTargets() {
+  loops.A.rt = [makeTarget(), makeTarget()];
+  loops.B.rt = [makeTarget(), makeTarget()];
+  return makeTarget();
+}
+let comp = makeAllTargets();
+if (useFloat && ![...loops.A.rt, ...loops.B.rt, comp].every((t) => t.ok)) {
+  useFloat = false;
+  comp = makeAllTargets();
+}
+function clearTargets() {
+  gl.clearColor(0, 0, 0, 1);
+  for (const t of [...loops.A.rt, ...loops.B.rt, comp]) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+}
+clearTargets();
+
+function makeSourceTex() {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function uploadTo(tex, src) {
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+}
+
+/* ================= sources ================= */
+// A live source keeps two textures so "Only movement" can compare this frame with the one before.
+class LiveSource {
+  constructor(flip) {
+    this.tex = [makeSourceTex(), makeSourceTex()];
+    this.idx = 0; this.frames = 0; this.video = null; this.stream = null;
+    this.aspect = 16 / 9; this.flip = flip; this.fresh = false; this.rvfc = false; this.lastTime = -1;
+  }
+  attach(video, stream) {
+    this.detach();
+    this.video = video; this.stream = stream || null;
+    this.frames = 0; this.lastTime = -1; this.fresh = true;
+    this.rvfc = 'requestVideoFrameCallback' in video;
+    if (this.rvfc) {
+      const cb = () => { if (this.video !== video) return; this.fresh = true; video.requestVideoFrameCallback(cb); };
+      video.requestVideoFrameCallback(cb);
+    }
+  }
+  detach() {
+    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    if (this.video) { try { this.video.pause(); } catch (_) {} if (this.stream) this.video.srcObject = null; }
+    this.video = null; this.stream = null; this.frames = 0;
+  }
+  get on() { return !!this.video; }
+  update() {
+    const v = this.video;
+    if (!v || v.readyState < 2 || !v.videoWidth) return;
+    const fresh = this.rvfc ? this.fresh : v.currentTime !== this.lastTime;
+    if (!fresh) return;
+    this.fresh = false;
+    this.lastTime = v.currentTime;
+    this.idx = 1 - this.idx;
+    try { uploadTo(this.tex[this.idx], v); this.frames++; } catch (_) {}
+    this.aspect = v.videoWidth / v.videoHeight;
+  }
+  get cur() { return this.tex[this.idx]; }
+  get prev() { return this.tex[1 - this.idx]; }
+}
+const vid = new LiveSource(false);
+const cam = new LiveSource(true);
+const scr = new LiveSource(false);
+const pho = new LiveSource(false);
+const LIVE_SRC = { video: vid, camera: cam, screen: scr, phone: pho };
+
+function mkVideo() {
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.autoplay = true;
+  return v;
+}
+
+/* picture */
+const picTex = makeSourceTex();
+let picAspect = 4 / 3;
+function makeTestCard() {
+  const c = document.createElement('canvas');
+  c.width = 640; c.height = 480;
+  const g = c.getContext('2d');
+  const bw = 640 / 7;
+  const top = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'];
+  const mid = ['#0000c0', '#131313', '#c000c0', '#131313', '#00c0c0', '#131313', '#c0c0c0'];
+  top.forEach((col, i) => { g.fillStyle = col; g.fillRect(Math.floor(i * bw), 0, Math.ceil(bw) + 1, 320); });
+  mid.forEach((col, i) => { g.fillStyle = col; g.fillRect(Math.floor(i * bw), 320, Math.ceil(bw) + 1, 40); });
+  const bot = [['#00214c', 1.25], ['#ffffff', 1.25], ['#32006a', 1.25], ['#131313', 1.25],
+               ['#090909', 1 / 3], ['#131313', 1 / 3], ['#1d1d1d', 1 / 3], ['#131313', 1]];
+  let x = 0;
+  for (const [col, w] of bot) { g.fillStyle = col; g.fillRect(Math.floor(x), 360, Math.ceil(w * bw) + 1, 120); x += w * bw; }
+  g.strokeStyle = 'rgba(255,255,255,.92)';
+  g.lineWidth = 4;
+  g.beginPath(); g.arc(320, 240, 170, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = 2;
+  g.beginPath(); g.moveTo(320, 40); g.lineTo(320, 440); g.moveTo(90, 240); g.lineTo(550, 240); g.stroke();
+  g.fillStyle = '#000'; g.fillRect(196, 216, 248, 48);
+  g.fillStyle = '#fff'; g.font = 'bold 26px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('PHOSPHOR LOOP', 320, 241);
+  return c;
+}
+const testCard = makeTestCard();
+uploadTo(picTex, testCard);
+
+/* ================= helpers ================= */
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+function hsv(h, s, v) {
+  const f = (n) => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [f(5), f(3), f(1)];
+}
+function foldJS(x, y, n) {
+  if (n < 1) return [x, y];
+  if (n < 3) return [Math.abs(x), y];
+  if (n < 5) return [Math.abs(x), Math.abs(y)];
+  const seg = Math.PI * 2 / n;
+  let a = Math.atan2(y, x);
+  a = ((a % seg) + seg) % seg;
+  a = Math.abs(a - seg / 2);
+  const r = Math.hypot(x, y);
+  return [r * Math.cos(a), r * Math.sin(a)];
+}
+function stamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+function randId(n) {
+  const a = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const r = crypto.getRandomValues(new Uint8Array(n));
+  let s = '';
+  for (const x of r) s += a[x % a.length];
+  return s;
+}
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+let toastTimer;
+function toast(text) {
+  toastEl.textContent = text;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.textContent = ''; }, 4500);
+}
+let osdTimer;
+function showOSD(a, b) {
+  osd.querySelector('.osd-a').textContent = a;
+  osd.querySelector('.osd-b').textContent = b;
+  osd.classList.add('on');
+  clearTimeout(osdTimer);
+  osdTimer = setTimeout(() => osd.classList.remove('on'), 2200);
+}
+function burst() { if (!reduceMotion) staticAmt = 1; }
+let tipGone = false;
+function hideTip() {
+  if (tipGone) return;
+  tipGone = true;
+  tip.classList.add('gone');
+  setTimeout(() => { tip.hidden = true; }, 700);
+}
+setTimeout(hideTip, 25000);
+function say(el, html, warn) {
+  el.innerHTML = html;
+  el.classList.toggle('warn', !!warn);
+}
+
+/* ================= UI: channels ================= */
+const chWrap = $('#channels');
+CHANNELS.forEach((c, i) => {
+  const b = document.createElement('button');
+  b.className = 'ch';
+  b.setAttribute('aria-pressed', 'false');
+  b.dataset.ch = i;
+  const key = (i + 1) % 10;
+  b.title = `Channel ${i + 1}: ${c.name} (key ${key})`;
+  b.innerHTML = `<span class="sw" style="--sw:${c.sw}"><b>${key}</b></span><span class="nm">${c.name}</span>`;
+  b.addEventListener('click', () => loadChannel(i));
+  chWrap.appendChild(b);
+});
+
+/* ================= UI: sliders ================= */
+const sliderEls = {}, outputs = {};
+[...LOOP_SLIDERS, ...MIX_SLIDERS].forEach((k) => {
+  const el = $('#' + k);
+  sliderEls[k] = el;
+  outputs[k] = $('#' + k + 'Out');
+  const isMix = MIX_SLIDERS.includes(k);
+  el.addEventListener('input', () => {
+    (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
+    paintSlider(k);
+    if (k === 'view' || k === 'xfeed') syncVisibility();
+  });
+  el.addEventListener('dblclick', () => {
+    const v = (isMix ? mix.base : loops[edit].base)[k];
+    (isMix ? mix.tgt : loops[edit].tgt)[k] = v;
+    el.value = v;
+    paintSlider(k);
+    syncVisibility();
+  });
+});
+function sliderText(k, v) {
+  v = Math.round(v);
+  switch (k) {
+    case 'zoom': return v > 0 ? `IN ${v}` : v < 0 ? `OUT ${-v}` : 'HOLD';
+    case 'spin': return v > 0 ? `RIGHT ${v}` : v < 0 ? `LEFT ${-v}` : 'HOLD';
+    case 'view': {
+      const wA = Math.round(Math.min(1, 2 * (1 - v / 100)) * 100), wB = Math.round(Math.min(1, 2 * v / 100) * 100);
+      return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
+    }
+    case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
+    case 'color': case 'warp': case 'tv': case 'xfeed': return v === 0 ? 'OFF' : String(v);
+    default: return String(v);
+  }
+}
+function paintSlider(k) {
+  const el = sliderEls[k];
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = (v - min) / (max - min) * 100;
+  if (el.classList.contains('bipolar')) {
+    el.style.setProperty('--a', Math.min(50, pct) + '%');
+    el.style.setProperty('--b', Math.max(50, pct) + '%');
+  } else {
+    el.style.setProperty('--a', '0%');
+    el.style.setProperty('--b', pct + '%');
+  }
+  outputs[k].textContent = sliderText(k, v);
+}
+
+/* ================= UI: inputs ================= */
+const in2Sel = $('#in2');
+function buildIn2() {
+  in2Sel.innerHTML = '';
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'],
+                ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone']];
+  for (const [v, label] of opts) {
+    if (inArtifact && DEVICE.includes(v)) continue;
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    in2Sel.appendChild(o);
+  }
+}
+buildIn2();
+if (inArtifact) $$('#inputs [data-device]').forEach((b) => { b.hidden = true; });
+
+$$('#inputs button').forEach((b) => b.addEventListener('click', () => chooseSource('in1', b.dataset.src)));
+in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
+$$('#mirror button').forEach((b) => b.addEventListener('click', () => { loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
+$('#motion').addEventListener('click', () => { const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
+
+function uses(src) { return ['A', 'B'].some((k) => loops[k].tgt.in1 === src || loops[k].tgt.in2 === src); }
+
+// Pick an input for the loop being edited. Devices start right here, inside the click, so the
+// browser treats the camera or screen request as something the person asked for.
+function chooseSource(slot, src) {
+  loops[edit].tgt[slot] = src;
+  if (src === 'camera' && !cam.on) startCamera();
+  if (src === 'screen' && !scr.on) startScreen(true);
+  if (src === 'phone') startPhoneLink();
+  if (src === 'video' && !vid.on) $('#vidFile').click();
+  if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
+  settleDevices();
+  syncUI();
+  if (src !== 'none') showOSD(`INPUT ${edit}`, SRC_LABEL[src].toUpperCase());
+}
+
+// Turn off the camera and screen share when nothing uses them; pause an unused video.
+function settleDevices() {
+  if (!uses('camera') && cam.on) stopCamera();
+  if (!uses('screen') && scr.on) stopScreen();
+  if (vid.video) {
+    if (uses('video') && vid.video.paused && !vidUserPaused) vid.video.play().catch(() => {});
+    if (!uses('video') && !vid.video.paused) vid.video.pause();
+  }
+}
+
+/* ================= UI: loop tabs ================= */
+const editor = $('#editor');
+$('#tabA').addEventListener('click', () => setEdit('A'));
+$('#tabB').addEventListener('click', () => setEdit('B'));
+function setEdit(k) {
+  edit = k;
+  editor.dataset.loop = k;
+  $('#tabA').setAttribute('aria-selected', String(k === 'A'));
+  $('#tabB').setAttribute('aria-selected', String(k === 'B'));
+  $('#h-in').textContent = `What feeds loop ${k}`;
+  $('#h-shape').textContent = `Shape loop ${k}`;
+  syncUI();
+}
+$('#showLoop').addEventListener('click', () => {
+  mix.tgt.view = 50;
+  syncUI();
+});
+function weights(v) { return [Math.min(1, 2 * (1 - v / 100)), Math.min(1, 2 * v / 100)]; }
+function syncVisibility() {
+  const [wA, wB] = weights(mix.tgt.view);
+  for (const [id, w] of [['#visA', wA], ['#visB', wB]]) {
+    const el = $(id);
+    el.classList.toggle('on', w > 0);
+    el.title = w > 0 ? 'On screen' : 'Not on screen';
+    el.setAttribute('aria-label', el.title);
+  }
+  const hidden = (edit === 'A' ? wA : wB) === 0;
+  $('#hiddenHint').hidden = !hidden;
+  $('#hiddenText').textContent = mix.tgt.xfeed > 0
+    ? `Loop ${edit} isn’t on screen, but it still pours in through cross-feed.`
+    : `Loop ${edit} isn’t on screen right now.`;
+}
+
+function syncUI() {
+  const t = loops[edit].tgt;
+  LOOP_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(t[k]); paintSlider(k); });
+  MIX_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(mix.tgt[k]); paintSlider(k); });
+  $$('#inputs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.src === t.in1)));
+  in2Sel.value = t.in2;
+  $('#blendCtl').hidden = t.in2 === 'none';
+  $$('#mirror button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mirror === t.mirror)));
+  $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
+  $$('.ch').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ch === channel)));
+  const usesHere = (s) => t.in1 === s || t.in2 === s;
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone']) $('#row-' + s).hidden = !usesHere(s);
+  $('#motionCtl').hidden = !LIVE.some(usesHere);
+  $('#motion').setAttribute('aria-pressed', String(!!t.motion));
+  syncVisibility();
+}
+
+/* ================= channels & surprise ================= */
+function liveActive(src) {
+  if (src === 'phone') return pho.on;
+  const s = LIVE_SRC[src];
+  return !!(s && s.on);
+}
+function patchLoop(k, p) {
+  const L = loops[k];
+  const keep = liveActive(L.tgt.in1) ? L.tgt.in1 : null;   // a running camera, phone, screen or video stays put
+  const n = { ...loopDefaults(), ...p };
+  if (p.shift) { n.shiftX = p.shift[0]; n.shiftY = p.shift[1]; }
+  delete n.shift;
+  n.motion = L.tgt.motion;
+  if (keep) n.in1 = keep;
+  Object.assign(L.tgt, n);
+  L.base = { ...L.tgt };
+}
+function applyPatch(c) {
+  patchLoop('A', c.A);
+  patchLoop('B', c.B || B_PARTNER);
+  mix.tgt.view = c.view ?? 0;
+  mix.tgt.xfeed = c.xfeed ?? 0;
+  mix.base = { ...mix.tgt };
+  settleDevices();
+}
+function loadChannel(i) {
+  channel = i;
+  applyPatch(CHANNELS[i]);
+  syncUI();
+  burst();
+  showOSD(`CH ${String(i + 1).padStart(2, '0')}`, CHANNELS[i].name.toUpperCase());
+}
+function randomLoop() {
+  const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
+  return {
+    in1: pick(['wave', 'shape', 'bars', 'sparks', 'picture']),
+    form: 2 + Math.floor(Math.random() * 4),
+    zoom,
+    spin: Math.round(rnd(-60, 60)),
+    trails: Math.round(rnd(80, 96)),
+    color: Math.round(Math.pow(Math.random(), 1.4) * 45),
+    warp: Math.round(Math.random() < 0.5 ? rnd(0, 15) : rnd(15, 60)),
+    mirror: pick([0, 0, 2, 4, 6, 8]),
+    blur: +rnd(-0.1, 0.35).toFixed(2),
+    edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
+    shift: Math.random() < 0.3 ? [rnd(-0.003, 0.003), rnd(-0.003, 0.003)] : [0, 0],
+  };
+}
+function surprise() {
+  const both = Math.random() < 0.5;
+  channel = -1;
+  applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xfeed: both ? Math.round(rnd(20, 70)) : 0 });
+  syncUI();
+  burst();
+  showOSD('CH --', 'SURPRISE');
+}
+$('#surprise').addEventListener('click', surprise);
+
+/* ================= transport ================= */
+const freezeBtn = $('#freeze');
+function toggleFreeze(force) {
+  frozen = typeof force === 'boolean' ? force : !frozen;
+  freezeBtn.setAttribute('aria-pressed', String(frozen));
+  if (frozen) showOSD('II', 'FROZEN');
+}
+freezeBtn.addEventListener('click', () => toggleFreeze());
+function clearScreen() { clearTargets(); burst(); }
+$('#clear').addEventListener('click', clearScreen);
+const driftBtn = $('#drift');
+function setDrift(on) { drift = on; driftBtn.setAttribute('aria-pressed', String(on)); }
+setDrift(drift);
+driftBtn.addEventListener('click', () => setDrift(!drift));
+
+const fullBtn = $('#full');
+const fsEnabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+if (!fsEnabled) fullBtn.hidden = true;
+function toggleFS() {
+  if (!fsEnabled) return;
+  const active = document.fullscreenElement || document.webkitFullscreenElement;
+  try {
+    if (active) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else {
+      const r = (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
+      if (r && r.catch) r.catch(() => toast('Full screen isn’t available here.'));
+    }
+  } catch (e) { toast('Full screen isn’t available here.'); }
+}
+fullBtn.addEventListener('click', toggleFS);
+['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
+  const active = document.fullscreenElement || document.webkitFullscreenElement;
+  fullBtn.textContent = active ? 'Exit full screen' : 'Full screen';
+  fit();
+}));
+
+/* ================= picture & video files ================= */
+const picFile = $('#picFile'), vidFile = $('#vidFile');
+$('#pickPic').addEventListener('click', () => picFile.click());
+$('#pickVid').addEventListener('click', () => vidFile.click());
+picFile.addEventListener('change', () => { if (picFile.files[0]) loadFile(picFile.files[0]); picFile.value = ''; });
+vidFile.addEventListener('change', () => { if (vidFile.files[0]) loadFile(vidFile.files[0]); vidFile.value = ''; });
+$('#useCard').addEventListener('click', () => {
+  uploadTo(picTex, testCard);
+  picAspect = 4 / 3;
+  $('#picName').textContent = 'the test card';
+  $('#useCard').hidden = true;
+});
+function downscale(img) {
+  const max = 1024;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const s = Math.min(1, max / Math.max(w, h));
+  if (s === 1) return img;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * s); c.height = Math.round(h * s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+let vidURL = null, vidUserPaused = false;
+const vidPlay = $('#vidPlay');
+vidPlay.addEventListener('click', () => {
+  if (!vid.video) return;
+  if (vid.video.paused) { vidUserPaused = false; vid.video.play().catch(() => {}); }
+  else { vidUserPaused = true; vid.video.pause(); }
+  vidPlay.textContent = vid.video.paused ? 'Play' : 'Pause';
+});
+function feedInto(src) {
+  const t = loops[edit].tgt;
+  if (t.in1 !== src && t.in2 !== src) t.in1 = src;
+  settleDevices();
+  syncUI();
+  showOSD(`INPUT ${edit}`, SRC_LABEL[src].toUpperCase());
+}
+function loadFile(file) {
+  if (!file) return;
+  const type = file.type || '';
+  if (type.startsWith('image/')) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      uploadTo(picTex, downscale(img));
+      picAspect = img.naturalWidth / img.naturalHeight;
+      URL.revokeObjectURL(url);
+      $('#picName').textContent = file.name;
+      $('#useCard').hidden = false;
+      feedInto('picture');
+      toast(`Feeding ${file.name} into loop ${edit}.`);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('That picture couldn’t be opened. Try a JPG or PNG.'); };
+    img.src = url;
+  } else if (type.startsWith('video/')) {
+    const url = URL.createObjectURL(file);
+    const v = mkVideo();
+    v.loop = true;
+    v.src = url;
+    v.addEventListener('loadeddata', () => {
+      if (vidURL) URL.revokeObjectURL(vidURL);
+      vidURL = url;
+      vid.attach(v, null);
+      vidUserPaused = false;
+      say($('#vidStatus'), `<span class="live"></span><b>${escapeHTML(file.name)}</b>`);
+      vidPlay.hidden = false; vidPlay.textContent = 'Pause';
+      feedInto('video');
+      toast(`Feeding ${file.name} into loop ${edit}.`);
+    }, { once: true });
+    v.addEventListener('error', () => { URL.revokeObjectURL(url); toast('That video couldn’t be played here. Try an MP4 or WebM file.'); }, { once: true });
+    v.play().catch(() => {});
+  } else {
+    toast('That file isn’t a picture or video.');
+  }
+}
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+const dropEl = $('#drop');
+let dragDepth = 0;
+stage.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; dropEl.hidden = false; });
+stage.addEventListener('dragover', (e) => { e.preventDefault(); });
+stage.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropEl.hidden = true; });
+stage.addEventListener('drop', (e) => {
+  e.preventDefault(); dragDepth = 0; dropEl.hidden = true;
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+
+/* ================= camera ================= */
+const camStatus = $('#camStatus'), camRetry = $('#camRetry'), camSel = $('#camSel');
+let camStarting = false, camDeviceId = '';
+function camSay(html, warn) { say(camStatus, html, warn); camRetry.hidden = !warn; }
+async function startCamera() {
+  if (cam.on || camStarting) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camSay('This browser won’t share a camera with this page. Open it in <b>Chrome</b> or <b>Edge</b>.', true);
+    return;
+  }
+  camStarting = true;
+  camSay('Waiting for you to allow the camera…');
+  try {
+    const video = camDeviceId
+      ? { deviceId: { exact: camDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      : { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' };
+    const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+    if (!uses('camera')) { stream.getTracks().forEach((t) => t.stop()); camSay('Camera is off.'); return; }
+    const v = mkVideo();
+    v.srcObject = stream;
+    await v.play();
+    cam.attach(v, stream);
+    const track = stream.getVideoTracks()[0];
+    camDeviceId = (track.getSettings && track.getSettings().deviceId) || camDeviceId;
+    track.addEventListener('ended', () => { cam.detach(); camSay('The camera stopped. Press Try again.', true); });
+    camSay('<span class="live"></span><b>Camera is on.</b>');
+    listCameras();
+  } catch (err) {
+    const n = err && err.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') camSay('Camera access was blocked. Click the camera icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
+    else if (n === 'NotFoundError' || n === 'OverconstrainedError') { camDeviceId = ''; camSay('No camera was found. Plug one in, then press Try again.', true); }
+    else if (n === 'NotReadableError' || n === 'AbortError') camSay('Another app is using the camera. Close it, then press Try again.', true);
+    else camSay('The camera couldn’t start. Press Try again.', true);
+  } finally {
+    camStarting = false;
+  }
+}
+function stopCamera() { cam.detach(); camSay('Camera is off.'); }
+async function listCameras() {
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+    camSel.innerHTML = '';
+    devs.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId; o.textContent = d.label || `Camera ${i + 1}`;
+      camSel.appendChild(o);
+    });
+    camSel.value = camDeviceId;
+    camSel.hidden = devs.length < 2;
+  } catch (_) {}
+}
+camSel.addEventListener('change', () => { camDeviceId = camSel.value; cam.detach(); startCamera(); });
+camRetry.addEventListener('click', () => { if (uses('camera')) startCamera(); });
+$('#camOff').addEventListener('click', () => dropSource('camera'));
+
+// Swap a device out of every slot that uses it
+function dropSource(src) {
+  for (const k of ['A', 'B']) {
+    const t = loops[k].tgt;
+    if (t.in1 === src) t.in1 = (channel >= 0 && CHANNELS[channel][k] && !LIVE.includes(CHANNELS[channel][k].in1)) ? CHANNELS[channel][k].in1 : (k === 'A' ? 'wave' : 'shape');
+    if (t.in2 === src) t.in2 = 'none';
+  }
+  settleDevices();
+  syncUI();
+}
+
+/* ================= screen ================= */
+const scrStatus = $('#scrStatus');
+function scrSay(html, warn) { say(scrStatus, html, warn); $('#scrStop').hidden = !scr.on; }
+async function startScreen(thisTab) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    scrSay('This browser can’t share its screen here. Use <b>Chrome</b> or <b>Edge</b> on a computer.', true);
+    return;
+  }
+  scrSay(thisTab ? 'Press <b>Allow</b> (or <b>Share</b>) in the box your browser opened…' : 'Pick a window or screen in the box your browser opened…');
+  const opts = { video: { frameRate: 30 }, audio: false, selfBrowserSurface: 'include', surfaceSwitching: 'include' };
+  if (thisTab) opts.preferCurrentTab = true;
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia(opts);
+    const track = stream.getVideoTracks()[0];
+    // When this tab is shared, crop the capture to the monitor so the loop sees only its own screen
+    let cropped = false;
+    if (window.CropTarget && track.cropTo) {
+      try { await track.cropTo(await CropTarget.fromElement(screenWrap)); cropped = true; } catch (_) {}
+    }
+    if (!uses('screen')) { stream.getTracks().forEach((t) => t.stop()); scrSay('Not sharing.'); return; }
+    const v = mkVideo();
+    v.srcObject = stream;
+    await v.play();
+    scr.attach(v, stream);
+    track.addEventListener('ended', () => { scr.detach(); scrSay('Screen sharing stopped.'); });
+    scrSay(cropped ? '<span class="live"></span><b>The screen is feeding itself.</b>' : '<span class="live"></span><b>Sharing your screen.</b>');
+  } catch (err) {
+    const n = err && err.name;
+    if (n === 'NotAllowedError') scrSay('Screen sharing was cancelled. Pick one of the options below to try again.', true);
+    else scrSay('Screen sharing couldn’t start. Pick one of the options below to try again.', true);
+  }
+}
+function stopScreen() { scr.detach(); scrSay('Not sharing.'); }
+$('#scrSelf').addEventListener('click', () => { scr.detach(); startScreen(true); });
+$('#scrOther').addEventListener('click', () => { scr.detach(); startScreen(false); });
+$('#scrStop').addEventListener('click', () => dropSource('screen'));
+
+/* ================= phone link ================= */
+// Uses the free PeerJS connection service only to introduce the phone and this page;
+// the video itself travels phone-to-computer over WebRTC.
+const SIGNAL_URL = params.get('signal') || 'wss://0.peerjs.com:443/peerjs';
+const ICE = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+] };
+const phoneOK = !inArtifact && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+const phoStatus = $('#phoStatus'), phoRetry = $('#phoRetry'), phoOff = $('#phoOff');
+function phoSay(html, warn) { say(phoStatus, html, warn); phoRetry.hidden = !warn; phoOff.hidden = !pho.on; }
+
+class Signal {
+  constructor(base, id, h) { this.base = base; this.id = id; this.h = h; this.ws = null; this.hb = null; this.closed = false; this.open = false; }
+  connect() {
+    const token = randId(12);
+    let ws;
+    try { ws = new WebSocket(`${this.base}?key=peerjs&id=${encodeURIComponent(this.id)}&token=${token}&version=1.5.5`); }
+    catch (e) { setTimeout(() => this.h.lost && this.h.lost(false), 0); return; }
+    this.ws = ws;
+    ws.onmessage = (e) => {
+      let m;
+      try { m = JSON.parse(e.data); } catch (_) { return; }
+      if (m.type === 'OPEN') { this.open = true; this.h.open && this.h.open(); }
+      else if (m.type === 'ID-TAKEN') this.h.error && this.h.error('id-taken');
+      else if (m.type === 'ERROR') this.h.error && this.h.error('server');
+      else this.h.message && this.h.message(m);
+    };
+    ws.onclose = () => {
+      clearInterval(this.hb);
+      const was = this.open;
+      this.open = false; this.ws = null;
+      if (!this.closed && this.h.lost) this.h.lost(was);
+    };
+    this.hb = setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'HEARTBEAT' })); }, 5000);
+  }
+  send(type, dst, payload) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type, dst, payload })); }
+  close() { this.closed = true; clearInterval(this.hb); if (this.ws) { try { this.ws.close(); } catch (_) {} } }
+}
+
+let sig = null, deskId = null, sigFails = 0;
+let phonePC = null, phonePeer = null, phoneConn = null, phoneCands = [];
+let qrReady = false;
+
+function phoneURL() {
+  const u = new URL('phone.html', location.href);
+  u.search = ''; u.hash = '';
+  u.searchParams.set('id', deskId);
+  if (params.get('signal')) u.searchParams.set('signal', params.get('signal'));
+  return u.toString();
+}
+async function drawQR() {
+  const url = phoneURL();
+  $('#qrUrl').textContent = url;
+  $('#qrWrap').hidden = false;
+  try {
+    if (!window.qrcode) await loadScript('qrcode.js');
+    const qr = window.qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    const n = qr.getModuleCount(), quiet = 3, scale = Math.max(2, Math.floor(256 / (n + quiet * 2)));
+    const c = $('#qr');
+    c.width = c.height = (n + quiet * 2) * scale;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let q = 0; q < n; q++) if (qr.isDark(r, q)) g.fillRect((q + quiet) * scale, (r + quiet) * scale, scale, scale);
+    qrReady = true;
+  } catch (_) {
+    $('#qr').hidden = true;
+    say(phoStatus, 'The QR code couldn’t be drawn (qrcode.js is missing next to this page). Open the address above on your phone instead.', true);
+  }
+}
+function startPhoneLink() {
+  if (!phoneOK) {
+    $('#qrWrap').hidden = true;
+    phoSay(inArtifact
+      ? 'Connecting a phone isn’t available in this preview. Open Phosphor Loop from its own web address.'
+      : 'Connecting a phone works when Phosphor Loop is opened from its web address (https://…), not from a file on your computer.', false);
+    phoRetry.hidden = true;
+    return;
+  }
+  if (sig && !sig.closed) return;
+  if (!deskId) deskId = 'phosphorloop-' + randId(10);
+  if (!pho.on) phoSay('Getting a connection code…');
+  sig = new Signal(SIGNAL_URL, deskId, {
+    open() {
+      sigFails = 0;
+      if (!qrReady) drawQR();
+      if (!pho.on) phoSay('Waiting for your phone…');
+    },
+    message: onPhoneSignal,
+    error(kind) {
+      sig.close(); sig = null;
+      if (kind === 'id-taken') { deskId = null; qrReady = false; startPhoneLink(); }
+      else phoSay('The connection service had a problem. Press Try again.', true);
+    },
+    lost() {
+      sig = null;
+      sigFails++;
+      if (sigFails <= 3) { if (!pho.on) phoSay('Reconnecting to the connection service…'); setTimeout(startPhoneLink, 1500 * sigFails); }
+      else if (!pho.on) phoSay('Couldn’t reach the connection service. Check your internet connection, then press Try again.', true);
+    },
+  });
+  sig.connect();
+}
+function closePhonePC() {
+  if (phonePC) { try { phonePC.close(); } catch (_) {} }
+  phonePC = null; phoneCands = [];
+}
+function phoneGone(text) {
+  closePhonePC();
+  pho.detach();
+  phoSay(text + (qrReady ? ' Scan the code to connect again.' : ''), false);
+}
+async function onPhoneSignal(m) {
+  const p = m.payload || {};
+  if (m.type === 'OFFER') {
+    closePhonePC();
+    phonePeer = m.src; phoneConn = p.connectionId;
+    pho.flip = p.facing === 'user';
+    const pc = new RTCPeerConnection(ICE);
+    phonePC = pc;
+    pc.ontrack = (e) => {
+      const stream = (e.streams && e.streams[0]) || new MediaStream([e.track]);
+      const v = mkVideo();
+      v.srcObject = stream;
+      v.play().catch(() => {});
+      pho.attach(v, stream);
+      phoSay('<span class="live"></span><b>Phone connected.</b> Point it at anything, even this screen.');
+      showOSD('INPUT', 'PHONE');
+      hideTip();
+    };
+    pc.ondatachannel = (e) => {
+      e.channel.onmessage = (ev) => { try { const d = JSON.parse(ev.data); if (d.facing) pho.flip = d.facing === 'user'; } catch (_) {} };
+    };
+    pc.onicecandidate = (e) => { if (e.candidate && sig) sig.send('CANDIDATE', phonePeer, { candidate: e.candidate, type: 'media', connectionId: phoneConn }); };
+    pc.onconnectionstatechange = () => {
+      if (phonePC !== pc) return;
+      const s = pc.connectionState;
+      if (s === 'failed') phoneGone('The phone connection dropped.');
+      else if (s === 'disconnected' && pho.on) phoSay('The phone connection is unsteady…');
+      else if (s === 'connected' && pho.on) phoSay('<span class="live"></span><b>Phone connected.</b> Point it at anything, even this screen.');
+    };
+    try {
+      await pc.setRemoteDescription(p.sdp);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      if (sig) sig.send('ANSWER', phonePeer, { sdp: pc.localDescription, type: 'media', connectionId: phoneConn });
+      for (const c of phoneCands) await pc.addIceCandidate(c).catch(() => {});
+      phoneCands = [];
+      phoSay('Phone found. Starting the picture…');
+    } catch (err) {
+      phoneGone('The phone’s video couldn’t be set up.');
+    }
+  } else if (m.type === 'CANDIDATE') {
+    if (m.src !== phonePeer || p.connectionId !== phoneConn) return;
+    if (phonePC && phonePC.remoteDescription) phonePC.addIceCandidate(p.candidate).catch(() => {});
+    else phoneCands.push(p.candidate);
+  } else if (m.type === 'LEAVE') {
+    if (m.src === phonePeer) phoneGone('Your phone disconnected.');
+  }
+}
+phoRetry.addEventListener('click', () => { sigFails = 0; if (sig) { sig.close(); sig = null; } startPhoneLink(); });
+phoOff.addEventListener('click', () => {
+  if (sig && phonePeer) sig.send('LEAVE', phonePeer, {});
+  phoneGone('Phone disconnected.');
+});
+
+/* ================= painting ================= */
+let painting = false, pCur = null, pPrev = null;
+function pointerToP(e) {
+  const r = canvas.getBoundingClientRect();
+  let u = (e.clientX - r.left) / r.width;
+  let v = 1 - (e.clientY - r.top) / r.height;
+  const k = 0.11 * mix.cur.tv / 100;
+  let cx = u * 2 - 1, cy = v * 2 - 1;
+  const f = 1 + k * (cx * cx + cy * cy);
+  cx *= f; cy *= f;
+  u = cx * 0.5 + 0.5; v = cy * 0.5 + 0.5;
+  return [(u - 0.5) * ASPECT, v - 0.5];
+}
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  painting = true;
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  pCur = pointerToP(e); pPrev = pCur;
+  hideTip();
+  if (frozen) toggleFreeze(false);
+  e.preventDefault();
+});
+canvas.addEventListener('pointermove', (e) => { if (painting) pCur = pointerToP(e); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => canvas.addEventListener(ev, () => { painting = false; }));
+
+/* ================= keyboard ================= */
+window.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = e.target && e.target.tagName;
+  if (tag === 'SELECT' || tag === 'TEXTAREA') return;
+  const onControl = tag === 'BUTTON' || tag === 'INPUT';
+  if (e.key >= '0' && e.key <= '9') { loadChannel(e.key === '0' ? 9 : +e.key - 1); e.preventDefault(); }
+  else if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
+  else if (e.key === 'r' || e.key === 'R') surprise();
+  else if (e.key === 'c' || e.key === 'C') clearScreen();
+  else if (e.key === 'f' || e.key === 'F') toggleFS();
+});
+
+/* ================= saving ================= */
+const snapBtn = $('#snap');
+const recBtn = $('#rec');
+const canRecord = typeof canvas.captureStream === 'function' && typeof window.MediaRecorder !== 'undefined';
+let downloadsNS = null;
+let saveMode = 'none';
+function setSaveUI(mode) {
+  saveMode = mode;
+  snapBtn.hidden = mode === 'none';
+  recBtn.hidden = mode === 'none' || !canRecord;
+}
+if (inArtifact) {
+  window.claude.use('downloads').then((ns) => { downloadsNS = ns; setSaveUI(ns ? 'claude' : 'none'); }, () => setSaveUI('none'));
+} else {
+  setSaveUI('anchor');
+}
+async function offerFile(name, blob) {
+  if (saveMode === 'claude' && downloadsNS) {
+    try {
+      const res = await downloadsNS.save({ filename: name, data: blob });
+      if (res && res.status === 'saved') toast(`Saved ${name}`);
+    } catch (err) {
+      const code = err && err.code;
+      if (code === 'declined') toast('Save cancelled.');
+      else if (code === 'too_large') toast('That clip is too large to save here. Try a shorter recording.');
+      else if (code === 'rate_limited') toast('A save is already waiting for your answer.');
+      else { toast('Saving isn’t available here.'); setSaveUI('none'); }
+    }
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast(`Saved ${name} to your Downloads folder.`);
+}
+let snapPending = false;
+snapBtn.addEventListener('click', () => { snapPending = true; });
+
+let recorder = null, recChunks = [], recStart = 0, recTick = null;
+const REC_LIMIT = 60;
+const recInd = $('#recInd'), recTime = $('#recTime'), recLabel = $('#recLabel');
+function fmt(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function startRec() {
+  let stream;
+  try { stream = canvas.captureStream(30); } catch (e) { toast('Recording isn’t supported in this browser.'); return; }
+  const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  const mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+  try {
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 10000000 } : undefined);
+  } catch (e) { toast('Recording isn’t supported in this browser.'); return; }
+  recChunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+  recorder.onstop = () => {
+    const type = recorder.mimeType || mime || 'video/webm';
+    const ext = type.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(recChunks, { type });
+    stream.getTracks().forEach((t) => t.stop());
+    recorder = null;
+    clearInterval(recTick);
+    recInd.hidden = true;
+    recBtn.setAttribute('aria-pressed', 'false');
+    recLabel.textContent = 'Record';
+    if (blob.size) offerFile(`phosphor-loop-${stamp()}.${ext}`, blob);
+    else toast('Nothing was recorded. Try again.');
+  };
+  recorder.start(250);
+  recStart = performance.now();
+  recInd.hidden = false;
+  recBtn.setAttribute('aria-pressed', 'true');
+  recTime.textContent = '0:00';
+  recLabel.textContent = 'Stop 0:00';
+  recTick = setInterval(() => {
+    const s = (performance.now() - recStart) / 1000;
+    recTime.textContent = fmt(s);
+    recLabel.textContent = `Stop ${fmt(s)}`;
+    if (s >= REC_LIMIT) stopRec();
+  }, 250);
+}
+function stopRec() { if (recorder && recorder.state !== 'inactive') recorder.stop(); }
+recBtn.addEventListener('click', () => { recorder ? stopRec() : startRec(); });
+
+/* ================= sizing ================= */
+const narrowMQ = window.matchMedia('(max-width: 900px)');
+function fit() {
+  const fs = document.fullscreenElement || document.webkitFullscreenElement;
+  const narrow = narrowMQ.matches && !fs;
+  const sr = stage.getBoundingClientRect();
+  const bz = getComputedStyle(bezel);
+  const padX = parseFloat(bz.paddingLeft) + parseFloat(bz.paddingRight);
+  const padY = parseFloat(bz.paddingTop) + parseFloat(bz.paddingBottom);
+  const availW = Math.max(160, sr.width - padX);
+  const availH = narrow ? Math.min(window.innerHeight * 0.62, availW / ASPECT) : Math.max(120, sr.height - padY);
+  const w = Math.floor(Math.min(availW, availH * ASPECT));
+  const h = Math.floor(w / ASPECT);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const cw = Math.max(1, Math.round(w * dpr)), ch = Math.max(1, Math.round(h * dpr));
+  if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+}
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(stage);
+window.addEventListener('resize', fit);
+fit();
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  fail('The graphics card reset the screen. Reload the page to start it again.');
+});
+window.addEventListener('pagehide', () => {
+  cam.detach(); scr.detach();
+  if (sig && phonePeer) sig.send('LEAVE', phonePeer, {});
+});
+
+/* ================= loop ================= */
+const tcEl = $('#tc');
+let tcLast = -1;
+const t0 = performance.now();
+function updateTC(now) {
+  const frames = Math.floor((now - t0) / 40); // 25 frames per second, PAL timecode
+  if (frames === tcLast) return;
+  tcLast = frames;
+  const ff = frames % 25, s = Math.floor(frames / 25) % 60, m = Math.floor(frames / 1500) % 60, h = Math.floor(frames / 90000) % 24;
+  tcEl.textContent = [h, m, s, ff].map((n) => String(n).padStart(2, '0')).join(':');
+}
+
+function resolveSrc(src, motion) {
+  const live = LIVE_SRC[src];
+  if (live && live.frames < (motion ? 2 : 1)) return SRC_ID.none;
+  return SRC_ID[src] ?? SRC_ID.none;
+}
+
+let last = performance.now();
+let simT = 0, driftT = 0;
+
+function runLoop(k, otherTex, xf, brush, f) {
+  const L = loops[k], c = L.cur, t = L.tgt;
+  let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
+  if (drift) {
+    const d = driftT + (k === 'B' ? 37.0 : 0);
+    z += 22 * Math.sin(d * 0.13);
+    s += 26 * Math.sin(d * 0.071 + 1.3);
+    col += 12 * (0.5 + 0.5 * Math.sin(d * 0.05));
+    w += 16 * (0.5 + 0.5 * Math.sin(d * 0.09 + 2.0));
+    sx += 0.0012 * Math.sin(d * 0.11);
+    sy += 0.0012 * Math.cos(d * 0.083);
+  }
+  z = clamp(z, -100, 100); s = clamp(s, -100, 100); col = clamp(col, 0, 100); w = clamp(w, 0, 100);
+  const tr = clamp(c.trails, 0, 100) / 100;
+  const decay60 = 1 - (0.2 - 0.194 * Math.pow(tr, 0.7));
+
+  const src = L.rt[L.front], dst = L.rt[1 - L.front];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, SIM_W, SIM_H);
+  gl.useProgram(fbProg.p);
+  const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev];
+  texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
+
+  set2f(fbProg, 'uSim', SIM_W, SIM_H);
+  set1f(fbProg, 'uTime', simT + (k === 'B' ? 11.0 : 0));
+  set1f(fbProg, 'uZoom', (z / 100) * 0.03 * f);
+  set1f(fbProg, 'uSpin', -(s / 100) * 0.045 * f);
+  set1f(fbProg, 'uDecay', Math.pow(decay60, f));
+  set1f(fbProg, 'uHue', Math.pow(col / 100, 1.5) * 0.08 * f);
+  set1f(fbProg, 'uWarp', (w / 100) * 0.006 * f);
+  set1f(fbProg, 'uMirror', t.mirror);
+  set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
+  set1f(fbProg, 'uEdge', t.edge);
+  set2f(fbProg, 'uShift', sx * f, sy * f);
+  set1f(fbProg, 'uGain', c.gain);
+  set1f(fbProg, 'uForm', t.form);
+  set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
+  set1f(fbProg, 'uXfeed', xf);
+  set1i(fbProg, 'uIn1', resolveSrc(t.in1, t.motion));
+  set1i(fbProg, 'uIn2', t.in2 === 'none' ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
+  set1f(fbProg, 'uScale', Math.pow(2.5, (clamp(c.size, 0, 100) / 100 - 0.5) * 2));
+  set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
+  set1f(fbProg, 'uAspPic', picAspect);
+  set1f(fbProg, 'uAspVid', vid.aspect);
+  set1f(fbProg, 'uAspCam', cam.aspect);
+  set1f(fbProg, 'uAspScr', scr.aspect);
+  set1f(fbProg, 'uAspPho', pho.aspect);
+  set1f(fbProg, 'uFlipCam', cam.flip ? 1 : 0);
+  set1f(fbProg, 'uFlipPho', pho.flip ? 1 : 0);
+  let b = [0, 0, 0, 0], on = 0;
+  if (brush) {
+    let a = foldJS(brush[0][0], brush[0][1], t.mirror);
+    const e = foldJS(brush[1][0], brush[1][1], t.mirror);
+    if (Math.hypot(a[0] - e[0], a[1] - e[1]) > 0.2) a = e;
+    b = [a[0], a[1], e[0], e[1]]; on = 1;
+  }
+  set4f(fbProg, 'uBrush', b[0], b[1], b[2], b[3]);
+  set1f(fbProg, 'uBrushOn', on);
+  const bc = hsv(((simT * 0.15) + (k === 'B' ? 0.5 : 0)) % 1, 0.65, 1);
+  set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  L.front = 1 - L.front;
+}
+
+function frame(now) {
+  const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
+  last = now;
+  const k = 1 - Math.exp(-dt * 5);
+  for (const key of ['A', 'B']) {
+    const L = loops[key];
+    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * k;
+  }
+  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * k;
+  if (!frozen) simT += dt;
+  if (drift && !frozen) driftT += dt;
+  staticAmt = Math.max(0, staticAmt - dt * 3);
+
+  for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update();
+
+  const [wA, wB] = weights(mix.cur.view);
+  const xf = clamp(mix.cur.xfeed, 0, 100) / 100;
+  const f = dt * 60;
+  if (!frozen) {
+    let brush = null;
+    if (painting && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
+    const aPrev = loops.A.rt[loops.A.front].tex;
+    const bPrev = loops.B.rt[loops.B.front].tex;
+    const needA = wA > 0.001 || xf > 0.001;
+    const needB = wB > 0.001 || xf > 0.001;
+    if (needA) runLoop('A', bPrev, xf, wA > 0.01 ? brush : null, f);
+    if (needB) runLoop('B', aPrev, xf, wB > 0.01 ? brush : null, f);
+  }
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
+  gl.viewport(0, 0, SIM_W, SIM_H);
+  gl.useProgram(compProg.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, loops.A.rt[loops.A.front].tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loops.B.rt[loops.B.front].tex);
+  set2f(compProg, 'uSim', SIM_W, SIM_H);
+  set1f(compProg, 'uWA', wA);
+  set1f(compProg, 'uWB', wB);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.useProgram(dispProg.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, comp.tex);
+  set2f(dispProg, 'uRes', canvas.width, canvas.height);
+  set1f(dispProg, 'uTV', clamp(mix.cur.tv, 0, 100) / 100);
+  set1f(dispProg, 'uTime', (now - t0) / 1000);
+  set1f(dispProg, 'uStatic', staticAmt);
+  set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  if (snapPending) {
+    snapPending = false;
+    canvas.toBlob((blob) => { if (blob) offerFile(`phosphor-loop-${stamp()}.png`, blob); }, 'image/png');
+  }
+  updateTC(now);
+  requestAnimationFrame(frame);
+}
+
+/* ================= start ================= */
+const startCh = reduceMotion ? 7 : 0;
+channel = startCh;
+applyPatch(CHANNELS[startCh]);
+for (const key of ['A', 'B']) Object.assign(loops[key].cur, loops[key].tgt);
+Object.assign(mix.cur, mix.tgt);
+setEdit('A');
+showOSD(`CH ${String(startCh + 1).padStart(2, '0')}`, CHANNELS[startCh].name.toUpperCase());
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
