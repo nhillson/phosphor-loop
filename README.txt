@@ -5,6 +5,7 @@ WHAT'S IN THIS FOLDER
   index.html   The workstation. Open this on your computer.
   phone.html   The page your phone opens when you scan the QR code.
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
+  icon-180.png, icon-192.png   Icons for phone and tablet home screens.
 
 YOU CAN JUST DOUBLE-CLICK index.html
 Everything works that way except the phone link: channels, both loops,
@@ -20,7 +21,7 @@ GitHub Pages hosts it for free:
   2. Click the + at the top right, then "New repository".
      Name it phosphor-loop, leave it Public, and click "Create repository".
   3. On the next page, click the "uploading an existing file" link.
-     Drag in index.html, phone.html and qrcode.js (README.txt is optional),
+     Drag in every file from this folder,
      then click "Commit changes".
   4. Click "Settings" (top of the repository), then "Pages" in the left list.
      Under "Build and deployment", set Source to "Deploy from a branch",
@@ -33,8 +34,8 @@ UPDATING YOUR SITE WITH A NEW VERSION
   1. Unzip the new version somewhere you can find it.
   2. Open your repository on github.com (github.com/YOUR-GITHUB-NAME/phosphor-loop).
   3. Click "Add file" (near the green "Code" button), then "Upload files".
-  4. Drag in the new index.html, phone.html and qrcode.js. Files with the
-     same names replace the old ones. Click "Commit changes".
+  4. Drag in the new files. Files with the same names replace the old ones.
+     Click "Commit changes".
   5. Click the "Actions" tab. A run called "pages build and deployment"
      appears. When it shows a green check (usually under a minute), the site
      is updated.
@@ -62,5 +63,10 @@ TIPS
     in directly. Channels 9 (Twins) and 0 (Weave) show it off.
   - Autopilot (next to Surprise me, or the P key) changes the settings slowly
     by itself. Touch any control to take over again.
-  - Keys: 1-9 and 0 channels, Space freeze, R surprise, P autopilot, C clear,
-    F full screen, H hide controls, G guide.
+  - Projector or second screen: press "Output window", drag the new window
+    onto that screen and double-click it to fill it. The controls stay on
+    your laptop. If nothing opens, allow pop-ups for the page.
+  - Neutral (next to Surprise me, or the N key) shows just loop A's input
+    with every effect off. Raise Trails first, then Zoom and Spin.
+  - Keys: 1-9 and 0 channels, Space freeze, N neutral, R surprise,
+    P autopilot, C clear, F full screen, H hide controls, G guide.
