@@ -77,19 +77,27 @@
   /* ---------- main deck ---------- */
   .deck { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
 
-  .monitor { display: flex; flex-direction: column; gap: 14px; padding: 20px; min-height: 0; min-width: 0; }
+  .monitor { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 14px; min-height: 0; min-width: 0; }
   .stage { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
   .stage:fullscreen { background: #000; padding: 0; }
   .stage:-webkit-full-screen { background: #000; }
+  .stage:fullscreen .bezel { padding: 0; border-radius: 0; background: #000; box-shadow: none; }
+  .stage:fullscreen .screen { border-radius: 0; }
+  .stage:-webkit-full-screen .bezel { padding: 0; border-radius: 0; background: #000; box-shadow: none; }
+  .stage:-webkit-full-screen .screen { border-radius: 0; }
+  /* Hide controls: the monitor takes the whole window */
+  .app.bare .deck { grid-template-columns: minmax(0, 1fr); }
+  .app.bare .panel { display: none; }
+  .app.bare .monitor { padding: 12px; }
   .bezel {
-    padding: 16px;
-    border-radius: 22px;
+    padding: 8px;
+    border-radius: 14px;
     background: linear-gradient(160deg, #34302b 0%, #221f1c 45%, #151412 100%);
     box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 0 rgba(0,0,0,.4), 0 24px 50px rgba(0,0,0,.5);
   }
   .screen {
     position: relative; overflow: hidden; line-height: 0;
-    border-radius: 16px / 18px;
+    border-radius: 9px / 10px;
     background: #030303;
     box-shadow: 0 0 0 2px #0a0908, inset 0 0 40px rgba(0,0,0,.9);
   }
@@ -213,6 +221,8 @@
   .seg { display: grid; gap: 6px; }
   .seg-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .seg-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .seg button {
     min-height: 36px; padding: 6px 2px; border-radius: 6px;
     border: 1px solid var(--line); border-bottom-color: #0c0b0a;
@@ -258,6 +268,18 @@
   .dev-status.warn, .dev-status.warn b { color: #ffc98a; }
   .dev-actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .live { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); vertical-align: 1px; }
+  .vcr { display: flex; flex-direction: column; gap: 10px; }
+  .vcr-time { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .vcr-time .tc { font: 19px/1 var(--f-osd); color: var(--amber); font-variant-numeric: tabular-nums; min-width: 4ch; }
+  .vcr-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+  details.adj { border-top: 1px solid var(--line); padding-top: 8px; }
+  details.adj summary {
+    cursor: pointer; font-weight: 600; font-size: 14px; color: var(--dim); list-style-position: inside;
+    padding-block: 4px;
+  }
+  details.adj summary:hover { color: var(--ink); }
+  details.adj[open] summary { color: var(--ink); margin-bottom: 6px; }
+  .adj-body { display: flex; flex-direction: column; gap: 8px; }
   .qr-wrap { display: flex; gap: 12px; align-items: center; }
   .qr-wrap canvas { flex: none; width: 128px; height: 128px; border-radius: 6px; background: #fff; image-rendering: pixelated; }
   .qr-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 14px; }
@@ -315,6 +337,66 @@
   input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--amber); outline-offset: 2px; }
   input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid var(--amber); outline-offset: 2px; }
 
+  /* ---------- top bar guide button ---------- */
+  .top-right { display: flex; align-items: center; gap: 16px; }
+  .guide-btn { min-height: 34px; padding: 5px 14px; gap: 7px; }
+  .guide-btn .q {
+    display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--loop-a); color: #1b1206; font: 700 12px/1 var(--f-body);
+  }
+
+  /* ---------- guide page ---------- */
+  .guide {
+    position: fixed; inset: 0; z-index: 50; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--chassis); color: var(--ink);
+  }
+  .guide-bar {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
+    background: rgba(25, 24, 22, .94); backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+  }
+  .guide-bar .wordmark { font-size: 13px; }
+  .guide-bar .spacer { flex: 1; }
+  .guide-inner { max-width: 880px; margin: 0 auto; padding: 32px 20px calc(56px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 44px; }
+  .guide .g-eyebrow { margin: 0 0 12px; font: 20px/1 var(--f-osd); color: var(--loop-a); letter-spacing: .04em; }
+  .guide h1 { margin: 0; font: 400 clamp(22px, 3.4vw, 32px)/1.25 var(--f-display); letter-spacing: .06em; text-transform: uppercase; text-wrap: balance; }
+  .guide .g-lede { margin: 16px 0 0; font-size: 17px; line-height: 1.55; color: var(--dim); max-width: 62ch; }
+  .guide h2 { margin: 0 0 14px; font: 600 22px/1.2 var(--f-body); text-wrap: balance; }
+  .guide h2 small { font: 11px/1 var(--f-display); letter-spacing: .2em; text-transform: uppercase; color: var(--faint); display: block; margin-bottom: 8px; }
+  .guide h3 { margin: 0; font: 600 16px/1.3 var(--f-body); }
+  .guide p { margin: 0; line-height: 1.55; }
+  .g-flow { margin-top: 22px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .g-node { flex: 1 1 150px; padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+  .g-node b { display: block; font: 19px/1 var(--f-osd); color: var(--loop-a); letter-spacing: .04em; margin-bottom: 4px; }
+  .g-node span { font-size: 14px; color: var(--dim); }
+  .g-arrow { align-self: center; font: 24px/1 var(--f-osd); color: var(--faint); }
+  .g-return { flex-basis: 100%; font: 18px/1 var(--f-osd); color: var(--faint); text-align: center; padding-top: 2px; }
+  .g-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .g-steps li { counter-increment: step; padding: 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--dim); line-height: 1.5; }
+  .g-steps li::before { content: counter(step); display: block; font: 30px/1 var(--f-osd); color: var(--loop-a); margin-bottom: 6px; }
+  .g-steps li b { color: var(--ink); }
+  .g-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .g-card { padding: 16px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .g-card dl, .g-fix { margin: 0; display: grid; gap: 8px; }
+  .g-card dt, .g-fix dt { font-weight: 600; }
+  .g-card dd, .g-fix dd { margin: -6px 0 0; color: var(--dim); line-height: 1.5; }
+  .g-list { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; color: var(--dim); line-height: 1.5; max-width: 66ch; }
+  .g-list b { color: var(--ink); }
+  .g-keys { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 6px 16px; font-size: 14px; color: var(--dim); }
+  .g-keys div { display: flex; gap: 10px; align-items: baseline; }
+  .g-keys kbd { min-width: 64px; text-align: center; font: 13px/1 var(--f-body); color: var(--ink); padding: 4px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--raise); }
+  .g-recipes { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 14px; }
+  .g-recipe { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+  .g-recipe .g-swatch { height: 54px; border-radius: 6px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+  .g-recipe p { color: var(--dim); font-size: 14.5px; }
+  .g-recipe .g-how { font: 17px/1.25 var(--f-osd); color: var(--loop-a); letter-spacing: .02em; }
+  .g-recipe .g-act { margin-top: auto; padding-top: 4px; }
+  .g-recipe .g-act .hint { display: block; }
+  .g-fix { max-width: 70ch; }
+  .g-foot { display: flex; justify-content: center; }
+
   /* ---------- narrow screens ---------- */
   @media (max-width: 900px) {
     html, body { height: auto; }
@@ -325,11 +407,19 @@
     .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding: 20px 16px 32px; }
     .top { padding: 10px 16px; }
     .readout .lines { display: none; }
-    .bezel { padding: 10px; border-radius: 16px; }
+    .top-right { gap: 10px; }
+    .bezel { padding: 6px; border-radius: 12px; }
+  }
+  @media (max-width: 520px) {
+    .top .readout { display: none; }
+    .g-arrow { display: none; }
+    .g-return { text-align: left; }
   }
   @media (max-width: 420px) {
     .wordmark { font-size: 13px; letter-spacing: .16em; }
     .readout { font-size: 18px; }
+    .readout .tc-label { display: none; }
+    .guide-btn { padding-inline: 10px; }
     .transport .btn { padding-inline: 11px; }
     .seg button { font-size: 12.5px; }
   }
@@ -347,8 +437,11 @@
       <span class="guns" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="wordmark">Phosphor Loop</span>
     </div>
-    <div class="readout" aria-hidden="true">
-      <span class="tc-label">TC</span><span id="tc">00:00:00:00</span><span class="lines">· 576 lines</span>
+    <div class="top-right">
+      <div class="readout" aria-hidden="true">
+        <span class="tc-label">TC</span><span id="tc">00:00:00:00</span><span class="lines">· 576 lines</span>
+      </div>
+      <button class="btn guide-btn" id="guideBtn" aria-haspopup="dialog" aria-controls="guide"><span class="q" aria-hidden="true">?</span>Guide</button>
     </div>
   </header>
 
@@ -360,7 +453,7 @@
             <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to paint light."></canvas>
             <div class="osd on" id="osd" aria-hidden="true"><span class="osd-a">CH 01</span><span class="osd-b">TUNNEL</span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
-            <div class="tip" id="tip">Drag on the screen to paint light into the loop</div>
+            <div class="tip" id="tip">Drag on the screen to paint light into the loop. New here? Open the Guide.</div>
             <div class="drop" id="drop" hidden>Drop to feed it into the loop</div>
             <div class="screen-msg" id="msg" hidden></div>
           </div>
@@ -372,12 +465,13 @@
         <button class="btn" id="clear">Clear</button>
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="full">Full screen</button>
+        <button class="btn" id="hideCtl" aria-pressed="false">Hide controls</button>
         <span class="spacer" aria-hidden="true"></span>
         <button class="btn" id="snap" hidden>Save picture</button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd> channels · <kbd>Space</kbd> freeze · <kbd>R</kbd> surprise · <kbd>C</kbd> clear · <kbd>F</kbd> full screen</p>
+        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd> channels · <kbd>Space</kbd> freeze · <kbd>R</kbd> surprise · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -438,9 +532,41 @@
 
           <div class="dev" id="row-video" hidden>
             <span class="dev-status" id="vidStatus">No video chosen yet.</span>
+            <div class="vcr" id="vcr" hidden>
+              <div class="vcr-time">
+                <span class="tc" id="vidTime">0:00</span>
+                <input type="range" id="vidPos" min="0" max="1000" step="1" value="0" aria-label="Position in the video">
+                <span class="tc" id="vidDur">0:00</span>
+              </div>
+              <div class="vcr-keys">
+                <button class="btn small" id="vidStart" title="Jump to the start (or the start of the repeat)">Start</button>
+                <button class="btn small" id="vidBack" title="Back 5 seconds">−5 s</button>
+                <button class="btn small" id="vidPlay">Pause</button>
+                <button class="btn small" id="vidFwd" title="Ahead 5 seconds">+5 s</button>
+              </div>
+              <div class="ctl">
+                <span class="lbl" id="speedLbl">Speed</span>
+                <div class="seg seg-6" id="vidSpeed" role="group" aria-labelledby="speedLbl">
+                  <button data-rate="0.25" aria-pressed="false">¼×</button>
+                  <button data-rate="0.5" aria-pressed="false">½×</button>
+                  <button data-rate="1" aria-pressed="true">1×</button>
+                  <button data-rate="1.5" aria-pressed="false">1½×</button>
+                  <button data-rate="2" aria-pressed="false">2×</button>
+                  <button data-rate="4" aria-pressed="false">4×</button>
+                </div>
+              </div>
+              <div class="ctl">
+                <span class="lbl">Repeat a section</span>
+                <div class="vcr-keys">
+                  <button class="btn small" id="vidIn">Mark start</button>
+                  <button class="btn small" id="vidOut">Mark end</button>
+                  <button class="btn small" id="vidAll" hidden>Whole video</button>
+                </div>
+                <span class="hint" id="vidLoopText">The whole video plays on repeat.</span>
+              </div>
+            </div>
             <div class="dev-actions">
               <button class="btn small" id="pickVid">Choose a video…</button>
-              <button class="btn small" id="vidPlay" hidden>Pause</button>
             </div>
           </div>
 
@@ -544,6 +670,14 @@
       <section class="group" aria-labelledby="h-screen">
         <h2 id="h-screen">Screen</h2>
         <div class="ctl">
+          <span class="lbl" id="shapeLbl">Screen shape</span>
+          <div class="seg seg-3" id="shape" role="group" aria-labelledby="shapeLbl">
+            <button data-shape="fill" aria-pressed="true">Fill the space</button>
+            <button data-shape="tv" aria-pressed="false">4:3 TV</button>
+            <button data-shape="wide" aria-pressed="false">16:9</button>
+          </div>
+        </div>
+        <div class="ctl">
           <div class="ctl-head"><label for="tv">Old TV look</label><output id="tvOut" for="tv"></output></div>
           <input type="range" id="tv" min="0" max="100" step="1" value="60">
           <div class="ends"><span>Clean</span><span>Worn</span></div>
@@ -555,6 +689,118 @@
       <input type="file" id="vidFile" accept="video/*" hidden>
     </aside>
   </main>
+
+  <div class="guide" id="guide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" hidden>
+    <div class="guide-bar">
+      <span class="guns" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="wordmark">Phosphor Loop</span>
+      <span class="spacer"></span>
+      <button class="btn small" id="guideClose">Close guide</button>
+    </div>
+    <div class="guide-inner">
+      <header>
+        <p class="g-eyebrow">QUICK GUIDE · ABOUT 3 MINUTES</p>
+        <h1 id="guideTitle">How to play Phosphor Loop</h1>
+        <p class="g-lede">Video feedback is what happens when a camera films the screen it’s plugged into. Every frame goes back in a little zoomed, turned and tinted, so anything on screen leaves a trail of echoes. Phosphor Loop runs that loop sixty times a second, and you steer it.</p>
+        <div class="g-flow" aria-hidden="true">
+          <div class="g-node"><b>INPUT</b><span>A pattern, picture, video, camera, screen or phone</span></div>
+          <div class="g-arrow">→</div>
+          <div class="g-node"><b>LOOP</b><span>Zoom, spin, warp, fade and tint the last frame</span></div>
+          <div class="g-arrow">→</div>
+          <div class="g-node"><b>SCREEN</b><span>What you see, with an optional old-TV glass</span></div>
+          <div class="g-return">↻ the screen is fed back into the loop sixty times a second</div>
+        </div>
+      </header>
+
+      <section>
+        <h2><small>Start here</small>Your first 30 seconds</h2>
+        <ol class="g-steps">
+          <li><b>Pick a channel.</b> The ten buttons at the top of the controls are ready-made looks. Keys 1 to 9 and 0 work too.</li>
+          <li><b>Drag on the screen.</b> You paint light straight into the loop and watch it echo.</li>
+          <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
+          <li><b>Press Surprise me</b> whenever you want something new.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><small>Reference</small>What the controls do</h2>
+        <div class="g-grid">
+          <div class="g-card"><h3>Channels</h3><dl>
+            <dt>Channels 1 to 0</dt><dd>Ready-made looks. 9 (Twins) and 0 (Weave) use both loops.</dd>
+            <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
+          </dl></div>
+          <div class="g-card"><h3>Mix the two loops</h3><dl>
+            <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
+            <dt>Cross-feed</dt><dd>Pours each loop into the other. Between 30 and 60 they start trading shapes.</dd>
+            <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
+          </dl></div>
+          <div class="g-card"><h3>What feeds the loop</h3><dl>
+            <dt>Wave, Shape, Bars, Sparks</dt><dd>Built-in patterns that need no setup.</dd>
+            <dt>Picture and Video</dt><dd>Your own files. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
+            <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
+            <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
+            <dt>Input size</dt><dd>How big the input sits on screen, up to filling it.</dd>
+            <dt>Only movement</dt><dd>For live inputs and video: only what moves gets in.</dd>
+            <dt>Adjust the picture</dt><dd>Under each picture, video or live input: Tracking (worn-tape wobble), Brightness, Contrast, Color, Cut out dark parts, and Hold this frame.</dd>
+          </dl></div>
+          <div class="g-card"><h3>Shape the loop</h3><dl>
+            <dt>Zoom</dt><dd>In makes a tunnel. Out shrinks the picture into itself.</dd>
+            <dt>Spin</dt><dd>Twists every echo. Small amounts make spirals.</dd>
+            <dt>Trails</dt><dd>How long echoes last. High is dreamy, low is snappy.</dd>
+            <dt>Color shift</dt><dd>Moves each echo a little further round the rainbow.</dd>
+            <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
+            <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
+          </dl></div>
+          <div class="g-card"><h3>Screen and buttons</h3><dl>
+            <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
+            <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
+            <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
+            <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
+            <dt>Full screen and Hide controls</dt><dd>Show only the picture.</dd>
+            <dt>Save picture and Record</dt><dd>Save a still, or up to a minute of video.</dd>
+          </dl></div>
+        </div>
+      </section>
+
+      <section>
+        <h2><small>Hands on</small>Things you can do with the screen</h2>
+        <ul class="g-list">
+          <li><b>Paint</b> by dragging on the screen with a mouse or finger. Paint goes into whichever loops are showing, and Mirror copies every stroke.</li>
+          <li><b>Drop a file</b>, a picture or a video, onto the screen to feed it in.</li>
+          <li><b>Double-click any slider</b> to put it back where the channel had it.</li>
+        </ul>
+        <div class="g-keys">
+          <div><kbd>1 … 0</kbd>Channels</div>
+          <div><kbd>Space</kbd>Freeze</div>
+          <div><kbd>R</kbd>Surprise me</div>
+          <div><kbd>C</kbd>Clear</div>
+          <div><kbd>F</kbd>Full screen</div>
+          <div><kbd>H</kbd>Hide controls</div>
+          <div><kbd>G</kbd>This guide</div>
+          <div><kbd>Esc</kbd>Close the guide</div>
+        </div>
+      </section>
+
+      <section>
+        <h2><small>Recipes</small>Settings worth trying</h2>
+        <p class="g-list-intro">Each recipe sets everything up. Press <b>Try it</b>, then nudge the sliders from there.</p>
+        <div class="g-recipes" id="recipes"></div>
+      </section>
+
+      <section>
+        <h2><small>Troubleshooting</small>If something looks wrong</h2>
+        <dl class="g-fix">
+          <dt>The screen went white</dt><dd>Lower Trails or Color shift a little, or press Clear.</dd>
+          <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
+          <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
+          <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
+          <dt>It’s choppy</dt><dd>Turn the Old TV look down, close other tabs, or choose 4:3 TV as the screen shape.</dd>
+        </dl>
+      </section>
+
+      <p class="g-foot"><button class="btn" id="guideDone">Back to the screen</button></p>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -562,7 +808,9 @@
 'use strict';
 
 /* ================= constants ================= */
-const SIM_W = 768, SIM_H = 576, ASPECT = SIM_W / SIM_H;
+// The picture is always 576 lines tall; its width follows the shape of the screen.
+const SIM_H = 576;
+let simW = 768, simH = SIM_H, simAspect = simW / simH;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -671,6 +919,8 @@ uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, u
 uniform float uBlend, uScale, uMotion, uXfeed;
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
+uniform vec4 uAdjA[9];   // per input: tracking, brightness, contrast, color
+uniform vec4 uAdjB[9];   // per input: cut-out level
 uniform vec2 uShift;
 uniform vec4 uBrush;
 uniform vec3 uBrushCol;
@@ -740,22 +990,50 @@ vec3 seedSparks(vec2 p, float t) {
   return hsv(hash(id * 1.7 + tb), 0.55, 1.0) * exp(-d * d / 0.01) * on;
 }
 vec2 edgeMask(vec2 q) { return smoothstep(vec2(0.0), vec2(0.012), q) * smoothstep(vec2(1.0), vec2(0.988), q); }
-vec3 still(sampler2D tex, float asp, vec2 p) {
+// VHS-style tracking error: a band of torn, noisy lines rolls up the picture, lines jitter sideways
+// and the color smears. Everything else is a plain texture read.
+vec3 sampleSrc(sampler2D tex, vec2 q, int id) {
+  float trk = uAdjA[id].x;
+  if (trk <= 0.0) return texture(tex, clamp(q, 0.0, 1.0)).rgb;
+  float t = uTime;
+  float line = floor(q.y * 240.0);
+  float bandPos = 1.0 - fract(t * (0.04 + 0.12 * trk));
+  float inBand = smoothstep(0.03 + 0.14 * trk, 0.0, abs(q.y - bandPos)) * trk;
+  float jit = (hash(vec2(line, floor(t * 30.0))) - 0.5) * 0.014 * trk
+            + sin(q.y * 23.0 + t * 3.7) * 0.004 * trk
+            + (hash(vec2(line * 1.7, floor(t * 60.0))) - 0.5) * 0.2 * inBand;
+  vec2 qq = clamp(q + vec2(jit, 0.0), 0.0, 1.0);
+  float cs = 0.007 * trk;
+  vec3 c = vec3(texture(tex, clamp(qq + vec2(cs, 0.0), 0.0, 1.0)).r,
+                texture(tex, qq).g,
+                texture(tex, clamp(qq - vec2(cs, 0.0), 0.0, 1.0)).b);
+  float nz = step(0.72, hash(vec2(floor(q.x * 320.0), line + floor(t * 60.0))));
+  return mix(c, vec3(nz), inBand * 0.75);
+}
+vec3 grade(vec3 c, int id) {
+  vec4 a = uAdjA[id];
+  c = (c - 0.5) * (1.0 + a.z) + 0.5 + a.y;                  // contrast, brightness
+  c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 1.0 + a.w);  // color
+  c = clamp(c, 0.0, 1.0);
+  float key = uAdjB[id].x;                                     // cut out dark parts
+  if (key > 0.0) c *= smoothstep(key - 0.06, key + 0.06, dot(c, vec3(0.299, 0.587, 0.114)));
+  return c;
+}
+vec3 still(sampler2D tex, float asp, vec2 p, int id) {
   vec2 hs = vec2(0.3 * uScale * asp, 0.3 * uScale);
   vec2 q = p / (2.0 * hs) + 0.5;
   vec2 e = edgeMask(q);
-  return texture(tex, clamp(q, 0.0, 1.0)).rgb * e.x * e.y;
+  return grade(sampleSrc(tex, q, id), id) * e.x * e.y;
 }
-vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p) {
+vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id) {
   vec2 hs = vec2(0.3 * uScale * asp, 0.3 * uScale);
   vec2 q = p / (2.0 * hs) + 0.5;
   if (flip > 0.5) q.x = 1.0 - q.x;
   vec2 e = edgeMask(q);
-  vec2 qc = clamp(q, 0.0, 1.0);
-  vec3 c = texture(cur, qc).rgb;
+  vec3 c = grade(sampleSrc(cur, q, id), id);
   if (uMotion > 0.5) {
     // Only what changed since the previous frame of this source gets into the loop
-    float d = length(c - texture(prv, qc).rgb);
+    float d = length(c - grade(sampleSrc(prv, q, id), id));
     float m = smoothstep(0.07, 0.24, d);
     c = (c * 1.6 + 0.3 * hsv(fract(uTime * 0.05 + d), 0.8, 1.0)) * m;
   }
@@ -767,11 +1045,11 @@ vec3 source(int id, vec2 p) {
   if (id == 1) return seedShape(g, uTime);
   if (id == 2) return seedBars(g, uTime);
   if (id == 3) return seedSparks(g, uTime);
-  if (id == 4) return still(uPic, uAspPic, p);
-  if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p);
-  if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p);
-  if (id == 7) return live(uScr0, uScr1, uAspScr, 0.0, p);
-  if (id == 8) return live(uPho0, uPho1, uAspPho, uFlipPho, p);
+  if (id == 4) return still(uPic, uAspPic, p, 4);
+  if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5);
+  if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6);
+  if (id == 7) return live(uScr0, uScr1, uAspScr, 0.0, p, 7);
+  if (id == 8) return live(uPho0, uPho1, uAspPho, uFlipPho, p, 8);
   return vec3(0.0);
 }
 void main() {
@@ -928,11 +1206,11 @@ gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
 
 let useFloat = !!gl.getExtension('EXT_color_buffer_float');
-function makeTarget() {
+function makeTarget(w = simW, h = simH) {
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  if (useFloat) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, SIM_W, SIM_H, 0, gl.RGBA, gl.HALF_FLOAT, null);
-  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, SIM_W, SIM_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  if (useFloat) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1005,7 +1283,7 @@ class LiveSource {
   get on() { return !!this.video; }
   update() {
     const v = this.video;
-    if (!v || v.readyState < 2 || !v.videoWidth) return;
+    if (this.hold || !v || v.readyState < 2 || !v.videoWidth) return;
     const fresh = this.rvfc ? this.fresh : v.currentTime !== this.lastTime;
     if (!fresh) return;
     this.fresh = false;
@@ -1173,8 +1451,7 @@ function sliderText(k, v) {
     default: return String(v);
   }
 }
-function paintSlider(k) {
-  const el = sliderEls[k];
+function paintFill(el) {
   const min = +el.min, max = +el.max, v = +el.value;
   const pct = (v - min) / (max - min) * 100;
   if (el.classList.contains('bipolar')) {
@@ -1184,7 +1461,11 @@ function paintSlider(k) {
     el.style.setProperty('--a', '0%');
     el.style.setProperty('--b', pct + '%');
   }
-  outputs[k].textContent = sliderText(k, v);
+}
+function paintSlider(k) {
+  const el = sliderEls[k];
+  paintFill(el);
+  outputs[k].textContent = sliderText(k, +el.value);
 }
 
 /* ================= UI: inputs ================= */
@@ -1290,13 +1571,14 @@ function liveActive(src) {
   const s = LIVE_SRC[src];
   return !!(s && s.on);
 }
-function patchLoop(k, p) {
+function patchLoop(k, p, force) {
   const L = loops[k];
-  const keep = liveActive(L.tgt.in1) ? L.tgt.in1 : null;   // a running camera, phone, screen or video stays put
+  // On channel changes a running camera, phone, screen or video stays put; recipes set everything
+  const keep = !force && liveActive(L.tgt.in1) ? L.tgt.in1 : null;
   const n = { ...loopDefaults(), ...p };
   if (p.shift) { n.shiftX = p.shift[0]; n.shiftY = p.shift[1]; }
   delete n.shift;
-  n.motion = L.tgt.motion;
+  n.motion = p.motion ?? (force ? false : L.tgt.motion);
   if (keep) n.in1 = keep;
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
@@ -1443,7 +1725,11 @@ function loadFile(file) {
       vid.attach(v, null);
       vidUserPaused = false;
       say($('#vidStatus'), `<span class="live"></span><b>${escapeHTML(file.name)}</b>`);
-      vidPlay.hidden = false; vidPlay.textContent = 'Pause';
+      $('#vcr').hidden = false;
+      vidPlay.textContent = 'Pause';
+      vidLoopA = null; vidLoopB = null; loopText();
+      v.playbackRate = vidRate;
+      $('#vidDur').textContent = fmtT(v.duration);
       feedInto('video');
       toast(`Feeding ${file.name} into loop ${edit}.`);
     }, { once: true });
@@ -1465,6 +1751,146 @@ stage.addEventListener('drop', (e) => {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   if (f) loadFile(f);
 });
+
+/* ================= video deck ================= */
+const vidPos = $('#vidPos'), vidTime = $('#vidTime');
+let scrubbing = false, vidLoopA = null, vidLoopB = null, vidRate = 1, vidTxt = '';
+function fmtT(s) {
+  if (!isFinite(s)) s = 0;
+  s = Math.max(0, s);
+  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+}
+function seekTo(t) { const v = vid.video; if (v && isFinite(v.duration)) v.currentTime = clamp(t, 0, Math.max(0, v.duration - 0.05)); }
+function seekBy(d) { const v = vid.video; if (v) seekTo(v.currentTime + d); }
+vidPos.addEventListener('input', () => {
+  const v = vid.video;
+  if (!v || !isFinite(v.duration)) return;
+  scrubbing = true;
+  v.currentTime = (+vidPos.value / 1000) * v.duration;
+  paintFill(vidPos);
+  vidTime.textContent = fmtT(v.currentTime);
+});
+vidPos.addEventListener('change', () => { scrubbing = false; });
+$('#vidStart').addEventListener('click', () => seekTo(vidLoopA ?? 0));
+$('#vidBack').addEventListener('click', () => seekBy(-5));
+$('#vidFwd').addEventListener('click', () => seekBy(5));
+$$('#vidSpeed button').forEach((b) => b.addEventListener('click', () => {
+  vidRate = +b.dataset.rate;
+  if (vid.video) vid.video.playbackRate = vidRate;
+  $$('#vidSpeed button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+}));
+$('#vidIn').addEventListener('click', () => {
+  if (!vid.video) return;
+  vidLoopA = vid.video.currentTime;
+  if (vidLoopB != null && vidLoopB <= vidLoopA + 0.1) vidLoopB = null;
+  loopText();
+});
+$('#vidOut').addEventListener('click', () => {
+  if (!vid.video) return;
+  const t = vid.video.currentTime;
+  if (vidLoopA != null && t <= vidLoopA + 0.1) { toast('Mark the end somewhere after the start.'); return; }
+  vidLoopB = t;
+  seekTo(vidLoopA ?? 0);
+  loopText();
+});
+$('#vidAll').addEventListener('click', () => { vidLoopA = null; vidLoopB = null; loopText(); });
+function loopText() {
+  const has = vidLoopA != null || vidLoopB != null;
+  $('#vidAll').hidden = !has;
+  $('#vidLoopText').textContent = has
+    ? `Repeating ${fmtT(vidLoopA ?? 0)} to ${vidLoopB != null ? fmtT(vidLoopB) : 'the end'}.`
+    : 'The whole video plays on repeat.';
+}
+function vcrTick() {
+  const v = vid.video;
+  if (!v || scrubbing) return;
+  if (vidLoopB != null && v.currentTime >= vidLoopB) v.currentTime = vidLoopA ?? 0;
+  else if (vidLoopA != null && v.currentTime < vidLoopA - 0.25 && !v.seeking) v.currentTime = vidLoopA;
+  if (isFinite(v.duration) && v.duration > 0) {
+    const pos = String(Math.round(v.currentTime / v.duration * 1000));
+    if (vidPos.value !== pos) { vidPos.value = pos; paintFill(vidPos); }
+    const txt = fmtT(v.currentTime);
+    if (txt !== vidTxt) { vidTxt = txt; vidTime.textContent = txt; }
+  }
+}
+paintFill(vidPos);
+
+/* ================= picture adjustments ================= */
+const ADJ_SRC = ['picture', 'video', 'camera', 'screen', 'phone'];
+const ADJ_DEF = [
+  ['tracking', 'Tracking', 0, 100, 'Clean', 'Chewed tape', false],
+  ['bright', 'Brightness', -100, 100, 'Darker', 'Brighter', true],
+  ['contrast', 'Contrast', -100, 100, 'Flatter', 'Punchier', true],
+  ['sat', 'Color', -100, 100, 'Gray', 'Vivid', true],
+  ['key', 'Cut out dark parts', 0, 100, 'Off', 'Only the brightest', false],
+];
+function adjDefaults() { return { tracking: 0, bright: 0, contrast: 0, sat: 0, key: 0 }; }
+const adj = {};
+ADJ_SRC.forEach((src) => { adj[src] = adjDefaults(); });
+const adjEls = [];
+const adjA = new Float32Array(36), adjB = new Float32Array(36);
+function packAdj() {
+  for (const src of ADJ_SRC) {
+    const i = SRC_ID[src] * 4, a = adj[src];
+    adjA[i] = a.tracking / 100;
+    adjA[i + 1] = a.bright / 100 * 0.5;
+    adjA[i + 2] = a.contrast / 100;
+    adjA[i + 3] = a.sat / 100;
+    adjB[i] = a.key / 100 * 0.9;
+  }
+}
+function buildAdjust(src) {
+  const d = document.createElement('details');
+  d.className = 'adj';
+  d.innerHTML = '<summary>Adjust the picture</summary>';
+  const body = document.createElement('div');
+  body.className = 'adj-body';
+  for (const [k, label, min, max, lo, hi, bip] of ADJ_DEF) {
+    const id = `adj-${src}-${k}`;
+    const c = document.createElement('div');
+    c.className = 'ctl';
+    c.innerHTML = `<div class="ctl-head"><label for="${id}">${label}</label><output id="${id}-out" for="${id}"></output></div>` +
+      `<input type="range" id="${id}"${bip ? ' class="bipolar"' : ''} min="${min}" max="${max}" step="1" value="0">` +
+      `<div class="ends"><span>${lo}</span><span>${hi}</span></div>`;
+    body.appendChild(c);
+    const el = c.querySelector('input'), out = c.querySelector('output');
+    const paint = () => {
+      paintFill(el);
+      const v = +el.value;
+      out.textContent = v === 0 ? (bip ? '0' : 'OFF') : (bip && v > 0 ? '+' + v : String(v));
+    };
+    el.addEventListener('input', () => { adj[src][k] = +el.value; paint(); });
+    el.addEventListener('dblclick', () => { el.value = 0; adj[src][k] = 0; paint(); });
+    adjEls.push({ src, k, el, paint });
+    paint();
+  }
+  const actions = document.createElement('div');
+  actions.className = 'dev-actions';
+  if (src !== 'picture') {
+    const hold = document.createElement('button');
+    hold.className = 'btn small';
+    hold.setAttribute('aria-pressed', 'false');
+    hold.innerHTML = '<span class="led"></span>Hold this frame';
+    hold.addEventListener('click', () => {
+      const s = LIVE_SRC[src];
+      s.hold = !s.hold;
+      hold.setAttribute('aria-pressed', String(s.hold));
+    });
+    actions.appendChild(hold);
+  }
+  const reset = document.createElement('button');
+  reset.className = 'btn small';
+  reset.textContent = 'Reset';
+  reset.addEventListener('click', () => { adj[src] = adjDefaults(); syncAdjUI(); });
+  actions.appendChild(reset);
+  body.appendChild(actions);
+  d.appendChild(body);
+  const row = $('#row-' + src);
+  const hintEl = row.querySelector(':scope > .hint');
+  row.insertBefore(d, hintEl || null);
+}
+function syncAdjUI() { adjEls.forEach(({ src, k, el, paint }) => { el.value = adj[src][k]; paint(); }); }
+ADJ_SRC.forEach(buildAdjust);
 
 /* ================= camera ================= */
 const camStatus = $('#camStatus'), camRetry = $('#camRetry'), camSel = $('#camSel');
@@ -1749,7 +2175,7 @@ function pointerToP(e) {
   const f = 1 + k * (cx * cx + cy * cy);
   cx *= f; cy *= f;
   u = cx * 0.5 + 0.5; v = cy * 0.5 + 0.5;
-  return [(u - 0.5) * ASPECT, v - 0.5];
+  return [(u - 0.5) * simAspect, v - 0.5];
 }
 canvas.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -1763,6 +2189,123 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => { if (painting) pCur = pointerToP(e); });
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => canvas.addEventListener(ev, () => { painting = false; }));
 
+/* ================= guide & recipes ================= */
+const RECIPES = [
+  { name: 'Infinite hallway', needs: 'screen',
+    text: 'Share this tab and the screen films itself, like a camera pointed at a TV. Tiny changes to Zoom and Spin make big differences.',
+    how: 'SCREEN · ZOOM IN 12 · SPIN 4 · TRAILS 72',
+    sw: 'repeating-radial-gradient(circle at 50% 50%,#0d0c0b 0 6px,#ffae3b 6px 8px,#0d0c0b 8px 12px)',
+    patch: { A: { in1: 'screen', size: 100, zoom: 12, spin: 4, trails: 72, color: 6 }, tv: 70 } },
+  { name: 'Kaleidoscope painting', after: 'Now drag on the screen.',
+    text: 'A blank loop with an eight-way mirror. Every stroke you draw is copied eight times and slowly drifts outward.',
+    how: 'NOTHING · MIRROR 8 · TRAILS 97 · ZOOM IN 10',
+    sw: 'conic-gradient(from 0deg,#ff4fa3,#ffcf6b,#3bff9a,#3b8bff,#c43bff,#ff4fa3)',
+    patch: { A: { in1: 'none', mirror: 8, trails: 97, zoom: 10, spin: 6, color: 18, blur: 0.1 } }, drift: false },
+  { name: 'Ghost trails', needs: 'camera', after: 'Wave your hands in front of the camera.',
+    text: 'Only moving things get in, so waving your hands leaves glowing smears while the still room disappears.',
+    how: 'CAMERA · ONLY MOVEMENT · SIZE FULL · TRAILS 95',
+    sw: 'radial-gradient(ellipse at 40% 60%,#7cf5ff 0 8%,#3b6bff 22%,#0b0f25 60%)',
+    patch: { A: { in1: 'camera', motion: true, size: 100, trails: 95, zoom: 4, color: 14, blur: 0.2 } } },
+  { name: 'Twin mandala',
+    text: 'Two mirrored loops pour into each other through cross-feed and keep trading shapes.',
+    how: 'A SHAPE · B WAVE · CROSS-FEED 60 · BOTH',
+    sw: 'radial-gradient(circle,#ffae3b 0 12%,transparent 13% 22%,#4fd1c5 23% 30%,transparent 31% 40%,#ffae3b 41% 46%,#141210 47%)',
+    patch: { A: { in1: 'shape', form: 4, mirror: 6, zoom: 22, spin: 10, trails: 90, color: 16 },
+             B: { in1: 'wave', form: 3, mirror: 8, zoom: -18, spin: -12, trails: 92, color: 22, edge: 1 }, xfeed: 60, view: 50 } },
+  { name: 'Chewed tape',
+    text: 'Your video (or the test card) on a worn-out VCR. Tracking errors roll through while the picture melts downward.',
+    how: 'VIDEO · TRACKING 70 · WARP 45 · TRAILS 94',
+    sw: 'linear-gradient(180deg,#c0c0c0 0 20%,#c0c000 20% 35%,#fff 35% 38%,#00c0c0 38% 55%,#00a000 55% 72%,#a000a0 72%)',
+    patch: { A: { in1: 'video', size: 85, warp: 45, trails: 94, zoom: 3, shift: [0, -0.003], blur: 0.25, color: 4 },
+             adj: { video: { tracking: 70 }, picture: { tracking: 70 } }, tv: 85 } },
+  { name: 'Hyperspace',
+    text: 'Sparks rushing past at full zoom. Push Spin either way for a wormhole.',
+    how: 'SPARKS · ZOOM IN 85 · TRAILS 80',
+    sw: 'radial-gradient(circle at 50% 50%,#fff 0 3%,#9fd6ff 6%,#1a2a6c 30%,#05060f 70%)',
+    patch: { A: { in1: 'sparks', zoom: 85, spin: 0, trails: 80, color: 6, blur: 0.1 } } },
+  { name: 'Phone at the monitor', needs: 'phone', after: 'Scan the code, then aim your phone at this screen.',
+    text: 'Aim your phone at this screen for real camera-and-TV feedback. Tilt the phone to twist the spiral.',
+    how: 'PHONE · SIZE FULL · TRAILS 70 · OLD TV 80',
+    sw: 'repeating-conic-gradient(from 0deg at 50% 50%,#1b0f3d 0 10deg,#ff7ac6 10deg 14deg)',
+    patch: { A: { in1: 'phone', size: 100, trails: 70, color: 4 }, tv: 80 } },
+  { name: 'Slow drift',
+    text: 'Calm and slow. Good for leaving on a second screen or a projector while music plays.',
+    how: 'A WAVE · B SHAPE · CROSS-FEED 30 · AUTO-DRIFT',
+    sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)',
+    patch: { A: { in1: 'wave', form: 2, zoom: 6, spin: 3, trails: 96, color: 5, warp: 12, mirror: 2, blur: 0.35 },
+             B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xfeed: 30, view: 50 },
+    drift: true },
+];
+function recipeBlocked(r) {
+  if (!r.needs) return '';
+  if (inArtifact) return 'Needs the downloaded copy or your web address. Camera, screen and phone are turned off in this preview.';
+  if (r.needs === 'phone' && !phoneOK) return 'Needs Phosphor Loop opened from its https:// web address.';
+  if (r.needs === 'screen' && !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) return 'This browser can’t share its screen. Use Chrome or Edge on a computer.';
+  return '';
+}
+const recipeWrap = $('#recipes');
+RECIPES.forEach((r) => {
+  const a = document.createElement('article');
+  a.className = 'g-recipe';
+  const blocked = recipeBlocked(r);
+  a.innerHTML = `<div class="g-swatch" style="--sw:${r.sw}"></div><h3>${r.name}</h3><p>${r.text}</p><p class="g-how">${r.how}</p>` +
+    `<div class="g-act">${blocked ? `<span class="hint">${blocked}</span>` : '<button class="btn small">Try it</button>'}</div>`;
+  const btn = a.querySelector('button');
+  if (btn) btn.addEventListener('click', () => applyRecipe(r));
+  recipeWrap.appendChild(a);
+});
+function applyRecipe(r) {
+  const p = JSON.parse(JSON.stringify(r.patch));
+  if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
+  channel = -1;
+  patchLoop('A', p.A, true);
+  patchLoop('B', p.B || B_PARTNER, true);
+  mix.tgt.view = p.view ?? 0;
+  mix.tgt.xfeed = p.xfeed ?? 0;
+  if (p.tv != null) mix.tgt.tv = p.tv;
+  mix.base = { ...mix.tgt };
+  ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((p.adj && p.adj[src]) || {}) }; });
+  syncAdjUI();
+  if (typeof r.drift === 'boolean') setDrift(r.drift);
+  closeGuide();
+  setEdit('A');
+  // Start any device right here, inside the click, so the browser lets it ask for permission
+  const inp = p.A.in1;
+  if (inp === 'camera' && !cam.on) startCamera();
+  if (inp === 'screen' && !scr.on) startScreen(true);
+  if (inp === 'phone') startPhoneLink();
+  settleDevices();
+  syncUI();
+  burst();
+  showOSD('RECIPE', r.name.toUpperCase());
+  toast(r.after || `Recipe loaded: ${r.name}.`);
+}
+
+const guide = $('#guide');
+let guideReturn = null;
+function openGuide() {
+  if (!guide.hidden) return;
+  guideReturn = document.activeElement;
+  guide.hidden = false;
+  guide.scrollTop = 0;
+  document.documentElement.style.overflow = 'hidden';
+  $('#guideClose').focus();
+}
+function closeGuide() {
+  if (guide.hidden) return;
+  guide.hidden = true;
+  document.documentElement.style.overflow = '';
+  if (guideReturn && guideReturn.focus) guideReturn.focus();
+}
+$('#guideBtn').addEventListener('click', openGuide);
+$('#guideClose').addEventListener('click', closeGuide);
+$('#guideDone').addEventListener('click', closeGuide);
+guide.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeGuide(); }
+  else e.stopPropagation(); // keep channel keys from firing while reading
+});
+if (location.hash === '#guide') openGuide();
+
 /* ================= keyboard ================= */
 window.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1774,6 +2317,8 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'c' || e.key === 'C') clearScreen();
   else if (e.key === 'f' || e.key === 'F') toggleFS();
+  else if (e.key === 'h' || e.key === 'H') toggleBare();
+  else if (e.key === 'g' || e.key === 'G' || e.key === '?') openGuide();
 });
 
 /* ================= saving ================= */
@@ -1861,6 +2406,45 @@ recBtn.addEventListener('click', () => { recorder ? stopRec() : startRec(); });
 
 /* ================= sizing ================= */
 const narrowMQ = window.matchMedia('(max-width: 900px)');
+const SHAPES = { fill: 0, tv: 4 / 3, wide: 16 / 9 };
+let shape = 'fill';
+try { const saved = localStorage.getItem('phosphor-shape'); if (saved && saved in SHAPES) shape = saved; } catch (_) {}
+
+// Rebuild the loop buffers at a new width, stretching the old picture into them so nothing blinks.
+const copyProg = program(`#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uSim;
+out vec4 o;
+void main() { o = vec4(texture(uSrc, gl_FragCoord.xy / uSim).rgb, 1.0); }`);
+gl.useProgram(copyProg.p);
+set1i(copyProg, 'uSrc', 0);
+function copyInto(dst, srcTex) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(copyProg.p);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  set2f(copyProg, 'uSim', simW, simH);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function dropTarget(t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+function resim(aspect) {
+  const w = clamp(Math.round(SIM_H * aspect / 4) * 4, 256, 1600);
+  if (w === simW) return;
+  const oldA = loops.A.rt, oldB = loops.B.rt, oldComp = comp;
+  const frontA = oldA[loops.A.front].tex, frontB = oldB[loops.B.front].tex;
+  simW = w; simAspect = simW / simH;
+  loops.A.rt = [makeTarget(), makeTarget()];
+  loops.B.rt = [makeTarget(), makeTarget()];
+  comp = makeTarget();
+  copyInto(loops.A.rt[0], frontA);
+  copyInto(loops.B.rt[0], frontB);
+  loops.A.front = 0; loops.B.front = 0;
+  [...oldA, ...oldB, oldComp].forEach(dropTarget);
+}
+
+let resimTimer = null, firstFit = true;
 function fit() {
   const fs = document.fullscreenElement || document.webkitFullscreenElement;
   const narrow = narrowMQ.matches && !fs;
@@ -1868,19 +2452,47 @@ function fit() {
   const bz = getComputedStyle(bezel);
   const padX = parseFloat(bz.paddingLeft) + parseFloat(bz.paddingRight);
   const padY = parseFloat(bz.paddingTop) + parseFloat(bz.paddingBottom);
-  const availW = Math.max(160, sr.width - padX);
-  const availH = narrow ? Math.min(window.innerHeight * 0.62, availW / ASPECT) : Math.max(120, sr.height - padY);
-  const w = Math.floor(Math.min(availW, availH * ASPECT));
-  const h = Math.floor(w / ASPECT);
+  const availW = Math.max(160, Math.floor(sr.width - padX));
+  const want = SHAPES[shape];
+  let availH = narrow
+    ? Math.round(want ? Math.min(window.innerHeight * 0.62, availW / want) : window.innerHeight * 0.58)
+    : Math.max(120, Math.floor(sr.height - padY));
+  let w = availW, h = availH;
+  if (want) { w = Math.floor(Math.min(availW, availH * want)); h = Math.floor(w / want); }
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  // Cap the drawing size so a big 4K full screen stays smooth
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(4.5e6 / (w * h)));
   const cw = Math.max(1, Math.round(w * dpr)), ch = Math.max(1, Math.round(h * dpr));
   if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+  const aspect = w / h;
+  clearTimeout(resimTimer);
+  if (firstFit) { firstFit = false; resim(aspect); }
+  else resimTimer = setTimeout(() => resim(aspect), 180);
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(stage);
 window.addEventListener('resize', fit);
 fit();
+
+$$('#shape button').forEach((b) => b.addEventListener('click', () => {
+  shape = b.dataset.shape;
+  try { localStorage.setItem('phosphor-shape', shape); } catch (_) {}
+  syncShapeUI();
+  fit();
+}));
+function syncShapeUI() { $$('#shape button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.shape === shape))); }
+syncShapeUI();
+
+const appEl = $('.app');
+const hideBtn = $('#hideCtl');
+function toggleBare(force) {
+  const bare = typeof force === 'boolean' ? force : !appEl.classList.contains('bare');
+  appEl.classList.toggle('bare', bare);
+  hideBtn.textContent = bare ? 'Show controls' : 'Hide controls';
+  hideBtn.setAttribute('aria-pressed', String(bare));
+  fit();
+}
+hideBtn.addEventListener('click', () => toggleBare());
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   fail('The graphics card reset the screen. Reload the page to start it again.');
@@ -1929,12 +2541,12 @@ function runLoop(k, otherTex, xf, brush, f) {
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
-  gl.viewport(0, 0, SIM_W, SIM_H);
+  gl.viewport(0, 0, simW, simH);
   gl.useProgram(fbProg.p);
   const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
 
-  set2f(fbProg, 'uSim', SIM_W, SIM_H);
+  set2f(fbProg, 'uSim', simW, simH);
   set1f(fbProg, 'uTime', simT + (k === 'B' ? 11.0 : 0));
   set1f(fbProg, 'uZoom', (z / 100) * 0.03 * f);
   set1f(fbProg, 'uSpin', -(s / 100) * 0.045 * f);
@@ -1961,6 +2573,9 @@ function runLoop(k, otherTex, xf, brush, f) {
   set1f(fbProg, 'uAspPho', pho.aspect);
   set1f(fbProg, 'uFlipCam', cam.flip ? 1 : 0);
   set1f(fbProg, 'uFlipPho', pho.flip ? 1 : 0);
+  const la = U(fbProg, 'uAdjA[0]'), lb = U(fbProg, 'uAdjB[0]');
+  if (la) gl.uniform4fv(la, adjA);
+  if (lb) gl.uniform4fv(lb, adjB);
   let b = [0, 0, 0, 0], on = 0;
   if (brush) {
     let a = foldJS(brush[0][0], brush[0][1], t.mirror);
@@ -1990,6 +2605,8 @@ function frame(now) {
   staticAmt = Math.max(0, staticAmt - dt * 3);
 
   for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update();
+  vcrTick();
+  packAdj();
 
   const [wA, wB] = weights(mix.cur.view);
   const xf = clamp(mix.cur.xfeed, 0, 100) / 100;
@@ -2006,11 +2623,11 @@ function frame(now) {
   }
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
-  gl.viewport(0, 0, SIM_W, SIM_H);
+  gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, loops.A.rt[loops.A.front].tex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loops.B.rt[loops.B.front].tex);
-  set2f(compProg, 'uSim', SIM_W, SIM_H);
+  set2f(compProg, 'uSim', simW, simH);
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
   gl.drawArrays(gl.TRIANGLES, 0, 3);

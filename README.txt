@@ -29,6 +29,19 @@ GitHub Pages hosts it for free:
        https://YOUR-GITHUB-NAME.github.io/phosphor-loop/
      Bookmark it. That's Phosphor Loop, and anyone can open it there.
 
+UPDATING YOUR SITE WITH A NEW VERSION
+  1. Unzip the new version somewhere you can find it.
+  2. Open your repository on github.com (github.com/YOUR-GITHUB-NAME/phosphor-loop).
+  3. Click "Add file" (near the green "Code" button), then "Upload files".
+  4. Drag in the new index.html, phone.html and qrcode.js. Files with the
+     same names replace the old ones. Click "Commit changes".
+  5. Click the "Actions" tab. A run called "pages build and deployment"
+     appears. When it shows a green check (usually under a minute), the site
+     is updated.
+  6. Open your web address and press Ctrl+F5 (Ctrl+Shift+R also works) to
+     skip the browser's saved copy. On the phone, close the tab and scan the
+     code again. GitHub can keep serving the old copy for up to 10 minutes.
+
 USING YOUR PHONE AS AN INPUT
   1. On the computer, open your https:// address in Chrome or Edge.
   2. Under "What feeds loop A", click Phone. A QR code appears.
@@ -40,8 +53,11 @@ other, then the video goes phone-to-computer directly (or through PeerJS's
 relay if your network blocks direct links). Nothing is recorded.
 
 TIPS
+  - Press the Guide button (top right) or G for a tour of every control and
+    eight one-click recipes.
   - Share this tab (Screen input) or aim the phone at the monitor for
     classic "camera pointed at the TV" feedback.
   - Loop B and Cross-feed: slide "What you see" to Both, then raise
     Cross-feed. Channels 9 (Twins) and 0 (Weave) show it off.
-  - Keys: 1-9 and 0 channels, Space freeze, R surprise, C clear, F full screen.
+  - Keys: 1-9 and 0 channels, Space freeze, R surprise, C clear, F full screen,
+    H hide controls, G guide.
