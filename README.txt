@@ -54,6 +54,9 @@ other, then the video goes phone-to-computer directly (or through PeerJS's
 relay if your network blocks direct links). Nothing is recorded.
 
 TIPS
+  - Stop white-outs (under Screen, on by default) eases off the trails,
+    inputs and feeds when the picture starts turning white, and clears a
+    loop that stays solid white. Turn it off to allow white-outs on purpose.
   - My presets: set up a look, press "Save current look" and name it. Presets
     stay in this browser on this device (another browser or computer won't
     see them). Save under the same name to update one.

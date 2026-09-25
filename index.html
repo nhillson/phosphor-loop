@@ -778,7 +778,7 @@
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="size">Input size</label><output id="sizeOut" for="size"></output></div>
-            <input type="range" id="size" min="0" max="100" step="1" value="50">
+            <input type="range" id="size" min="0" max="100" step="1" value="100">
             <div class="ends"><span>Small</span><span>Fills the screen</span></div>
           </div>
           <div class="ctl" id="motionCtl" hidden>
@@ -843,6 +843,10 @@
           <div class="ctl-head"><label for="tv">Old TV look</label><output id="tvOut" for="tv"></output></div>
           <input type="range" id="tv" min="0" max="100" step="1" value="60">
           <div class="ends"><span>Clean</span><span>Worn</span></div>
+        </div>
+        <div class="ctl">
+          <button class="btn" id="guardBtn" aria-pressed="true"><span class="led"></span>Stop white-outs</button>
+          <span class="hint" id="guardState">Watches for the picture turning white and eases off the trails, inputs and feeds until it recovers.</span>
         </div>
         <p class="hint">Double-click a slider to put it back where the channel had it.</p>
       </section>
@@ -928,6 +932,7 @@
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
+            <dt>Stop white-outs</dt><dd>On by default. When the picture starts filling up with white, it eases off the trails, input brightness and loop feeds, then lets go slowly. A loop stuck at solid white gets cleared, and Autopilot moves on to a new look. Turn it off if you want white-outs as an effect.</dd>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
@@ -970,7 +975,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Lower Trails or Color shift a little, or press Clear.</dd>
+          <dt>The screen went white</dt><dd>Stop white-outs (under Screen) usually catches this within a second or two, so check that it’s on. Otherwise lower Trails or Input size a little, or press Clear.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
@@ -1007,7 +1012,7 @@ const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that ca
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { in1: 'wave', in2: 'none', blend: 50, size: 50, motion: false, form: 3,
+  return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3,
            zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1 };
 }
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
@@ -1021,17 +1026,17 @@ const CHANNELS = [
     sw: 'linear-gradient(90deg,#1b0f3d,#7b3cff 40%,#ff4fa3 70%,#ffcf6b)' },
   { name: 'Bloom', A: { in1: 'wave', form: 3, zoom: 18, trails: 90, color: 34, warp: 10, mirror: 6, blur: 0.2 },
     sw: 'radial-gradient(circle at 50% 50%,#fff3b0 0 10%,#ff7ac6 28%,#6a2bd9 55%,#140a2a 85%)' },
-  { name: 'Vortex', A: { in1: 'bars', zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1 },
+  { name: 'Vortex', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1 },
     sw: 'conic-gradient(from 20deg,#ff3b3b,#ffd23b,#3bff9a,#3b8bff,#c43bff,#ff3b3b)' },
-  { name: 'Melt', A: { in1: 'picture', zoom: 4, trails: 95, color: 6, warp: 62, mirror: 2, blur: 0.35, shift: [0, -0.0035], gain: 0.9 },
+  { name: 'Melt', A: { in1: 'picture', size: 50, zoom: 4, trails: 95, color: 6, warp: 62, mirror: 2, blur: 0.35, shift: [0, -0.0035], gain: 0.9 },
     sw: 'linear-gradient(180deg,#c0c0c0 0 18%,#c0c000 18% 34%,#00c0c0 34% 52%,#00a000 52% 70%,#a000a0 70% 86%,#a00000 86%)' },
   { name: 'Lattice', A: { in1: 'shape', form: 2, zoom: -30, spin: 9, trails: 90, color: 18, mirror: 4, edge: 1 },
     sw: 'repeating-linear-gradient(45deg,#0b2a3a 0 6px,#39d0ff 6px 8px),#0b2a3a' },
   { name: 'Embers', A: { in1: 'sparks', zoom: 55, spin: -22, trails: 84, color: 9, warp: 28, blur: 0.15, shift: [0, 0.0025] },
     sw: 'radial-gradient(circle at 25% 70%,#ffcf6b 0 7%,transparent 9%),radial-gradient(circle at 70% 35%,#ff7a3b 0 6%,transparent 8%),radial-gradient(circle at 55% 80%,#ff3b3b 0 5%,transparent 7%),linear-gradient(#2a0d05,#120604)' },
-  { name: 'Echo', A: { in1: 'picture', zoom: 22, spin: 12, trails: 96, color: 4, gain: 0.95 },
+  { name: 'Echo', A: { in1: 'picture', size: 50, zoom: 22, spin: 12, trails: 96, color: 4, gain: 0.95 },
     sw: 'repeating-radial-gradient(circle,#101418 0 5px,#4ad0c8 5px 7px)' },
-  { name: 'Calm', A: { in1: 'wave', form: 2, zoom: 7, spin: 4, trails: 95, color: 5, warp: 14, mirror: 2, blur: 0.35 },
+  { name: 'Calm', A: { in1: 'wave', size: 50, form: 2, zoom: 7, spin: 4, trails: 95, color: 5, warp: 14, mirror: 2, blur: 0.35 },
     sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)' },
   { name: 'Twins',
     A: { in1: 'shape', form: 3, zoom: 35, spin: 20, trails: 88, color: 12 },
@@ -1099,7 +1104,7 @@ precision highp float;
 uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev;
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
-uniform float uBlend, uScale, uMotion, uXfeed;
+uniform float uBlend, uScale, uMotion, uXfeed, uKnee;
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
 uniform vec4 uAdjA[11];  // per input: tracking, brightness, contrast, color
@@ -1265,6 +1270,7 @@ void main() {
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   fb = max(hueRot(fb, uHue), 0.0);
+  fb = fb / (1.0 + uKnee * fb);   // washout guard: squeezes the brightest parts most
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec3 s = source(uIn1, pf);
@@ -1798,8 +1804,9 @@ function loadChannel(i) {
 }
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'picture']);
   return {
-    in1: pick(['wave', 'shape', 'bars', 'sparks', 'picture']),
+    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : 100,
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2095,6 +2102,7 @@ function apScene() {
     if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
   }
   if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
+  if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
   if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) { sc.size = Math.round(rnd(60, 100)); sc.motion = Math.random() < 0.35; }
   return sc;
 }
@@ -2744,7 +2752,7 @@ const RECIPES = [
     text: 'Calm and slow. Good for leaving on a second screen or a projector while music plays.',
     how: 'A WAVE · B SHAPE · BOTH FEEDS 30 · AUTO-DRIFT',
     sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)',
-    patch: { A: { in1: 'wave', form: 2, zoom: 6, spin: 3, trails: 96, color: 5, warp: 12, mirror: 2, blur: 0.35 },
+    patch: { A: { in1: 'wave', size: 50, form: 2, zoom: 6, spin: 3, trails: 96, color: 5, warp: 12, mirror: 2, blur: 0.35 },
              B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xab: 30, xba: 30, view: 50 },
     drift: true },
   { name: 'Hands-free show', autopilot: true, after: 'Autopilot is on. Leave it running, or touch any control to take over.',
@@ -2764,7 +2772,7 @@ const RECIPES = [
     text: 'Loop A is fed straight into loop B as its input, so B spins A’s picture into a whirlpool while A stays calm.',
     how: 'B INPUT: LOOP A · B SPIN 35 · BOTH ON SCREEN',
     sw: 'linear-gradient(90deg,#ffae3b 0 40%,#4fd1c5)',
-    patch: { A: { in1: 'bars', zoom: 10, spin: 0, trails: 88, color: 8 },
+    patch: { A: { in1: 'bars', size: 50, zoom: 10, spin: 0, trails: 88, color: 8 },
              B: { in1: 'loop', size: 42, zoom: 30, spin: 35, trails: 93, color: 18, mirror: 2 }, view: 50 } },
 ];
 function recipeBlocked(r) {
@@ -3216,6 +3224,94 @@ function toggleBare(force) {
 }
 hideBtn.addEventListener('click', () => toggleBare());
 
+/* ================= washout guard ================= */
+// Feedback piles brightness on brightness, so long trails, big inputs and strong feeds can drift
+// to solid white. This samples each loop and the mixed picture at 32 x 18 points a few times a
+// second. When too much of it is near white, the guard eases off the trails, input brightness and
+// feeds and squeezes the highlights, then lets go slowly so the picture doesn't pump.
+const MEAS_W = 32, MEAS_H = 18;
+const measTarget = (() => {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, MEAS_W, MEAS_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fbo };
+})();
+const measBuf = new Uint8Array(MEAS_W * MEAS_H * 4);
+const MEAS_ORDER = ['A', 'comp', 'B', 'comp'];
+let measTick = 0;
+const bright = { A: { mean: 0, white: 0 }, B: { mean: 0, white: 0 }, comp: { mean: 0, white: 0 } };
+const guard = { on: true, A: 0, B: 0, stuckA: 0, stuckB: 0 };
+try { if (localStorage.getItem('phosphor-guard') === 'off') guard.on = false; } catch (_) {}
+function measure(key, tex) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, measTarget.fbo);
+  gl.viewport(0, 0, MEAS_W, MEAS_H);
+  gl.useProgram(copyProg.p);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  set2f(copyProg, 'uSim', MEAS_W, MEAS_H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.readPixels(0, 0, MEAS_W, MEAS_H, gl.RGBA, gl.UNSIGNED_BYTE, measBuf);
+  let sum = 0, white = 0;
+  for (let i = 0; i < measBuf.length; i += 4) {
+    const l = (0.299 * measBuf[i] + 0.587 * measBuf[i + 1] + 0.114 * measBuf[i + 2]) / 255;
+    sum += l;
+    if (l > 0.88) white++;
+  }
+  const n = MEAS_W * MEAS_H;
+  bright[key].mean = sum / n;
+  bright[key].white = white / n;
+}
+function overAmount(b) { return clamp(Math.max((b.white - 0.22) / 0.35, (b.mean - 0.58) / 0.3), 0, 1); }
+function updateGuard(dt, wA, wB, now) {
+  for (const k of ['A', 'B']) {
+    if (!guard.on) { guard[k] = 0; continue; }
+    const own = bright[k];
+    let over = overAmount(own);
+    // The mixed picture can wash out even when neither loop does on its own
+    if ((k === 'A' ? wA : wB) > 0 && own.mean > 0.3) over = Math.max(over, overAmount(bright.comp));
+    if (over > 0) guard[k] = Math.min(1, guard[k] + dt * (0.35 + 1.4 * over));
+    else guard[k] = Math.max(0, guard[k] - dt * 0.1);
+    // Still solid white with the guard all the way on: wipe that loop and let it rebuild
+    const stuck = 'stuck' + k;
+    if (guard[k] > 0.95 && own.mean > 0.9 && own.white > 0.8) {
+      guard[stuck] += dt;
+      if (guard[stuck] > 2.5) {
+        guard[stuck] = 0;
+        clearLoop(k);
+        bright[k].mean = 0; bright[k].white = 0;
+        burst();
+        if (ap.on) ap.next = Math.min(ap.next, now + 1500);
+      }
+    } else guard[stuck] = 0;
+  }
+  guardText();
+}
+const guardBtn = $('#guardBtn'), guardState = $('#guardState');
+let guardShown = '';
+function guardText() {
+  let t;
+  if (!guard.on) t = 'Off. The picture is free to wash out to white.';
+  else {
+    const a = guard.A > 0.15, b = guard.B > 0.15;
+    t = a && b ? 'Easing off loops A and B right now.' : a ? 'Easing off loop A right now.' : b ? 'Easing off loop B right now.'
+      : 'Watches for the picture turning white and eases off the trails, inputs and feeds until it recovers.';
+  }
+  if (t !== guardShown) { guardShown = t; guardState.textContent = t; }
+}
+function setGuard(on) {
+  guard.on = on;
+  guardBtn.setAttribute('aria-pressed', String(on));
+  try { localStorage.setItem('phosphor-guard', on ? 'on' : 'off'); } catch (_) {}
+  guardText();
+}
+guardBtn.addEventListener('click', () => setGuard(!guard.on));
+setGuard(guard.on);
+
 /* ================= output window ================= */
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
 // at that window's resolution, so the controls can stay on this screen.
@@ -3359,7 +3455,8 @@ function runLoop(k, xf, brush, f) {
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
   const ramp = tr >= 0.1 ? 1 : (tr / 0.1) * (tr / 0.1) * (3 - 2 * tr / 0.1);
-  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp;
+  const G = guard.on ? guard[k] : 0;
+  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp * (1 - 0.14 * G);
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -3379,10 +3476,11 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
-  set1f(fbProg, 'uGain', c.gain * gainBoost);
+  set1f(fbProg, 'uGain', c.gain * gainBoost * (1 - 0.5 * G));
+  set1f(fbProg, 'uKnee', 0.35 * G);
   set1f(fbProg, 'uForm', t.form);
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
-  set1f(fbProg, 'uXfeed', xf);
+  set1f(fbProg, 'uXfeed', xf * (1 - 0.6 * G));
   set1i(fbProg, 'uIn1', resolveSrc(t.in1, t.motion));
   set1i(fbProg, 'uIn2', t.in2 === 'none' ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
@@ -3458,6 +3556,15 @@ function frame() {
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // Washout guard: look at one of loop A, loop B or the mixed picture every few frames
+  if (guard.on && !frozen && ++measTick % 4 === 0) {
+    const key = MEAS_ORDER[(measTick / 4) % MEAS_ORDER.length];
+    const L = loops[key];
+    const busy = key === 'comp' || (key === 'A' ? (wA > 0.001 || mix.cur.xab > 0.1) : (wB > 0.001 || mix.cur.xba > 0.1));
+    if (busy) measure(key, key === 'comp' ? comp.tex : L.rt[L.front].tex);
+  }
+  updateGuard(dt, wA, wB, now);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
