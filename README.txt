@@ -57,7 +57,10 @@ TIPS
     eight one-click recipes.
   - Share this tab (Screen input) or aim the phone at the monitor for
     classic "camera pointed at the TV" feedback.
-  - Loop B and Cross-feed: slide "What you see" to Both, then raise
-    Cross-feed. Channels 9 (Twins) and 0 (Weave) show it off.
-  - Keys: 1-9 and 0 channels, Space freeze, R surprise, C clear, F full screen,
-    H hide controls, G guide.
+  - Loop B: slide "What you see" to Both, then raise "Feed A into B" and/or
+    "Feed B into A". Or pick "Loop A's picture" as loop B's input to feed it
+    in directly. Channels 9 (Twins) and 0 (Weave) show it off.
+  - Autopilot (next to Surprise me, or the P key) changes the settings slowly
+    by itself. Touch any control to take over again.
+  - Keys: 1-9 and 0 channels, Space freeze, R surprise, P autopilot, C clear,
+    F full screen, H hide controls, G guide.

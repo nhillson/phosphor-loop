@@ -218,6 +218,7 @@
   .ch[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a), 0 0 14px rgba(255,174,59,.18); }
   .ch[aria-pressed="true"] .sw::before { background: transparent; }
 
+  .ch-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .seg { display: grid; gap: 6px; }
   .seg-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -288,6 +289,13 @@
   .ctl { display: grid; gap: 2px; }
   .ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .ctl-head label, .ctl-head .lbl { font-weight: 600; font-size: 15px; }
+  .mini {
+    display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 3px; vertical-align: 1px;
+    font: 400 16px/1 var(--f-osd); color: #111;
+  }
+  .mini.a { background: var(--loop-a); }
+  .mini.b { background: var(--loop-b); }
+  #inputs button[data-src="loop"] { grid-column: 1 / -1; }
   .ctl-head output { font-family: var(--f-osd); font-size: 19px; line-height: 1; color: var(--amber); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); letter-spacing: .02em; }
   .ctl select { margin-top: 4px; }
@@ -471,7 +479,7 @@
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd> channels · <kbd>Space</kbd> freeze · <kbd>R</kbd> surprise · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd> channels · <kbd>Space</kbd> freeze · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -482,7 +490,10 @@
       <section class="group" aria-labelledby="h-ch">
         <h2 id="h-ch">Channels</h2>
         <div class="channels" id="channels"></div>
-        <button class="btn wide" id="surprise">Surprise me</button>
+        <div class="ch-actions">
+          <button class="btn" id="surprise">Surprise me</button>
+          <button class="btn" id="autopilot" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
+        </div>
       </section>
 
       <section class="group" aria-labelledby="h-mix">
@@ -493,11 +504,16 @@
           <div class="ends"><span>Loop A</span><span>Both</span><span>Loop B</span></div>
         </div>
         <div class="ctl">
-          <div class="ctl-head"><label for="xfeed">Cross-feed</label><output id="xfeedOut" for="xfeed"></output></div>
-          <input type="range" id="xfeed" min="0" max="100" step="1" value="0">
-          <div class="ends"><span>Off</span><span>Tangled</span></div>
+          <div class="ctl-head"><label for="xab">Feed <span class="mini a">A</span> into <span class="mini b">B</span></label><output id="xabOut" for="xab"></output></div>
+          <input type="range" id="xab" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Strong</span></div>
         </div>
-        <p class="hint">Cross-feed pours each loop into the other, so their shapes start to trade places.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="xba">Feed <span class="mini b">B</span> into <span class="mini a">A</span></label><output id="xbaOut" for="xba"></output></div>
+          <input type="range" id="xba" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Strong</span></div>
+        </div>
+        <p class="hint">Each feed pours one loop’s picture into the other loop’s trails. Turn both up and the loops trade shapes. You can also choose the other loop as an input below.</p>
       </section>
 
       <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
@@ -520,6 +536,12 @@
             <button data-src="camera" aria-pressed="false" data-device>Camera</button>
             <button data-src="screen" aria-pressed="false" data-device>Screen</button>
             <button data-src="phone" aria-pressed="false" data-device>Phone</button>
+            <button data-src="loop" aria-pressed="false" id="loopSrcBtn">Loop B’s picture</button>
+          </div>
+
+          <div class="dev" id="row-loop" hidden>
+            <span class="dev-status" id="loopStatus">Loop B’s picture is feeding loop A.</span>
+            <span class="hint">Input size 50 lines it up with the screen. Smaller makes a picture inside the picture; bigger zooms in.</span>
           </div>
 
           <div class="dev" id="row-picture" hidden>
@@ -622,7 +644,7 @@
           </div>
           <div class="ctl" id="motionCtl" hidden>
             <button class="btn" id="motion" aria-pressed="false"><span class="led"></span>Only movement</button>
-            <span class="hint">Camera, phone, screen and video let in only what moves.</span>
+            <span class="hint">For camera, phone, screen, video and the other loop: only what moves gets in.</span>
           </div>
           <p class="hint">You can also drop a picture or video file onto the screen.</p>
         </div>
@@ -718,7 +740,7 @@
           <li><b>Pick a channel.</b> The ten buttons at the top of the controls are ready-made looks. Keys 1 to 9 and 0 work too.</li>
           <li><b>Drag on the screen.</b> You paint light straight into the loop and watch it echo.</li>
           <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
-          <li><b>Press Surprise me</b> whenever you want something new.</li>
+          <li><b>Press Surprise me</b> for something new, or <b>Autopilot</b> to let it run by itself.</li>
         </ol>
       </section>
 
@@ -728,16 +750,18 @@
           <div class="g-card"><h3>Channels</h3><dl>
             <dt>Channels 1 to 0</dt><dd>Ready-made looks. 9 (Twins) and 0 (Weave) use both loops.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
+            <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Touch any control and you’re back in charge.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
-            <dt>Cross-feed</dt><dd>Pours each loop into the other. Between 30 and 60 they start trading shapes.</dd>
+            <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
             <dt>Wave, Shape, Bars, Sparks</dt><dd>Built-in patterns that need no setup.</dd>
             <dt>Picture and Video</dt><dd>Your own files. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
+            <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
             <dt>Input size</dt><dd>How big the input sits on screen, up to filling it.</dd>
             <dt>Only movement</dt><dd>For live inputs and video: only what moves gets in.</dd>
@@ -773,6 +797,7 @@
           <div><kbd>1 … 0</kbd>Channels</div>
           <div><kbd>Space</kbd>Freeze</div>
           <div><kbd>R</kbd>Surprise me</div>
+          <div><kbd>P</kbd>Autopilot</div>
           <div><kbd>C</kbd>Clear</div>
           <div><kbd>F</kbd>Full screen</div>
           <div><kbd>H</kbd>Hide controls</div>
@@ -819,9 +844,9 @@ const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
 let params;
 try { params = new URLSearchParams(location.search); } catch (_) { params = new URLSearchParams(); }
 
-const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing' };
-const LIVE = ['video', 'camera', 'screen', 'phone'];
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
+const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
@@ -830,7 +855,7 @@ function loopDefaults() {
 }
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
 const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size'];
-const MIX_SLIDERS = ['view', 'xfeed', 'tv'];
+const MIX_SLIDERS = ['view', 'xab', 'xba', 'tv'];
 // What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
 
@@ -854,19 +879,19 @@ const CHANNELS = [
   { name: 'Twins',
     A: { in1: 'shape', form: 3, zoom: 35, spin: 20, trails: 88, color: 12 },
     B: { in1: 'wave', form: 3, zoom: -25, spin: -18, trails: 90, color: 26, mirror: 4, edge: 1, blur: 0.1 },
-    xfeed: 40, view: 50,
+    xab: 40, xba: 40, view: 50,
     sw: 'linear-gradient(90deg,#ffae3b 0 46%,#0e0d0c 46% 54%,#4fd1c5 54%)' },
   { name: 'Weave',
     A: { in1: 'bars', in2: 'wave', blend: 45, zoom: 20, spin: 30, trails: 90, color: 10, mirror: 2 },
     B: { in1: 'sparks', zoom: 50, spin: -40, trails: 86, color: 18, warp: 30 },
-    xfeed: 65, view: 35,
+    xab: 70, xba: 45, view: 35,
     sw: 'repeating-linear-gradient(45deg,rgba(255,174,59,.95) 0 4px,transparent 4px 9px),repeating-linear-gradient(-45deg,rgba(79,209,197,.95) 0 4px,transparent 4px 9px),#101418' },
 ];
 
 /* ================= state ================= */
 function mkLoop() { const d = loopDefaults(); return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0 }; }
 const loops = { A: mkLoop(), B: mkLoop() };
-const mixDefaults = { view: 0, xfeed: 0, tv: 60 };
+const mixDefaults = { view: 0, xab: 0, xba: 0, tv: 60 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
 let edit = 'A';
 let channel = -1;
@@ -913,14 +938,14 @@ vec3 hsv(float h, float s, float v) {
 
 const FS_FEEDBACK = `#version 300 es
 precision highp float;
-uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1;
+uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev;
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
-uniform vec4 uAdjA[9];   // per input: tracking, brightness, contrast, color
-uniform vec4 uAdjB[9];   // per input: cut-out level
+uniform vec4 uAdjA[11];  // per input: tracking, brightness, contrast, color
+uniform vec4 uAdjB[11];  // per input: cut-out level
 uniform vec2 uShift;
 uniform vec4 uBrush;
 uniform vec3 uBrushCol;
@@ -1025,8 +1050,8 @@ vec3 still(sampler2D tex, float asp, vec2 p, int id) {
   vec2 e = edgeMask(q);
   return grade(sampleSrc(tex, q, id), id) * e.x * e.y;
 }
-vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id) {
-  vec2 hs = vec2(0.3 * uScale * asp, 0.3 * uScale);
+vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, float base) {
+  vec2 hs = vec2(base * uScale * asp, base * uScale);
   vec2 q = p / (2.0 * hs) + 0.5;
   if (flip > 0.5) q.x = 1.0 - q.x;
   vec2 e = edgeMask(q);
@@ -1046,10 +1071,12 @@ vec3 source(int id, vec2 p) {
   if (id == 2) return seedBars(g, uTime);
   if (id == 3) return seedSparks(g, uTime);
   if (id == 4) return still(uPic, uAspPic, p, 4);
-  if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5);
-  if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6);
-  if (id == 7) return live(uScr0, uScr1, uAspScr, 0.0, p, 7);
-  if (id == 8) return live(uPho0, uPho1, uAspPho, uFlipPho, p, 8);
+  if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
+  if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);
+  if (id == 7) return live(uScr0, uScr1, uAspScr, 0.0, p, 7, 0.3);
+  if (id == 8) return live(uPho0, uPho1, uAspPho, uFlipPho, p, 8, 0.3);
+  // The other loop's picture: at the default size it lines up exactly with the screen
+  if (id == 10) return live(uOther, uOtherPrev, uSim.x / uSim.y, 0.0, p, 10, 0.5);
   return vec3(0.0);
 }
 void main() {
@@ -1197,7 +1224,7 @@ function set4f(prog, name, a, b, c, d) { const l = U(prog, name); if (l) gl.unif
 function set1i(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1i(l, v); }
 
 // Texture units for the feedback pass never change, so set them once
-const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1'];
+const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev'];
 gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
 gl.useProgram(compProg.p);
@@ -1425,11 +1452,13 @@ const sliderEls = {}, outputs = {};
   outputs[k] = $('#' + k + 'Out');
   const isMix = MIX_SLIDERS.includes(k);
   el.addEventListener('input', () => {
+    if (k !== 'tv') takeOver();
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     paintSlider(k);
-    if (k === 'view' || k === 'xfeed') syncVisibility();
+    if (k === 'view' || k === 'xab' || k === 'xba') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
+    if (k !== 'tv') takeOver();
     const v = (isMix ? mix.base : loops[edit].base)[k];
     (isMix ? mix.tgt : loops[edit].tgt)[k] = v;
     el.value = v;
@@ -1447,7 +1476,7 @@ function sliderText(k, v) {
       return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
     }
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
-    case 'color': case 'warp': case 'tv': case 'xfeed': return v === 0 ? 'OFF' : String(v);
+    case 'color': case 'warp': case 'tv': case 'xab': case 'xba': return v === 0 ? 'OFF' : String(v);
     default: return String(v);
   }
 }
@@ -1473,7 +1502,7 @@ const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
   const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'],
-                ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone']];
+                ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if (inArtifact && DEVICE.includes(v)) continue;
     const o = document.createElement('option');
@@ -1486,14 +1515,15 @@ if (inArtifact) $$('#inputs [data-device]').forEach((b) => { b.hidden = true; })
 
 $$('#inputs button').forEach((b) => b.addEventListener('click', () => chooseSource('in1', b.dataset.src)));
 in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
-$$('#mirror button').forEach((b) => b.addEventListener('click', () => { loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
-$('#motion').addEventListener('click', () => { const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
+$$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver(); loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
+$('#motion').addEventListener('click', () => { takeOver(); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
 
 function uses(src) { return ['A', 'B'].some((k) => loops[k].tgt.in1 === src || loops[k].tgt.in2 === src); }
 
 // Pick an input for the loop being edited. Devices start right here, inside the click, so the
 // browser treats the camera or screen request as something the person asked for.
 function chooseSource(slot, src) {
+  takeOver();
   loops[edit].tgt[slot] = src;
   if (src === 'camera' && !cam.on) startCamera();
   if (src === 'screen' && !scr.on) startScreen(true);
@@ -1502,7 +1532,7 @@ function chooseSource(slot, src) {
   if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
-  if (src !== 'none') showOSD(`INPUT ${edit}`, SRC_LABEL[src].toUpperCase());
+  if (src !== 'none') showOSD(`INPUT ${edit}`, src === 'loop' ? `LOOP ${edit === 'A' ? 'B' : 'A'}` : SRC_LABEL[src].toUpperCase());
 }
 
 // Turn off the camera and screen share when nothing uses them; pause an unused video.
@@ -1529,6 +1559,7 @@ function setEdit(k) {
   syncUI();
 }
 $('#showLoop').addEventListener('click', () => {
+  takeOver();
   mix.tgt.view = 50;
   syncUI();
 });
@@ -1543,8 +1574,10 @@ function syncVisibility() {
   }
   const hidden = (edit === 'A' ? wA : wB) === 0;
   $('#hiddenHint').hidden = !hidden;
-  $('#hiddenText').textContent = mix.tgt.xfeed > 0
-    ? `Loop ${edit} isn’t on screen, but it still pours in through cross-feed.`
+  const other = edit === 'A' ? 'B' : 'A';
+  const feedsOther = (edit === 'A' ? mix.tgt.xab : mix.tgt.xba) > 0 || [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop');
+  $('#hiddenText').textContent = feedsOther
+    ? `Loop ${edit} isn’t on screen, but it still feeds loop ${other}.`
     : `Loop ${edit} isn’t on screen right now.`;
 }
 
@@ -1559,7 +1592,11 @@ function syncUI() {
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
   $$('.ch').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ch === channel)));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop']) $('#row-' + s).hidden = !usesHere(s);
+  const otherK = edit === 'A' ? 'B' : 'A';
+  $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
+  $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
+  in2Sel.querySelector('option[value="loop"]').textContent = `Loop ${otherK}’s picture`;
   $('#motionCtl').hidden = !LIVE.some(usesHere);
   $('#motion').setAttribute('aria-pressed', String(!!t.motion));
   syncVisibility();
@@ -1587,11 +1624,13 @@ function applyPatch(c) {
   patchLoop('A', c.A);
   patchLoop('B', c.B || B_PARTNER);
   mix.tgt.view = c.view ?? 0;
-  mix.tgt.xfeed = c.xfeed ?? 0;
+  mix.tgt.xab = c.xab ?? 0;
+  mix.tgt.xba = c.xba ?? 0;
   mix.base = { ...mix.tgt };
   settleDevices();
 }
 function loadChannel(i) {
+  takeOver();
   channel = i;
   applyPatch(CHANNELS[i]);
   syncUI();
@@ -1615,14 +1654,112 @@ function randomLoop() {
   };
 }
 function surprise() {
+  takeOver();
   const both = Math.random() < 0.5;
   channel = -1;
-  applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xfeed: both ? Math.round(rnd(20, 70)) : 0 });
+  applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xab: both ? Math.round(rnd(0, 70)) : 0, xba: both ? Math.round(rnd(0, 70)) : 0 });
   syncUI();
   burst();
   showOSD('CH --', 'SURPRISE');
 }
 $('#surprise').addEventListener('click', surprise);
+
+/* ================= autopilot ================= */
+// Every 20-40 seconds the hidden loop gets a new look, then the view glides over to it,
+// sometimes resting on both loops at once. The loop on screen keeps drifting in between.
+const ap = { on: false, next: 0 };
+const apBtn = $('#autopilot');
+function setAutopilot(on, quiet) {
+  ap.on = on;
+  apBtn.setAttribute('aria-pressed', String(on));
+  if (on) {
+    setDrift(true);
+    channel = -1;
+    ap.next = performance.now() + 7000;
+    syncUI();
+    if (!quiet) {
+      showOSD('AUTOPILOT', 'ON');
+      toast('Autopilot is on. It changes a little at a time. Touch any control to take over.');
+    }
+  } else {
+    settleDevices();
+    if (!quiet) showOSD('AUTOPILOT', 'OFF');
+  }
+}
+function takeOver() {
+  if (!ap.on) return;
+  setAutopilot(false, true);
+  toast('Autopilot off. You’re steering now.');
+}
+apBtn.addEventListener('click', () => setAutopilot(!ap.on));
+
+function apPool() {
+  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'picture', 'loop'];
+  if (vid.on) pool.push('video', 'video');
+  for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
+  return pool;
+}
+function apScene() {
+  const pool = apPool();
+  let sc;
+  if (Math.random() < 0.45) {
+    // Start from one of the channels and vary it
+    const c = pick(CHANNELS);
+    sc = { ...((c.B && Math.random() < 0.5) ? c.B : c.A) };
+    sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12), -60, 80));
+    sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15), -70, 70));
+    sc.color = Math.round(clamp((sc.color ?? 10) + rnd(-6, 10), 0, 45));
+    if (Math.random() < 0.35) sc.in1 = pick(pool);
+    if (sc.in2 && !pool.includes(sc.in2)) sc.in2 = 'none';
+  } else {
+    const zoom = Math.round(Math.random() < 0.25 ? rnd(-40, -10) : rnd(5, 60));
+    sc = {
+      in1: pick(pool), form: 2 + Math.floor(Math.random() * 4), zoom,
+      spin: Math.round(rnd(-45, 45)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 32)),
+      warp: Math.round(Math.random() < 0.6 ? rnd(0, 15) : rnd(15, 45)),
+      mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
+      edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
+    };
+    if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
+  }
+  if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
+  if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) { sc.size = Math.round(rnd(60, 100)); sc.motion = Math.random() < 0.35; }
+  return sc;
+}
+function clearLoop(k) {
+  gl.clearColor(0, 0, 0, 1);
+  for (const t of loops[k].rt) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.clear(gl.COLOR_BUFFER_BIT); }
+}
+function nudge(k) {
+  const t = loops[k].tgt;
+  t.zoom = Math.round(clamp(t.zoom + rnd(-15, 15), -60, 80));
+  t.spin = Math.round(clamp(t.spin + rnd(-15, 15), -70, 70));
+  t.color = Math.round(clamp(t.color + rnd(-8, 8), 0, 45));
+  t.warp = Math.round(clamp(t.warp + rnd(-10, 10), 0, 50));
+}
+function apStep(now) {
+  ap.next = now + rnd(22000, 38000);
+  const v = mix.tgt.view;
+  if (v <= 1 || v >= 99) {
+    const hidden = v <= 1 ? 'B' : 'A', shown = hidden === 'A' ? 'B' : 'A';
+    const sc = apScene();
+    // Two loops that only feed on each other fade to black, so one of them keeps a real input
+    if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) sc.in1 = 'wave';
+    patchLoop(hidden, sc, true);
+    const L = loops[hidden];
+    for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+    clearLoop(hidden);
+    nudge(shown);
+    mix.tgt.view = Math.random() < 0.4 ? 50 : (hidden === 'B' ? 100 : 0);
+  } else {
+    mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
+    nudge('A'); nudge('B');
+  }
+  mix.tgt.xab = Math.random() < 0.5 ? 0 : Math.round(rnd(10, 55));
+  mix.tgt.xba = Math.random() < 0.5 ? 0 : Math.round(rnd(10, 55));
+  if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
+  syncUI();
+}
 
 /* ================= transport ================= */
 const freezeBtn = $('#freeze');
@@ -1816,7 +1953,7 @@ function vcrTick() {
 paintFill(vidPos);
 
 /* ================= picture adjustments ================= */
-const ADJ_SRC = ['picture', 'video', 'camera', 'screen', 'phone'];
+const ADJ_SRC = ['picture', 'video', 'camera', 'screen', 'phone', 'loop'];
 const ADJ_DEF = [
   ['tracking', 'Tracking', 0, 100, 'Clean', 'Chewed tape', false],
   ['bright', 'Brightness', -100, 100, 'Darker', 'Brighter', true],
@@ -1828,7 +1965,7 @@ function adjDefaults() { return { tracking: 0, bright: 0, contrast: 0, sat: 0, k
 const adj = {};
 ADJ_SRC.forEach((src) => { adj[src] = adjDefaults(); });
 const adjEls = [];
-const adjA = new Float32Array(36), adjB = new Float32Array(36);
+const adjA = new Float32Array(44), adjB = new Float32Array(44);
 function packAdj() {
   for (const src of ADJ_SRC) {
     const i = SRC_ID[src] * 4, a = adj[src];
@@ -1866,7 +2003,7 @@ function buildAdjust(src) {
   }
   const actions = document.createElement('div');
   actions.className = 'dev-actions';
-  if (src !== 'picture') {
+  if (src !== 'picture' && src !== 'loop') {
     const hold = document.createElement('button');
     hold.className = 'btn small';
     hold.setAttribute('aria-pressed', 'false');
@@ -2207,11 +2344,11 @@ const RECIPES = [
     sw: 'radial-gradient(ellipse at 40% 60%,#7cf5ff 0 8%,#3b6bff 22%,#0b0f25 60%)',
     patch: { A: { in1: 'camera', motion: true, size: 100, trails: 95, zoom: 4, color: 14, blur: 0.2 } } },
   { name: 'Twin mandala',
-    text: 'Two mirrored loops pour into each other through cross-feed and keep trading shapes.',
-    how: 'A SHAPE · B WAVE · CROSS-FEED 60 · BOTH',
+    text: 'Two mirrored loops pour into each other through both feeds and keep trading shapes.',
+    how: 'A SHAPE · B WAVE · BOTH FEEDS 60',
     sw: 'radial-gradient(circle,#ffae3b 0 12%,transparent 13% 22%,#4fd1c5 23% 30%,transparent 31% 40%,#ffae3b 41% 46%,#141210 47%)',
     patch: { A: { in1: 'shape', form: 4, mirror: 6, zoom: 22, spin: 10, trails: 90, color: 16 },
-             B: { in1: 'wave', form: 3, mirror: 8, zoom: -18, spin: -12, trails: 92, color: 22, edge: 1 }, xfeed: 60, view: 50 } },
+             B: { in1: 'wave', form: 3, mirror: 8, zoom: -18, spin: -12, trails: 92, color: 22, edge: 1 }, xab: 60, xba: 60, view: 50 } },
   { name: 'Chewed tape',
     text: 'Your video (or the test card) on a worn-out VCR. Tracking errors roll through while the picture melts downward.',
     how: 'VIDEO · TRACKING 70 · WARP 45 · TRAILS 94',
@@ -2230,11 +2367,22 @@ const RECIPES = [
     patch: { A: { in1: 'phone', size: 100, trails: 70, color: 4 }, tv: 80 } },
   { name: 'Slow drift',
     text: 'Calm and slow. Good for leaving on a second screen or a projector while music plays.',
-    how: 'A WAVE · B SHAPE · CROSS-FEED 30 · AUTO-DRIFT',
+    how: 'A WAVE · B SHAPE · BOTH FEEDS 30 · AUTO-DRIFT',
     sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)',
     patch: { A: { in1: 'wave', form: 2, zoom: 6, spin: 3, trails: 96, color: 5, warp: 12, mirror: 2, blur: 0.35 },
-             B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xfeed: 30, view: 50 },
+             B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xab: 30, xba: 30, view: 50 },
     drift: true },
+  { name: 'Hands-free show', autopilot: true, after: 'Autopilot is on. Leave it running, or touch any control to take over.',
+    text: 'Autopilot gives each loop a new look every half minute or so and fades slowly between them. Leave it on a TV or projector.',
+    how: 'AUTOPILOT · AUTO-DRIFT · OLD TV 65',
+    sw: 'linear-gradient(90deg,#ffae3b,#ff4fa3 35%,#6a2bd9 65%,#4fd1c5)',
+    patch: { A: { in1: 'wave', form: 3, zoom: 14, spin: 6, trails: 92, color: 14, mirror: 4, blur: 0.2 }, tv: 65 } },
+  { name: 'One-way river', after: 'Loop A pours into loop B. Try Feed B into A too.',
+    text: 'Loop A is fed straight into loop B as its input, so B spins A’s picture into a whirlpool while A stays calm.',
+    how: 'B INPUT: LOOP A · B SPIN 35 · BOTH ON SCREEN',
+    sw: 'linear-gradient(90deg,#ffae3b 0 40%,#4fd1c5)',
+    patch: { A: { in1: 'bars', zoom: 10, spin: 0, trails: 88, color: 8 },
+             B: { in1: 'loop', size: 42, zoom: 30, spin: 35, trails: 93, color: 18, mirror: 2 }, view: 50 } },
 ];
 function recipeBlocked(r) {
   if (!r.needs) return '';
@@ -2255,13 +2403,15 @@ RECIPES.forEach((r) => {
   recipeWrap.appendChild(a);
 });
 function applyRecipe(r) {
+  if (ap.on) setAutopilot(false, true);
   const p = JSON.parse(JSON.stringify(r.patch));
   if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
   channel = -1;
   patchLoop('A', p.A, true);
   patchLoop('B', p.B || B_PARTNER, true);
   mix.tgt.view = p.view ?? 0;
-  mix.tgt.xfeed = p.xfeed ?? 0;
+  mix.tgt.xab = p.xab ?? 0;
+  mix.tgt.xba = p.xba ?? 0;
   if (p.tv != null) mix.tgt.tv = p.tv;
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((p.adj && p.adj[src]) || {}) }; });
@@ -2279,6 +2429,7 @@ function applyRecipe(r) {
   burst();
   showOSD('RECIPE', r.name.toUpperCase());
   toast(r.after || `Recipe loaded: ${r.name}.`);
+  if (r.autopilot) setAutopilot(true);
 }
 
 const guide = $('#guide');
@@ -2315,6 +2466,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key >= '0' && e.key <= '9') { loadChannel(e.key === '0' ? 9 : +e.key - 1); e.preventDefault(); }
   else if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
   else if (e.key === 'r' || e.key === 'R') surprise();
+  else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
   else if (e.key === 'c' || e.key === 'C') clearScreen();
   else if (e.key === 'f' || e.key === 'F') toggleFS();
   else if (e.key === 'h' || e.key === 'H') toggleBare();
@@ -2523,8 +2675,10 @@ function resolveSrc(src, motion) {
 let last = performance.now();
 let simT = 0, driftT = 0;
 
-function runLoop(k, otherTex, xf, brush, f) {
+function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
+  const O = loops[k === 'A' ? 'B' : 'A'];
+  const otherTex = O.rt[O.front].tex, otherPrev = O.rt[1 - O.front].tex;
   let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
   if (drift) {
     const d = driftT + (k === 'B' ? 37.0 : 0);
@@ -2543,7 +2697,7 @@ function runLoop(k, otherTex, xf, brush, f) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(fbProg.p);
-  const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev];
+  const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev, otherPrev];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
 
   set2f(fbProg, 'uSim', simW, simH);
@@ -2595,11 +2749,14 @@ function frame(now) {
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
   const k = 1 - Math.exp(-dt * 5);
+  const kLoop = ap.on ? 1 - Math.exp(-dt * 0.3) : k;    // autopilot glides over ~10 seconds
+  const kMix = ap.on ? 1 - Math.exp(-dt * 0.22) : k;
   for (const key of ['A', 'B']) {
     const L = loops[key];
-    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * k;
+    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * kLoop;
   }
-  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * k;
+  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (p === 'tv' ? k : kMix);
+  if (ap.on && !frozen && now >= ap.next) apStep(now);
   if (!frozen) simT += dt;
   if (drift && !frozen) driftT += dt;
   staticAmt = Math.max(0, staticAmt - dt * 3);
@@ -2609,17 +2766,16 @@ function frame(now) {
   packAdj();
 
   const [wA, wB] = weights(mix.cur.view);
-  const xf = clamp(mix.cur.xfeed, 0, 100) / 100;
+  const xab = clamp(mix.cur.xab, 0, 100) / 100, xba = clamp(mix.cur.xba, 0, 100) / 100;
   const f = dt * 60;
   if (!frozen) {
     let brush = null;
     if (painting && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
-    const aPrev = loops.A.rt[loops.A.front].tex;
-    const bPrev = loops.B.rt[loops.B.front].tex;
-    const needA = wA > 0.001 || xf > 0.001;
-    const needB = wB > 0.001 || xf > 0.001;
-    if (needA) runLoop('A', bPrev, xf, wA > 0.01 ? brush : null, f);
-    if (needB) runLoop('B', aPrev, xf, wB > 0.01 ? brush : null, f);
+    const feedsFromOther = (k) => [loops[k].tgt.in1, loops[k].tgt.in2].includes('loop');
+    const needA = wA > 0.001 || xab > 0.001 || feedsFromOther('B');
+    const needB = wB > 0.001 || xba > 0.001 || feedsFromOther('A');
+    if (needA) runLoop('A', xba, wA > 0.01 ? brush : null, f);
+    if (needB) runLoop('B', xab, wB > 0.01 ? brush : null, f);
   }
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
