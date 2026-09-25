@@ -844,10 +844,6 @@
           <input type="range" id="tv" min="0" max="100" step="1" value="60">
           <div class="ends"><span>Clean</span><span>Worn</span></div>
         </div>
-        <div class="ctl">
-          <button class="btn" id="guardBtn" aria-pressed="true"><span class="led"></span>Stop white-outs</button>
-          <span class="hint" id="guardState">Watches for the picture turning white and eases off the trails, inputs and feeds until it recovers.</span>
-        </div>
         <p class="hint">Double-click a slider to put it back where the channel had it.</p>
       </section>
 
@@ -932,7 +928,6 @@
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
-            <dt>Stop white-outs</dt><dd>On by default. When the picture starts filling up with white, it eases off the trails, input brightness and loop feeds, then lets go slowly. A loop stuck at solid white gets cleared, and Autopilot moves on to a new look. Turn it off if you want white-outs as an effect.</dd>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
@@ -975,7 +970,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Stop white-outs (under Screen) usually catches this within a second or two, so check that it’s on. Otherwise lower Trails or Input size a little, or press Clear.</dd>
+          <dt>The screen went white</dt><dd>Lower Trails, Input size or Color shift a little, or press Clear.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
@@ -1104,9 +1099,11 @@ precision highp float;
 uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev;
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
-uniform float uBlend, uScale, uMotion, uXfeed, uKnee;
+uniform float uBlend, uScale, uMotion, uXfeed;
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
+uniform vec2 uWave[81];     // the Wave curve's 81 points, worked out once per frame
+uniform vec4 uWaveBox[8];   // 8 stretches of 10 segments: centre and radius of each
 uniform vec4 uAdjA[11];  // per input: tracking, brightness, contrast, color
 uniform vec4 uAdjB[11];  // per input: cut-out level
 uniform vec2 uShift;
@@ -1134,16 +1131,17 @@ vec3 hueRot(vec3 c, float a) {
   return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
 }
 vec3 seedWave(vec2 p, float t) {
-  float A = floor(uForm + 0.5), B = A - 1.0;
-  float R = 0.27, ph = t * 0.5, ph2 = t * 0.17;
+  // Only the stretches of curve close enough to glow on this pixel are measured
   float d = 1e5;
-  vec2 prev = vec2(sin(ph) * 1.2, sin(ph2)) * R;
-  for (int i = 1; i <= 80; i++) {
-    float u = float(i) / 80.0 * TAU;
-    vec2 q = vec2(sin(A * u + ph) * 1.2, sin(B * u + ph2)) * R;
-    d = min(d, sdSeg(p, prev, q));
-    prev = q;
+  for (int c = 0; c < 8; c++) {
+    vec4 bx = uWaveBox[c];
+    if (length(p - bx.xy) - bx.z > min(d, 0.08)) continue;
+    for (int i = 0; i < 10; i++) {
+      int j = c * 10 + i;
+      d = min(d, sdSeg(p, uWave[j], uWave[j + 1]));
+    }
   }
+  if (d > 0.08) return vec3(0.0);
   float w = 0.0045;
   float g = exp(-d * d / (w * w)) + 0.16 * exp(-d / 0.012);
   return hsv(fract(t * 0.04), 0.7, 1.0) * g;
@@ -1270,7 +1268,6 @@ void main() {
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   fb = max(hueRot(fb, uHue), 0.0);
-  fb = fb / (1.0 + uKnee * fb);   // washout guard: squeezes the brightest parts most
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec3 s = source(uIn1, pf);
@@ -1441,10 +1438,16 @@ function makeSourceTex() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return t;
 }
+const texSize = new WeakMap();
 function uploadTo(tex, src) {
+  const w = src.videoWidth || src.naturalWidth || src.width || 0;
+  const h = src.videoHeight || src.naturalHeight || src.height || 0;
+  const prev = texSize.get(tex);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  // A new frame of the same size is copied into the existing texture, which is much cheaper
+  if (prev && prev[0] === w && prev[1] === h) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  else { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); texSize.set(tex, [w, h]); }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 }
 
@@ -3224,94 +3227,6 @@ function toggleBare(force) {
 }
 hideBtn.addEventListener('click', () => toggleBare());
 
-/* ================= washout guard ================= */
-// Feedback piles brightness on brightness, so long trails, big inputs and strong feeds can drift
-// to solid white. This samples each loop and the mixed picture at 32 x 18 points a few times a
-// second. When too much of it is near white, the guard eases off the trails, input brightness and
-// feeds and squeezes the highlights, then lets go slowly so the picture doesn't pump.
-const MEAS_W = 32, MEAS_H = 18;
-const measTarget = (() => {
-  const tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, MEAS_W, MEAS_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  const fbo = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  return { tex, fbo };
-})();
-const measBuf = new Uint8Array(MEAS_W * MEAS_H * 4);
-const MEAS_ORDER = ['A', 'comp', 'B', 'comp'];
-let measTick = 0;
-const bright = { A: { mean: 0, white: 0 }, B: { mean: 0, white: 0 }, comp: { mean: 0, white: 0 } };
-const guard = { on: true, A: 0, B: 0, stuckA: 0, stuckB: 0 };
-try { if (localStorage.getItem('phosphor-guard') === 'off') guard.on = false; } catch (_) {}
-function measure(key, tex) {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, measTarget.fbo);
-  gl.viewport(0, 0, MEAS_W, MEAS_H);
-  gl.useProgram(copyProg.p);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  set2f(copyProg, 'uSim', MEAS_W, MEAS_H);
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
-  gl.readPixels(0, 0, MEAS_W, MEAS_H, gl.RGBA, gl.UNSIGNED_BYTE, measBuf);
-  let sum = 0, white = 0;
-  for (let i = 0; i < measBuf.length; i += 4) {
-    const l = (0.299 * measBuf[i] + 0.587 * measBuf[i + 1] + 0.114 * measBuf[i + 2]) / 255;
-    sum += l;
-    if (l > 0.88) white++;
-  }
-  const n = MEAS_W * MEAS_H;
-  bright[key].mean = sum / n;
-  bright[key].white = white / n;
-}
-function overAmount(b) { return clamp(Math.max((b.white - 0.22) / 0.35, (b.mean - 0.58) / 0.3), 0, 1); }
-function updateGuard(dt, wA, wB, now) {
-  for (const k of ['A', 'B']) {
-    if (!guard.on) { guard[k] = 0; continue; }
-    const own = bright[k];
-    let over = overAmount(own);
-    // The mixed picture can wash out even when neither loop does on its own
-    if ((k === 'A' ? wA : wB) > 0 && own.mean > 0.3) over = Math.max(over, overAmount(bright.comp));
-    if (over > 0) guard[k] = Math.min(1, guard[k] + dt * (0.35 + 1.4 * over));
-    else guard[k] = Math.max(0, guard[k] - dt * 0.1);
-    // Still solid white with the guard all the way on: wipe that loop and let it rebuild
-    const stuck = 'stuck' + k;
-    if (guard[k] > 0.95 && own.mean > 0.9 && own.white > 0.8) {
-      guard[stuck] += dt;
-      if (guard[stuck] > 2.5) {
-        guard[stuck] = 0;
-        clearLoop(k);
-        bright[k].mean = 0; bright[k].white = 0;
-        burst();
-        if (ap.on) ap.next = Math.min(ap.next, now + 1500);
-      }
-    } else guard[stuck] = 0;
-  }
-  guardText();
-}
-const guardBtn = $('#guardBtn'), guardState = $('#guardState');
-let guardShown = '';
-function guardText() {
-  let t;
-  if (!guard.on) t = 'Off. The picture is free to wash out to white.';
-  else {
-    const a = guard.A > 0.15, b = guard.B > 0.15;
-    t = a && b ? 'Easing off loops A and B right now.' : a ? 'Easing off loop A right now.' : b ? 'Easing off loop B right now.'
-      : 'Watches for the picture turning white and eases off the trails, inputs and feeds until it recovers.';
-  }
-  if (t !== guardShown) { guardShown = t; guardState.textContent = t; }
-}
-function setGuard(on) {
-  guard.on = on;
-  guardBtn.setAttribute('aria-pressed', String(on));
-  try { localStorage.setItem('phosphor-guard', on ? 'on' : 'off'); } catch (_) {}
-  guardText();
-}
-guardBtn.addEventListener('click', () => setGuard(!guard.on));
-setGuard(guard.on);
-
 /* ================= output window ================= */
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
 // at that window's resolution, so the controls can stay on this screen.
@@ -3427,6 +3342,26 @@ function resolveSrc(src, motion) {
 let last = performance.now();
 let simT = 0, driftT = 0;
 
+// The Wave input's curve, worked out on the CPU once per loop per frame instead of per pixel
+const wavePts = new Float32Array(81 * 2), waveBoxes = new Float32Array(8 * 4);
+function computeWave(t, form) {
+  const A = Math.floor(form + 0.5), B = A - 1, R = 0.27, ph = t * 0.5, ph2 = t * 0.17;
+  for (let i = 0; i <= 80; i++) {
+    const u = i / 80 * Math.PI * 2;
+    wavePts[i * 2] = Math.sin(A * u + ph) * 1.2 * R;
+    wavePts[i * 2 + 1] = Math.sin(B * u + ph2) * R;
+  }
+  for (let c = 0; c < 8; c++) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = c * 10; i <= c * 10 + 10; i++) {
+      const x = wavePts[i * 2], y = wavePts[i * 2 + 1];
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    waveBoxes[c * 4] = (x0 + x1) / 2;
+    waveBoxes[c * 4 + 1] = (y0 + y1) / 2;
+    waveBoxes[c * 4 + 2] = Math.hypot(x1 - x0, y1 - y0) / 2;
+  }
+}
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const O = loops[k === 'A' ? 'B' : 'A'];
@@ -3455,8 +3390,7 @@ function runLoop(k, xf, brush, f) {
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
   const ramp = tr >= 0.1 ? 1 : (tr / 0.1) * (tr / 0.1) * (3 - 2 * tr / 0.1);
-  const G = guard.on ? guard[k] : 0;
-  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp * (1 - 0.14 * G);
+  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp;
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -3476,11 +3410,16 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
-  set1f(fbProg, 'uGain', c.gain * gainBoost * (1 - 0.5 * G));
-  set1f(fbProg, 'uKnee', 0.35 * G);
+  set1f(fbProg, 'uGain', c.gain * gainBoost);
   set1f(fbProg, 'uForm', t.form);
+  if (t.in1 === 'wave' || t.in2 === 'wave') {
+    computeWave(simT + (k === 'B' ? 11.0 : 0), t.form);
+    const lw = U(fbProg, 'uWave[0]'), lb = U(fbProg, 'uWaveBox[0]');
+    if (lw) gl.uniform2fv(lw, wavePts);
+    if (lb) gl.uniform4fv(lb, waveBoxes);
+  }
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
-  set1f(fbProg, 'uXfeed', xf * (1 - 0.6 * G));
+  set1f(fbProg, 'uXfeed', xf);
   set1i(fbProg, 'uIn1', resolveSrc(t.in1, t.motion));
   set1i(fbProg, 'uIn2', t.in2 === 'none' ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
@@ -3557,14 +3496,6 @@ function frame() {
   set1f(compProg, 'uWB', wB);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  // Washout guard: look at one of loop A, loop B or the mixed picture every few frames
-  if (guard.on && !frozen && ++measTick % 4 === 0) {
-    const key = MEAS_ORDER[(measTick / 4) % MEAS_ORDER.length];
-    const L = loops[key];
-    const busy = key === 'comp' || (key === 'A' ? (wA > 0.001 || mix.cur.xab > 0.1) : (wB > 0.001 || mix.cur.xba > 0.1));
-    if (busy) measure(key, key === 'comp' ? comp.tex : L.rt[L.front].tex);
-  }
-  updateGuard(dt, wA, wB, now);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
