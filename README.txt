@@ -63,6 +63,10 @@ TIPS
     in directly. Channels 9 (Twins) and 0 (Weave) show it off.
   - Autopilot (next to Surprise me, or the P key) changes the settings slowly
     by itself. Touch any control to take over again.
+  - Music visualizer: under "React to sound" choose Computer sound. In the
+    box Chrome opens, pick Entire screen, switch on "Also share system
+    audio" and press Share, then play Spotify or anything else. Microphone
+    listens to the room instead. Record keeps the sound in the video.
   - Projector or second screen: press "Output window", drag the new window
     onto that screen and double-click it to fill it. The controls stay on
     your laptop. If nothing opens, allow pop-ups for the page.

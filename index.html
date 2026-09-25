@@ -222,6 +222,23 @@
   .ch[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a), 0 0 14px rgba(255,174,59,.18); }
   .ch[aria-pressed="true"] .sw::before { background: transparent; }
 
+  .meter { display: flex; align-items: stretch; gap: 8px; height: 58px; padding: 6px 8px 4px; border-radius: 6px; background: #070707; border: 1px solid var(--line); }
+  .mbar { flex: 1; display: flex; flex-direction: column; gap: 3px; position: relative; }
+  .mbar::before { content: ""; position: absolute; left: 0; right: 0; top: 0; bottom: 16px; border-radius: 2px; background: rgba(255,255,255,.05); }
+  .mbar i { position: relative; }
+  .mbar i { flex: 1; display: block; border-radius: 2px; transform-origin: bottom; transform: scaleY(0);
+    background: linear-gradient(0deg, var(--loop-a), #fff1c2); }
+  .mbar span { font: 13px/1 var(--f-osd); color: var(--faint); text-align: center; }
+  .mbeat { align-self: center; font: 18px/1 var(--f-osd); color: #3c3530; padding-inline: 4px; }
+  .mbeat.on { color: var(--tally); text-shadow: 0 0 8px rgba(255,75,62,.7); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 4px 11px; border-radius: 999px;
+    border: 1px solid var(--line); border-bottom-color: #0c0b0a; background: linear-gradient(var(--raise-2), var(--raise));
+    font-size: 13.5px; font-weight: 500; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--loop-a); color: var(--press-ink); }
+  .chip[aria-pressed="true"] .led { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
   .ch-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .ch-actions .btn { padding-inline: 8px; }
   .seg { display: grid; gap: 6px; }
@@ -524,6 +541,42 @@
         <p class="hint">Each feed pours one loop’s picture into the other loop’s trails. Turn both up and the loops trade shapes. You can also choose the other loop as an input below.</p>
       </section>
 
+      <section class="group" id="soundGroup" aria-labelledby="h-sound">
+        <h2 id="h-sound">React to sound</h2>
+        <div class="seg seg-3" id="soundSrc" role="group" aria-label="What to listen to">
+          <button data-snd="off" aria-pressed="true">Off</button>
+          <button data-snd="system" aria-pressed="false">Computer sound</button>
+          <button data-snd="mic" aria-pressed="false">Microphone</button>
+        </div>
+        <div class="dev" id="soundRow" hidden>
+          <span class="dev-status" id="sndStatus">Not listening.</span>
+          <div class="meter" aria-hidden="true">
+            <div class="mbar"><i id="mLow"></i><span>LOW</span></div>
+            <div class="mbar"><i id="mMid"></i><span>MID</span></div>
+            <div class="mbar"><i id="mHigh"></i><span>HIGH</span></div>
+            <div class="mbeat" id="mBeat">● BEAT</div>
+          </div>
+          <div class="dev-actions"><button class="btn small" id="sndRetry" hidden>Try again</button></div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="sndAmt">Amount</label><output id="sndAmtOut" for="sndAmt"></output></div>
+            <input type="range" id="sndAmt" min="0" max="100" step="1" value="60">
+            <div class="ends"><span>Subtle</span><span>Wild</span></div>
+          </div>
+          <div class="ctl">
+            <span class="lbl">What the music moves</span>
+            <div class="chips" id="sndMap">
+              <button class="chip" data-map="kick" aria-pressed="true" title="Zoom pumps on the bass"><span class="led"></span>Zoom kick</button>
+              <button class="chip" data-map="size" aria-pressed="false" title="The input swells on the bass"><span class="led"></span>Input size</button>
+              <button class="chip" data-map="spin" aria-pressed="false" title="Spin follows the mids"><span class="led"></span>Spin</button>
+              <button class="chip" data-map="color" aria-pressed="true" title="Color shift follows the highs"><span class="led"></span>Color</button>
+              <button class="chip" data-map="warp" aria-pressed="false" title="Warp shakes on beats"><span class="led"></span>Warp</button>
+              <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else and the picture moves with it. Record keeps the sound too.</p>
+      </section>
+
       <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
         <div class="tabs" role="tablist" aria-label="Which loop to edit">
           <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span>Loop A <span class="vis" id="visA" role="img"></span></button>
@@ -785,6 +838,13 @@
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
           </dl></div>
+          <div class="g-card"><h3>React to sound</h3><dl>
+            <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: pick Entire screen and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
+            <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works.</dd>
+            <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
+            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts, and which settings follow the music: Zoom kick pumps on the bass, Input size swells, Spin follows the mids, Color follows the highs, Warp shakes and Flash brightens on beats.</dd>
+            <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on.</dd>
+          </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
@@ -833,6 +893,7 @@
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
           <dt>The output window didn’t open</dt><dd>The browser blocked it. Click the blocked pop-up icon at the right of the address bar, choose to always allow pop-ups for this page, then press Output window again.</dd>
+          <dt>The picture doesn’t react to music</dt><dd>Check that the Low, Mid and High bars move. With Computer sound, share again and make sure Also share system audio is switched on (or Also share tab audio for a browser tab). Then raise Amount.</dd>
           <dt>It’s choppy</dt><dd>Turn the Old TV look down, close other tabs, or choose 4:3 TV as the screen shape.</dd>
         </dl>
       </section>
@@ -1155,7 +1216,7 @@ const FS_DISPLAY = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
 uniform vec2 uRes;
-uniform float uTV, uTime, uStatic, uLines;
+uniform float uTV, uTime, uStatic, uLines, uFlash;
 out vec4 o;
 ${COMMON}
 vec2 barrel(vec2 uv, float k) { vec2 c = uv * 2.0 - 1.0; c *= 1.0 + k * dot(c, c); return c * 0.5 + 0.5; }
@@ -1184,7 +1245,7 @@ void main() {
   float m = mod(floor(gl_FragCoord.x), 3.0);
   vec3 mask = vec3(m == 0.0 ? 1.0 : 0.7, m == 1.0 ? 1.0 : 0.7, m == 2.0 ? 1.0 : 0.7);
   col *= mix(vec3(1.0), mask, 0.5 * uTV);
-  col *= 1.0 + 0.45 * uTV;
+  col *= 1.0 + 0.45 * uTV + uFlash;
   col *= 1.0 - 0.28 * uTV * dot(c * 0.75, c * 0.75);
   col *= 1.0 - 0.035 * uTV * (0.5 + 0.5 * sin((uv.y + uTime * 0.07) * TAU));
   col += (hash(gl_FragCoord.xy + fract(uTime * 7.13) * 391.0) - 0.5) * 0.045 * uTV;
@@ -1677,6 +1738,145 @@ function surprise() {
   showOSD('CH --', 'SURPRISE');
 }
 $('#surprise').addEventListener('click', surprise);
+
+/* ================= react to sound ================= */
+// Listens to the computer's sound (the browser only offers that through screen sharing with
+// "share system audio") or to the microphone, splits it into low, mid and high bands plus beats,
+// and nudges both loops with them. Nothing is played back, so there is no echo.
+const snd = {
+  src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null,
+  env: { low: 0, mid: 0, high: 0, beat: 0 },
+  avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
+  lastBeat: 0, amount: 60,
+  map: { kick: true, size: false, spin: false, color: true, warp: false, flash: true },
+};
+const sndStatus = $('#sndStatus'), sndRetry = $('#sndRetry'), sndAmt = $('#sndAmt');
+if (inArtifact) $('#soundGroup').hidden = true;
+function sndSay(html, warn) { say(sndStatus, html, warn); sndRetry.hidden = !warn; }
+function syncSoundUI() {
+  $$('#soundSrc button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.snd === snd.src)));
+  $('#soundRow').hidden = snd.src === 'off';
+  $$('#sndMap button').forEach((b) => b.setAttribute('aria-pressed', String(!!snd.map[b.dataset.map])));
+  sndAmt.value = snd.amount;
+  paintFill(sndAmt);
+  $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
+}
+function stopSound() {
+  if (snd.stream) snd.stream.getTracks().forEach((t) => t.stop());
+  if (snd.source) { try { snd.source.disconnect(); } catch (_) {} }
+  if (snd.ctx) { try { snd.ctx.close(); } catch (_) {} }
+  snd.stream = null; snd.source = null; snd.analyser = null; snd.ctx = null; snd.track = null;
+  for (const k in snd.env) snd.env[k] = 0;
+}
+function listen(stream) {
+  const track = stream.getAudioTracks()[0];
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const source = ctx.createMediaStreamSource(new MediaStream([track]));
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.55;
+  analyser.minDecibels = -90;
+  analyser.maxDecibels = -20;
+  source.connect(analyser);
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  Object.assign(snd, { ctx, analyser, source, stream, track, bins: new Uint8Array(analyser.frequencyBinCount) });
+  snd.avg = { low: 0, mid: 0, high: 0 };
+  snd.peak = { low: 0.1, mid: 0.1, high: 0.1 };
+  track.addEventListener('ended', () => {
+    if (snd.track !== track) return;
+    stopSound();
+    snd.src = 'off';
+    syncSoundUI();
+    toast('The sound stopped. Choose Computer sound or Microphone to listen again.');
+  });
+}
+async function setSound(src) {
+  stopSound();
+  snd.src = src;
+  syncSoundUI();
+  if (src === 'off') { sndSay('Not listening.'); return; }
+  if (src === 'mic') {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { sndSay('This browser can’t use a microphone on this page.', true); return; }
+    sndSay('Waiting for you to allow the microphone…');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false,
+      });
+      if (snd.src !== 'mic') { stream.getTracks().forEach((t) => t.stop()); return; }
+      listen(stream);
+      sndSay('<span class="live"></span><b>Listening through the microphone.</b> Play music nearby, or clap.');
+    } catch (err) {
+      const n = err && err.name;
+      if (n === 'NotAllowedError' || n === 'SecurityError') sndSay('Microphone access was blocked. Click the microphone icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
+      else if (n === 'NotFoundError') sndSay('No microphone was found. Plug one in, then press Try again.', true);
+      else sndSay('The microphone couldn’t start. Press Try again.', true);
+    }
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    sndSay('This browser can’t listen to the computer’s sound. Use <b>Chrome</b> or <b>Edge</b> on a computer.', true);
+    return;
+  }
+  sndSay('In the box that opens, choose <b>Entire screen</b>, switch on <b>Also share system audio</b>, then press <b>Share</b>.');
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
+      systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
+    });
+    stream.getVideoTracks().forEach((t) => t.stop());   // only the sound is used
+    if (snd.src !== 'system') { stream.getTracks().forEach((t) => t.stop()); return; }
+    if (!stream.getAudioTracks().length) {
+      sndSay('No sound came through. Press Try again, and in the box switch on <b>Also share system audio</b> (or <b>Also share tab audio</b> for a browser tab).', true);
+      return;
+    }
+    listen(stream);
+    sndSay('<span class="live"></span><b>Listening to this computer’s sound.</b> Chrome shows a sharing bar while it listens; only the sound is used.');
+  } catch (err) {
+    sndSay('Sharing was cancelled. Press Try again, choose <b>Entire screen</b> and switch on <b>Also share system audio</b>.', true);
+  }
+}
+$$('#soundSrc button').forEach((b) => b.addEventListener('click', () => setSound(b.dataset.snd)));
+sndRetry.addEventListener('click', () => setSound(snd.src === 'off' ? 'system' : snd.src));
+sndAmt.addEventListener('input', () => { snd.amount = +sndAmt.value; syncSoundUI(); });
+sndAmt.addEventListener('dblclick', () => { snd.amount = 60; syncSoundUI(); });
+$$('#sndMap button').forEach((b) => b.addEventListener('click', () => { snd.map[b.dataset.map] = !snd.map[b.dataset.map]; syncSoundUI(); }));
+syncSoundUI();
+
+// Each band is judged against its own recent level, so quiet and loud songs both move the picture
+function analyzeSound(dt, now) {
+  if (!snd.analyser) return;
+  snd.analyser.getByteFrequencyData(snd.bins);
+  const hz = snd.ctx.sampleRate / snd.analyser.fftSize;
+  const band = (lo, hi) => {
+    const a = Math.max(1, Math.floor(lo / hz)), b = Math.min(snd.bins.length - 1, Math.ceil(hi / hz));
+    let sum = 0;
+    for (let i = a; i <= b; i++) sum += snd.bins[i];
+    return sum / Math.max(1, b - a + 1) / 255;
+  };
+  const raw = { low: band(30, 150), mid: band(250, 2000), high: band(3000, 10000) };
+  for (const k of ['low', 'mid', 'high']) {
+    const v = raw[k];
+    snd.avg[k] += (v - snd.avg[k]) * (1 - Math.exp(-dt / 2.5));
+    snd.peak[k] = Math.max(v, snd.peak[k] - dt * 0.05);
+    const floor = snd.avg[k] * 0.85;
+    const x = clamp((v - floor) / Math.max(snd.peak[k] - floor, 0.04), 0, 1);
+    const e = snd.env[k];
+    snd.env[k] = e + (x - e) * (1 - Math.exp(-dt * (x > e ? 25 : 5)));
+  }
+  if (raw.low > 0.12 && raw.low > snd.avg.low * 1.22 + 0.03 && now - snd.lastBeat > 280) { snd.lastBeat = now; snd.env.beat = 1; }
+  snd.env.beat *= Math.exp(-dt * 6);
+}
+const mLow = $('#mLow'), mMid = $('#mMid'), mHigh = $('#mHigh'), mBeat = $('#mBeat');
+let meterTick = 0;
+function drawMeter() {
+  if (!snd.analyser || (++meterTick & 1)) return;
+  mLow.style.transform = `scaleY(${snd.env.low.toFixed(3)})`;
+  mMid.style.transform = `scaleY(${snd.env.mid.toFixed(3)})`;
+  mHigh.style.transform = `scaleY(${snd.env.high.toFixed(3)})`;
+  mBeat.classList.toggle('on', snd.env.beat > 0.45);
+}
 
 /* ================= neutral ================= */
 // Back to a plain monitor: loop A shows its current input filling the screen, with every effect off
@@ -2427,6 +2627,14 @@ const RECIPES = [
     how: 'AUTOPILOT · AUTO-DRIFT · OLD TV 65',
     sw: 'linear-gradient(90deg,#ffae3b,#ff4fa3 35%,#6a2bd9 65%,#4fd1c5)',
     patch: { A: { in1: 'wave', form: 3, zoom: 14, spin: 6, trails: 92, color: 14, mirror: 4, blur: 0.2 }, tv: 65 } },
+  { name: 'Music visualizer', needs: 'sound', sound: 'system', soundAmount: 70,
+    soundMap: { kick: true, size: true, spin: false, color: true, warp: false, flash: true },
+    after: 'Pick Entire screen, switch on “Also share system audio”, press Share, then play some music.',
+    text: 'Play music on this computer and two mirrored loops pump on the bass, flash on the beats and shift color with the highs.',
+    how: 'COMPUTER SOUND · ZOOM KICK · SIZE · COLOR · FLASH',
+    sw: 'repeating-linear-gradient(90deg,#141210 0 4px,transparent 4px 10px),linear-gradient(0deg,#ffae3b,#ff4fa3 45%,#6a2bd9 80%,#1b0f3d)',
+    patch: { A: { in1: 'shape', form: 3, zoom: 12, spin: 6, trails: 86, color: 10, mirror: 4, blur: 0.1 },
+             B: { in1: 'wave', form: 4, zoom: -15, spin: -8, trails: 90, color: 20, mirror: 6, edge: 1 }, xab: 25, xba: 25, view: 50 } },
   { name: 'One-way river', after: 'Loop A pours into loop B. Try Feed B into A too.',
     text: 'Loop A is fed straight into loop B as its input, so B spins A’s picture into a whirlpool while A stays calm.',
     how: 'B INPUT: LOOP A · B SPIN 35 · BOTH ON SCREEN',
@@ -2436,9 +2644,9 @@ const RECIPES = [
 ];
 function recipeBlocked(r) {
   if (!r.needs) return '';
-  if (inArtifact) return 'Needs the downloaded copy or your web address. Camera, screen and phone are turned off in this preview.';
+  if (inArtifact) return 'Needs the downloaded copy or your web address. Camera, screen, phone and sound are turned off in this preview.';
   if (r.needs === 'phone' && !phoneOK) return 'Needs Phosphor Loop opened from its https:// web address.';
-  if (r.needs === 'screen' && !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) return 'This browser can’t share its screen. Use Chrome or Edge on a computer.';
+  if ((r.needs === 'screen' || r.needs === 'sound') && !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) return 'This browser can’t share its screen or sound. Use Chrome or Edge on a computer.';
   return '';
 }
 const recipeWrap = $('#recipes');
@@ -2474,6 +2682,12 @@ function applyRecipe(r) {
   if (inp === 'camera' && !cam.on) startCamera();
   if (inp === 'screen' && !scr.on) startScreen(true);
   if (inp === 'phone') startPhoneLink();
+  if (r.sound) {
+    if (r.soundMap) Object.assign(snd.map, r.soundMap);
+    if (r.soundAmount != null) snd.amount = r.soundAmount;
+    syncSoundUI();
+    if (snd.src !== r.sound || !snd.analyser) setSound(r.sound);
+  }
   settleDevices();
   syncUI();
   burst();
@@ -2572,7 +2786,12 @@ function fmt(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 
 function startRec() {
   let stream;
   try { stream = canvas.captureStream(30); } catch (e) { toast('Recording isn’t supported in this browser.'); return; }
-  const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  // With React to sound on, the recording keeps the sound (a copy, so stopping it leaves listening alone)
+  const withSound = !!(snd.track && snd.track.readyState === 'live');
+  if (withSound) stream.addTrack(snd.track.clone());
+  const types = withSound
+    ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+    : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
   const mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
   try {
     recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 10000000 } : undefined);
@@ -2800,6 +3019,7 @@ canvas.addEventListener('webglcontextlost', (e) => {
 });
 window.addEventListener('pagehide', () => {
   if (outWin) { try { outWin.close(); } catch (_) {} }
+  stopSound();
   cam.detach(); scr.detach();
   if (sig && phonePeer) sig.send('LEAVE', phonePeer, {});
 });
@@ -2839,6 +3059,16 @@ function runLoop(k, xf, brush, f) {
     sx += 0.0012 * Math.sin(d * 0.11);
     sy += 0.0012 * Math.cos(d * 0.083);
   }
+  let sizeBoost = 0, gainBoost = 1;
+  if (snd.analyser) {
+    const a = snd.amount / 100 * 1.4, E = snd.env, m = snd.map;
+    if (m.kick) z += a * (E.low * 40 + E.beat * 30);
+    if (m.spin) s += a * E.mid * 50 * (s < 0 ? -1 : 1);
+    if (m.color) col += a * E.high * 55;
+    if (m.warp) w += a * (E.beat * 40 + E.mid * 12);
+    if (m.size) sizeBoost = a * (E.low * 28 + E.beat * 14);
+    if (m.flash) gainBoost = 1 + a * E.beat * 1.1;
+  }
   z = clamp(z, -100, 100); s = clamp(s, -100, 100); col = clamp(col, 0, 100); w = clamp(w, 0, 100);
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
@@ -2863,14 +3093,14 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
-  set1f(fbProg, 'uGain', c.gain);
+  set1f(fbProg, 'uGain', c.gain * gainBoost);
   set1f(fbProg, 'uForm', t.form);
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
   set1f(fbProg, 'uXfeed', xf);
   set1i(fbProg, 'uIn1', resolveSrc(t.in1, t.motion));
   set1i(fbProg, 'uIn2', t.in2 === 'none' ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
-  set1f(fbProg, 'uScale', Math.pow(2.5, (clamp(c.size, 0, 100) / 100 - 0.5) * 2));
+  set1f(fbProg, 'uScale', Math.pow(2.5, (clamp(c.size + sizeBoost, 0, 100) / 100 - 0.5) * 2));
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
   set1f(fbProg, 'uAspPic', picAspect);
   set1f(fbProg, 'uAspVid', vid.aspect);
@@ -2917,6 +3147,8 @@ function frame() {
   for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update();
   vcrTick();
   packAdj();
+  analyzeSound(dt, now);
+  drawMeter();
 
   const [wA, wB] = weights(mix.cur.view);
   const xab = clamp(mix.cur.xab, 0, 100) / 100, xba = clamp(mix.cur.xba, 0, 100) / 100;
@@ -2949,6 +3181,7 @@ function frame() {
   set1f(dispProg, 'uTV', clamp(mix.cur.tv, 0, 100) / 100);
   set1f(dispProg, 'uTime', (now - t0) / 1000);
   set1f(dispProg, 'uStatic', staticAmt);
+  set1f(dispProg, 'uFlash', snd.analyser && snd.map.flash ? snd.amount / 100 * snd.env.beat * 0.35 : 0);
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
