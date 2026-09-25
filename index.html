@@ -202,6 +202,59 @@
     font: 11px/1 var(--f-display); letter-spacing: .2em; text-transform: uppercase; color: var(--dim);
   }
   .group h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  /* folding sections */
+  .group h2.fold::after { display: none; }
+  .group-toggle {
+    flex: 1; display: flex; align-items: center; gap: 10px; min-height: 28px; padding: 0; margin: -4px 0;
+    background: none; border: 0; cursor: pointer; text-align: left;
+    font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
+  }
+  .group-toggle:hover { color: var(--ink); }
+  .group-toggle .rule { flex: 1; height: 1px; background: var(--line); }
+  .group-toggle .chev {
+    width: 8px; height: 8px; margin-right: 3px; flex: none;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s ease;
+  }
+  .group-toggle[aria-expanded="false"] .chev { transform: rotate(-45deg); }
+  .group-body { display: flex; flex-direction: column; gap: 12px; }
+  .panel-tools { display: flex; gap: 14px; margin-top: -14px; font-size: 13px; }
+  .panel-tools .linkish { font-weight: 500; }
+
+  /* my presets */
+  .presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .pre { position: relative; min-width: 0; }
+  .pre-load {
+    width: 100%; display: flex; flex-direction: column; gap: 5px; padding: 4px 4px 6px;
+    border-radius: 7px; border: 1px solid var(--line); border-bottom-color: #0c0b0a;
+    background: linear-gradient(var(--raise-2), var(--raise)); cursor: pointer; text-align: left;
+  }
+  .pre-load:hover { border-color: #564f47; }
+  .pre-load .sw { display: block; height: 44px; border-radius: 4px; background: #0b0a09 center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+  .pre-load .nm { font-size: 13px; line-height: 1.15; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pre-load[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a); }
+  .pre-del {
+    position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center; padding: 0; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.2); background: rgba(10,9,8,.8); color: var(--ink); font: 600 14px/1 var(--f-body);
+    opacity: 0; transition: opacity .15s;
+  }
+  .pre:hover .pre-del, .pre-del:focus-visible { opacity: 1; }
+  @media (hover: none) { .pre-del { opacity: 1; } }
+  .pre-confirm {
+    position: absolute; inset: 0; border-radius: 7px; background: rgba(12,11,10,.94); border: 1px solid var(--tally);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px;
+  }
+  .pre-confirm div { display: flex; gap: 6px; }
+  .pre-confirm button { min-height: 28px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--line); background: var(--raise-2); cursor: pointer; font-size: 13px; }
+  .pre-confirm .yes { border-color: var(--tally); color: #ffd9d5; }
+  .preset-form { display: flex; flex-direction: column; gap: 6px; }
+  .preset-row { display: flex; gap: 6px; }
+  .preset-row input {
+    flex: 1; min-width: 0; min-height: 34px; padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--well); color: var(--ink); font: inherit; font-size: 14px;
+  }
+  .preset-row input:focus-visible { outline: 2px solid var(--loop-a); outline-offset: 1px; }
   .hint { margin: 0; font-size: 13px; color: var(--faint); }
 
   .channels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
@@ -510,6 +563,7 @@
 
     <aside class="panel" aria-label="Controls">
       <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick a channel</b>, move a slider, or <b>drag on the screen</b> to paint.</p>
+      <div class="panel-tools"><button class="linkish" id="foldAll">Collapse all</button><button class="linkish" id="openAll">Expand all</button></div>
 
       <section class="group" aria-labelledby="h-ch">
         <h2 id="h-ch">Channels</h2>
@@ -519,6 +573,22 @@
           <button class="btn" id="surprise">Surprise me</button>
           <button class="btn" id="autopilot" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         </div>
+      </section>
+
+      <section class="group" id="presetGroup" aria-labelledby="h-pre">
+        <h2 id="h-pre">My presets</h2>
+        <p class="hint" id="presetEmpty">Nothing saved yet. Set up a look you like, then save it here.</p>
+        <div class="presets" id="presetList"></div>
+        <form class="preset-form" id="presetForm" hidden>
+          <label for="presetName" class="lbl">Name this look</label>
+          <div class="preset-row">
+            <input type="text" id="presetName" maxlength="40" autocomplete="off" spellcheck="false">
+            <button class="btn small" type="submit">Save</button>
+            <button class="btn small" type="button" id="presetCancel">Cancel</button>
+          </div>
+        </form>
+        <button class="btn wide" id="presetSave">Save current look</button>
+        <p class="hint" id="presetNote">Presets stay in this browser on this device. Save under the same name to update one. Pictures and videos aren’t saved, only the settings.</p>
       </section>
 
       <section class="group" aria-labelledby="h-mix">
@@ -821,6 +891,7 @@
             <dt>Channels 1 to 0</dt><dd>Ready-made looks. 9 (Twins) and 0 (Weave) use both loops.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
+            <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Touch any control and you’re back in charge.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
@@ -873,6 +944,7 @@
           <li><b>Paint</b> by dragging on the screen with a mouse or finger. Paint goes into whichever loops are showing, and Mirror copies every stroke.</li>
           <li><b>Drop a file</b>, a picture or a video, onto the screen to feed it in.</li>
           <li><b>Double-click any slider</b> to put it back where the channel had it.</li>
+          <li><b>Fold away sections</b> you’re not using by clicking their headings, or use Collapse all at the top of the controls.</li>
         </ul>
         <div class="g-keys">
           <div><kbd>1 … 0</kbd>Channels</div>
@@ -980,6 +1052,7 @@ const mixDefaults = { view: 0, xab: 0, xba: 0, tv: 60 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
 let edit = 'A';
 let channel = -1;
+let activePresetId = null;
 let drift = !reduceMotion;
 let frozen = false;
 let staticAmt = 0;
@@ -1716,6 +1789,7 @@ function applyPatch(c) {
 }
 function loadChannel(i) {
   takeOver();
+  markPreset(null);
   channel = i;
   applyPatch(CHANNELS[i]);
   syncUI();
@@ -1740,6 +1814,7 @@ function randomLoop() {
 }
 function surprise() {
   takeOver();
+  markPreset(null);
   const both = Math.random() < 0.5;
   channel = -1;
   applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xab: both ? Math.round(rnd(0, 70)) : 0, xba: both ? Math.round(rnd(0, 70)) : 0 });
@@ -1932,6 +2007,7 @@ function drawMeter() {
 const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (ap.on) setAutopilot(false, true);
+  markPreset(null);
   setDrift(false);
   if (frozen) toggleFreeze(false);
   let src = loops.A.tgt.in1;
@@ -2711,6 +2787,7 @@ RECIPES.forEach((r) => {
 });
 function applyRecipe(r) {
   if (ap.on) setAutopilot(false, true);
+  markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
   if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
   channel = -1;
@@ -2770,11 +2847,171 @@ guide.addEventListener('keydown', (e) => {
 });
 if (location.hash === '#guide') openGuide();
 
+/* ================= my presets ================= */
+// Saved in this browser's own storage: they survive closing the page, and stay on this device.
+const PRESET_KEY = 'phosphor-presets-v1';
+let thumbReq = null;
+const storageOK = (() => { try { localStorage.setItem('__pl', '1'); localStorage.removeItem('__pl'); return true; } catch (_) { return false; } })();
+function readPresets() {
+  try { const v = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+}
+function writePresets() {
+  if (!storageOK) return false;
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return true; } catch (_) { return false; }
+}
+let presets = readPresets();
+if (!storageOK) $('#presetNote').textContent = 'This browser isn’t letting the page keep anything (a private window, perhaps), so presets last only until you close the page.';
+const presetList = $('#presetList'), presetForm = $('#presetForm'), presetName = $('#presetName'), presetSaveBtn = $('#presetSave');
+
+function snapshot() {
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  return {
+    v: 1,
+    A: clone(loops.A.tgt), B: clone(loops.B.tgt),
+    mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba, tv: mix.tgt.tv },
+    adj: clone(adj),
+    snd: { amount: snd.amount, map: clone(snd.map) },
+    drift,
+  };
+}
+function markPreset(id) {
+  activePresetId = id;
+  $$('.pre-load').forEach((b) => b.setAttribute('aria-pressed', String(b.parentElement.dataset.id === id)));
+}
+function renderPresets() {
+  presetList.innerHTML = '';
+  $('#presetEmpty').hidden = presets.length > 0;
+  presets.forEach((pr) => {
+    const t = document.createElement('div');
+    t.className = 'pre';
+    t.dataset.id = pr.id;
+    const name = escapeHTML(pr.name);
+    const thumb = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(pr.thumb || '') ? `background-image:url(${pr.thumb})` : '';
+    t.innerHTML =
+      `<button class="pre-load" aria-pressed="${pr.id === activePresetId}" title="Load ${name}"><span class="sw" style="${thumb}"></span><span class="nm">${name}</span></button>` +
+      `<button class="pre-del" aria-label="Delete ${name}" title="Delete">×</button>` +
+      `<div class="pre-confirm" hidden><span>Delete “${name}”?</span><div><button class="yes">Delete</button><button class="no">Keep</button></div></div>`;
+    const confirmBox = t.querySelector('.pre-confirm');
+    t.querySelector('.pre-load').addEventListener('click', () => loadPreset(pr));
+    t.querySelector('.pre-del').addEventListener('click', () => { confirmBox.hidden = false; confirmBox.querySelector('.no').focus(); });
+    confirmBox.querySelector('.no').addEventListener('click', () => { confirmBox.hidden = true; });
+    confirmBox.querySelector('.yes').addEventListener('click', () => {
+      presets = presets.filter((x) => x.id !== pr.id);
+      writePresets();
+      if (activePresetId === pr.id) activePresetId = null;
+      renderPresets();
+      toast(`Deleted “${pr.name}”.`);
+    });
+    presetList.appendChild(t);
+  });
+}
+function nextPresetName() {
+  let n = presets.length + 1;
+  while (presets.some((p) => p.name.toLowerCase() === `my look ${n}`)) n++;
+  return `My look ${n}`;
+}
+presetSaveBtn.addEventListener('click', () => {
+  presetForm.hidden = false;
+  presetSaveBtn.hidden = true;
+  presetName.value = activePresetId ? (presets.find((p) => p.id === activePresetId) || {}).name || nextPresetName() : nextPresetName();
+  presetName.focus();
+  presetName.select();
+});
+function closePresetForm() { presetForm.hidden = true; presetSaveBtn.hidden = false; }
+$('#presetCancel').addEventListener('click', closePresetForm);
+presetName.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closePresetForm(); } });
+presetForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = presetName.value.trim().slice(0, 40) || nextPresetName();
+  const data = snapshot();
+  const thumb = await new Promise((res) => { thumbReq = res; });
+  const existing = presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) { existing.data = data; existing.thumb = thumb; existing.saved = Date.now(); }
+  else presets.push({ id: 'p' + Date.now().toString(36) + randId(4), name, thumb, data, saved: Date.now() });
+  if (presets.length > 60) presets = presets.slice(-60);
+  const ok = writePresets();
+  closePresetForm();
+  const id = (existing || presets[presets.length - 1]).id;
+  activePresetId = id;
+  renderPresets();
+  if (!ok && storageOK) toast('Couldn’t save: this browser’s storage for the page is full. Delete a few presets and try again.');
+  else toast(existing ? `Updated “${name}”.` : `Saved “${name}” in this browser.`);
+});
+
+function loadPreset(pr) {
+  if (ap.on) setAutopilot(false, true);
+  const d = pr.data || {};
+  channel = -1;
+  patchLoop('A', d.A || {}, true);
+  patchLoop('B', d.B || B_PARTNER, true);
+  const m = d.mix || {};
+  mix.tgt.view = m.view ?? 0; mix.tgt.xab = m.xab ?? 0; mix.tgt.xba = m.xba ?? 0;
+  if (m.tv != null) mix.tgt.tv = m.tv;
+  mix.base = { ...mix.tgt };
+  ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((d.adj && d.adj[src]) || {}) }; });
+  syncAdjUI();
+  if (d.snd) { if (d.snd.amount != null) snd.amount = d.snd.amount; if (d.snd.map) Object.assign(snd.map, d.snd.map); syncSoundUI(); }
+  if (typeof d.drift === 'boolean') setDrift(d.drift);
+  // Start any camera, screen or phone the preset uses, right here inside the click
+  const used = [loops.A.tgt.in1, loops.A.tgt.in2, loops.B.tgt.in1, loops.B.tgt.in2];
+  if (used.includes('camera') && !cam.on) startCamera();
+  if (used.includes('screen') && !scr.on) startScreen(true);
+  if (used.includes('phone')) startPhoneLink();
+  settleDevices();
+  setEdit('A');
+  syncUI();
+  markPreset(pr.id);
+  burst();
+  showOSD('PRESET', pr.name.toUpperCase().slice(0, 18));
+  if (used.includes('video') && !vid.on) toast('This preset uses a video. Choose one under Video.');
+}
+renderPresets();
+
+/* ================= folding sections ================= */
+// Every section heading folds its section away. What's folded is remembered in this browser.
+const FOLD_KEY = 'phosphor-folded-v1';
+let folded = {};
+try { folded = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (_) { folded = {}; }
+const foldControls = [];
+$$('.panel .group').forEach((group) => {
+  const h2 = group.querySelector(':scope > h2');
+  if (!h2) return;
+  const key = h2.id || group.id;
+  const body = document.createElement('div');
+  body.className = 'group-body';
+  body.id = 'fold-' + key;
+  while (h2.nextSibling) body.appendChild(h2.nextSibling);
+  group.appendChild(body);
+  const label = document.createElement('span');
+  label.textContent = h2.textContent;
+  if (h2.id) { label.id = h2.id; h2.removeAttribute('id'); }
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'group-toggle';
+  btn.setAttribute('aria-controls', body.id);
+  const rule = document.createElement('span'); rule.className = 'rule';
+  const chev = document.createElement('span'); chev.className = 'chev'; chev.setAttribute('aria-hidden', 'true');
+  btn.append(label, rule, chev);
+  h2.textContent = '';
+  h2.classList.add('fold');
+  h2.appendChild(btn);
+  const set = (open, save) => {
+    btn.setAttribute('aria-expanded', String(open));
+    body.hidden = !open;
+    if (save) { folded[key] = !open; try { localStorage.setItem(FOLD_KEY, JSON.stringify(folded)); } catch (_) {} }
+  };
+  set(!folded[key], false);
+  btn.addEventListener('click', () => set(body.hidden, true));
+  foldControls.push(set);
+});
+$('#foldAll').addEventListener('click', () => foldControls.forEach((set) => set(false, true)));
+$('#openAll').addEventListener('click', () => foldControls.forEach((set) => set(true, true)));
+
 /* ================= keyboard ================= */
 function onKey(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const tag = e.target && e.target.tagName;
-  if (tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return;
   const onControl = tag === 'BUTTON' || tag === 'INPUT';
   if (e.key >= '0' && e.key <= '9') { loadChannel(e.key === '0' ? 9 : +e.key - 1); e.preventDefault(); }
   else if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
@@ -3237,6 +3474,16 @@ function frame() {
   if (snapPending) {
     snapPending = false;
     canvas.toBlob((blob) => { if (blob) offerFile(`phosphor-loop-${stamp()}.png`, blob); }, 'image/png');
+  }
+  if (thumbReq) {
+    const done = thumbReq;
+    thumbReq = null;
+    try {
+      const c = document.createElement('canvas');
+      c.width = 160; c.height = Math.max(40, Math.round(160 / simAspect));
+      c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+      done(c.toDataURL('image/jpeg', 0.72));
+    } catch (_) { done(''); }
   }
   if (outCtx) {
     if (!outWin || outWin.closed) closeOutput(true);

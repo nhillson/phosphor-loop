@@ -54,6 +54,11 @@ other, then the video goes phone-to-computer directly (or through PeerJS's
 relay if your network blocks direct links). Nothing is recorded.
 
 TIPS
+  - My presets: set up a look, press "Save current look" and name it. Presets
+    stay in this browser on this device (another browser or computer won't
+    see them). Save under the same name to update one.
+  - Crowded controls? Click any section heading to fold it away, or use
+    "Collapse all" at the top of the controls.
   - Press the Guide button (top right) or G for a tour of every control and
     eight one-click recipes.
   - Share this tab (Screen input) or aim the phone at the monitor for
