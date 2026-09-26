@@ -584,6 +584,7 @@
         <button class="btn" id="hideCtl" aria-pressed="false">Hide controls</button>
         <span class="spacer" aria-hidden="true"></span>
         <button class="btn" id="snap" hidden>Save picture</button>
+        <button class="btn" id="recMic" aria-pressed="true" hidden title="When lit, videos you record include the microphone"><span class="led"></span>Include mic</button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
@@ -977,7 +978,7 @@
             <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
             <dt>Amount and What the music moves</dt><dd>How hard the picture reacts, and which settings follow the music: Zoom kick pumps on the bass, Input size swells, Spin follows the mids, Color follows the highs, Warp shakes and Flash brightens on beats.</dd>
             <dt>Which browser</dt><dd>Computer sound works in Chrome and Edge. Firefox and Safari don’t pass sound through screen sharing, so use Microphone there (Stereo Mix on Windows hears the computer itself).</dd>
-            <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on.</dd>
+            <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on. With Include mic lit, the microphone goes in too, mixed with the music.</dd>
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
@@ -987,6 +988,7 @@
             <dt>Full screen and Hide controls</dt><dd>Show only the picture.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can paint on the projected picture too.</dd>
             <dt>Save picture and Record</dt><dd>Save a still, or up to a minute of video.</dd>
+            <dt>Include mic</dt><dd>When its light is on, videos you record include the microphone, so you can talk over the picture or catch the room. The first time, the browser asks to use the microphone: choose Allow. Press it again to turn the mic off.</dd>
           </dl></div>
           <div class="g-card"><h3>Show setup</h3><dl>
             <dt>Show mode</dt><dd>For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look and Autopilot, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake. Tap Fill my other screen in the output window to put the picture on the projector.</dd>
@@ -1635,10 +1637,10 @@ function loadScript(src) {
 }
 
 let toastTimer;
-function toast(text) {
+function toast(text, ms = 4500) {
   toastEl.textContent = text;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastEl.textContent = ''; }, 4500);
+  toastTimer = setTimeout(() => { toastEl.textContent = ''; }, ms);
 }
 let osdTimer;
 function showOSD(a, b) {
@@ -3117,13 +3119,16 @@ window.addEventListener('keydown', onKey);
 /* ================= saving ================= */
 const snapBtn = $('#snap');
 const recBtn = $('#rec');
+const recMicBtn = $('#recMic');
 const canRecord = typeof canvas.captureStream === 'function' && typeof window.MediaRecorder !== 'undefined';
+const canRecMic = !inArtifact && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 let downloadsNS = null;
 let saveMode = 'none';
 function setSaveUI(mode) {
   saveMode = mode;
   snapBtn.hidden = mode === 'none';
   recBtn.hidden = mode === 'none' || !canRecord;
+  recMicBtn.hidden = recBtn.hidden || !canRecMic;
 }
 if (inArtifact) {
   window.claude.use('downloads').then((ns) => { downloadsNS = ns; setSaveUI(ns ? 'claude' : 'none'); }, () => setSaveUI('none'));
@@ -3154,30 +3159,109 @@ async function offerFile(name, blob) {
 let snapPending = false;
 snapBtn.addEventListener('click', () => { snapPending = true; });
 
-let recorder = null, recChunks = [], recStart = 0, recTick = null;
+let recorder = null, recChunks = [], recStart = 0, recTick = null, recStarting = false;
 const REC_LIMIT = 60;
 const recInd = $('#recInd'), recTime = $('#recTime'), recLabel = $('#recLabel');
 function fmt(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
-function startRec() {
+
+// Include mic: videos also carry the microphone, on top of any music React to sound is hearing.
+// On unless switched off; the choice is remembered in this browser.
+let recMic = true;
+try { recMic = localStorage.getItem('phosphor-recmic') !== '0'; } catch (_) {}
+function setRecMic(on) {
+  recMic = on;
+  recMicBtn.setAttribute('aria-pressed', String(on));
+  try { localStorage.setItem('phosphor-recmic', on ? '1' : '0'); } catch (_) {}
+}
+setRecMic(recMic);
+recMicBtn.addEventListener('click', () => {
+  if (recorder || recStarting) { toast('Stop the recording first, then switch Include mic on or off.'); return; }
+  setRecMic(!recMic);
+  toast(recMic ? 'Videos you record will include the microphone.' : 'Videos you record won’t include the microphone.');
+});
+const isLoopback = (label) => LOOPBACK.test(label || '');
+// A room microphone, never Stereo Mix and the like (those carry the computer's sound, not a voice)
+async function openRecMic() {
+  const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  const picked = [...micSel.options].find((o) => o.value === micDeviceId);
+  if (micDeviceId && picked && !isLoopback(picked.textContent)) audio.deviceId = { ideal: micDeviceId };
+  let stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+  if (isLoopback(stream.getAudioTracks()[0].label)) {
+    const ins = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications' && !isLoopback(d.label));
+    if (ins.length) {
+      stream.getTracks().forEach((t) => t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: ins[0].deviceId } }, video: false });
+    }
+  }
+  return stream.getAudioTracks()[0];
+}
+// Two sounds (music and mic) are blended into one, since a video holds a single sound track
+function blendSounds(tracks) {
+  if (tracks.length < 2) return { track: tracks[0] || null, ctx: null };
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const out = ctx.createMediaStreamDestination();
+  tracks.forEach((t) => ctx.createMediaStreamSource(new MediaStream([t])).connect(out));
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  return { track: out.stream.getAudioTracks()[0], ctx };
+}
+
+async function startRec() {
+  if (recStarting || recorder) return;
+  const sounds = [];
+  // With React to sound on, the recording keeps the sound (a copy, so stopping it leaves listening alone).
+  // When that sound is the room microphone itself, Include mic decides whether it goes in.
+  const heard = snd.track && snd.track.readyState === 'live' ? snd.track : null;
+  const heardIsMic = !!heard && snd.src === 'mic' && !isLoopback(heard.label);
+  if (heard && (!heardIsMic || recMic)) sounds.push(heard.clone());
+  if (recMic && canRecMic && !heardIsMic) {
+    recStarting = true;
+    recLabel.textContent = 'Starting…';
+    // If the browser stops to ask about the microphone, say what to press
+    let asked = false;
+    const asking = setTimeout(() => { asked = true; toast('Your browser is asking to use the microphone. Choose Allow and recording starts.', 30000); }, 600);
+    try {
+      sounds.push(await openRecMic());
+      if (asked) toast('Recording with the microphone.');
+    } catch (err) {
+      const n = err && err.name;
+      if (n === 'NotAllowedError' || n === 'SecurityError') {
+        setRecMic(false);
+        toast('The microphone is blocked, so this video has no mic. To fix it, click the microphone icon in the address bar, choose Allow, then turn Include mic back on.', 12000);
+      } else {
+        toast('No microphone was found, so this video has no mic.', 8000);
+      }
+    }
+    clearTimeout(asking);
+    recStarting = false;
+    recLabel.textContent = 'Record';
+  }
+  const stopSounds = () => sounds.forEach((t) => t.stop());
   let stream;
-  try { stream = canvas.captureStream(30); } catch (e) { toast('Recording isn’t supported in this browser.'); return; }
-  // With React to sound on, the recording keeps the sound (a copy, so stopping it leaves listening alone)
-  const withSound = !!(snd.track && snd.track.readyState === 'live');
-  if (withSound) stream.addTrack(snd.track.clone());
+  try { stream = canvas.captureStream(30); } catch (e) { stopSounds(); toast('Recording isn’t supported in this browser.'); return; }
+  const blend = blendSounds(sounds);
+  if (blend.track) stream.addTrack(blend.track);
+  const withSound = !!blend.track;
   const types = withSound
     ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
     : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
   const mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+  const cleanUp = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    stopSounds();
+    if (blend.ctx) { try { blend.ctx.close(); } catch (_) {} }
+  };
   try {
     recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 10000000 } : undefined);
-  } catch (e) { toast('Recording isn’t supported in this browser.'); return; }
+  } catch (e) { cleanUp(); recorder = null; toast('Recording isn’t supported in this browser.'); return; }
   recChunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
   recorder.onstop = () => {
     const type = recorder.mimeType || mime || 'video/webm';
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
     const blob = new Blob(recChunks, { type });
-    stream.getTracks().forEach((t) => t.stop());
+    cleanUp();
     recorder = null;
     clearInterval(recTick);
     recInd.hidden = true;

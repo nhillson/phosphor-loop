@@ -99,6 +99,9 @@ TIPS
     switch on "Also share system audio" and press Share, then play Spotify
     or anything else. Microphone listens to the room instead. Record keeps
     the sound in the video.
+  - Include mic (next to Record): when its light is on, videos you record
+    include the microphone too, mixed with any music. The first time, the
+    browser asks to use the microphone; choose Allow.
   - Computer sound works in Chrome and Edge. Firefox and Safari don't pass
     sound through screen sharing, so use Microphone there.
   - No screen sharing on Windows: choose Microphone and pick Stereo Mix
