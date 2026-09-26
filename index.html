@@ -182,6 +182,18 @@
   .btn.rec[aria-pressed="true"] { color: #ffd9d5; }
   .btn.wide { width: 100%; }
   .btn.small { min-height: 32px; padding: 5px 11px; font-size: 14px; }
+  .btn.special {
+    border-color: var(--loop-a);
+    background: linear-gradient(var(--press-1), var(--press-2));
+    color: var(--press-ink);
+    font-weight: 600;
+    animation: special-pulse 2.4s ease-in-out infinite;
+  }
+  .btn.special:hover { filter: brightness(1.12); }
+  @keyframes special-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px var(--loop-a), 0 0 8px var(--amber-glow), inset 0 1px 0 rgba(255,255,255,.08); }
+    50% { box-shadow: 0 0 0 1px var(--loop-a), 0 0 20px var(--amber-glow), inset 0 1px 0 rgba(255,255,255,.08); }
+  }
   .linkish {
     background: none; border: 0; padding: 0; cursor: pointer;
     color: var(--amber); text-decoration: underline; text-underline-offset: 2px; font-weight: 600;
@@ -527,6 +539,7 @@
   @media (prefers-reduced-motion: reduce) {
     .osd, .tip { transition: none; }
     .rec-ind .dot { animation: none; }
+    .btn.special { animation: none; }
   }
 </style>
 </head>
@@ -567,6 +580,7 @@
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
+        <button class="btn special" id="phoneMotion" title="Sets this loop's input to your phone, showing only what moves">Phone: movement only</button>
         <button class="btn" id="hideCtl" aria-pressed="false">Hide controls</button>
         <span class="spacer" aria-hidden="true"></span>
         <button class="btn" id="snap" hidden>Save picture</button>
@@ -1762,6 +1776,17 @@ function settleDevices() {
     if (!uses('video') && !vid.video.paused) vid.video.pause();
   }
 }
+
+// One-click button: sets this loop's input to the phone and turns on "Only movement".
+// Nothing else about the current look changes.
+const phoneMotionBtn = $('#phoneMotion');
+if (inArtifact) phoneMotionBtn.hidden = true;
+phoneMotionBtn.addEventListener('click', () => {
+  chooseSource('in1', 'phone');
+  loops[edit].tgt.motion = true;
+  syncUI();
+  toast('This loop’s input is now your phone, with Only movement on. Scan the QR code to connect it.');
+});
 
 /* ================= UI: loop tabs ================= */
 const editor = $('#editor');
