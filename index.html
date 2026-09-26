@@ -362,6 +362,23 @@
   .qr-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 14px; }
   .qr-url { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; user-select: all; }
 
+  /* show setup and MIDI */
+  .midi-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .midi-list li {
+    display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 3px 4px 3px 10px;
+    border-radius: 6px; background: var(--well); border: 1px solid var(--line); font-size: 13.5px;
+  }
+  .midi-list .src { font: 16px/1 var(--f-osd); color: var(--dim); white-space: nowrap; }
+  .midi-list .dst { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .midi-list button {
+    flex: none; width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer;
+    border: 1px solid var(--line); background: var(--raise); font: 600 15px/1 var(--f-body);
+  }
+  #offlineNote:not(:empty) { margin-top: 6px; color: var(--dim); }
+  .midi-can { outline: 1px dashed var(--faint); outline-offset: 2px; cursor: cell; }
+  .midi-mapped { outline: 1px solid var(--loop-b); outline-offset: 2px; }
+  .midi-target { outline: 2px solid var(--tally) !important; outline-offset: 2px; }
+
   .ctl { display: grid; gap: 2px; }
   .ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .ctl-head label, .ctl-head .lbl { font-weight: 600; font-size: 15px; }
@@ -847,6 +864,28 @@
         <p class="hint">Double-click a slider to put it back where the channel had it.</p>
       </section>
 
+      <section class="group" id="showGroup" aria-labelledby="h-show">
+        <h2 id="h-show">Show setup</h2>
+        <div class="ctl">
+          <button class="btn wide" id="showBtn" aria-pressed="false"><span class="led"></span>Show mode</button>
+          <span class="hint">For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake.</span>
+          <span class="hint" id="offlineNote"></span>
+        </div>
+        <div class="ctl">
+          <span class="lbl">MIDI controller</span>
+          <div class="dev">
+            <span class="dev-status" id="midiStatus">Not connected.</span>
+            <div class="dev-actions">
+              <button class="btn small" id="midiConnect">Use a MIDI controller</button>
+              <button class="btn small" id="midiLearn" aria-pressed="false" hidden><span class="led"></span>Learn</button>
+              <button class="btn small" id="midiClear" hidden>Forget all</button>
+            </div>
+            <ul class="midi-list" id="midiList"></ul>
+            <span class="hint">Press Learn, touch a slider or button here, then move a fader, turn a knob or press a button on the controller. Faders take over once they reach the slider’s position, so the picture never jumps.</span>
+          </div>
+        </div>
+      </section>
+
       <input type="file" id="picFile" accept="image/*" hidden>
       <input type="file" id="vidFile" accept="video/*" hidden>
     </aside>
@@ -935,6 +974,12 @@
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can paint on the projected picture too.</dd>
             <dt>Save picture and Record</dt><dd>Save a still, or up to a minute of video.</dd>
           </dl></div>
+          <div class="g-card"><h3>Show setup</h3><dl>
+            <dt>Show mode</dt><dd>For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look and Autopilot, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake. Tap Fill my other screen in the output window to put the picture on the projector.</dd>
+            <dt>Without internet</dt><dd>After one visit from its web address, the browser keeps a copy, so Phosphor Loop opens offline. Only the phone link still needs internet.</dd>
+            <dt>MIDI controller</dt><dd>Press Use a MIDI controller and allow it. Then press Learn, touch a slider or button, and move a fader, turn a knob or press a button on the controller. Repeat for each control. Mappings stay in this browser, like presets.</dd>
+            <dt>Pickup</dt><dd>A fader only takes over once it reaches the slider’s current position, so loading a channel or preset never makes the picture jump. Endless knobs work straight away.</dd>
+          </dl></div>
         </div>
       </section>
 
@@ -977,6 +1022,8 @@
           <dt>The output window didn’t open</dt><dd>The browser blocked it. Click the blocked pop-up icon at the right of the address bar, choose to always allow pop-ups for this page, then press Output window again.</dd>
           <dt>The picture doesn’t react to music</dt><dd>Check that the Low, Mid and High bars move. With Computer sound, share again and make sure Also share system audio is switched on under the screen you pick (or Also share tab audio for a browser tab). If that switch never appears, use Microphone with Stereo Mix instead. Then raise Amount.</dd>
           <dt>It’s choppy</dt><dd>Turn the Old TV look down, close other tabs, or choose 4:3 TV as the screen shape.</dd>
+          <dt>A fader on the MIDI controller does nothing</dt><dd>It’s waiting to pick up: move it past the slider’s current position (a note under the screen says where). If nothing reacts at all, check the controller is listed under Show setup.</dd>
+          <dt>It won’t open without internet</dt><dd>It needs one visit from its web address with internet first. Open it once online, wait until Show setup says it’s saved, and from then on it opens offline.</dd>
         </dl>
       </section>
 
@@ -1000,6 +1047,10 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
 let params;
 try { params = new URLSearchParams(location.search); } catch (_) { params = new URLSearchParams(); }
+// Keep a copy in the browser so Phosphor Loop opens without internet after one visit (see sw.js)
+const swOK = !inArtifact && 'serviceWorker' in navigator &&
+  (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
@@ -2949,7 +3000,7 @@ presetForm.addEventListener('submit', async (e) => {
   else toast(existing ? `Updated “${name}”.` : `Saved “${name}” in this browser.`);
 });
 
-function loadPreset(pr) {
+function loadPreset(pr, quiet) {
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
   channel = -1;
@@ -2972,8 +3023,10 @@ function loadPreset(pr) {
   setEdit('A');
   syncUI();
   markPreset(pr.id);
-  burst();
-  showOSD('PRESET', pr.name.toUpperCase().slice(0, 18));
+  if (!quiet) {
+    burst();
+    showOSD('PRESET', pr.name.toUpperCase().slice(0, 18));
+  }
   if (used.includes('video') && !vid.on) toast('This preset uses a video. Choose one under Video.');
 }
 renderPresets();
@@ -3231,7 +3284,8 @@ hideBtn.addEventListener('click', () => toggleBare());
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
 // at that window's resolution, so the controls can stay on this screen.
 const outBtn = $('#outBtn');
-if (inArtifact || window.matchMedia('(hover: none)').matches) outBtn.hidden = true;
+// Phones and tablets have no second screen, but a touchscreen computer with a projector does
+if (inArtifact || (window.matchMedia('(hover: none)').matches && !(window.screen && window.screen.isExtended))) outBtn.hidden = true;
 const OUTPUT_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Phosphor Loop Output</title>
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
@@ -3243,6 +3297,7 @@ body.idle,body.idle canvas{cursor:none}
 .hint.gone{opacity:0;pointer-events:none}
 .hint b{color:#ffae3b}
 .hint button{margin-top:8px;min-height:34px;padding:5px 14px;border-radius:6px;border:1px solid #3a3631;background:#35312c;color:#ece5d6;font:inherit;cursor:pointer}
+.show .hint button{min-height:60px;padding:12px 30px;font-size:21px;font-weight:600;border-color:#ffae3b;background:#4a3a22;color:#ffe2b8}
 </style></head><body><canvas id="out"></canvas>
 <div class="hint" id="hint"><span id="hintText">Drag this window onto your projector or second screen, then <b>double-click the picture</b> (or press F) to fill it.</span><br><button id="other" hidden>Fill my other screen</button></div>
 </body></html>`;
@@ -3280,7 +3335,13 @@ function openOutput() {
   wake();
   // With two or more screens, Chrome can fill the other one directly
   const other = doc.getElementById('other');
-  if (w.screen && w.screen.isExtended && 'getScreenDetails' in w) {
+  const canFill = !!(w.screen && w.screen.isExtended && 'getScreenDetails' in w);
+  if (canFill && showMode) {
+    // Show mode: one big button, since this window usually opened by itself on the controls screen
+    doc.body.classList.add('show');
+    doc.getElementById('hintText').textContent = 'Tap the button to put the picture on your projector or second screen.';
+  }
+  if (canFill) {
     other.hidden = false;
     other.addEventListener('click', async () => {
       try {
@@ -3298,7 +3359,9 @@ function openOutput() {
   $$('#shape button').forEach((b) => { b.disabled = true; });
   $('#shapeNote').hidden = false;
   fit();
-  toast('Output window open. Drag it to your projector or second screen, then double-click it to fill that screen.');
+  toast(canFill && showMode
+    ? 'Output window open. Tap Fill my other screen in it to put the picture on the projector.'
+    : 'Output window open. Drag it to your projector or second screen, then double-click it to fill that screen.');
 }
 function closeOutput(alreadyClosed) {
   if (outWin && !alreadyClosed) { try { outWin.close(); } catch (_) {} }
@@ -3320,6 +3383,432 @@ window.addEventListener('pagehide', () => {
   cam.detach(); scr.detach();
   if (sig && phonePeer) sig.send('LEAVE', phonePeer, {});
 });
+
+/* ================= show mode ================= */
+// For a computer that plays Phosphor Loop at gigs: after a restart it picks up where it left off,
+// reconnects the camera and microphone, opens the output window and keeps the screen awake.
+const SHOW_KEY = 'phosphor-show-v1', LAST_KEY = 'phosphor-last-v1', MIDI_KEY = 'phosphor-midi-v1';
+function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (_) { return false; } }
+// ?show=1 in the address turns it on for that visit; the Show mode button remembers it in this browser
+const showParam = params.get('show');
+let showMode = showParam != null ? showParam !== '0' : lsGet(SHOW_KEY) === '1';
+const showBtn = $('#showBtn'), offlineNote = $('#offlineNote');
+if (inArtifact) $('#showGroup').hidden = true;
+function syncShowUI() { showBtn.setAttribute('aria-pressed', String(showMode)); }
+showBtn.addEventListener('click', () => {
+  showMode = !showMode;
+  lsSet(SHOW_KEY, showMode ? '1' : '0');
+  syncShowUI();
+  if (showMode) {
+    showExtras();
+    toast('Show mode is on. From the next start, Phosphor Loop picks up where you left off and opens the output window.');
+  } else toast('Show mode is off.');
+});
+
+// The current look is saved every couple of seconds, so a power cut costs nothing
+let sessionReady = false, lastSaved = '';
+function saveSession() {
+  if (!sessionReady) return;
+  let s;
+  try {
+    s = JSON.stringify({ v: 1, look: snapshot(), ap: ap.on, cam: camDeviceId,
+      snd: snd.src === 'mic' ? { src: 'mic', mic: micDeviceId } : { src: 'off' } });
+  } catch (_) { return; }
+  if (s !== lastSaved && lsSet(LAST_KEY, s)) lastSaved = s;
+}
+setInterval(saveSession, 2000);
+window.addEventListener('pagehide', saveSession);
+
+function restoreSession() {
+  let s = null;
+  try { s = JSON.parse(lsGet(LAST_KEY) || 'null'); } catch (_) {}
+  if (!s || !s.look) return false;
+  const d = JSON.parse(JSON.stringify(s.look));
+  // Screen sharing and video files need a person to pick them again, so those slots fall back to a pattern
+  let missing = '';
+  for (const k of ['A', 'B']) {
+    const L = d[k];
+    if (!L) continue;
+    for (const slot of ['in1', 'in2']) {
+      if (L[slot] !== 'screen' && L[slot] !== 'video') continue;
+      missing = L[slot] === 'screen' ? 'Screen' : 'Video';
+      L[slot] = slot === 'in2' ? 'none' : (k === 'A' ? 'wave' : 'shape');
+    }
+  }
+  if (s.cam) camDeviceId = s.cam;
+  loadPreset({ id: null, name: '', data: d }, true);
+  if (s.ap) setAutopilot(true, true);
+  if (s.snd && s.snd.src === 'mic') { micDeviceId = s.snd.mic || ''; setSound('mic'); }
+  showOSD('SHOW', 'RESUMED');
+  if (missing) toast(`Picked up where you left off. Choose ${missing} again to bring it back.`);
+  return true;
+}
+
+let wakeLock = null, extrasOn = false;
+async function keepAwake() {
+  if (!showMode || document.hidden || !('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+function showExtras() {
+  keepAwake();
+  hideTip();
+  if (!midi.access) midiStart();
+  if (extrasOn) return;
+  extrasOn = true;
+  // A long press on the touchscreen shouldn't pop a menu up over the controls
+  document.addEventListener('contextmenu', (e) => { if (showMode) e.preventDefault(); });
+}
+
+function offlineStatus() {
+  if (!swOK) {
+    offlineNote.textContent = location.protocol === 'file:'
+      ? 'Opened from a file on this computer, so it already works without internet (except the phone link).'
+      : '';
+    return;
+  }
+  navigator.serviceWorker.ready
+    .then(() => caches.keys())
+    .then((keys) => {
+      offlineNote.textContent = keys.some((k) => k.startsWith('pl-'))
+        ? 'Saved on this computer: Phosphor Loop opens even without internet. Only the phone link needs it.'
+        : '';
+    })
+    .catch(() => {});
+}
+
+/* ================= MIDI controller ================= */
+// Works with any MIDI controller. Press Learn, touch a slider or button, then move a control on the device.
+// Faders pick up the slider where it is, so loading a look never makes the picture jump.
+let midiSaved = { enabled: false, maps: [] };
+try {
+  const v = JSON.parse(lsGet(MIDI_KEY) || 'null');
+  if (v && Array.isArray(v.maps)) midiSaved = { enabled: !!v.enabled, maps: v.maps.filter((m) => m && m.t && m.key) };
+} catch (_) {}
+const midi = { access: null, learning: false, target: null, pending: null, pendTimer: null, st: new Map(), lastHint: 0 };
+const midiStatus = $('#midiStatus'), midiConnect = $('#midiConnect'), midiLearnBtn = $('#midiLearn');
+const midiClear = $('#midiClear'), midiList = $('#midiList');
+function midiWrite() { lsSet(MIDI_KEY, JSON.stringify(midiSaved)); }
+function midiSay(html, warn) { say(midiStatus, html, warn); }
+
+async function midiStart() {
+  if (midi.access) return;
+  if (!navigator.requestMIDIAccess) { midiSay('This browser can’t use MIDI controllers. Use <b>Chrome</b> or <b>Edge</b>.', true); return; }
+  midiSay('Waiting for the browser to allow MIDI devices…');
+  try {
+    midi.access = await navigator.requestMIDIAccess({ sysex: false });
+  } catch (_) {
+    midiSay('MIDI was blocked. Click the icon left of the address, allow <b>MIDI devices</b>, then press Use a MIDI controller again.', true);
+    return;
+  }
+  midiSaved.enabled = true;
+  midiWrite();
+  midi.access.onstatechange = midiBind;
+  midiBind();
+}
+function midiBind() {
+  if (!midi.access) return;
+  const names = [];
+  for (const inp of midi.access.inputs.values()) {
+    if (inp.state === 'disconnected') continue;
+    inp.onmidimessage = midiIn;
+    names.push(inp.name || 'MIDI device');
+  }
+  midiConnect.hidden = true;
+  midiLearnBtn.hidden = false;
+  midiClear.hidden = !midiSaved.maps.length;
+  if (midi.learning) return;
+  midiSay(names.length
+    ? `<span class="live"></span><b>${escapeHTML(names.join(', '))}</b> connected.`
+    : 'No MIDI controller found. Plug one in and it appears here.');
+}
+
+function midiIn(e) {
+  const d = e.data;
+  if (!d || d.length < 2) return;
+  const status = d[0] & 0xF0, ch = (d[0] & 0x0F) + 1;
+  let type, num, val;
+  if (status === 0xB0) { type = 'cc'; num = d[1]; val = d[2] || 0; }
+  else if (status === 0x90 || status === 0x80) { type = 'note'; num = d[1]; val = status === 0x80 ? 0 : (d[2] || 0); }
+  else if (status === 0xE0) { type = 'pb'; num = 0; val = (((d[2] || 0) << 7) | d[1]) / 16383 * 127; }
+  else return;
+  const key = `${type}:${ch}:${num}`;
+  if (midi.learning) { learnMessage(key, type, ch, num, val, e.currentTarget || e.target); return; }
+  for (const m of midiSaved.maps) if (m.key === key) midiApply(m, val);
+}
+
+// What a slider or button stands for, stored so a mapping survives page reloads
+const LOOP_KEYS = LOOP_SLIDERS;
+const GROUP_NAMES = { inputs: 'Input', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed' };
+const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-confirm button, #presetForm button, #presetSave, ' +
+  '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn';
+function labelFor(el) {
+  const l = document.querySelector(`label[for="${el.id}"]`);
+  return l ? l.textContent.replace(/\s+/g, ' ').trim() : el.id;
+}
+function btnAddress(b) {
+  if (b.id) return '#' + b.id;
+  const tile = b.closest('.pre');
+  if (tile && tile.dataset.id) return `.pre[data-id="${CSS.escape(tile.dataset.id)}"] .pre-load`;
+  if (b.classList.contains('hold-btn')) { const row = b.closest('.dev[id]'); return row ? `#${row.id} .hold-btn` : null; }
+  const holder = b.parentElement && b.parentElement.closest('[id]');
+  if (!holder) return null;
+  for (const a of b.attributes) {
+    if (a.name.startsWith('data-') && a.name !== 'data-device') return `#${holder.id} [${a.name}="${CSS.escape(a.value)}"]`;
+  }
+  return null;
+}
+function btnLabel(b) {
+  if (b.classList.contains('ch')) { const i = +b.dataset.ch; return `Channel ${i + 1}: ${CHANNELS[i].name}`; }
+  const tile = b.closest('.pre');
+  if (tile) { const pr = presets.find((p) => p.id === tile.dataset.id); return `Preset: ${pr ? pr.name : 'saved look'}`; }
+  const text = (b.getAttribute('aria-label') || b.textContent || '').replace(/\s+/g, ' ').trim();
+  const g = b.parentElement && GROUP_NAMES[b.parentElement.id];
+  return g ? `${g}: ${text}` : text;
+}
+function targetFor(el) {
+  if (el.matches('input[type="range"]')) {
+    const id = el.id;
+    if (LOOP_KEYS.includes(id)) return { kind: 'loop', loop: edit, key: id, lo: +el.min, hi: +el.max, label: `Loop ${edit} · ${labelFor(el)}` };
+    if (MIX_SLIDERS.includes(id)) return { kind: 'mix', key: id, lo: +el.min, hi: +el.max, label: labelFor(el) };
+    if (id === 'sndAmt') return { kind: 'snd', key: 'amount', lo: 0, hi: 100, label: 'Sound amount' };
+    const a = /^adj-(\w+)-(\w+)$/.exec(id);
+    if (a) return { kind: 'adj', src: a[1], key: a[2], lo: +el.min, hi: +el.max, label: `${SRC_LABEL[a[1]] || a[1]} · ${labelFor(el)}` };
+    return null;
+  }
+  if (el.tagName !== 'BUTTON') return null;
+  const sel = btnAddress(el);
+  if (!sel) return null;
+  // Buttons under the loop tabs act on the loop that was showing when they were learned
+  const scoped = !!el.closest('#editor');
+  return { kind: 'button', sel, loop: scoped ? edit : null, label: (scoped ? `Loop ${edit} · ` : '') + btnLabel(el) };
+}
+function learnableFrom(node) {
+  const el = node && node.closest ? node.closest('input[type="range"], button') : null;
+  if (!el || el.matches(NOT_LEARNABLE) || !el.closest('.panel, .transport')) return null;
+  return targetFor(el) ? el : null;
+}
+function sameTarget(a, b) {
+  return a.kind === b.kind && a.key === b.key && (a.loop || null) === (b.loop || null) && a.src === b.src && a.sel === b.sel;
+}
+function ctrlName(m) {
+  const what = m.type === 'note' ? `NOTE ${m.num}` : m.type === 'pb' ? 'BEND' : `${m.mode === 'rel' ? 'ENC' : 'CC'} ${m.num}`;
+  return `${what} · CH ${m.ch}`;
+}
+
+function getTarget(t) {
+  if (t.kind === 'loop') return loops[t.loop].tgt[t.key];
+  if (t.kind === 'mix') return mix.tgt[t.key];
+  if (t.kind === 'snd') return snd.amount;
+  if (t.kind === 'adj') return adj[t.src] ? adj[t.src][t.key] : 0;
+  return 0;
+}
+function setTarget(t, v) {
+  if (t.kind === 'loop') {
+    takeOver();
+    loops[t.loop].tgt[t.key] = v;
+    if (t.loop === edit) { sliderEls[t.key].value = v; paintSlider(t.key); }
+  } else if (t.kind === 'mix') {
+    if (t.key !== 'tv') takeOver();
+    mix.tgt[t.key] = v;
+    sliderEls[t.key].value = v;
+    paintSlider(t.key);
+    if (t.key !== 'tv') syncVisibility();
+  } else if (t.kind === 'snd') {
+    snd.amount = v;
+    syncSoundUI();
+  } else if (t.kind === 'adj' && adj[t.src]) {
+    adj[t.src][t.key] = v;
+    const a = adjEls.find((x) => x.src === t.src && x.k === t.key);
+    if (a) { a.el.value = v; a.paint(); }
+  }
+}
+function pressTarget(t) {
+  const el = document.querySelector(t.sel);
+  if (!el || el.disabled) return;
+  if (t.loop && t.loop !== edit) { const was = edit; setEdit(t.loop); el.click(); setEdit(was); }
+  else el.click();
+}
+function midiApply(m, val) {
+  const t = m.t;
+  let st = midi.st.get(m.key);
+  if (!st) { st = { picked: false, last: null, applied: null, down: false }; midi.st.set(m.key, st); }
+  if (t.kind === 'button') {
+    const down = val >= 64 || (m.type === 'note' && val > 0);
+    if (down && !st.down) pressTarget(t);
+    st.down = down;
+    return;
+  }
+  if (m.mode === 'rel') {
+    // Endless knobs send small steps: 1–63 up and 65–127 down, or around 64
+    const delta = m.enc === 'mid' ? val - 64 : (val < 64 ? val : val - 128);
+    if (!delta) return;
+    const step = Math.sign(delta) * Math.max(1, Math.round(Math.abs(delta) * (t.hi - t.lo) / 127));
+    setTarget(t, clamp(Math.round(getTarget(t)) + step, t.lo, t.hi));
+    return;
+  }
+  // Faders and knobs with an end stop take over only once they reach the slider's position
+  const n = val / 127, now = getTarget(t), cur = (now - t.lo) / (t.hi - t.lo);
+  if (st.picked && st.applied != null && Math.abs(now - st.applied) > 0.5) st.picked = false;   // something else moved it
+  if (!st.picked && (Math.abs(n - cur) <= 0.03 || (st.last != null && (st.last - cur) * (n - cur) <= 0))) st.picked = true;
+  st.last = n;
+  if (!st.picked) {
+    const t0 = performance.now();
+    if (t0 - midi.lastHint > 1500) {
+      midi.lastHint = t0;
+      toast(`${t.label} is at ${Math.round(now)}. Move the control past there to take over.`);
+    }
+    return;
+  }
+  const v = Math.round(t.lo + n * (t.hi - t.lo));
+  setTarget(t, v);
+  st.applied = v;
+}
+
+// Learning
+function markLearnable() {
+  $$('.midi-can, .midi-mapped').forEach((el) => el.classList.remove('midi-can', 'midi-mapped'));
+  if (!midi.learning) return;
+  $$('.panel input[type="range"], .panel button, .transport button').forEach((el) => {
+    if (learnableFrom(el) === el) el.classList.add('midi-can');
+  });
+  for (const m of midiSaved.maps) {
+    const t = m.t;
+    let el = null;
+    if (t.kind === 'button') { if (!t.loop || t.loop === edit) el = document.querySelector(t.sel); }
+    else if (t.kind === 'loop') { if (t.loop === edit) el = sliderEls[t.key]; }
+    else if (t.kind === 'mix') el = sliderEls[t.key];
+    else if (t.kind === 'snd') el = sndAmt;
+    else if (t.kind === 'adj') el = document.getElementById(`adj-${t.src}-${t.key}`);
+    if (el) el.classList.add('midi-mapped');
+  }
+}
+function setLearnTarget(el) {
+  if (midi.target) midi.target.el.classList.remove('midi-target');
+  midi.target = null;
+  if (!el) return;
+  const t = targetFor(el);
+  if (!t) return;
+  midi.target = { el, t };
+  el.classList.add('midi-target');
+  midiSay(`Now move a control on the MIDI device for <b>${escapeHTML(t.label)}</b>.`);
+}
+function setLearning(on) {
+  midi.learning = on;
+  midiLearnBtn.setAttribute('aria-pressed', String(on));
+  clearTimeout(midi.pendTimer);
+  midi.pending = null;
+  setLearnTarget(null);
+  markLearnable();
+  if (on) midiSay('<b>Learning.</b> Touch a slider or button here, then move a control on the MIDI device.');
+  else midiBind();
+}
+function learnMessage(key, type, ch, num, val, port) {
+  if (!midi.target) { midiSay('<b>Learning.</b> First touch the slider or button it should control.'); return; }
+  if (type === 'note' && val === 0) return;   // the release of a pad or key
+  if (!midi.pending || midi.pending.key !== key) midi.pending = { key, type, ch, num, vals: [], port: (port && port.name) || '' };
+  midi.pending.vals.push(Math.round(val));
+  clearTimeout(midi.pendTimer);
+  if (midi.target.t.kind === 'button' || type === 'note' || midi.pending.vals.length >= 8) { commitLearn(); return; }
+  midi.pendTimer = setTimeout(commitLearn, 600);   // keep listening briefly to tell a fader from an endless knob
+}
+function commitLearn() {
+  clearTimeout(midi.pendTimer);
+  const p = midi.pending;
+  midi.pending = null;
+  if (!p || !midi.target) return;
+  const t = midi.target.t;
+  const m = { key: p.key, type: p.type, ch: p.ch, num: p.num, port: p.port, mode: 'abs', t };
+  if (t.kind === 'button') m.mode = 'btn';
+  else if (p.type === 'cc') {
+    // An endless knob repeats the same small step value; a fader never sends the same value twice in a row
+    const v = p.vals;
+    const repeats = v.some((x, i) => i > 0 && x === v[i - 1]);
+    if (repeats && v.every((x) => x >= 56 && x <= 72 && x !== 64)) { m.mode = 'rel'; m.enc = 'mid'; }
+    else if (repeats && v.every((x) => (x >= 1 && x <= 15) || x >= 113)) { m.mode = 'rel'; m.enc = 'twos'; }
+  }
+  // One control drives one thing, and each thing listens to one control
+  midiSaved.maps = midiSaved.maps.filter((x) => x.key !== m.key && !sameTarget(x.t, t));
+  midiSaved.maps.push(m);
+  midiWrite();
+  midi.st.delete(m.key);
+  renderMidiList();
+  toast(`${ctrlName(m)} now controls ${t.label}.`);
+  setLearnTarget(null);
+  markLearnable();
+  midiSay('<b>Learning.</b> Touch the next slider or button, or press Learn again to finish.');
+}
+// While learning, touching a control picks it instead of using it
+document.addEventListener('pointerdown', (e) => {
+  if (!midi.learning) return;
+  const el = learnableFrom(e.target);
+  if (!el) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (el.matches('input[type="range"]')) el.dataset.learnHold = el.value;
+  setLearnTarget(el);
+}, true);
+['click', 'dblclick'].forEach((type) => document.addEventListener(type, (e) => {
+  if (midi.learning && learnableFrom(e.target)) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true));
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!midi.learning || !el || !el.dataset || el.dataset.learnHold == null) return;
+  el.value = el.dataset.learnHold;
+  e.stopImmediatePropagation();
+}, true);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && midi.learning) setLearning(false); });
+['#tabA', '#tabB'].forEach((s) => $(s).addEventListener('click', () => { if (midi.learning) markLearnable(); }));
+
+function renderMidiList() {
+  midiList.innerHTML = '';
+  midiClear.hidden = !midiSaved.maps.length || !midi.access;
+  for (const m of midiSaved.maps) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="src">${escapeHTML(ctrlName(m))}</span><span class="dst">${escapeHTML(m.t.label)}</span>` +
+      `<button type="button" aria-label="Forget ${escapeHTML(m.t.label)}" title="Forget">×</button>`;
+    li.querySelector('button').addEventListener('click', () => {
+      midiSaved.maps = midiSaved.maps.filter((x) => x !== m);
+      midiWrite();
+      renderMidiList();
+      markLearnable();
+    });
+    midiList.appendChild(li);
+  }
+}
+midiConnect.addEventListener('click', () => midiStart());
+midiLearnBtn.addEventListener('click', () => setLearning(!midi.learning));
+let clearArmed = 0;
+midiClear.addEventListener('click', () => {
+  if (Date.now() - clearArmed > 3000) {
+    clearArmed = Date.now();
+    midiClear.textContent = 'Tap again to forget all';
+    setTimeout(() => { midiClear.textContent = 'Forget all'; }, 3000);
+    return;
+  }
+  clearArmed = 0;
+  midiSaved.maps = [];
+  midiWrite();
+  renderMidiList();
+  markLearnable();
+  midiClear.textContent = 'Forget all';
+  toast('Forgot every MIDI mapping.');
+});
+renderMidiList();
+
+function showStart() {
+  syncShowUI();
+  offlineStatus();
+  if (inArtifact) { sessionReady = true; return; }
+  if (showMode) {
+    showExtras();
+    restoreSession();
+    // With a second screen plugged in, open the output window straight away (the browser must allow pop-ups here)
+    if (window.screen && window.screen.isExtended) setTimeout(() => { if (!outputOpen()) openOutput(); }, 1200);
+  } else if (midiSaved.enabled) midiStart();
+  sessionReady = true;
+}
 
 /* ================= loop ================= */
 const tcEl = $('#tc');
@@ -3542,6 +4031,7 @@ Object.assign(mix.cur, mix.tgt);
 setEdit('A');
 showOSD(`CH ${String(startCh + 1).padStart(2, '0')}`, CHANNELS[startCh].name.toUpperCase());
 requestAnimationFrame(frame);
+showStart();
 })();
 </script>
 

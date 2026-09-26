@@ -5,6 +5,7 @@ WHAT'S IN THIS FOLDER
   index.html   The workstation. Open this on your computer.
   phone.html   The page your phone opens when you scan the QR code.
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
+  sw.js        Keeps a copy in the browser so it opens without internet.
   icon-180.png, icon-192.png   Icons for phone and tablet home screens.
 
 YOU CAN JUST DOUBLE-CLICK index.html
@@ -52,6 +53,30 @@ USING YOUR PHONE AS AN INPUT
 Both devices need internet. The free PeerJS service introduces them to each
 other, then the video goes phone-to-computer directly (or through PeerJS's
 relay if your network blocks direct links). Nothing is recorded.
+
+SHOW MODE (a computer that plays at gigs)
+  1. Open your https:// address in Chrome once with internet. After a few
+     seconds, Show setup says it's saved on this computer; from then on it
+     opens without internet too (only the phone link still needs it).
+  2. Click the icon left of the address, open Site settings, and set Camera,
+     Microphone, MIDI devices, Pop-ups and redirects, and Window management
+     to Allow, so nothing asks permission in the middle of a set.
+  3. Under Show setup, switch on Show mode (or add ?show=1 to the address).
+     Each time Phosphor Loop starts it then picks up the last look and
+     Autopilot, reconnects the camera and microphone, keeps the screen awake,
+     and opens the output window when a second screen is plugged in. Tap
+     "Fill my other screen" in that window to put the picture on the projector.
+  4. To start it with Windows, press Win+R, type shell:startup, and make a
+     shortcut there with this target (one line, with your address):
+       "C:\Program Files\Google\Chrome\Application\chrome.exe" --start-fullscreen https://YOUR-GITHUB-NAME.github.io/phosphor-loop/?show=1
+
+MIDI CONTROLLER
+  Under Show setup press "Use a MIDI controller" and allow it. Press Learn,
+  touch a slider or button, then move a fader, turn a knob or press a button
+  on the controller. Repeat for each control and press Learn again to finish.
+  Mappings stay in this browser. A fader only takes over once it reaches the
+  slider's current position, so loading a look never makes the picture jump.
+  Endless knobs are recognized and work straight away.
 
 TIPS
   - My presets: set up a look, press "Save current look" and name it. Presets
