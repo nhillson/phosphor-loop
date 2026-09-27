@@ -149,5 +149,13 @@ TIPS
     your laptop. If nothing opens, allow pop-ups for the page.
   - Neutral (next to Surprise me, or the N key) shows just loop A's input
     with every effect off. Raise Trails first, then Zoom and Spin.
-  - Keys: 1-9 and 0 channels, Space freeze, N neutral, R surprise,
+  - Ink in water: channel 11 (Ink, the minus key) drops colored ink that
+    curls into threads. The Flow slider adds those swirling currents to any
+    look, and Ink under "What feeds the loop" gives you the drops.
+  - Split lines (under Mirror): every other line of the picture slides left
+    and the lines between slide right, like a scrambled TV.
+  - Camera: a phone's back camera shows the world the right way round; a
+    front camera or computer webcam works like a mirror. With more than one
+    camera, a list under Camera picks which one.
+  - Keys: 1-9, 0 and - (minus) channels, Space freeze, N neutral, R surprise,
     P autopilot, C clear, F full screen, H hide controls, G guide.
