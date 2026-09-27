@@ -11,13 +11,19 @@ WHAT'S IN THIS FOLDER
 
 ANDROID APP
   Install it (Android 10 or newer):
-  1. On the phone, open github.com/nhillson/phosphor-loop/releases/latest
-  2. Tap PhosphorLoop.apk. When it has downloaded, tap it (or tap Open).
-  3. If Android asks, allow your browser to install apps, then go back.
-  4. Tap Install. If Google Play Protect asks, tap "Install anyway"
-     (it asks because the app isn't from the Play Store).
-  5. Open Phosphor Loop from your apps. Allow the camera and microphone
-     when you pick Camera or Microphone.
+  1. On the phone, open this address in Chrome:
+       https://github.com/nhillson/phosphor-loop/releases/latest/download/PhosphorLoop.apk
+     It downloads straight away (about 1 MB).
+  2. Tap Open on the download message (or open Downloads and tap
+     PhosphorLoop.apk).
+  3. If Android says your browser isn't allowed to install apps, tap
+     Settings, switch on "Allow from this source", then tap back.
+  4. Tap Install. If Google Play Protect pops up, choose the option that
+     installs anyway ("Install without scanning", or "More details" >
+     "Install anyway"). It asks only because the app isn't from the Play Store.
+  5. Open Phosphor Loop from your apps. The first time, Android explains how
+     to leave full screen; tap Got it. Allow the camera and microphone when
+     you pick Camera or Microphone.
 
   What's different in the app:
   - It opens full screen and keeps the screen awake.
