@@ -1061,6 +1061,18 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 // Inside a Claude artifact the camera, screen sharing and network links are refused, so those inputs hide there.
 const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
+// The Android app (android/ folder) opens this page with a helper called PhosphorApp. It adds what a phone
+// browser can't do: the picture on a plugged-in projector or TV, reacting to music playing on the phone,
+// and saving photos and videos to the phone's gallery. In a normal browser APP is null and nothing changes.
+const APP = (!inArtifact && window.PhosphorApp && typeof window.PhosphorApp.info === 'function') ? window.PhosphorApp : null;
+let appInfo = {};
+if (APP) {
+  try { appInfo = JSON.parse(APP.info()) || {}; } catch (_) { appInfo = {}; }
+  document.documentElement.classList.add('in-app');
+}
+function onApp(type, fn) {
+  if (APP) window.addEventListener('phosphorapp', (e) => { if (e.detail && e.detail.type === type) fn(e.detail); });
+}
 let params;
 try { params = new URLSearchParams(location.search); } catch (_) { params = new URLSearchParams(); }
 // Keep a copy in the browser so Phosphor Loop opens without internet after one visit (see sw.js)
@@ -1738,7 +1750,7 @@ function buildIn2() {
   const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'],
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
-    if (inArtifact && DEVICE.includes(v)) continue;
+    if ((inArtifact && DEVICE.includes(v)) || (APP && v === 'screen')) continue;
     const o = document.createElement('option');
     o.value = v; o.textContent = label;
     in2Sel.appendChild(o);
@@ -1746,6 +1758,8 @@ function buildIn2() {
 }
 buildIn2();
 if (inArtifact) $$('#inputs [data-device]').forEach((b) => { b.hidden = true; });
+// Phones can't share their screen with a page, so the app leaves Screen out
+if (APP) $$('#inputs [data-src="screen"]').forEach((b) => { b.hidden = true; });
 
 $$('#inputs button').forEach((b) => b.addEventListener('click', () => chooseSource('in1', b.dataset.src)));
 in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
@@ -1936,6 +1950,143 @@ if (noScreenAudio) {
 const LOOPBACK = /stereo mix|what u hear|wave out|cable output|loopback|voicemeeter|monitor of/i;
 if (inArtifact) $('#soundGroup').hidden = true;
 function sndSay(html, warn, offerMic) { say(sndStatus, html, warn); sndRetry.hidden = !warn; $('#sndUseMic').hidden = !offerMic; }
+
+// Android app: "Phone sound" hears whatever the phone plays (Spotify, YouTube, games). Android asks first,
+// then the app streams the sound here in small pieces, which become an ordinary audio track for listen().
+const appSnd = { ctx: null, dest: null, node: null, push: null, on: false, session: 0, heard: 0, quiet: null };
+const FEED_WORKLET = `class PLFeed extends AudioWorkletProcessor {
+  constructor() {
+    super(); this.q = []; this.off = 0; this.len = 0; this.go = false;
+    this.port.onmessage = (e) => {
+      this.q.push(e.data); this.len += e.data.length;
+      while (this.len - this.off > sampleRate * 0.3 && this.q.length > 1) { this.len -= this.q.shift().length; this.off = 0; }
+    };
+  }
+  process(inputs, outputs) {
+    const out = outputs[0][0];
+    if (!out) return true;
+    if (!this.go && this.len - this.off >= sampleRate * 0.06) this.go = true;
+    let i = 0;
+    while (this.go && i < out.length && this.q.length) {
+      const h = this.q[0], n = Math.min(out.length - i, h.length - this.off);
+      out.set(h.subarray(this.off, this.off + n), i); i += n; this.off += n;
+      if (this.off >= h.length) { this.q.shift(); this.len -= h.length; this.off = 0; }
+    }
+    if (i < out.length) { out.fill(0, i); this.go = false; }
+    return true;
+  }
+}
+registerProcessor('pl-feed', PLFeed);`;
+if (APP) {
+  $('[data-snd="system"]').textContent = 'Phone sound';
+  $('#sndHint').innerHTML = 'Play music in Spotify, YouTube or any app on this phone and choose <b>Phone sound</b>, or let the <b>Microphone</b> hear the room. Record keeps the sound too.';
+  window.addEventListener('message', (e) => {
+    if (e.data !== 'phosphor-sound-port' || !e.ports || !e.ports[0]) return;
+    e.ports[0].onmessage = (m) => appSoundChunk(m.data);
+  });
+}
+function appSoundClose() {
+  if (appSnd.ctx || appSnd.on) { try { APP.stopSound(); } catch (_) {} }
+  clearTimeout(appSnd.quiet);
+  if (appSnd.node) { try { appSnd.node.disconnect(); } catch (_) {} }
+  if (appSnd.ctx) { try { appSnd.ctx.close(); } catch (_) {} }
+  Object.assign(appSnd, { ctx: null, dest: null, node: null, push: null, on: false });
+}
+// Built during the tap, so the phone lets the sound run
+function appSoundPrepare() {
+  appSoundClose();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ctx;
+  try { ctx = new AC({ sampleRate: 48000 }); } catch (_) { ctx = new AC(); }
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  const dest = ctx.createMediaStreamDestination();
+  const sink = ctx.createGain();   // silent, but keeps the phone's audio engine pulling samples through
+  sink.gain.value = 0;
+  sink.connect(ctx.destination);
+  Object.assign(appSnd, { ctx, dest, session: appSnd.session + 1, heard: 0 });
+  const attach = (node, push) => {
+    if (appSnd.ctx !== ctx) { try { node.disconnect(); } catch (_) {} return; }
+    node.connect(dest); node.connect(sink);
+    appSnd.node = node; appSnd.push = push;
+  };
+  (async () => {
+    if (ctx.audioWorklet && window.AudioWorkletNode) {
+      try {
+        const url = URL.createObjectURL(new Blob([FEED_WORKLET], { type: 'application/javascript' }));
+        await ctx.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        const node = new AudioWorkletNode(ctx, 'pl-feed', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+        attach(node, (f) => node.port.postMessage(f, [f.buffer]));
+        return;
+      } catch (_) {}
+    }
+    // Older phones: fill the sound from the page itself
+    const q = [];
+    let off = 0;
+    const node = ctx.createScriptProcessor(2048, 1, 1);
+    node.onaudioprocess = (e) => {
+      const out = e.outputBuffer.getChannelData(0);
+      let i = 0;
+      while (i < out.length && q.length) {
+        const h = q[0], n = Math.min(out.length - i, h.length - off);
+        out.set(h.subarray(off, off + n), i); i += n; off += n;
+        if (off >= h.length) { q.shift(); off = 0; }
+      }
+      if (i < out.length) out.fill(0, i);
+      while (q.length > 15) { q.shift(); off = 0; }
+    };
+    attach(node, (f) => q.push(f));
+  })();
+}
+function appSoundChunk(data) {
+  if (!appSnd.on || !appSnd.push || typeof data !== 'string') return;
+  let bin;
+  try { bin = atob(data); } catch (_) { return; }
+  const n = bin.length >> 1, f = new Float32Array(n);
+  let peak = 0;
+  for (let i = 0, j = 0; i < n; i++, j += 2) {
+    let v = bin.charCodeAt(j) | (bin.charCodeAt(j + 1) << 8);
+    if (v > 32767) v -= 65536;
+    f[i] = v / 32768;
+    if (v > peak) peak = v; else if (-v > peak) peak = -v;
+  }
+  if (peak > 64) appSnd.heard = performance.now();
+  appSnd.push(f);
+}
+function appSound() {
+  if (!appInfo.sound) { sndSay('This phone can’t share its own sound with apps (that needs Android 10 or newer). Use the <b>Microphone</b> instead.', false, true); return; }
+  appSoundPrepare();
+  sndSay('Android asks whether Phosphor Loop may record or cast your screen. Tap <b>Start</b> (or <b>Start now</b>). Only the sound is used, and nothing is saved or sent anywhere.');
+  try { APP.startSound(Math.round(appSnd.ctx.sampleRate), appSnd.session); }
+  catch (_) { appSoundClose(); sndSay('The phone’s sound couldn’t start. Press Try again, or use the Microphone.', true, true); }
+}
+onApp('sound', (d) => {
+  if (d.session !== appSnd.session) return;
+  if (d.state === 'started') {
+    if (snd.src !== 'system' || !appSnd.dest) { appSoundClose(); return; }
+    appSnd.on = true;
+    listen(new MediaStream(appSnd.dest.stream.getAudioTracks()));
+    sndSay('<span class="live"></span><b>Listening to this phone’s sound.</b> Play music in any app. Android shows that Phosphor Loop is sharing; only the sound is used.');
+    clearTimeout(appSnd.quiet);
+    appSnd.quiet = setTimeout(() => {
+      if (appSnd.on && snd.src === 'system' && !appSnd.heard) {
+        sndSay('Listening, but nothing has come through yet. Start some music. If the bars still don’t move, that app keeps its sound to itself, so use the <b>Microphone</b> instead.', false, true);
+      }
+    }, 15000);
+  } else if (d.state === 'stopped') {
+    if (!appSnd.on || snd.src !== 'system') return;
+    stopSound();
+    snd.src = 'off';
+    syncSoundUI();
+    toast('The phone’s sound stopped. Choose Phone sound or Microphone to listen again.');
+  } else {
+    if (snd.src !== 'system') return;
+    appSoundClose();
+    if (d.state === 'denied') sndSay('Android didn’t start sharing. Press Try again and tap <b>Start</b>.', true);
+    else if (d.state === 'mic-denied') sndSay('Android files the phone’s sound under the <b>Microphone</b> permission. Press Try again and choose <b>Allow</b>.', true);
+    else sndSay('The phone’s sound couldn’t start. Press Try again, or use the Microphone.', true, true);
+  }
+});
 function syncSoundUI() {
   $$('#soundSrc button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.snd === snd.src)));
   $('#soundRow').hidden = snd.src === 'off';
@@ -1946,6 +2097,7 @@ function syncSoundUI() {
   $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
 }
 function stopSound() {
+  if (APP) appSoundClose();
   if (snd.stream) snd.stream.getTracks().forEach((t) => t.stop());
   if (snd.source) { try { snd.source.disconnect(); } catch (_) {} }
   if (snd.ctx) { try { snd.ctx.close(); } catch (_) {} }
@@ -1998,12 +2150,16 @@ async function setSound(src) {
       listMics();
     } catch (err) {
       const n = err && err.name;
-      if (n === 'NotAllowedError' || n === 'SecurityError') sndSay('Microphone access was blocked. Click the microphone icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
+      if (n === 'NotAllowedError' || n === 'SecurityError') {
+        sndSay(APP ? 'Microphone access was blocked. Press Try again and choose <b>Allow</b>.'
+          : 'Microphone access was blocked. Click the microphone icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
+      }
       else if (n === 'NotFoundError' || n === 'OverconstrainedError') { micDeviceId = ''; sndSay('That input wasn’t found. Plug it in or pick another, then press Try again.', true); }
       else sndSay('The microphone couldn’t start. Press Try again.', true);
     }
     return;
   }
+  if (APP) { appSound(); return; }
   if (noScreenAudio || !navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
     sndSay(`${noScreenAudio ? browserName : 'This browser'} can’t pass the computer’s sound to web pages, so Computer sound needs <b>Chrome</b> or <b>Edge</b>. ` +
       'Here you can use the microphone instead. On Windows, choose <b>Stereo Mix</b> when asked which microphone, and it hears the computer’s own sound.', false, true);
@@ -2519,7 +2675,10 @@ async function startCamera() {
     listCameras();
   } catch (err) {
     const n = err && err.name;
-    if (n === 'NotAllowedError' || n === 'SecurityError') camSay('Camera access was blocked. Click the camera icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
+    if (n === 'NotAllowedError' || n === 'SecurityError') {
+      camSay(APP ? 'Camera access was blocked. Press Try again and choose <b>Allow</b>.'
+        : 'Camera access was blocked. Click the camera icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
+    }
     else if (n === 'NotFoundError' || n === 'OverconstrainedError') { camDeviceId = ''; camSay('No camera was found. Plug one in, then press Try again.', true); }
     else if (n === 'NotReadableError' || n === 'AbortError') camSay('Another app is using the camera. Close it, then press Try again.', true);
     else camSay('The camera couldn’t start. Press Try again.', true);
@@ -2543,6 +2702,8 @@ async function listCameras() {
 }
 camSel.addEventListener('change', () => { camDeviceId = camSel.value; cam.detach(); startCamera(); });
 camRetry.addEventListener('click', () => { if (uses('camera')) startCamera(); });
+// Android lets go of the camera while the app is in the background; take it back on return
+onApp('resume', () => { if (uses('camera') && !cam.on) startCamera(); });
 $('#camOff').addEventListener('click', () => dropSource('camera'));
 
 // Swap a device out of every slot that uses it
@@ -2860,6 +3021,8 @@ function recipeBlocked(r) {
   if (!r.needs) return '';
   if (inArtifact) return 'Needs the downloaded copy or your web address. Camera, screen, phone and sound are turned off in this preview.';
   if (r.needs === 'phone' && !phoneOK) return 'Needs Phosphor Loop opened from its https:// web address.';
+  if (APP && r.needs === 'screen') return 'Needs a computer: phones can’t share their screen with Phosphor Loop.';
+  if (APP && r.needs === 'sound') return appInfo.sound ? '' : 'Needs Android 10 or newer to hear the phone’s sound.';
   if ((r.needs === 'screen' || r.needs === 'sound') && !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) return 'This browser can’t share its screen or sound. Use Chrome or Edge on a computer.';
   return '';
 }
@@ -3135,7 +3298,30 @@ if (inArtifact) {
 } else {
   setSaveUI('anchor');
 }
+// In the Android app, pictures and videos go to the phone's gallery. The file travels in slices,
+// because a minute of video is too big to hand over in one piece.
+async function appSave(name, blob) {
+  const mime = (blob.type || '').split(';')[0] || (name.endsWith('.png') ? 'image/png' : 'video/webm');
+  const SLICE = 3 * 512 * 1024;
+  let ok = false, where = '';
+  try {
+    if (!APP.saveBegin(name, mime)) throw new Error('begin');
+    for (let i = 0; i < blob.size; i += SLICE) {
+      const part = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1] || '');
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob.slice(i, i + SLICE));
+      });
+      if (!APP.saveChunk(part)) throw new Error('chunk');
+    }
+    ok = true;
+  } catch (_) {}
+  try { where = APP.saveEnd(ok) || ''; } catch (_) { where = ''; }
+  toast(ok && where ? `Saved to ${where}.` : 'That couldn’t be saved. Check the phone has free space, then try again.');
+}
 async function offerFile(name, blob) {
+  if (APP) { appSave(name, blob); return; }
   if (saveMode === 'claude' && downloadsNS) {
     try {
       const res = await downloadsNS.save({ filename: name, data: blob });
@@ -3394,7 +3580,9 @@ hideBtn.addEventListener('click', () => toggleBare());
 // at that window's resolution, so the controls can stay on this screen.
 const outBtn = $('#outBtn');
 // Phones and tablets have no second screen, but a touchscreen computer with a projector does
-if (inArtifact || (window.matchMedia('(hover: none)').matches && !(window.screen && window.screen.isExtended))) outBtn.hidden = true;
+// In the Android app the button shows while a projector or TV is plugged in (or cast to)
+if (APP) outBtn.hidden = !appInfo.display;
+else if (inArtifact || (window.matchMedia('(hover: none)').matches && !(window.screen && window.screen.isExtended))) outBtn.hidden = true;
 const OUTPUT_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Phosphor Loop Output</title>
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
@@ -3413,7 +3601,11 @@ body.idle,body.idle canvas{cursor:none}
 function openOutput() {
   let w = null;
   try { w = window.open('', 'phosphorOutput', 'popup,width=960,height=540'); } catch (_) {}
-  if (!w) { toast('The browser blocked the new window. Allow pop-ups for this page, then press Output window again.'); return; }
+  if (!w) {
+    toast(APP ? 'Plug in a projector or TV first (or cast the screen to it), then press Output window again.'
+      : 'The browser blocked the new window. Allow pop-ups for this page, then press Output window again.');
+    return;
+  }
   let doc;
   try { doc = w.document; doc.open(); doc.write(OUTPUT_HTML); doc.close(); }
   catch (_) { try { w.close(); } catch (__) {} toast('This browser won’t let the page draw into a second window.'); return; }
@@ -3423,6 +3615,7 @@ function openOutput() {
   outCanvas = doc.getElementById('out');
   outCtx = outCanvas.getContext('2d', { alpha: false });
   const hint = doc.getElementById('hint');
+  if (APP) hint.classList.add('gone');   // the app already put this window on the other screen
   const toggleOutFS = () => {
     try {
       if (doc.fullscreenElement) doc.exitFullscreen();
@@ -3468,6 +3661,7 @@ function openOutput() {
   $$('#shape button').forEach((b) => { b.disabled = true; });
   $('#shapeNote').hidden = false;
   fit();
+  if (APP) { toast('The picture is on your other screen. The controls stay here.'); return; }
   toast(canFill && showMode
     ? 'Output window open. Tap Fill my other screen in it to put the picture on the projector.'
     : 'Output window open. Drag it to your projector or second screen, then double-click it to fill that screen.');
@@ -3482,6 +3676,13 @@ function closeOutput(alreadyClosed) {
   fit();
 }
 outBtn.addEventListener('click', () => (outputOpen() ? closeOutput() : openOutput()));
+// Android app: plugging in a projector or TV puts the picture there by itself; unplugging brings it back
+onApp('display', (d) => {
+  appInfo.display = !!d.connected;
+  outBtn.hidden = !appInfo.display;
+  if (!appInfo.display) { if (outWin) closeOutput(); return; }
+  setTimeout(() => { if (appInfo.display && !outputOpen()) openOutput(); }, 800);
+});
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   fail('The graphics card reset the screen. Reload the page to start it again.');
@@ -3571,6 +3772,7 @@ function showExtras() {
 }
 
 function offlineStatus() {
+  if (APP) { offlineNote.textContent = 'The app keeps a copy on this phone, so it opens without internet. Only the phone link needs it.'; return; }
   if (!swOK) {
     offlineNote.textContent = location.protocol === 'file:'
       ? 'Opened from a file on this computer, so it already works without internet (except the phone link).'
@@ -3603,7 +3805,11 @@ function midiSay(html, warn) { say(midiStatus, html, warn); }
 
 async function midiStart() {
   if (midi.access) return;
-  if (!navigator.requestMIDIAccess) { midiSay('This browser can’t use MIDI controllers. Use <b>Chrome</b> or <b>Edge</b>.', true); return; }
+  if (!navigator.requestMIDIAccess) {
+    midiSay(APP ? 'MIDI controllers work on a computer in <b>Chrome</b> or <b>Edge</b>. The Android app can’t use them yet.'
+      : 'This browser can’t use MIDI controllers. Use <b>Chrome</b> or <b>Edge</b>.', true);
+    return;
+  }
   midiSay('Waiting for the browser to allow MIDI devices…');
   try {
     midi.access = await navigator.requestMIDIAccess({ sysex: false });
@@ -3914,8 +4120,10 @@ function showStart() {
     showExtras();
     restoreSession();
     // With a second screen plugged in, open the output window straight away (the browser must allow pop-ups here)
-    if (window.screen && window.screen.isExtended) setTimeout(() => { if (!outputOpen()) openOutput(); }, 1200);
+    if (!APP && window.screen && window.screen.isExtended) setTimeout(() => { if (!outputOpen()) openOutput(); }, 1200);
   } else if (midiSaved.enabled) midiStart();
+  // The Android app puts the picture on a plugged-in projector or TV straight away, show mode or not
+  if (APP && appInfo.display) setTimeout(() => { if (appInfo.display && !outputOpen()) openOutput(); }, 1200);
   sessionReady = true;
 }
 

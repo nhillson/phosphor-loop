@@ -7,6 +7,36 @@ WHAT'S IN THIS FOLDER
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
   sw.js        Keeps a copy in the browser so it opens without internet.
   icon-180.png, icon-192.png   Icons for phone and tablet home screens.
+  android/     The Android app (GitHub builds it by itself; see ANDROID APP below).
+
+ANDROID APP
+  Install it (Android 10 or newer):
+  1. On the phone, open github.com/nhillson/phosphor-loop/releases/latest
+  2. Tap PhosphorLoop.apk. When it has downloaded, tap it (or tap Open).
+  3. If Android asks, allow your browser to install apps, then go back.
+  4. Tap Install. If Google Play Protect asks, tap "Install anyway"
+     (it asks because the app isn't from the Play Store).
+  5. Open Phosphor Loop from your apps. Allow the camera and microphone
+     when you pick Camera or Microphone.
+
+  What's different in the app:
+  - It opens full screen and keeps the screen awake.
+  - Phone sound (under React to sound) hears Spotify, YouTube or any app on
+    the phone. Android asks to "record or cast"; tap Start. Only the sound
+    is used. A few apps keep their sound private; use Microphone for those.
+  - Plug the phone into a projector or TV (a USB-C to HDMI adapter, or cast
+    the screen) and the picture moves there by itself while the controls
+    stay on the phone. Keep Phosphor Loop open on the phone during the show.
+  - Snapshots and recordings go to the phone's Gallery, in a Phosphor Loop
+    album.
+  - Screen sharing and MIDI controllers need a computer.
+  - Updates to the website reach the app by themselves. A new copy of the
+    app itself is only needed when the android folder changes; install it
+    over the old one the same way (presets stay).
+
+  How it's built: each time the android folder changes, GitHub builds the
+  app (Actions tab, "Android app") and puts it on the Releases page.
+  To build it again by hand: Actions > Android app > Run workflow.
 
 YOU CAN JUST DOUBLE-CLICK index.html
 Everything works that way except the phone link: channels, both loops,

@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Every build on GitHub gets the next number, so a new copy always installs over the old one
+def buildNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int
+
+android {
+    namespace 'io.github.nhillson.phosphorloop'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.nhillson.phosphorloop'
+        minSdk 29
+        targetSdk 35
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    // The same key signs every build, so updates install over the old app and keep its presets.
+    // It lives in this public folder, which is fine for installing on your own phones. Before a
+    // Play Store release, make a private key and pass it in through these environment variables.
+    signingConfigs {
+        phosphor {
+            storeFile file(System.getenv('PL_KEYSTORE') ?: 'phosphor-loop.jks')
+            storePassword System.getenv('PL_STORE_PASSWORD') ?: 'phosphorloop'
+            keyAlias System.getenv('PL_KEY_ALIAS') ?: 'phosphorloop'
+            keyPassword System.getenv('PL_KEY_PASSWORD') ?: 'phosphorloop'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.phosphor
+        }
+        debug {
+            signingConfig signingConfigs.phosphor
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // The offline copy of the site (index.html, fonts...) is gathered by tools/bundle_site.py into this folder
+    sourceSets {
+        main {
+            assets {
+                srcDir 'build/offline-assets'
+            }
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
