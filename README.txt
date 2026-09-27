@@ -152,10 +152,14 @@ TIPS
   - Ink in water: channel 11 (Ink, the minus key) drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look, and Ink under "What feeds the loop" gives you the drops.
+  - Paint splats: channel 12 (Splat, the = key) throws solid paint onto a
+    table seen from above. Each splat stays wet for a few seconds, then
+    fades as new ones land on top. Paint under "What feeds the loop" adds
+    splats to any look; Input size makes them bigger or smaller.
   - Split lines (under Mirror): every other line of the picture slides left
     and the lines between slide right, like a scrambled TV.
   - Camera: a phone's back camera shows the world the right way round; a
     front camera or computer webcam works like a mirror. With more than one
     camera, a list under Camera picks which one.
-  - Keys: 1-9, 0 and - (minus) channels, Space freeze, N neutral, R surprise,
+  - Keys: 1-9, 0, - (minus) and = channels, Space freeze, N neutral, R surprise,
     P autopilot, C clear, F full screen, H hide controls, G guide.
