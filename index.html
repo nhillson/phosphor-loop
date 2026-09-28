@@ -2103,6 +2103,7 @@ $('#surprise').addEventListener('click', surprise);
 // and nudges both loops with them. Nothing is played back, so there is no echo.
 const snd = {
   src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null, prevBins: null,
+  rate: 48000, tap: null, appFeed: null,
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
   flux: 0, lastBeat: 0, beats: 0, shakeDir: [1, 0], amount: 60,
@@ -2125,20 +2126,24 @@ if (inArtifact) $('#soundGroup').hidden = true;
 function sndSay(html, warn, offerMic) { say(sndStatus, html, warn); sndRetry.hidden = !warn; $('#sndUseMic').hidden = !offerMic; }
 
 // Android app: "Phone sound" hears whatever the phone plays (Spotify, YouTube, games). Android asks first,
-// then the app streams the sound here in small pieces, which become an ordinary audio track for listen().
+// then the app streams the sound here in small pieces. Each piece goes straight to the picture, and a copy
+// becomes an ordinary audio track so a recording can keep the sound.
 const appSnd = { ctx: null, dest: null, node: null, push: null, on: false, session: 0, heard: 0, quiet: null };
+// The recording's copy waits in a short queue (about 40-60 ms) so it stays in step with the picture
 const FEED_WORKLET = `class PLFeed extends AudioWorkletProcessor {
   constructor() {
     super(); this.q = []; this.off = 0; this.len = 0; this.go = false;
     this.port.onmessage = (e) => {
       this.q.push(e.data); this.len += e.data.length;
-      while (this.len - this.off > sampleRate * 0.3 && this.q.length > 1) { this.len -= this.q.shift().length; this.off = 0; }
+      if (this.len - this.off > sampleRate * 0.15) {
+        while (this.len - this.off > sampleRate * 0.06 && this.q.length > 1) { this.len -= this.q.shift().length; this.off = 0; }
+      }
     };
   }
   process(inputs, outputs) {
     const out = outputs[0][0];
     if (!out) return true;
-    if (!this.go && this.len - this.off >= sampleRate * 0.06) this.go = true;
+    if (!this.go && this.len - this.off >= sampleRate * 0.04) this.go = true;
     let i = 0;
     while (this.go && i < out.length && this.q.length) {
       const h = this.q[0], n = Math.min(out.length - i, h.length - this.off);
@@ -2206,13 +2211,13 @@ function appSoundPrepare() {
         if (off >= h.length) { q.shift(); off = 0; }
       }
       if (i < out.length) out.fill(0, i);
-      while (q.length > 15) { q.shift(); off = 0; }
+      while (q.length > 7) { q.shift(); off = 0; }
     };
     attach(node, (f) => q.push(f));
   })();
 }
 function appSoundChunk(data) {
-  if (!appSnd.on || !appSnd.push || typeof data !== 'string') return;
+  if (!appSnd.on || typeof data !== 'string') return;
   let bin;
   try { bin = atob(data); } catch (_) { return; }
   const n = bin.length >> 1, f = new Float32Array(n);
@@ -2224,7 +2229,9 @@ function appSoundChunk(data) {
     if (v > peak) peak = v; else if (-v > peak) peak = -v;
   }
   if (peak > 64) appSnd.heard = performance.now();
-  appSnd.push(f);
+  // Straight to the picture first; the copy handed on below only feeds a recording's sound track
+  if (snd.appFeed) snd.appFeed.push(f);
+  if (appSnd.push) appSnd.push(f);
 }
 function appSound() {
   if (!appInfo.sound) { sndSay('This phone can’t share its own sound with apps (that needs Android 10 or newer). Use the <b>Microphone</b> instead.', false, true); return; }
@@ -2238,7 +2245,7 @@ onApp('sound', (d) => {
   if (d.state === 'started') {
     if (snd.src !== 'system' || !appSnd.dest) { appSoundClose(); return; }
     appSnd.on = true;
-    listen(new MediaStream(appSnd.dest.stream.getAudioTracks()));
+    listen(new MediaStream(appSnd.dest.stream.getAudioTracks()), d.rate || appSnd.ctx.sampleRate);
     sndSay('<span class="live"></span><b>Listening to this phone’s sound.</b> Play music in any app. Android shows that Phosphor Loop is sharing; only the sound is used.');
     clearTimeout(appSnd.quiet);
     appSnd.quiet = setTimeout(() => {
@@ -2269,18 +2276,76 @@ function syncSoundUI() {
   paintFill(sndAmt);
   $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
 }
-function stopSound() {
-  if (APP) appSoundClose();
-  if (snd.stream) snd.stream.getTracks().forEach((t) => t.stop());
-  if (snd.source) { try { snd.source.disconnect(); } catch (_) {} }
-  if (snd.ctx) { try { snd.ctx.close(); } catch (_) {} }
-  snd.stream = null; snd.source = null; snd.analyser = null; snd.ctx = null; snd.track = null;
-  for (const k in snd.env) snd.env[k] = 0;
+// Does the same sums as the browser's own sound analyser (Blackman window, FFT, smoothing, 0-255 levels,
+// checked to match it bin for bin), but is handed the raw sound the moment it arrives. The browser's audio
+// engine holds sound in its own buffers first, and on the phone app the sound also queued for playback,
+// which is what made the picture react late.
+function makeFastAnalyser(rate) {
+  const N = 2048, H = N >> 1, R = N * 8;
+  const ring = new Float32Array(R), win = new Float32Array(N), re = new Float64Array(N), im = new Float64Array(N);
+  const mag = new Float64Array(H), rev = new Uint16Array(N), tc = new Float64Array(H), ts = new Float64Array(H);
+  for (let i = 0; i < N; i++) win[i] = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / N) + 0.08 * Math.cos(4 * Math.PI * i / N);
+  for (let i = 0; i < N; i++) { let r = 0; for (let b = 0; b < 11; b++) r |= ((i >> b) & 1) << (10 - b); rev[i] = r; }
+  for (let k = 0; k < H; k++) { tc[k] = Math.cos(2 * Math.PI * k / N); ts[k] = -Math.sin(2 * Math.PI * k / N); }
+  let w = 0;
+  return {
+    fftSize: N, frequencyBinCount: H, rate,
+    push(x) { for (let i = 0; i < x.length; i++) { ring[w] = x[i]; w = w + 1 === R ? 0 : w + 1; } },
+    getByteFrequencyData(out) {
+      for (let i = 0, j = w - N + R; i < N; i++, j++) { const k = rev[i]; re[k] = ring[j % R] * win[i]; im[k] = 0; }
+      for (let size = 2; size <= N; size <<= 1) {
+        const half = size >> 1, step = N / size;
+        for (let s = 0; s < N; s += size) {
+          for (let k = 0, t = 0; k < half; k++, t += step) {
+            const a = s + k, b = a + half;
+            const xr = re[b] * tc[t] - im[b] * ts[t], xi = re[b] * ts[t] + im[b] * tc[t];
+            re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+          }
+        }
+      }
+      // Same settings as before: light smoothing, and -90 to -20 dB spread over 0-255
+      for (let k = 0; k < H; k++) {
+        const m = Math.sqrt(re[k] * re[k] + (k ? im[k] * im[k] : 0)) / N;
+        mag[k] = 0.2 * mag[k] + 0.8 * m;
+        const v = (20 * Math.log10(mag[k]) + 90) * (255 / 70);
+        out[k] = v > 0 ? (v < 255 ? v : 255) : 0;
+      }
+    },
+  };
 }
-function listen(stream) {
-  const track = stream.getAudioTracks()[0];
+// Chrome and Edge can hand a page the raw sound straight from the track; other browsers use the audio engine
+const canTap = typeof window.MediaStreamTrackProcessor === 'function' && typeof window.AudioData === 'function';
+let tapOne = new Float32Array(0), tapMix = new Float32Array(0);
+function tapFeed(fa, ad) {
+  const n = ad.numberOfFrames, ch = ad.numberOfChannels;
+  if (tapOne.length < n) { tapOne = new Float32Array(n); tapMix = new Float32Array(n); }
+  const one = tapOne.subarray(0, n), mix = tapMix.subarray(0, n);
+  try {
+    for (let c = 0; c < ch; c++) {
+      ad.copyTo(one, { planeIndex: c, format: 'f32-planar' });
+      if (c === 0) mix.set(one); else for (let i = 0; i < n; i++) mix[i] += one[i];
+    }
+  } catch (_) { return false; }
+  if (ch > 1) for (let i = 0; i < n; i++) mix[i] /= ch;
+  fa.rate = ad.sampleRate;
+  fa.push(mix);
+  return true;
+}
+function setAnalyser(analyser, rate) {
+  Object.assign(snd, { analyser, rate, bins: new Uint8Array(analyser.frequencyBinCount), prevBins: new Uint8Array(analyser.frequencyBinCount) });
+}
+function dropTap() {
+  const t = snd.tap;
+  if (!t) return;
+  snd.tap = null;
+  clearTimeout(t.check);
+  try { t.reader.cancel().catch(() => {}); } catch (_) {}
+  try { t.copy.stop(); } catch (_) {}
+}
+// The browser's audio engine: slower, but works everywhere
+function useEngine(track) {
   const AC = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AC();
+  const ctx = new AC({ latencyHint: 'interactive' });
   const source = ctx.createMediaStreamSource(new MediaStream([track]));
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
@@ -2289,8 +2354,56 @@ function listen(stream) {
   analyser.maxDecibels = -20;
   source.connect(analyser);
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-  Object.assign(snd, { ctx, analyser, source, stream, track, bins: new Uint8Array(analyser.frequencyBinCount),
-    prevBins: new Uint8Array(analyser.frequencyBinCount) });
+  Object.assign(snd, { ctx, source });
+  setAnalyser(analyser, ctx.sampleRate);
+}
+// Reads the raw sound as it arrives. If that fails, or nothing turns up within two seconds, it goes back to the audio engine.
+function useTap(track) {
+  let copy, reader;
+  try {
+    copy = track.clone();
+    reader = new MediaStreamTrackProcessor({ track: copy }).readable.getReader();
+  } catch (_) { try { copy.stop(); } catch (__) {} return false; }
+  const fa = makeFastAnalyser(48000);
+  const tap = { reader, copy, got: 0, check: 0 };
+  const fallBack = () => {
+    if (snd.tap !== tap) return;
+    dropTap();
+    if (snd.track === track && track.readyState === 'live') useEngine(track);
+  };
+  snd.tap = tap;
+  setAnalyser(fa, fa.rate);
+  (async () => {
+    for (;;) {
+      let r;
+      try { r = await reader.read(); } catch (_) { r = { done: true }; }
+      if (snd.tap !== tap) { if (r.value) r.value.close(); return; }
+      if (r.done) { fallBack(); return; }
+      const ok = tapFeed(fa, r.value);
+      r.value.close();
+      if (!ok) { fallBack(); return; }
+      tap.got++;
+      snd.rate = fa.rate;
+    }
+  })();
+  tap.check = setTimeout(() => { if (!tap.got) fallBack(); }, 2000);
+  return true;
+}
+function stopSound() {
+  if (APP) appSoundClose();
+  dropTap();
+  if (snd.stream) snd.stream.getTracks().forEach((t) => t.stop());
+  if (snd.source) { try { snd.source.disconnect(); } catch (_) {} }
+  if (snd.ctx) { try { snd.ctx.close().catch(() => {}); } catch (_) {} }
+  snd.stream = null; snd.source = null; snd.analyser = null; snd.ctx = null; snd.track = null; snd.appFeed = null;
+  for (const k in snd.env) snd.env[k] = 0;
+}
+// appRate: the phone app's own sound, which appSoundChunk hands straight to the analyser
+function listen(stream, appRate) {
+  const track = stream.getAudioTracks()[0];
+  Object.assign(snd, { stream, track });
+  if (appRate) { snd.appFeed = makeFastAnalyser(appRate); setAnalyser(snd.appFeed, appRate); }
+  else if (!(canTap && useTap(track))) useEngine(track);
   snd.avg = { low: 0, mid: 0, high: 0 };
   snd.peak = { low: 0.1, mid: 0.1, high: 0.1 };
   snd.flux = 0;
@@ -2393,7 +2506,7 @@ function analyzeSound(dt, now) {
   if (!snd.analyser) return;
   const bins = snd.bins, prev = snd.prevBins;
   snd.analyser.getByteFrequencyData(bins);
-  const hz = snd.ctx.sampleRate / snd.analyser.fftSize;
+  const hz = snd.rate / snd.analyser.fftSize;
   const span = (lo, hi) => [Math.max(1, Math.floor(lo / hz)), Math.min(bins.length - 1, Math.ceil(hi / hz))];
   // Squaring widens the gap between a hit and the sound around it
   const band = (lo, hi) => {
