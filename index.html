@@ -676,11 +676,11 @@
           <div class="ctl">
             <span class="lbl">What the music moves</span>
             <div class="chips" id="sndMap">
-              <button class="chip" data-map="kick" aria-pressed="true" title="Zoom pumps on the bass"><span class="led"></span>Zoom kick</button>
-              <button class="chip" data-map="size" aria-pressed="false" title="The input swells on the bass"><span class="led"></span>Input size</button>
+              <button class="chip" data-map="kick" aria-pressed="true" title="The picture punches in on every kick and pumps with the bass"><span class="led"></span>Zoom kick</button>
+              <button class="chip" data-map="size" aria-pressed="true" title="The input swells on the bass"><span class="led"></span>Input size</button>
               <button class="chip" data-map="spin" aria-pressed="false" title="Spin follows the mids"><span class="led"></span>Spin</button>
-              <button class="chip" data-map="color" aria-pressed="true" title="Color shift follows the highs"><span class="led"></span>Color</button>
-              <button class="chip" data-map="warp" aria-pressed="false" title="Warp shakes on beats"><span class="led"></span>Warp</button>
+              <button class="chip" data-map="color" aria-pressed="true" title="Colors jump with the highs and the beat"><span class="led"></span>Color</button>
+              <button class="chip" data-map="warp" aria-pressed="false" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
               <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
             </div>
           </div>
@@ -992,7 +992,7 @@
             <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works. Listen to picks which input when there’s more than one.</dd>
             <dt>Stereo Mix (Windows)</dt><dd>Hears the computer’s sound with no screen sharing at all: choose Microphone, then Stereo Mix under Listen to. If it isn’t listed, turn it on once in Windows Settings → System → Sound → More sound settings (Sound Control Panel on Windows 10) → Recording tab → right-click an empty spot → Show Disabled Devices → right-click Stereo Mix → Enable, then reload this page. Some computers don’t have it.</dd>
             <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
-            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts, and which settings follow the music: Zoom kick pumps on the bass, Input size swells, Spin follows the mids, Color follows the highs, Warp shakes and Flash brightens on beats.</dd>
+            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on every kick, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>
             <dt>Which browser</dt><dd>Computer sound works in Chrome and Edge. Firefox and Safari don’t pass sound through screen sharing, so use Microphone there (Stereo Mix on Windows hears the computer itself).</dd>
             <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on. With Include mic lit, the microphone goes in too, mixed with the music.</dd>
           </dl></div>
@@ -1534,17 +1534,27 @@ const FS_DISPLAY = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
 uniform vec2 uRes;
-uniform float uTV, uTime, uStatic, uLines, uFlash;
+uniform float uTV, uTime, uStatic, uLines, uFlash, uPunch, uHueKick;
+uniform vec2 uShake;   // the music's jolt: its direction, times how hard
 out vec4 o;
 ${COMMON}
 vec2 barrel(vec2 uv, float k) { vec2 c = uv * 2.0 - 1.0; c *= 1.0 + k * dot(c, c); return c * 0.5 + 0.5; }
+vec3 hueTurn(vec3 c, float a) {
+  const vec3 k = vec3(0.57735027);
+  float ca = cos(a);
+  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec2 cuv = barrel(uv, 0.11 * uTV);
+  // Music hits land straight on the screen: a punch in on the kick and a jolt on the beat,
+  // zoomed in just enough that the jolt never shows the edge
+  float jolt = length(uShake);
+  cuv = (cuv - 0.5) / (1.0 + uPunch + jolt * 0.022) + 0.5 + uShake * 0.008;
   float line = floor(uv.y * uLines);
   cuv.x += (hash(vec2(line, floor(uTime * 60.0))) - 0.5) * 0.03 * uStatic;
   vec2 c = cuv * 2.0 - 1.0;
-  vec2 ca = c * 0.0035 * uTV;
+  vec2 ca = c * 0.0035 * uTV + uShake * 0.01;
   vec3 col;
   col.r = texture(uTex, cuv + ca).r;
   col.g = texture(uTex, cuv).g;
@@ -1557,6 +1567,7 @@ void main() {
   g += texture(uTex, cuv + vec2( r2.x, 0.0)).rgb + texture(uTex, cuv + vec2(-r2.x, 0.0)).rgb;
   g += texture(uTex, cuv + vec2(0.0,  r2.y)).rgb + texture(uTex, cuv + vec2(0.0, -r2.y)).rgb;
   col += g * 0.125 * 0.35 * uTV;
+  if (uHueKick != 0.0) col = max(hueTurn(col, uHueKick), 0.0);
 
   float scan = 0.5 + 0.5 * cos(cuv.y * uLines * TAU);
   col *= 1.0 - uTV * 0.42 * (1.0 - scan);
@@ -2091,12 +2102,14 @@ $('#surprise').addEventListener('click', surprise);
 // "share system audio") or to the microphone, splits it into low, mid and high bands plus beats,
 // and nudges both loops with them. Nothing is played back, so there is no echo.
 const snd = {
-  src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null,
+  src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null, prevBins: null,
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
-  lastBeat: 0, amount: 60,
-  map: { kick: true, size: false, spin: false, color: true, warp: false, flash: true },
+  flux: 0, lastBeat: 0, beats: 0, shakeDir: [1, 0], amount: 60,
+  map: { kick: true, size: true, spin: false, color: true, warp: false, flash: true },
 };
+// How hard the picture reacts. The old full strength now sits near 50, and Wild goes well past it.
+const sndPower = () => Math.pow(clamp(snd.amount, 0, 100) / 100, 0.85) * 2.4;
 const sndStatus = $('#sndStatus'), sndRetry = $('#sndRetry'), sndAmt = $('#sndAmt'), micSel = $('#micSel');
 let micDeviceId = '';
 // Firefox and Safari share screens without sound, so Computer sound only works in Chrome and Edge
@@ -2271,14 +2284,16 @@ function listen(stream) {
   const source = ctx.createMediaStreamSource(new MediaStream([track]));
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.55;
+  analyser.smoothingTimeConstant = 0.2;   // low, so a kick shows up the moment it lands
   analyser.minDecibels = -90;
   analyser.maxDecibels = -20;
   source.connect(analyser);
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-  Object.assign(snd, { ctx, analyser, source, stream, track, bins: new Uint8Array(analyser.frequencyBinCount) });
+  Object.assign(snd, { ctx, analyser, source, stream, track, bins: new Uint8Array(analyser.frequencyBinCount),
+    prevBins: new Uint8Array(analyser.frequencyBinCount) });
   snd.avg = { low: 0, mid: 0, high: 0 };
   snd.peak = { low: 0.1, mid: 0.1, high: 0.1 };
+  snd.flux = 0;
   track.addEventListener('ended', () => {
     if (snd.track !== track) return;
     stopSound();
@@ -2372,29 +2387,48 @@ sndAmt.addEventListener('dblclick', () => { snd.amount = 60; syncSoundUI(); });
 $$('#sndMap button').forEach((b) => b.addEventListener('click', () => { snd.map[b.dataset.map] = !snd.map[b.dataset.map]; syncSoundUI(); }));
 syncSoundUI();
 
-// Each band is judged against its own recent level, so quiet and loud songs both move the picture
+// Each band is judged against its own recent level, so quiet and loud songs both move the picture.
+// Beats come from how suddenly the bass jumps, which still catches the kick when a bass line fills the low end.
 function analyzeSound(dt, now) {
   if (!snd.analyser) return;
-  snd.analyser.getByteFrequencyData(snd.bins);
+  const bins = snd.bins, prev = snd.prevBins;
+  snd.analyser.getByteFrequencyData(bins);
   const hz = snd.ctx.sampleRate / snd.analyser.fftSize;
+  const span = (lo, hi) => [Math.max(1, Math.floor(lo / hz)), Math.min(bins.length - 1, Math.ceil(hi / hz))];
+  // Squaring widens the gap between a hit and the sound around it
   const band = (lo, hi) => {
-    const a = Math.max(1, Math.floor(lo / hz)), b = Math.min(snd.bins.length - 1, Math.ceil(hi / hz));
+    const [a, b] = span(lo, hi);
     let sum = 0;
-    for (let i = a; i <= b; i++) sum += snd.bins[i];
-    return sum / Math.max(1, b - a + 1) / 255;
+    for (let i = a; i <= b; i++) { const v = bins[i] / 255; sum += v * v; }
+    return sum / (b - a + 1);
   };
-  const raw = { low: band(30, 150), mid: band(250, 2000), high: band(3000, 10000) };
+  const raw = { low: band(35, 150), mid: band(250, 2000), high: band(3000, 12000) };
   for (const k of ['low', 'mid', 'high']) {
     const v = raw[k];
-    snd.avg[k] += (v - snd.avg[k]) * (1 - Math.exp(-dt / 2.5));
-    snd.peak[k] = Math.max(v, snd.peak[k] - dt * 0.05);
-    const floor = snd.avg[k] * 0.85;
-    const x = clamp((v - floor) / Math.max(snd.peak[k] - floor, 0.04), 0, 1);
+    snd.avg[k] += (v - snd.avg[k]) * (1 - Math.exp(-dt / 1.5));
+    // The loudest recent moment sinks back over a couple of seconds, but never all the way to the average
+    const top = snd.avg[k] * 1.35;
+    snd.peak[k] = Math.max(v, snd.peak[k] + (top - snd.peak[k]) * (1 - Math.exp(-dt / 2)));
+    const floor = snd.avg[k] * 0.9;
+    const x = v < 0.004 ? 0 : clamp((v - floor) / Math.max(snd.peak[k] - floor, 0.01), 0, 1);
     const e = snd.env[k];
-    snd.env[k] = e + (x - e) * (1 - Math.exp(-dt * (x > e ? 25 : 5)));
+    snd.env[k] = e + (x - e) * (1 - Math.exp(-dt * (x > e ? 60 : k === 'mid' ? 7 : 10)));
   }
-  if (raw.low > 0.12 && raw.low > snd.avg.low * 1.22 + 0.03 && now - snd.lastBeat > 280) { snd.lastBeat = now; snd.env.beat = 1; }
-  snd.env.beat *= Math.exp(-dt * 6);
+  // How much the bass rose since the last frame, compared with how much it usually rises
+  const [la, lb] = span(35, 170);
+  let flux = 0;
+  for (let i = la; i <= lb; i++) { const d = bins[i] - prev[i]; if (d > 0) flux += d; }
+  prev.set(bins);
+  // Scaled to a 60-frames-a-second step, so fast and slow screens find the same beats
+  flux = flux / ((lb - la + 1) * 255) * clamp(1 / 60 / dt, 0.4, 2.5);
+  const hit = flux > snd.flux * 3 + 0.04 && raw.low > snd.avg.low * 0.9 && raw.low > 0.02;
+  snd.flux += (flux - snd.flux) * (1 - Math.exp(-dt / (flux > snd.flux ? 1.2 : 0.4)));
+  if (hit && now - snd.lastBeat > 170) {
+    snd.lastBeat = now; snd.env.beat = 1; snd.beats++;
+    const a = Math.random() * Math.PI * 2;
+    snd.shakeDir = [Math.cos(a), Math.sin(a)];
+  }
+  snd.env.beat *= Math.exp(-dt * 7);
 }
 const mLow = $('#mLow'), mMid = $('#mMid'), mHigh = $('#mHigh'), mBeat = $('#mBeat');
 let meterTick = 0;
@@ -4446,13 +4480,13 @@ function runLoop(k, xf, brush, f) {
   }
   let sizeBoost = 0, gainBoost = 1;
   if (snd.analyser) {
-    const a = snd.amount / 100 * 1.4, E = snd.env, m = snd.map;
-    if (m.kick) z += a * (E.low * 40 + E.beat * 30);
-    if (m.spin) s += a * E.mid * 50 * (s < 0 ? -1 : 1);
-    if (m.color) col += a * E.high * 55;
-    if (m.warp) w += a * (E.beat * 40 + E.mid * 12);
-    if (m.size) sizeBoost = a * (E.low * 28 + E.beat * 14);
-    if (m.flash) gainBoost = 1 + a * E.beat * 1.1;
+    const a = sndPower(), E = snd.env, m = snd.map;
+    if (m.kick) z += a * (E.low * 45 + E.beat * 45);
+    if (m.spin) s += a * E.mid * 60 * (s < 0 ? -1 : 1);
+    if (m.color) col += a * (E.high * 60 + E.beat * 15);
+    if (m.warp) w += a * (E.beat * 50 + E.mid * 15);
+    if (m.size) sizeBoost = a * (E.low * 30 + E.beat * 22);
+    if (m.flash) gainBoost = 1 + a * E.beat * 0.8;
   }
   z = clamp(z, -100, 100); s = clamp(s, -100, 100); col = clamp(col, 0, 100); w = clamp(w, 0, 100);
   const tr = clamp(c.trails, 0, 100) / 100;
@@ -4496,7 +4530,8 @@ function runLoop(k, xf, brush, f) {
   set1i(fbProg, 'uIn1', resolveSrc(t.in1, t.motion));
   set1i(fbProg, 'uIn2', t.in2 === 'none' ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
-  const scale = Math.pow(2.5, (clamp(c.size + sizeBoost, 0, 100) / 100 - 0.5) * 2);
+  // The music can swell the input past the slider's top, so it still pulses when Size is already at 100
+  const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
   set1f(fbProg, 'uScale', scale);
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
   set1f(fbProg, 'uInkDt', inkOn ? f / 60 : 0);
@@ -4598,7 +4633,19 @@ function frame() {
   set1f(dispProg, 'uTV', clamp(mix.cur.tv, 0, 100) / 100);
   set1f(dispProg, 'uTime', (now - t0) / 1000);
   set1f(dispProg, 'uStatic', staticAmt);
-  set1f(dispProg, 'uFlash', snd.analyser && snd.map.flash ? snd.amount / 100 * snd.env.beat * 0.35 : 0);
+  // Hits from the music that show at once, on top of what they do inside the loops
+  let punch = 0, flash = 0, hueKick = 0, shake = 0;
+  if (snd.analyser) {
+    const a = sndPower(), E = snd.env, m = snd.map, calm = reduceMotion ? 0.4 : 1;
+    if (m.kick) punch = a * (E.beat * 0.06 + E.low * 0.025) * calm;
+    if (m.flash) flash = a * E.beat * 0.3;
+    if (m.color) hueKick = a * (E.high * 0.35 + E.beat * 0.3) * (snd.beats % 2 ? 1 : -1);
+    if (m.warp) shake = a * E.beat * calm;
+  }
+  set1f(dispProg, 'uPunch', punch);
+  set1f(dispProg, 'uFlash', flash);
+  set1f(dispProg, 'uHueKick', hueKick);
+  set2f(dispProg, 'uShake', snd.shakeDir[0] * shake, snd.shakeDir[1] * shake);
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
