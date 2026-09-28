@@ -1012,7 +1012,7 @@
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
             <dt>Full screen and Hide controls</dt><dd>Show only the picture.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can paint on the projected picture too.</dd>
-            <dt>Save picture and Record</dt><dd>Save a still, or up to a minute of video.</dd>
+            <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. Videos are large, up to about 75 MB a minute.</dd>
             <dt>Include mic</dt><dd>When its light is on, videos you record include the microphone, so you can talk over the picture or catch the room. The first time, the browser asks to use the microphone: choose Allow. Press it again to turn the mic off.</dd>
           </dl></div>
           <div class="g-card"><h3>Show setup</h3><dl>
@@ -3861,7 +3861,7 @@ if (inArtifact) {
   setSaveUI('anchor');
 }
 // In the Android app, pictures and videos go to the phone's gallery. The file travels in slices,
-// because a minute of video is too big to hand over in one piece.
+// because a video is too big to hand over in one piece.
 async function appSave(name, blob) {
   const mime = (blob.type || '').split(';')[0] || (name.endsWith('.png') ? 'image/png' : 'video/webm');
   const SLICE = 3 * 512 * 1024;
@@ -3907,10 +3907,14 @@ async function offerFile(name, blob) {
 let snapPending = false;
 snapBtn.addEventListener('click', () => { snapPending = true; });
 
-let recorder = null, recChunks = [], recStart = 0, recTick = null, recStarting = false;
-const REC_LIMIT = 60;
+// A recording runs until Record is pressed again; there is no time limit.
+let recorder = null, recChunks = [], recStart = 0, recStopAt = 0, recTick = null, recStarting = false;
 const recInd = $('#recInd'), recTime = $('#recTime'), recLabel = $('#recLabel');
-function fmt(s) { s = Math.floor(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function fmt(s) {
+  s = Math.floor(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
 
 // Include mic: videos also carry the microphone, on top of any music React to sound is hearing.
 // On unless switched off; the choice is remembered in this browser.
@@ -3953,6 +3957,78 @@ function blendSounds(tracks) {
   tracks.forEach((t) => ctx.createMediaStreamSource(new MediaStream([t])).connect(out));
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   return { track: out.stream.getAudioTracks()[0], ctx };
+}
+
+// Browsers save videos without writing down how long they are, so video players can't show the length
+// or jump around in a long one. This writes the length into the start of the file. Only the first few KB
+// are read and changed; the rest of the video is reused as is. If anything looks unfamiliar, the file is
+// left exactly as the browser made it.
+async function addWebmDuration(blob, ms) {
+  try {
+    if (!/webm/i.test(blob.type) || !(ms > 0)) return blob;
+    const head = new Uint8Array(await blob.slice(0, Math.min(blob.size, 65536)).arrayBuffer());
+    // A WebM file is nested labelled boxes; each label and each size is a variable-length number
+    const vint = (p, keepMarker) => {
+      const b = head[p];
+      if (!b) return null;
+      let len = 1, mask = 0x80;
+      while (!(b & mask)) { len++; mask >>= 1; }
+      if (p + len > head.length) return null;
+      let v = keepMarker ? b : b & (mask - 1);
+      let allOnes = (b & (mask - 1)) === mask - 1;
+      for (let i = 1; i < len; i++) { v = v * 256 + head[p + i]; if (head[p + i] !== 0xff) allOnes = false; }
+      return { v, len, unknown: !keepMarker && allOnes };
+    };
+    const box = (p) => {
+      const id = vint(p, true);
+      if (!id || id.len > 4) return null;
+      const size = vint(p + id.len, false);
+      if (!size) return null;
+      return { id: id.v, sizeAt: p + id.len, sizeLen: size.len, data: p + id.len + size.len, size: size.v, unknown: size.unknown };
+    };
+    const ebml = box(0);
+    if (!ebml || ebml.id !== 0x1A45DFA3 || ebml.unknown) return blob;
+    const seg = box(ebml.data + ebml.size);
+    if (!seg || seg.id !== 0x18538067) return blob;
+    const segEnd = seg.unknown ? head.length : Math.min(head.length, seg.data + seg.size);
+    let info = null;
+    for (let p = seg.data; p < segEnd;) {
+      const e = box(p);
+      if (!e || e.unknown) return blob;
+      if (e.id === 0x1549A966) { info = e; break; }
+      if (e.id !== 0xEC) return blob;   // only padding may come before it; anything else and we leave the file alone
+      p = e.data + e.size;
+    }
+    if (!info || info.data + info.size > head.length) return blob;
+    let scale = 1000000, dur = null;
+    for (let p = info.data; p < info.data + info.size;) {
+      const e = box(p);
+      if (!e || e.unknown) return blob;
+      if (e.id === 0x2AD7B1) { scale = 0; for (let i = 0; i < e.size; i++) scale = scale * 256 + head[e.data + i]; }
+      else if (e.id === 0x4489) dur = e;
+      p = e.data + e.size;
+    }
+    if (!(scale > 0)) return blob;
+    const value = ms * 1e6 / scale;
+    if (dur) {   // a length is already there: fill it in where it is
+      const dv = new DataView(head.buffer, dur.data, dur.size);
+      if (dur.size === 8) dv.setFloat64(0, value); else if (dur.size === 4) dv.setFloat32(0, value); else return blob;
+      return new Blob([head, blob.slice(head.length)], { type: blob.type });
+    }
+    // Add the length to the file's information box, and grow that box's size to match
+    const add = new Uint8Array(11);
+    add.set([0x44, 0x89, 0x88]);
+    new DataView(add.buffer).setFloat64(3, value);
+    const newSize = info.size + add.length;
+    if (newSize >= 2 ** (7 * info.sizeLen) - 1) return blob;
+    const sizeBytes = new Uint8Array(info.sizeLen);
+    for (let i = info.sizeLen - 1, n = newSize; i >= 0; i--) { sizeBytes[i] = n % 256; n = Math.floor(n / 256); }
+    sizeBytes[0] |= 0x80 >> (info.sizeLen - 1);
+    const end = info.data + info.size;
+    return new Blob([head.subarray(0, info.sizeAt), sizeBytes, head.subarray(info.sizeAt + info.sizeLen, end), add, blob.slice(end)], { type: blob.type });
+  } catch (_) {
+    return blob;
+  }
 }
 
 async function startRec() {
@@ -4009,17 +4085,20 @@ async function startRec() {
     const type = recorder.mimeType || mime || 'video/webm';
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
     const blob = new Blob(recChunks, { type });
+    const ms = (recStopAt || performance.now()) - recStart;
+    recChunks = [];
     cleanUp();
     recorder = null;
     clearInterval(recTick);
     recInd.hidden = true;
     recBtn.setAttribute('aria-pressed', 'false');
     recLabel.textContent = 'Record';
-    if (blob.size) offerFile(`phosphor-loop-${stamp()}.${ext}`, blob);
+    if (blob.size) addWebmDuration(blob, ms).then((file) => offerFile(`phosphor-loop-${stamp()}.${ext}`, file));
     else toast('Nothing was recorded. Try again.');
   };
   recorder.start(250);
   recStart = performance.now();
+  recStopAt = 0;
   recInd.hidden = false;
   recBtn.setAttribute('aria-pressed', 'true');
   recTime.textContent = '0:00';
@@ -4028,10 +4107,11 @@ async function startRec() {
     const s = (performance.now() - recStart) / 1000;
     recTime.textContent = fmt(s);
     recLabel.textContent = `Stop ${fmt(s)}`;
-    if (s >= REC_LIMIT) stopRec();
   }, 250);
 }
-function stopRec() { if (recorder && recorder.state !== 'inactive') recorder.stop(); }
+function stopRec() {
+  if (recorder && recorder.state !== 'inactive') { recStopAt = performance.now(); recorder.stop(); }
+}
 recBtn.addEventListener('click', () => { recorder ? stopRec() : startRec(); });
 
 /* ================= sizing ================= */
