@@ -126,7 +126,7 @@ TIPS
     classic "camera pointed at the TV" feedback.
   - Loop B: slide "What you see" to Both, then raise "Feed A into B" and/or
     "Feed B into A". Or pick "Loop A's picture" as loop B's input to feed it
-    in directly. Channels 9 (Twins) and 0 (Weave) show it off.
+    in directly. The Twins and Weave channels show it off.
   - The Feed sliders pour one loop into the other loop's trails, so the loop
     being fed has to be on screen and have some Trails. Raising a feed brings
     that loop on screen by itself, and if its Trails are at 0 a note under the
@@ -154,28 +154,34 @@ TIPS
     your laptop. If nothing opens, allow pop-ups for the page.
   - Neutral (next to Surprise me, or the N key) shows just loop A's input
     with every effect off. Raise Trails first, then Zoom and Spin.
-  - Ink in water: channel 11 (Ink, the minus key) drops colored ink that
+  - Ink in water: the Ink channel drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look, and Ink under "What feeds the loop" gives you the drops.
-  - Paint splats: channel 12 (Splat, the = key) throws solid paint onto a
+  - Paint splats: the Splat channel throws solid paint onto a
     table seen from above. Each splat stays wet for a few seconds, then
     fades as new ones land on top. Paint under "What feeds the loop" adds
     splats to any look; Input size makes them bigger or smaller.
-  - 3D flights: three channels fly you through a 3D world.
-      13 Cubes (the [ key): through floating cubes towards a glowing light.
-      14 Horizon (the ] key): low over a wet valley floor towards a striped
-         sunset, with glowing grid mountains on both sides.
-      15 Cavern (the \ key, above Enter): down a winding cave with coral-like
-         walls, light pulsing along glowing veins and spores drifting past.
-    Cubes, Horizon and Cavern under "What feeds the loop" add a flight to any
-    look. Input size widens or narrows the view. With React to sound on, the
-    flight surges forward on the kick and the lights flare on the beat (on
-    Horizon the mountains swell with the bass too). For warp-speed streaks,
-    raise Trails to about 60 and Zoom to about 30.
+  - 3D worlds: nine channels take you into a 3D world.
+      Cubes: through floating cubes towards a glowing light.
+      Horizon: low over a wet valley floor towards a striped sunset, with
+        glowing grid mountains on both sides.
+      Cavern: down a winding cave with coral-like walls and glowing veins.
+      Black hole: circling a black hole whose pull bends the light, so its
+        glowing disk shows over the top and underneath.
+      Aurora: gliding over a frozen lake under the northern lights.
+      Mercury: circling drops of liquid metal that merge and split.
+      Fractal: down a hall where bubbles grow on bubbles without end.
+      Crystals: through a grove of giant glowing crystals in violet mist.
+      Nebula: through glowing clouds of gas and dark dust.
+    "3D world" under "What feeds the loop" adds any of them to any look;
+    pick which one in the row of buttons that opens underneath. Input size
+    widens or narrows the view. With React to sound on, the flight surges
+    forward on the kick and the lights flare on the beat. For warp-speed
+    streaks, raise Trails to about 60 and Zoom to about 30.
   - Split lines (under Mirror): every other line of the picture slides left
     and the lines between slide right, like a scrambled TV.
   - Camera: a phone's back camera shows the world the right way round; a
     front camera or computer webcam works like a mirror. With more than one
     camera, a list under Camera picks which one.
-  - Keys: 1-9, 0, - (minus), =, [, ] and \ channels, Space freeze, N neutral, R surprise,
+  - Keys: Space freeze, N neutral, R surprise,
     P autopilot, C clear, F full screen, H hide controls, G guide.

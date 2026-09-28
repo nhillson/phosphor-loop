@@ -287,6 +287,7 @@
     font: 400 18px/1 var(--f-osd); color: #fff; text-shadow: 0 0 4px #000, 1px 1px 0 #000;
   }
   .ch .nm { font-size: 13px; line-height: 1.1; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ch .nm.long { font-size: 11px; letter-spacing: -0.01em; padding-inline: 1px; }
   .ch[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a), 0 0 14px rgba(255,174,59,.18); }
   .ch[aria-pressed="true"] .sw::before { background: transparent; }
 
@@ -592,7 +593,7 @@
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd>, <kbd>-</kbd>, <kbd>=</kbd>, <kbd>[</kbd>, <kbd>]</kbd> and <kbd>\</kbd> channels · <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -708,9 +709,7 @@
             <button data-src="sparks" aria-pressed="false">Sparks</button>
             <button data-src="ink" aria-pressed="false">Ink</button>
             <button data-src="splat" aria-pressed="false">Paint</button>
-            <button data-src="cubes" aria-pressed="false">Cubes</button>
-            <button data-src="horizon" aria-pressed="false">Horizon</button>
-            <button data-src="cavern" aria-pressed="false">Cavern</button>
+            <button data-src="world" aria-pressed="false">3D world</button>
             <button data-src="none" aria-pressed="false">Nothing</button>
             <button data-src="picture" aria-pressed="false">Picture</button>
             <button data-src="video" aria-pressed="false">Video</button>
@@ -721,6 +720,7 @@
           </div>
 
           <div class="dev" id="row-3d" hidden>
+            <div class="seg seg-3" id="worlds" role="group" aria-label="Which 3D world"></div>
             <span class="hint"><span id="hint3d"></span> Input size widens or narrows the view. For warp-speed streaks, raise Trails to about 60 and Zoom to about 30.</span>
           </div>
 
@@ -956,7 +956,7 @@
       <section>
         <h2><small>Start here</small>Your first 30 seconds</h2>
         <ol class="g-steps">
-          <li><b>Pick a channel.</b> The buttons at the top of the controls are ready-made looks. Keys 1 to 9, 0, - (minus), =, [, ] and \ work too.</li>
+          <li><b>Pick a channel.</b> The buttons at the top of the controls are ready-made looks.</li>
           <li><b>Drag on the screen.</b> You paint light straight into the loop and watch it echo.</li>
           <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
           <li><b>Press Surprise me</b> for something new, or <b>Autopilot</b> to let it run by itself.</li>
@@ -967,7 +967,7 @@
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
           <div class="g-card"><h3>Channels</h3><dl>
-            <dt>Channels</dt><dd>Ready-made looks. 9 (Twins) and 0 (Weave) use both loops. Ink (the minus key) drops colored ink into swirling water. Splat (the = key) throws paint onto a table seen from above. Cubes (the [ key) flies through floating cubes towards a glowing light, in 3D. Horizon (the ] key) flies low over a glowing valley towards a striped sunset. Cavern (the \ key) flies down a winding cave with glowing veins.</dd>
+            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Splat throws paint onto a table seen from above. Cubes to Nebula are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a crystal grove and a nebula.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
@@ -979,7 +979,7 @@
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
-            <dt>Wave, Shape, Bars, Sparks, Ink, Paint, Cubes, Horizon, Cavern</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. Paint throws solid splats that cover whatever is underneath, like paint on a table. Cubes, Horizon and Cavern are 3D flights: through floating cubes towards a glowing light, low over a glowing valley towards a sunset, and down a winding cave with glowing veins. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
+            <dt>Wave, Shape, Bars, Sparks, Ink, Paint, 3D world</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. Paint throws solid splats that cover whatever is underneath, like paint on a table. 3D world opens a picker of nine 3D worlds to fly through or circle round. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
             <dt>Picture and Video</dt><dd>Your own files. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
@@ -1107,8 +1107,10 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, splat: 12, cubes: 13, horizon: 14, cavern: 15 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', splat: 'Paint', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, splat: 12, cubes: 13, horizon: 14, cavern: 15,
+                 blackhole: 16, aurora: 17, mercury: 18, fractal: 19, crystals: 20, nebula: 21 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', splat: 'Paint', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', crystals: 'Crystals', nebula: 'Nebula', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
@@ -1129,14 +1131,10 @@ const CHANNELS = [
     sw: 'radial-gradient(circle at 50% 50%,#fff3b0 0 10%,#ff7ac6 28%,#6a2bd9 55%,#140a2a 85%)' },
   { name: 'Vortex', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1 },
     sw: 'conic-gradient(from 20deg,#ff3b3b,#ffd23b,#3bff9a,#3b8bff,#c43bff,#ff3b3b)' },
-  { name: 'Melt', A: { in1: 'picture', size: 50, zoom: 4, trails: 95, color: 6, warp: 62, mirror: 2, blur: 0.35, shift: [0, -0.0035], gain: 0.9 },
-    sw: 'linear-gradient(180deg,#c0c0c0 0 18%,#c0c000 18% 34%,#00c0c0 34% 52%,#00a000 52% 70%,#a000a0 70% 86%,#a00000 86%)' },
   { name: 'Lattice', A: { in1: 'shape', form: 2, zoom: -30, spin: 9, trails: 90, color: 18, mirror: 4, edge: 1 },
     sw: 'repeating-linear-gradient(45deg,#0b2a3a 0 6px,#39d0ff 6px 8px),#0b2a3a' },
   { name: 'Embers', A: { in1: 'sparks', zoom: 55, spin: -22, trails: 84, color: 9, warp: 28, blur: 0.15, shift: [0, 0.0025] },
     sw: 'radial-gradient(circle at 25% 70%,#ffcf6b 0 7%,transparent 9%),radial-gradient(circle at 70% 35%,#ff7a3b 0 6%,transparent 8%),radial-gradient(circle at 55% 80%,#ff3b3b 0 5%,transparent 7%),linear-gradient(#2a0d05,#120604)' },
-  { name: 'Echo', A: { in1: 'picture', size: 50, zoom: 22, spin: 12, trails: 96, color: 4, gain: 0.95 },
-    sw: 'repeating-radial-gradient(circle,#101418 0 5px,#4ad0c8 5px 7px)' },
   { name: 'Calm', A: { in1: 'wave', size: 50, form: 2, zoom: 7, spin: 4, trails: 95, color: 5, warp: 14, mirror: 2, blur: 0.35 },
     sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)' },
   { name: 'Twins',
@@ -1158,7 +1156,19 @@ const CHANNELS = [
   { name: 'Horizon', A: { in1: 'horizon', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
     sw: 'radial-gradient(circle at 50% 58%,#ffd23b 0 14%,#ff4fae 22%,transparent 23%),repeating-linear-gradient(90deg,#ff3bd0 0 1px,transparent 1px 8px) 0 100%/100% 42% no-repeat,repeating-linear-gradient(0deg,#ff3bd0 0 1px,transparent 1px 4px) 0 100%/100% 42% no-repeat,linear-gradient(#12031f,#6a1756 56%,#1a0624 58%)' },
   { name: 'Cavern', A: { in1: 'cavern', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 78% 28%,#7dff9a 0 3%,transparent 4%),radial-gradient(circle at 22% 70%,#6fe3ff 0 2%,transparent 3%),radial-gradient(circle at 50% 55%,#04060c 0 12%,transparent 13%),radial-gradient(circle at 50% 55%,transparent 0 22%,#c23bff 23% 25%,transparent 26%),radial-gradient(circle at 50% 55%,transparent 0 36%,#2de0c0 37% 39%,transparent 40%),radial-gradient(circle at 30% 30%,#3a2a6a,#0a1420 75%)' }
+    sw: 'radial-gradient(circle at 78% 28%,#7dff9a 0 3%,transparent 4%),radial-gradient(circle at 22% 70%,#6fe3ff 0 2%,transparent 3%),radial-gradient(circle at 50% 55%,#04060c 0 12%,transparent 13%),radial-gradient(circle at 50% 55%,transparent 0 22%,#c23bff 23% 25%,transparent 26%),radial-gradient(circle at 50% 55%,transparent 0 36%,#2de0c0 37% 39%,transparent 40%),radial-gradient(circle at 30% 30%,#3a2a6a,#0a1420 75%)' },
+  { name: 'Black hole', A: { in1: 'blackhole', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'radial-gradient(ellipse 62% 13% at 50% 56%,transparent 0 22%,#ffb04a 34%,#ff6a1a 52%,transparent 74%),radial-gradient(circle at 50% 50%,#000 0 17%,#ffe0a0 20%,#ff8a3a 25%,transparent 32%),#040306' },
+  { name: 'Aurora', A: { in1: 'aurora', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'linear-gradient(180deg,transparent 0 58%,#03060c 58% 66%,transparent 66%),radial-gradient(ellipse 70% 26% at 45% 42%,#3dffa0 0 18%,rgba(90,110,255,.55) 48%,transparent 72%),linear-gradient(#1c0a30,#07121e 58%,#0b1d28 66%,#02050a)' },
+  { name: 'Mercury', A: { in1: 'mercury', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'radial-gradient(circle at 36% 44%,#fff 0 5%,#c3cddd 11%,#3b4454 25%,transparent 27%),radial-gradient(circle at 64% 58%,#fff 0 4%,#cdb2ee 10%,#3a3150 21%,transparent 23%),linear-gradient(#2a1540,#0b0b12)' },
+  { name: 'Fractal', A: { in1: 'fractal', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'radial-gradient(circle at 30% 42%,#ffb34a 0 12%,transparent 13%),radial-gradient(circle at 62% 36%,#4ad0a0 0 15%,transparent 16%),radial-gradient(circle at 50% 78%,#b44aff 0 10%,transparent 11%),radial-gradient(circle at 82% 72%,#ff4a8a 0 8%,transparent 9%),radial-gradient(circle at 14% 80%,#4a9aff 0 7%,transparent 8%),#1a0f22' },
+  { name: 'Crystals', A: { in1: 'crystals', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'linear-gradient(100deg,transparent 0 18%,#a45cff 18% 26%,transparent 26%),linear-gradient(82deg,transparent 0 55%,#3ad8ff 55% 63%,transparent 63%),linear-gradient(95deg,transparent 0 76%,#ff5caa 76% 81%,transparent 81%),linear-gradient(#0a0414,#1c0c30)' },
+  { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'radial-gradient(circle at 56% 40%,#fff 0 3%,transparent 7%),radial-gradient(ellipse at 34% 46%,rgba(255,80,170,.85) 0,transparent 48%),radial-gradient(ellipse at 66% 56%,rgba(90,110,255,.85) 0,transparent 52%),#0a0514' }
 ];
 
 /* ================= state ================= */
@@ -1470,8 +1480,8 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 3) return seedSparks(g, uTime);
   if (id == 11) return seedInk(p);
   if (id == 12) return vec3(0.0);   // Paint is laid on top in main()
-  // Cubes, Horizon and Cavern: 3D flights, each drawn just before this pass (see draw3D) filling the screen
-  if (id >= 13 && id <= 15) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
+  // The 3D worlds (Cubes to Nebula), each drawn just before this pass (see draw3D) filling the screen
+  if (id >= 13 && id <= 21) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);
   if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
   if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);
@@ -2020,6 +2030,640 @@ void main() {
   o = vec4(col, 1.0);
 }`;
 
+// Black hole: circling a black hole whose pull bends light round it, so its glowing disk shows over the top and underneath.
+const FS_BLACKHOLE = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; the disk swirls and the view tilts with it
+uniform float uTravel;   // how far round the hole the camera has gone, as an angle (wraps every 2π)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the disk burns (the music pushes it up)
+uniform float uSeed;     // loop B sees another sky
+out vec4 o;
+float h31(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+float h21(vec2 p) { return h31(vec3(p, 7.1)); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), u.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+// The far sky: stars, and a faint band of the galaxy
+vec3 sky(vec3 d) {
+  vec3 c = vec3(0.0);
+  vec3 g = d * 170.0;
+  vec3 id = floor(g);
+  float h = h31(id + uSeed);
+  if (h > 0.995) {
+    float r = length(fract(g) - 0.5);
+    c += mix(vec3(0.7, 0.8, 1.0), vec3(1.0, 0.85, 0.7), fract(h * 91.0)) * smoothstep(0.35, 0.0, r) * (h - 0.995) * 500.0;
+  }
+  float band = exp(-abs(d.y - 0.25 * sin(d.x * 2.0 + d.z)) * 5.0);
+  c += vec3(0.35, 0.3, 0.55) * band * 0.07 * (0.6 + 0.8 * vnoise(vec2(atan(d.z, d.x) * 8.0, d.y * 8.0)));
+  return c;
+}
+// The glowing disk of gas swirling into the hole: white hot inside, cooling to orange and red further out.
+// It turns faster the closer in it is, and the side racing towards you shines brighter.
+vec4 disk(vec3 p, vec3 dir) {
+  float r = length(p.xz);
+  if (r < 2.3 || r > 13.0) return vec4(0.0);
+  float a = atan(p.z, p.x);
+  float spin = uTime * 2.4 * pow(3.0 / r, 1.5);
+  float sw = a + spin;
+  float n = vnoise(vec2(sw * 3.0 / 3.14159 * 4.0 + r * 1.3, r * 1.6)) * 0.65
+          + vnoise(vec2(sw * 6.0 / 3.14159 * 4.0 - r * 2.0, r * 3.2)) * 0.35;
+  float streak = 0.55 + 0.9 * n * n;
+  float T = pow(3.0 / r, 0.9);
+  vec3 col = mix(vec3(0.9, 0.18, 0.04), vec3(1.0, 0.72, 0.38), clamp(T, 0.0, 1.0));
+  col = mix(col, vec3(1.1, 1.05, 1.0), clamp(T * T - 0.6, 0.0, 1.0));
+  vec3 v = normalize(vec3(-p.z, 0.0, p.x));
+  float beam = pow(1.0 + 0.5 * dot(v, -dir), 2.2);
+  float edge = smoothstep(2.3, 3.2, r) * smoothstep(13.0, 6.5, r);
+  float I = edge * streak * T * 1.6 * beam * uGlow;
+  return vec4(col * I, clamp(edge * (0.35 + 0.6 * n) * 1.1, 0.0, 0.92));
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  // Slowly circling the hole, a little above the disk, the tilt drifting up and down
+  float a = uTravel;
+  float incl = 0.1 + 0.09 * sin(uTime * 0.043 + uSeed);
+  float D = 17.0;
+  vec3 ro = D * vec3(cos(incl) * sin(a), sin(incl), cos(incl) * cos(a));
+  vec3 fw = normalize(-ro);
+  float roll = 0.12 * sin(uTime * 0.031);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 dir = normalize(fw + sp.x * rt + sp.y * up);
+
+  // Follow the light back from the camera: the hole's pull bends its path, so the far side of the disk
+  // shows over the top and underneath, and the stars around the hole smear into arcs
+  vec3 pos = ro;
+  vec3 col = vec3(0.0);
+  float alpha = 0.0;
+  float h2 = dot(cross(pos, dir), cross(pos, dir));
+  float minR = 1e5;
+  bool gone = false;
+  for (int i = 0; i < 170; i++) {
+    float r = length(pos);
+    minR = min(minR, r);
+    if (r < 1.0) { gone = true; break; }
+    float dt = clamp(0.09 * r * r / (r + 2.0), 0.02, 1.6);
+    vec3 acc = -1.5 * h2 * pos / (r * r * r * r * r);
+    vec3 np = pos + dir * dt;
+    dir = normalize(dir + acc * dt);
+    if (pos.y * np.y < 0.0) {
+      vec3 hp = mix(pos, np, pos.y / (pos.y - np.y));
+      vec4 dk = disk(hp, dir);
+      col += (1.0 - alpha) * dk.rgb;
+      alpha += (1.0 - alpha) * dk.a;
+      if (alpha > 0.97) break;
+    }
+    pos = np;
+    if (r > 45.0 && dot(pos, dir) > 0.0) break;
+  }
+  if (!gone) col += (1.0 - alpha) * sky(dir);
+  // A thin ring of light hugging the edge of the shadow
+  col += vec3(1.0, 0.75, 0.5) * 0.25 * exp(-max(minR - 1.5, 0.0) * 5.0) * (1.0 - alpha) * uGlow * (gone ? 0.0 : 1.0);
+  o = vec4(col, 1.0);
+}`;
+
+// Aurora: a slow glide over a frozen lake under curtains of northern lights, mirrored in the ice.
+const FS_AURORA = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; the curtains ripple and fold with it
+uniform float uTravel;   // how far the glide has come (wraps every GAP, where the curtains repeat)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the lights burn (the music pushes it up)
+uniform float uSeed;     // loop B sees other mountains and other stars
+out vec4 o;
+const float GAP = 55.0;   // a new curtain of light hangs every GAP ahead
+float h31(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+float h11(float x) { return h31(vec3(x, 3.7, uSeed)); }
+float n11(float x) { float i = floor(x), f = fract(x); return mix(h11(i), h11(i + 1.0), f * f * (3.0 - 2.0 * f)); }
+// Where a curtain crosses the ground, bending and folding as it drifts
+float fold(float x, float t) {
+  return 7.0 * sin(x * 0.045 + t * 0.05) + 3.0 * sin(x * 0.12 - t * 0.09 + 1.0) + 1.2 * sin(x * 0.33 + t * 0.21);
+}
+// The curtains of light seen along one line of sight: sampled at a stack of heights, from the sharp green
+// lower hem up to the violet top, each curtain finely streaked with rays
+vec3 aurora(vec3 ro, vec3 rd, float dither) {
+  if (rd.y <= 0.01) return vec3(0.0);
+  vec3 c = vec3(0.0);
+  float t = uTime;
+  for (int i = 0; i < 26; i++) {
+    float f = (float(i) + dither) / 26.0;
+    float h = 9.0 + 26.0 * f * f;
+    float tt = (h - ro.y) / rd.y;
+    if (tt > 420.0) break;
+    vec3 q = ro + rd * tt;
+    float zz = q.z - fold(q.x, t);
+    float m = mod(zz, GAP) - 0.5 * GAP;
+    float w = 1.8 + 4.0 * f;
+    float sheet = exp(-m * m / (w * w));
+    float rays = 0.3 + 0.7 * n11(q.x * 0.9 + t * 0.35 + floor(zz / GAP) * 17.0) * n11(q.x * 2.7 - t * 0.2);
+    float hem = 0.45 + 1.4 * exp(-f * 7.0);
+    vec3 tint = mix(vec3(1.0, 0.2, 0.55), vec3(0.15, 1.0, 0.45), smoothstep(0.0, 0.05, f));   // a pink lower fringe
+    tint = mix(tint, vec3(0.15, 0.6, 1.0), smoothstep(0.15, 0.5, f));
+    tint = mix(tint, vec3(0.8, 0.2, 0.85), smoothstep(0.45, 1.0, f));
+    c += tint * sheet * rays * hem * exp(-tt * 0.006);
+  }
+  return c * 0.22 * uGlow;
+}
+// The far mountains all round, as an outline against the sky: how high they reach in each direction
+float ridge(vec3 d) {
+  float az = atan(d.x, d.z);
+  return 0.025 + 0.05 * n11(az * 5.0 + 11.0) * n11(az * 5.0 + 11.0) + 0.012 * n11(az * 23.0);
+}
+vec3 sky(vec3 ro, vec3 d, float dither) {
+  vec3 c = mix(vec3(0.02, 0.05, 0.1), vec3(0.0, 0.005, 0.02), smoothstep(0.0, 0.5, d.y));
+  vec3 g = d * 220.0;
+  vec3 id = floor(g);
+  float hs = h31(id + uSeed);
+  if (hs > 0.996) c += vec3(0.85, 0.9, 1.0) * smoothstep(0.35, 0.0, length(fract(g) - 0.5)) * (0.5 + 0.5 * sin(uTime * 2.0 + hs * 90.0)) * 0.9;
+  c += aurora(ro, d, dither);
+  if (d.y < ridge(d)) c = vec3(0.004, 0.008, 0.016) + aurora(ro, normalize(vec3(d.x, 0.08, d.z)), dither) * 0.06;
+  return c;
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float t = uTime;
+  // Gliding over a frozen lake, gently swaying and looking a little upwards
+  vec3 ro = vec3(3.0 * sin(t * 0.04), 1.6 + 0.3 * sin(t * 0.13), uTravel);
+  vec3 fw = normalize(vec3(0.12 * sin(t * 0.05), 0.2 + 0.06 * sin(t * 0.07), 1.0));
+  float roll = 0.04 * sin(t * 0.09);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+  float dither = h31(vec3(gl_FragCoord.xy, fract(t) * 13.0));
+  vec3 col;
+  if (rd.y >= 0.0) {
+    col = sky(ro, rd, dither);
+  } else {
+    // The ice mirrors the sky, dimmer, with faint cracks and frost streaks running across it
+    float tt = ro.y / -rd.y;
+    vec3 q = ro + rd * tt;
+    vec3 rf = vec3(rd.x, -rd.y, rd.z);
+    vec2 qq = q.xz;
+    // Frost dulls the mirror in soft patches
+    float frost = n11(qq.x * 0.35 + 5.0 * n11(mod(qq.y, GAP) * 0.4)) ;
+    float fres = 0.35 + 0.65 * pow(1.0 - rf.y, 4.0);
+    col = sky(q, rf, dither) * (0.45 + 0.35 * frost) * fres;
+    col += vec3(0.02, 0.03, 0.05) * frost * exp(-tt * 0.1);
+  }
+  o = vec4(col, 1.0);
+}`;
+
+// Mercury: circling drops of liquid metal that drift, merge and split, mirroring a neon-lit room.
+const FS_MERCURY = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; the blobs drift and merge with it
+uniform float uTravel;   // how far round the camera has circled, as an angle (wraps every 2π)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the lights are, and how much the blobs swell (the music pushes it up)
+uniform float uSeed;     // loop B watches a different dance
+out vec4 o;
+float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+// Seven drops of liquid metal drifting round each other, flowing together where they meet
+float map(vec3 p) {
+  float t = uTime * 0.45 + uSeed;
+  float swell = 1.0 + 0.18 * (uGlow - 1.0);
+  float d = 1e5;
+  for (int i = 0; i < 7; i++) {
+    float fi = float(i);
+    vec3 c = vec3(1.5 * sin(t * (0.53 + 0.11 * fi) + fi * 1.7),
+                  0.9 * sin(t * (0.71 + 0.07 * fi) + fi * 2.9),
+                  1.5 * cos(t * (0.47 + 0.13 * fi) + fi * 0.9));
+    float r = (0.55 + 0.3 * fract(fi * 0.618)) * swell;
+    d = smin(d, length(p - c) - r, 0.75);
+  }
+  return d;
+}
+vec3 normalAt(vec3 p) {
+  const vec2 k = vec2(1.0, -1.0);
+  const float h = 0.002;
+  return normalize(k.xyy * map(p + k.xyy * h) + k.yyx * map(p + k.yyx * h) + k.yxy * map(p + k.yxy * h) + k.xxx * map(p + k.xxx * h));
+}
+vec3 hue(float x) { return 0.5 + 0.5 * cos(6.28318 * (x + vec3(0.0, 0.33, 0.67))); }
+// The studio round the metal, which it mirrors: a dusky sky with a glowing horizon, three big soft lights,
+// and neon tubes standing round the room. The colours drift slowly.
+vec3 env(vec3 d) {
+  float az = atan(d.x, d.z);
+  float tt = uTime * 0.03;
+  vec3 c = d.y > 0.0 ? mix(hue(tt + 0.62) * 0.75 + 0.15, hue(tt + 0.1) * 0.25 + 0.05, smoothstep(0.0, 0.9, d.y))
+                     : mix(vec3(0.2, 0.19, 0.22), vec3(0.06, 0.055, 0.07), smoothstep(0.0, -0.5, d.y));
+  c += hue(tt + 0.9) * exp(-abs(d.y) * 9.0) * 0.9 * uGlow;
+  c += vec3(1.0, 0.97, 0.94) * smoothstep(0.6, 0.85, d.y) * 1.4;   // a big soft light overhead
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float ca = fk * 2.094 + 0.4 + uTime * 0.02;
+    float da = abs(mod(az - ca + 3.14159, 6.28318) - 3.14159);
+    float de = abs(d.y - (0.35 + 0.12 * fk));
+    float box = smoothstep(0.03, 0.0, max(da - 0.32, de - 0.2));
+    c += mix(vec3(1.0, 0.95, 0.88), hue(tt + fk * 0.33), 0.55) * box * (1.6 + 0.4 * fk);
+  }
+  float seg = 6.28318 / 7.0;
+  float a = mod(az + uTime * 0.05, seg) - 0.5 * seg;
+  float tube = exp(-a * a / 0.0008) * smoothstep(0.5, 0.35, abs(d.y - 0.05));
+  c += hue(floor((az + uTime * 0.05) / seg) * 0.21 + tt) * tube * 2.5 * uGlow;
+  return c;
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  // Circling slowly round the metal, rising and dipping a little
+  float a = uTravel;
+  float el = 0.28 + 0.18 * sin(uTime * 0.07);
+  vec3 ro = 5.6 * vec3(cos(el) * sin(a), sin(el), cos(el) * cos(a));
+  vec3 fw = normalize(-ro);
+  vec3 rt = normalize(cross(vec3(0.0, 1.0, 0.0), fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+  const float FLOOR = -2.2;
+
+  float t = 0.0, hit = 0.0;
+  for (int i = 0; i < 90; i++) {
+    float d = map(ro + rd * t);
+    if (d < 0.001) { hit = 1.0; break; }
+    t += d;
+    if (t > 20.0) break;
+  }
+  float tf = rd.y < 0.0 ? (FLOOR - ro.y) / rd.y : 1e5;
+  vec3 col;
+  if (hit > 0.5 && t < tf) {
+    vec3 q = ro + rd * t;
+    vec3 n = normalAt(q);
+    vec3 r = reflect(rd, n);
+    float fres = 0.7 + 0.3 * pow(1.0 - max(dot(n, -rd), 0.0), 5.0);
+    col = env(r) * fres * vec3(0.92, 0.95, 1.0);
+    // Where the metal curls in on itself it catches less light
+    col *= 0.5 + 0.5 * clamp(map(q + n * 0.4) / 0.4, 0.0, 1.0);
+    // The floor seen in the metal's underside
+    if (r.y < 0.0) col *= 0.6;
+  } else if (tf < 1e4) {
+    // A black glossy floor mirroring the metal and the lights
+    vec3 q = ro + rd * tf;
+    vec3 r = vec3(rd.x, -rd.y, rd.z);
+    float tr = 0.02, rh = 0.0;
+    for (int i = 0; i < 50; i++) {
+      float d = map(q + r * tr);
+      if (d < 0.004) { rh = 1.0; break; }
+      tr += d;
+      if (tr > 12.0) break;
+    }
+    vec3 rc = env(r) * 0.22;
+    if (rh > 0.5) {
+      vec3 qq = q + r * tr;
+      vec3 n = normalAt(qq);
+      rc = env(reflect(r, n)) * 0.6;
+    }
+    float fres = 0.2 + 0.8 * pow(1.0 - max(-rd.y, 0.0), 4.0);
+    col = rc * fres * 0.55 * exp(-length(q.xz) * 0.06);
+    // Far off, the floor fades into the glow of the room's horizon instead of ending in a hard line
+    col = mix(col, env(rd) * 0.22, 1.0 - exp(-length(q.xz) * 0.045));
+  } else {
+    col = env(rd) * 0.22;
+  }
+  o = vec4(col, 1.0);
+}`;
+
+// Fractal: a flight down a hall folded out of spheres, where bubbles grow on bubbles, smaller without end.
+const FS_FRACTAL = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; the colours drift and the view sways with it
+uniform float uTravel;   // how far the flight has come (wraps every 2, where the fractal repeats)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the lights are (the music pushes it up)
+uniform float uSeed;     // loop B takes a different line through the hall
+out vec4 o;
+// A fractal made by folding space into a repeating box and turning it inside out through a sphere, over
+// and over: a hall whose floor and ceiling grow bubbles on bubbles on bubbles, smaller without end.
+// Every fold repeats every 2 units, so the whole hall does too.
+float map(vec3 p, out float trap) {
+  float s = 1.0;
+  trap = 1e5;
+  for (int i = 0; i < 8; i++) {
+    p = -1.0 + 2.0 * fract(0.5 * p + 0.5);
+    float r2 = dot(p, p);
+    trap = min(trap, r2);
+    float k = 1.3 / max(r2, 1e-6);
+    p *= k;
+    s *= k;
+  }
+  return 0.25 * abs(p.y) / s;
+}
+float map(vec3 p) { float t; return map(p, t); }
+vec3 hue(float x) { return 0.5 + 0.5 * cos(6.28318 * (x + vec3(0.0, 0.33, 0.67))); }
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float t = uTime;
+  // Flying down the middle of the hall, well clear of the bubbles, looking about slowly
+  // (the corridor at mid-height round x = 1 is clear of bubbles for well over 0.4 either side)
+  float lane = uSeed > 0.0 ? 0.74 : 1.0;
+  vec3 ro = vec3(lane + 0.12 * sin(t * 0.13), 1.0 + 0.05 * sin(t * 0.17), uTravel);
+  vec3 fw = normalize(vec3(0.35 * sin(t * 0.05), 0.18 * sin(t * 0.037), 1.0));
+  float roll = 0.2 * sin(t * 0.03);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+
+  float tt = 0.0, hit = 0.0, trap = 0.0;
+  float steps = 0.0;
+  for (int i = 0; i < 120; i++) {
+    float d = map(ro + rd * tt, trap);
+    if (d < 0.0004 * (1.0 + tt * 3.0)) { hit = 1.0; break; }
+    tt += d;
+    steps += 1.0;
+    if (tt > 9.0) break;
+  }
+  vec3 col = vec3(0.0);
+  vec3 fog = hue(t * 0.01 + 0.62) * 0.05;
+  if (hit > 0.5) {
+    vec3 q = ro + rd * tt;
+    vec2 e = vec2(0.0006 * (1.0 + tt * 2.0), 0.0);
+    vec3 n = normalize(vec3(map(q + e.xyy) - map(q - e.xyy), map(q + e.yxy) - map(q - e.yxy), map(q + e.yyx) - map(q - e.yyx)));
+    // Colour by how close the folds came to the centre of the sphere: gold, teal and violet bands
+    vec3 base = hue(0.08 + sqrt(trap) * 2.2 + t * 0.01);
+    base = mix(base, vec3(1.0, 0.85, 0.6), 0.25);
+    float occ = 1.0 - clamp(steps / 70.0, 0.0, 1.0);   // tight corners took many steps: they sit in shadow
+    // A lamp just above the camera, and a cold light filling in from the far end of the hall
+    vec3 lp = ro + vec3(0.0, 0.25, 0.3);
+    vec3 L = lp - q;
+    float dl = length(L);
+    L /= dl;
+    float att = 1.0 / (1.0 + dl * dl * 0.8);
+    float dif = max(dot(n, L), 0.0) * att;
+    float spec = pow(max(dot(reflect(-L, n), -rd), 0.0), 30.0) * att;
+    float fill = max(dot(n, normalize(vec3(0.2, 0.4, -1.0))), 0.0);
+    float rim = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+    col = base * (dif * 3.2 + fill * 0.15 + 0.04) * occ + vec3(1.0, 0.95, 0.9) * spec * 1.2 * occ;
+    col += hue(t * 0.02 + 0.5) * rim * 0.35 * occ * uGlow;
+    // The tiniest bubbles glow like embers
+    col += vec3(1.0, 0.55, 0.2) * smoothstep(0.02, 0.0, trap) * 1.5 * uGlow;
+    col = mix(col, fog, 1.0 - exp(-tt * 0.35));
+  } else {
+    col = fog;
+  }
+  // A glow gathers along the hall where the rays graze the bubbles
+  col += hue(t * 0.02 + 0.55) * pow(steps / 120.0, 2.0) * 0.5 * uGlow;
+  o = vec4(col, 1.0);
+}`;
+
+// Crystals: a flight through a grove of giant glowing crystals rising from violet mist.
+const FS_CRYSTALS = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; the crystals shimmer and the view sways with it
+uniform float uTravel;   // how far the flight has come (wraps every ROWS rows of crystals)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the crystals burn (the music pushes it up)
+uniform float uSeed;     // loop B flies through another grove
+out vec4 o;
+const float C = 3.2;       // each crystal stands in its own C by C square of ground
+const float ROWS = 160.0;  // the grove repeats after this many rows
+float h31(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+float cellHash(vec2 id, float k) { return h31(vec3(id.x, mod(id.y, ROWS), k + uSeed)); }
+vec3 hue(float x) { return 0.5 + 0.5 * cos(6.28318 * (x + vec3(0.0, 0.33, 0.67))); }
+// A crystal's colour: amethyst, aquamarine, rose or ice
+vec3 crystalCol(vec2 id) {
+  float h = cellHash(id, 9.0);
+  return h < 0.3 ? vec3(0.65, 0.3, 1.0) : h < 0.55 ? vec3(0.2, 0.85, 1.0) : h < 0.8 ? vec3(1.0, 0.35, 0.7) : vec3(0.75, 0.9, 1.0);
+}
+// A six-sided crystal in local space: its cross-section and how far it is from the edges and the point
+const vec3 HK = vec3(-0.866025404, 0.5, 0.577350269);
+float crystal(vec3 q, float r, float hgt, out float edge) {
+  vec2 p = abs(q.xz);
+  p -= 2.0 * min(dot(HK.xy, p), 0.0) * HK.xy;
+  edge = HK.z * r - abs(p.x);
+  vec2 s = p - vec2(clamp(p.x, -HK.z * r, HK.z * r), r);
+  float side = length(s) * sign(s.y);
+  float tip = (q.y - hgt + 1.7 * p.y) * 0.5;   // six sloping faces meeting in a point
+  return max(max(side, tip), -q.y);
+}
+struct Hit { float d; vec2 id; float edge; float y; float r; float hgt; };
+Hit scene(vec3 p) {
+  Hit h;
+  vec2 id = floor(p.xz / C + 0.5);
+  vec2 lc = p.xz - id * C;
+  h.id = id; h.edge = 1.0; h.y = p.y; h.r = 0.0; h.hgt = 0.0;
+  h.d = p.y + 0.02;   // the ground
+  // The lane down the middle stays clear
+  if (id.x != 0.0 && abs(id.x) < 6.0 && cellHash(id, 1.0) < 0.85) {
+    float r = 0.35 + 0.45 * cellHash(id, 2.0);
+    float hgt = 1.8 + 6.0 * pow(cellHash(id, 3.0), 1.6) + abs(id.x) * 0.3;
+    vec2 off = (vec2(cellHash(id, 4.0), cellHash(id, 5.0)) - 0.5) * (C - 2.6 * r);
+    float lean = (cellHash(id, 6.0) - 0.5) * 0.5, turn = cellHash(id, 7.0) * 6.28;
+    vec3 q = vec3(lc - off, p.y).xzy;
+    float cl = cos(lean), sl = sin(lean);
+    q.xy = mat2(cl, -sl, sl, cl) * q.xy;
+    float ct = cos(turn), st = sin(turn);
+    q.xz = mat2(ct, -st, st, ct) * q.xz;
+    float e;
+    float dc = crystal(q, r, hgt, e);
+    if (dc < h.d) { h.d = dc; h.edge = e / r; h.y = q.y; h.r = r; h.hgt = hgt; }
+  }
+  return h;
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float t = uTime;
+  vec3 ro = vec3(0.5 * sin(t * 0.11), 1.3 + 0.4 * sin(t * 0.07), uTravel);
+  vec3 fw = normalize(vec3(0.15 * sin(t * 0.06), 0.06 + 0.05 * sin(t * 0.09), 1.0));
+  float roll = 0.05 * sin(t * 0.08);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+
+  const float FAR = 60.0;
+  float tt = 0.0;
+  Hit h;
+  bool hit = false;
+  vec2 inv = 1.0 / max(abs(rd.xz), vec2(1e-4));
+  for (int i = 0; i < 120; i++) {
+    vec3 pos = ro + rd * tt;
+    h = scene(pos);
+    if (h.d < 0.002 * (1.0 + tt)) { hit = true; break; }
+    // Never step past the edge of this square along the ray: the next crystal might be just over it
+    vec2 lc = pos.xz - floor(pos.xz / C + 0.5) * C;
+    vec2 tx = (0.5 * C - lc * sign(rd.xz)) * inv;
+    tt += min(h.d * 0.8, min(tx.x, tx.y) + 0.01);
+    if (tt > FAR) break;
+    if (ro.y + rd.y * tt > 12.0 && rd.y > 0.0) break;
+  }
+  vec3 sky = mix(vec3(0.09, 0.04, 0.16), vec3(0.005, 0.0, 0.02), smoothstep(0.0, 0.45, rd.y));
+  vec3 g = rd * 200.0;
+  float hs = h31(floor(g) + uSeed);
+  if (hs > 0.996 && rd.y > 0.05) sky += vec3(0.8, 0.85, 1.0) * smoothstep(0.35, 0.0, length(fract(g) - 0.5)) * 0.8;
+  vec3 mistCol = vec3(0.25, 0.12, 0.4);
+  vec3 col = sky;
+  if (hit) {
+    vec3 q = ro + rd * tt;
+    if (h.r > 0.0) {
+      // Inside, the crystal glows, brightest at its point; its edges catch the light;
+      // faces seen side-on shine like glass
+      vec3 cc = crystalCol(h.id);
+      vec2 e = vec2(0.003, 0.0);
+      vec3 n = normalize(vec3(scene(q + e.xyy).d - scene(q - e.xyy).d, scene(q + e.yxy).d - scene(q - e.yxy).d,
+                              scene(q + e.yyx).d - scene(q - e.yyx).d));
+      float along = clamp(h.y / h.hgt, 0.0, 1.0);
+      float fine = smoothstep(22.0, 6.0, tt);   // far away, fine detail fades instead of flickering
+      float ew = mix(0.35, 0.12, fine);
+      float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+      float streak = 1.0 - 0.25 * fine * (0.5 + 0.5 * sin(h.y * 7.0 + cellHash(h.id, 8.0) * 20.0 + t * 0.7));
+      float pulse = 0.8 + 0.2 * sin(t * 1.3 + cellHash(h.id, 10.0) * 6.28);
+      col = cc * (0.2 + 0.75 * along * along) * streak * pulse * uGlow;
+      col += cc * smoothstep(ew, 0.0, h.edge) * (0.5 + 0.8 * along) * uGlow * mix(0.35, 1.0, fine);
+      col += mix(cc, vec3(1.0), 0.5) * fres * 0.6 * fine;
+      vec3 rf = reflect(rd, n);
+      col += vec3(0.9, 0.9, 1.0) * pow(max(rf.y, 0.0), 8.0) * 0.25 * fine;
+    } else {
+      // The dark glassy ground mirrors the sky and pools with the colour of the nearest crystals
+      vec2 base = floor(q.xz / C);
+      vec3 pool = vec3(0.0);
+      for (int k = 0; k < 4; k++) {
+        vec2 cid = base + vec2(float(k % 2), float(k / 2));
+        if (cid.x != 0.0 && abs(cid.x) < 6.0 && cellHash(cid, 1.0) < 0.85) {
+          float r = 0.35 + 0.45 * cellHash(cid, 2.0);
+          vec2 off = (vec2(cellHash(cid, 4.0), cellHash(cid, 5.0)) - 0.5) * (C - 2.6 * r);
+          pool += crystalCol(cid) * exp(-length(q.xz - cid * C - off) * 1.1) * 0.6;
+        }
+      }
+      float fres = 0.3 + 0.7 * pow(1.0 - max(-rd.y, 0.0), 4.0);
+      col = pool * uGlow + sky * fres * 0.6;
+    }
+    // Low mist glowing faintly violet, thicker far away
+    float mist = (1.0 - exp(-tt * 0.075)) * exp(-max(q.y, 0.0) * 0.2);
+    col = mix(col, mistCol * 0.35, clamp(mist, 0.0, 1.0));
+    col = mix(col, mistCol * 0.3, smoothstep(FAR * 0.45, FAR, tt));
+  } else {
+    col = mix(sky, mistCol * 0.3, exp(-max(rd.y, 0.0) * 10.0));
+  }
+  o = vec4(col, 1.0);
+}`;
+
+// Nebula: a flight through glowing clouds of gas and dark dust, lit by a nearby star.
+const FS_NEBULA = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; the gas churns and the colours drift with it
+uniform float uTravel;   // how far the flight has come (wraps every ZP, where the clouds repeat)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the gas and stars shine (the music pushes it up)
+uniform float uSeed;     // loop B flies through other clouds
+out vec4 o;
+const float ZP = 400.0;
+float h31(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+// Soft random lumps in 3D that repeat every per squares going forward
+float vnoise(vec3 p, float per) {
+  vec3 i = floor(p), f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+  float z0 = mod(i.z, per), z1 = mod(i.z + 1.0, per);
+  vec3 s = vec3(uSeed, 0.0, 0.0);
+  float a = h31(vec3(i.xy, z0) + s), b = h31(vec3(i.x + 1.0, i.y, z0) + s);
+  float c = h31(vec3(i.x, i.y + 1.0, z0) + s), d = h31(vec3(i.x + 1.0, i.y + 1.0, z0) + s);
+  float e = h31(vec3(i.xy, z1) + s), f2 = h31(vec3(i.x + 1.0, i.y, z1) + s);
+  float g = h31(vec3(i.x, i.y + 1.0, z1) + s), h = h31(vec3(i.x + 1.0, i.y + 1.0, z1) + s);
+  return mix(mix(mix(a, b, u.x), mix(c, d, u.x), u.y), mix(mix(e, f2, u.x), mix(g, h, u.x), u.y), u.z);
+}
+vec2 path(float z) { return vec2(3.0 * sin(z * 6.28318 / 200.0), 2.0 * sin(z * 6.28318 / 133.333 + 1.0)); }
+// How thick the gas is here: billowing clouds, thinning out along the winding path the flight takes
+float density(vec3 p) {
+  vec3 q = p * 0.12;
+  float n = vnoise(q, 48.0) * 0.55 + vnoise(q * 2.0 + vec3(0.0, 0.0, 0.0), 96.0) * 0.3 + vnoise(q * 4.0, 192.0) * 0.15;
+  float lane = length(p.xy - path(p.z));
+  return max(n - 0.5 - 0.12 * smoothstep(6.0, 0.0, lane), 0.0) * 3.0;
+}
+vec3 hue(float x) { return 0.5 + 0.5 * cos(6.28318 * (x + vec3(0.0, 0.33, 0.67))); }
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float z = uTravel;
+  vec3 ro = vec3(path(z), z);
+  vec3 fw = normalize(vec3(path(z + 6.0), z + 6.0) - ro);
+  float roll = 0.15 * sin(uTime * 0.04);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+
+  // Far stars behind everything
+  vec3 g = rd * 160.0;
+  float hs = h31(floor(g) + uSeed);
+  vec3 bg = hs > 0.994 ? vec3(0.85, 0.9, 1.0) * smoothstep(0.35, 0.0, length(fract(g) - 0.5)) * (hs - 0.994) * 160.0 : vec3(0.0);
+
+  // March through the gas: it glows in its own colours and hides what lies behind it.
+  // A bright star floats ahead of the flight and lights the clouds round it.
+  vec3 star = vec3(path(z + 40.0), z + 40.0) + vec3(4.0, 2.5, 0.0);
+  vec3 col = vec3(0.0);
+  float trans = 1.0;
+  float dither = h31(vec3(gl_FragCoord.xy, 3.0));
+  float t = 0.3 + dither * 0.6;
+  for (int i = 0; i < 40; i++) {
+    vec3 q = ro + rd * t;
+    float d = density(q);
+    float dt = 0.45 + t * 0.045;
+    if (d > 0.0) {
+      // Some of the gas glows (violet, magenta, blue, now and then gold); the rest is dark dust
+      float kind = vnoise(q * 0.21 + vec3(7.0, 3.0, 0.0), 84.0);
+      float lit = smoothstep(0.35, 0.65, kind);
+      vec3 tint = mix(vec3(0.45, 0.2, 1.0), vec3(1.0, 0.2, 0.6), smoothstep(0.3, 0.7, vnoise(q * 0.09 + 11.0, 36.0)));
+      tint = mix(tint, vec3(0.2, 0.6, 1.0), smoothstep(0.55, 0.8, kind));
+      tint = mix(tint, vec3(1.0, 0.6, 0.25), smoothstep(0.75, 0.95, vnoise(q * 0.05 + 23.0, 20.0)) * 0.8);
+      vec3 toS = star - q;
+      float ls = 18.0 / (1.0 + dot(toS, toS) * 0.03);
+      vec3 emit = tint * d * (0.06 + 1.1 * lit) + vec3(1.0, 0.85, 0.7) * ls * d * 0.25;
+      float a = 1.0 - exp(-d * dt * 1.1);
+      col += trans * a * emit * uGlow;
+      trans *= 1.0 - a;
+      if (trans < 0.03) break;
+    }
+    t += dt;
+    if (t > 60.0) break;
+  }
+  // The star itself, glaring through the gas
+  vec3 toStar = normalize(star - ro);
+  float sa = max(dot(rd, toStar), 0.0);
+  vec3 glare = vec3(1.0, 0.9, 0.8) * (pow(sa, 3000.0) * 3.0 + pow(sa, 200.0) * 0.5 + pow(sa, 20.0) * 0.08) * uGlow;
+  col += trans * bg + glare * (0.4 + 0.6 * trans);
+
+  // Specks of light hanging in slices ahead, streaming past as the flight moves on
+  const float GAP = 2.0;
+  float z0 = (floor(ro.z / GAP) + 1.0) * GAP;
+  for (int k = 0; k < 10; k++) {
+    float zs = z0 + float(k) * GAP;
+    float ts = (zs - ro.z) / max(rd.z, 0.05);
+    if (ts <= 0.0) continue;
+    vec2 xy = (ro + rd * ts).xy - path(zs);
+    vec2 cell = floor(xy / 1.5);
+    float hh = h31(vec3(cell, mod(zs, ZP) + uSeed));
+    if (hh > 0.25) continue;
+    vec2 c = (cell + 0.2 + 0.6 * vec2(h31(vec3(cell, zs + 1.3)), h31(vec3(cell, zs + 2.7)))) * 1.5;
+    float r = length(xy - c);
+    float w = 0.02 + ts * 2.0 * uLens / uSim.y;
+    col += mix(vec3(0.7, 0.85, 1.0), vec3(1.0, 0.7, 0.9), hh * 4.0) * exp(-r * r / (w * w)) * min(1.0, 0.03 / w) * exp(-ts * 0.05) * uGlow;
+  }
+  o = vec4(col, 1.0);
+}`;
+
 function compile(type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -2055,21 +2699,67 @@ try {
   fail('The screen couldn’t start on this graphics card. Try another browser, or update your graphics drivers.');
   return;
 }
-// The 3D flights: how fast each flies (in its own units a second) and after how far its world repeats.
-// If this graphics card can't draw one, everything else still works and that input stays hidden.
+// The 3D worlds: what the picker calls each, how fast it moves (in its own units a second: along the
+// flight, or round the circle for Black hole and Mercury), after how far it repeats exactly, where loop B
+// starts in it, and for soft ones, how finely it is drawn (smaller is quicker, smoothed back up to size).
 const SCENES = {
-  cubes:   { fs: FS_CUBES,   speed: 0.9, period: 2048,          offB: 1000, prog: null, z: 0 },
-  horizon: { fs: FS_HORIZON, speed: 6.5, period: 512,           offB: 256,  prog: null, z: 0 },
-  cavern:  { fs: FS_CAVERN,  speed: 1.6, period: 80 * Math.PI,  offB: 40,   prog: null, z: 0 },
+  cubes:     { fs: FS_CUBES,     label: 'Cubes',      speed: 0.9,   period: 2048,          offB: 1000 },
+  horizon:   { fs: FS_HORIZON,   label: 'Horizon',    speed: 6.5,   period: 512,           offB: 256 },
+  cavern:    { fs: FS_CAVERN,    label: 'Cavern',     speed: 1.6,   period: 80 * Math.PI,  offB: 40 },
+  blackhole: { fs: FS_BLACKHOLE, label: 'Black hole', speed: 0.055, period: 2 * Math.PI,   offB: Math.PI },
+  aurora:    { fs: FS_AURORA,    label: 'Aurora',     speed: 2.5,   period: 55,            offB: 20 },
+  mercury:   { fs: FS_MERCURY,   label: 'Mercury',    speed: 0.12,  period: 2 * Math.PI,   offB: 2 },
+  fractal:   { fs: FS_FRACTAL,   label: 'Fractal',    speed: 0.09,  period: 2,             offB: 0.7 },
+  crystals:  { fs: FS_CRYSTALS,  label: 'Crystals',   speed: 2.2,   period: 512,           offB: 100 },
+  nebula:    { fs: FS_NEBULA,    label: 'Nebula',     speed: 2.0,   period: 400,           offB: 150, res: 0.5 },
 };
-for (const sc of Object.values(SCENES)) { try { sc.prog = program(sc.fs); } catch (_) { sc.prog = null; } }
-const is3D = (src) => !!SCENES[src];
 const HINT_3D = {
   cubes: 'A 3D flight through floating cubes towards a glowing light.',
   horizon: 'A 3D flight low over a wet valley floor towards a striped sunset, with glowing mountains on both sides. The mountains swell with the bass.',
   cavern: 'A 3D flight down a winding cave with coral-like walls, light pulsing along glowing veins and spores drifting past.',
+  blackhole: 'Circling a black hole: its pull bends the light, so the glowing disk of gas round it shows over the top and underneath.',
+  aurora: 'A slow glide over a frozen lake under curtains of northern lights, mirrored in the ice.',
+  mercury: 'Circling drops of liquid metal that drift, merge and split, mirroring a neon-lit room. They swell with the bass.',
+  fractal: 'A flight down a hall folded out of spheres, where bubbles grow on bubbles, smaller without end.',
+  crystals: 'A flight through a grove of giant glowing crystals rising from violet mist.',
+  nebula: 'A flight through glowing clouds of gas and dark dust, lit by a nearby star.',
 };
-const SCENES_OK = Object.keys(SCENES).filter((k) => SCENES[k].prog);
+// The worlds are built in the background as the page opens, so nine big shaders don't hold up the start.
+// Where the browser can (KHR_parallel_shader_compile) that happens on other threads; picking a world
+// before it's built just waits for it. A world this graphics card can't draw is left out of the picker.
+const parallelBuild = gl.getExtension('KHR_parallel_shader_compile');
+for (const sc of Object.values(SCENES)) {
+  sc.z = 0;
+  sc.prog = null;
+  try {
+    const pr = gl.createProgram();
+    for (const [type, src] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, sc.fs]]) {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      gl.attachShader(pr, sh);
+    }
+    gl.linkProgram(pr);
+    sc.building = pr;
+    sc.state = 'building';
+  } catch (_) { sc.state = 'failed'; }
+}
+function sceneReady(sc, wait) {
+  if (sc.state !== 'building') return sc.state === 'ready';
+  if (!wait && parallelBuild && !gl.getProgramParameter(sc.building, parallelBuild.COMPLETION_STATUS_KHR)) return false;
+  const pr = sc.building;
+  sc.building = null;
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { sc.state = 'failed'; return false; }
+  const u = {};
+  const n = gl.getProgramParameter(pr, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(pr, i); u[info.name] = gl.getUniformLocation(pr, info.name); }
+  sc.prog = { p: pr, u };
+  sc.state = 'ready';
+  return true;
+}
+const is3D = (src) => !!SCENES[src];
+const worldOK = (name) => !!SCENES[name] && SCENES[name].state !== 'failed';
+const worldsOK = () => Object.keys(SCENES).filter(worldOK);
 
 const U = (prog, name) => prog.u[name] || null;
 function set1f(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1f(l, v); }
@@ -2297,10 +2987,10 @@ CHANNELS.forEach((c, i) => {
   const b = document.createElement('button');
   b.className = 'ch';
   b.setAttribute('aria-pressed', 'false');
+  b.dataset.look = c.name;   // first, so a MIDI button learned on a channel follows it by name
   b.dataset.ch = i;
-  const key = i < 10 ? (i + 1) % 10 : ['-', '=', '[', ']', '\\'][i - 10] || '';
-  b.title = `Channel ${i + 1}: ${c.name} (key ${key})`;
-  b.innerHTML = `<span class="sw" style="--sw:${c.sw}"><b>${key}</b></span><span class="nm">${c.name}</span>`;
+  b.title = `Channel ${i + 1}: ${c.name}`;
+  b.innerHTML = `<span class="sw" style="--sw:${c.sw}"></span><span class="nm${c.name.length > 8 ? ' long' : ''}">${c.name}</span>`;
   b.addEventListener('click', () => loadChannel(i));
   chWrap.appendChild(b);
 });
@@ -2363,10 +3053,10 @@ function paintSlider(k) {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['splat', 'Paint splats'], ['cubes', 'Cubes (3D flight)'], ['horizon', 'Horizon (3D flight)'], ['cavern', 'Cavern (3D flight)'],
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['splat', 'Paint splats'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (3D world)`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
-    if ((inArtifact && DEVICE.includes(v)) || (APP && v === 'screen') || (is3D(v) && !SCENES_OK.includes(v))) continue;
+    if ((inArtifact && DEVICE.includes(v)) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
     const o = document.createElement('option');
     o.value = v; o.textContent = label;
     in2Sel.appendChild(o);
@@ -2376,7 +3066,25 @@ buildIn2();
 if (inArtifact) $$('#inputs [data-device]').forEach((b) => { b.hidden = true; });
 // Phones can't share their screen with a page, so the app leaves Screen out
 if (APP) $$('#inputs [data-src="screen"]').forEach((b) => { b.hidden = true; });
-for (const name of Object.keys(SCENES)) if (!SCENES[name].prog) $$(`#inputs [data-src="${name}"]`).forEach((b) => { b.hidden = true; });
+// The 3D world picker: one button per world. It changes whichever input of this loop is a world.
+let lastWorld = 'cubes';
+for (const [name, sc] of Object.entries(SCENES)) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.dataset.world = name;
+  b.setAttribute('aria-pressed', 'false');
+  b.textContent = sc.label;
+  b.addEventListener('click', () => { const t = loops[edit].tgt; chooseSource(is3D(t.in2) && !is3D(t.in1) ? 'in2' : 'in1', name); });
+  $('#worlds').appendChild(b);
+}
+// Once the worlds are built, leave out any this graphics card can't draw
+const worldCheck = setInterval(() => {
+  const all = Object.values(SCENES);
+  for (const sc of all) if (sc.state === 'building') sceneReady(sc, !parallelBuild);
+  $$('#worlds button').forEach((b) => { b.hidden = !worldOK(b.dataset.world); });
+  if (!worldsOK().length) $$('#inputs [data-src="world"]').forEach((b) => { b.hidden = true; });
+  if (!all.some((sc) => sc.state === 'building')) clearInterval(worldCheck);
+}, 1000);
 // The other loop's button fills whatever room the last row of input buttons leaves
 {
   const n = $$('#inputs button').filter((b) => !b.hidden && b.dataset.src !== 'loop').length;
@@ -2384,7 +3092,10 @@ for (const name of Object.keys(SCENES)) if (!SCENES[name].prog) $$(`#inputs [dat
   $('#loopSrcBtn').style.gridColumn = left === 5 ? '1 / -1' : `span ${left}`;
 }
 
-$$('#inputs button').forEach((b) => b.addEventListener('click', () => chooseSource('in1', b.dataset.src)));
+$$('#inputs button').forEach((b) => b.addEventListener('click', () => {
+  const t = loops[edit].tgt;
+  chooseSource('in1', b.dataset.src === 'world' ? (is3D(t.in1) ? t.in1 : lastWorld) : b.dataset.src);
+}));
 in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
 $$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver(); loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
 $('#motion').addEventListener('click', () => { takeOver(); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
@@ -2396,6 +3107,7 @@ function uses(src) { return ['A', 'B'].some((k) => loops[k].tgt.in1 === src || l
 function chooseSource(slot, src) {
   takeOver();
   loops[edit].tgt[slot] = src;
+  if (is3D(src)) lastWorld = src;
   if (src === 'camera' && !cam.on) startCamera();
   if (src === 'screen' && !scr.on) startScreen(true);
   if (src === 'phone') startPhoneLink();
@@ -2506,7 +3218,7 @@ function syncUI() {
   const t = loops[edit].tgt;
   LOOP_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(t[k]); paintSlider(k); });
   MIX_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(mix.tgt[k]); paintSlider(k); });
-  $$('#inputs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.src === t.in1)));
+  $$('#inputs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.src === t.in1 || (b.dataset.src === 'world' && is3D(t.in1)))));
   in2Sel.value = t.in2;
   $('#blendCtl').hidden = t.in2 === 'none';
   $$('#mirror button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mirror === t.mirror)));
@@ -2517,6 +3229,7 @@ function syncUI() {
   const fly = [t.in1, t.in2].find(is3D);
   $('#row-3d').hidden = !fly;
   if (fly) $('#hint3d').textContent = HINT_3D[fly];
+  $$('#worlds button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.world === fly)));
   const otherK = edit === 'A' ? 'B' : 'A';
   $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
   $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
@@ -2564,7 +3277,7 @@ function loadChannel(i) {
 }
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', ...SCENES_OK]);
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', ...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2)]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : 100,
     form: 2 + Math.floor(Math.random() * 4),
@@ -3115,7 +3828,7 @@ apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
 
 function apPool() {
   const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', 'loop'];
-  pool.push(...SCENES_OK);
+  pool.push(...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2));
   if (vid.on) pool.push('video', 'video');
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
   return pool;
@@ -3918,7 +4631,7 @@ $('#guideClose').addEventListener('click', closeGuide);
 $('#guideDone').addEventListener('click', closeGuide);
 guide.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { e.stopPropagation(); closeGuide(); }
-  else e.stopPropagation(); // keep channel keys from firing while reading
+  else e.stopPropagation(); // keep the keys from firing while reading
 });
 if (location.hash === '#guide') openGuide();
 
@@ -4090,13 +4803,7 @@ function onKey(e) {
   const tag = e.target && e.target.tagName;
   if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return;
   const onControl = tag === 'BUTTON' || tag === 'INPUT';
-  if (e.key >= '0' && e.key <= '9') { loadChannel(e.key === '0' ? 9 : +e.key - 1); e.preventDefault(); }
-  else if (e.key === '-' && CHANNELS[10]) { loadChannel(10); e.preventDefault(); }
-  else if (e.key === '=' && CHANNELS[11]) { loadChannel(11); e.preventDefault(); }
-  else if (e.key === '[' && CHANNELS[12]) { loadChannel(12); e.preventDefault(); }
-  else if (e.key === ']' && CHANNELS[13]) { loadChannel(13); e.preventDefault(); }
-  else if (e.key === '\\' && CHANNELS[14]) { loadChannel(14); e.preventDefault(); }
-  else if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
+  if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
   else if (e.key === 'n' || e.key === 'N') neutral();
@@ -5159,16 +5866,19 @@ const sceneRT = [null, null];
 let sceneGlow = 1;
 function draw3D(k, name, slot, scale) {
   const sc = SCENES[name];
+  if (!sceneReady(sc, true)) return null;
+  const w = Math.max(2, Math.round(simW * (sc.res || 1))), h = Math.max(2, Math.round(simH * (sc.res || 1)));
   let rt = sceneRT[slot];
-  if (!rt || rt.w !== simW) {
+  if (!rt || rt.w !== w || rt.h !== h) {
     if (rt) dropTarget(rt);
-    rt = sceneRT[slot] = makeTarget();
-    rt.w = simW;
+    rt = sceneRT[slot] = makeTarget(w, h);
+    rt.w = w;
+    rt.h = h;
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, rt.fbo);
-  gl.viewport(0, 0, simW, simH);
+  gl.viewport(0, 0, w, h);
   gl.useProgram(sc.prog.p);
-  set2f(sc.prog, 'uSim', simW, simH);
+  set2f(sc.prog, 'uSim', w, h);
   set1f(sc.prog, 'uTime', simT + (k === 'B' ? 11.0 : 0));
   set1f(sc.prog, 'uTravel', (sc.z + (k === 'B' ? sc.offB : 0)) % sc.period);
   // Input size is the lens: at 100 it sees about as much as your eye, lower sees wider
@@ -5215,8 +5925,8 @@ function runLoop(k, xf, brush, f) {
 
   // The music can swell the input past the slider's top, so it still pulses when Size is already at 100
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
-  const fly1 = SCENES_OK.includes(t.in1) ? t.in1 : null;
-  const fly2 = t.in2 !== t.in1 && SCENES_OK.includes(t.in2) ? t.in2 : null;
+  const fly1 = is3D(t.in1) ? t.in1 : null;
+  const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
   const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
   const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
 
@@ -5257,8 +5967,9 @@ function runLoop(k, xf, brush, f) {
   }
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
   set1f(fbProg, 'uXfeed', xf);
-  set1i(fbProg, 'uIn1', resolveSrc(t.in1, t.motion));
-  set1i(fbProg, 'uIn2', t.in2 === 'none' ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  // A world that can't be drawn feeds in nothing (never the loop's own last frame)
+  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
+  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
   set1f(fbProg, 'uScale', scale);
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
@@ -5329,14 +6040,14 @@ function frame() {
   analyzeSound(dt, now);
   drawMeter();
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
-  if (SCENES_OK.some(uses)) {
+  if (Object.keys(SCENES).some(uses)) {
     let surge = reduceMotion ? 0.45 : 1, glow = 1;
     if (snd.analyser) {
       const a = sndPower(), E = snd.env, m = snd.map;
       if (m.kick) surge *= 1 + a * (E.low * 1.2 + E.beat * 2.5);
       if (m.flash) glow += a * (E.beat * 0.35 + E.low * 0.2);
     }
-    for (const name of SCENES_OK) {
+    for (const name of Object.keys(SCENES)) {
       const sc = SCENES[name];
       if (!frozen && uses(name)) sc.z = (sc.z + dt * sc.speed * surge) % sc.period;
     }
@@ -5416,7 +6127,7 @@ function frame() {
 }
 
 /* ================= start ================= */
-const startCh = reduceMotion ? 7 : 0;
+const startCh = reduceMotion ? Math.max(0, CHANNELS.findIndex((c) => c.name === 'Calm')) : 0;
 channel = startCh;
 applyPatch(CHANNELS[startCh]);
 for (const key of ['A', 'B']) Object.assign(loops[key].cur, loops[key].tgt);
