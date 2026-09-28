@@ -157,10 +157,16 @@ TIPS
     table seen from above. Each splat stays wet for a few seconds, then
     fades as new ones land on top. Paint under "What feeds the loop" adds
     splats to any look; Input size makes them bigger or smaller.
+  - Cubes: channel 13 (Cubes, the [ key) flies you through floating cubes
+    towards a glowing light, in 3D. Cubes under "What feeds the loop" adds the
+    flight to any look. Input size widens or narrows the view. With React to
+    sound on, the flight surges forward on the kick and the light flares on
+    the beat. For warp-speed streaks, raise Trails to about 60 and Zoom to
+    about 30.
   - Split lines (under Mirror): every other line of the picture slides left
     and the lines between slide right, like a scrambled TV.
   - Camera: a phone's back camera shows the world the right way round; a
     front camera or computer webcam works like a mirror. With more than one
     camera, a list under Camera picks which one.
-  - Keys: 1-9, 0, - (minus) and = channels, Space freeze, N neutral, R surprise,
+  - Keys: 1-9, 0, - (minus), = and [ channels, Space freeze, N neutral, R surprise,
     P autopilot, C clear, F full screen, H hide controls, G guide.
