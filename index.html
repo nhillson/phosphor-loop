@@ -592,7 +592,7 @@
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd>, <kbd>-</kbd>, <kbd>=</kbd> and <kbd>[</kbd> channels · <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>1</kbd>–<kbd>0</kbd>, <kbd>-</kbd>, <kbd>=</kbd>, <kbd>[</kbd>, <kbd>]</kbd> and <kbd>\</kbd> channels · <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -709,6 +709,8 @@
             <button data-src="ink" aria-pressed="false">Ink</button>
             <button data-src="splat" aria-pressed="false">Paint</button>
             <button data-src="cubes" aria-pressed="false">Cubes</button>
+            <button data-src="horizon" aria-pressed="false">Horizon</button>
+            <button data-src="cavern" aria-pressed="false">Cavern</button>
             <button data-src="none" aria-pressed="false">Nothing</button>
             <button data-src="picture" aria-pressed="false">Picture</button>
             <button data-src="video" aria-pressed="false">Video</button>
@@ -718,8 +720,8 @@
             <button data-src="loop" aria-pressed="false" id="loopSrcBtn">Loop B’s picture</button>
           </div>
 
-          <div class="dev" id="row-cubes" hidden>
-            <span class="hint">A 3D flight through floating cubes towards a glowing light. Input size widens or narrows the view. For warp-speed streaks, raise Trails to about 60 and Zoom to about 30.</span>
+          <div class="dev" id="row-3d" hidden>
+            <span class="hint"><span id="hint3d"></span> Input size widens or narrows the view. For warp-speed streaks, raise Trails to about 60 and Zoom to about 30.</span>
           </div>
 
           <div class="dev" id="row-loop" hidden>
@@ -954,7 +956,7 @@
       <section>
         <h2><small>Start here</small>Your first 30 seconds</h2>
         <ol class="g-steps">
-          <li><b>Pick a channel.</b> The buttons at the top of the controls are ready-made looks. Keys 1 to 9, 0, - (minus), = and [ work too.</li>
+          <li><b>Pick a channel.</b> The buttons at the top of the controls are ready-made looks. Keys 1 to 9, 0, - (minus), =, [, ] and \ work too.</li>
           <li><b>Drag on the screen.</b> You paint light straight into the loop and watch it echo.</li>
           <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
           <li><b>Press Surprise me</b> for something new, or <b>Autopilot</b> to let it run by itself.</li>
@@ -965,7 +967,7 @@
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
           <div class="g-card"><h3>Channels</h3><dl>
-            <dt>Channels</dt><dd>Ready-made looks. 9 (Twins) and 0 (Weave) use both loops. Ink (the minus key) drops colored ink into swirling water. Splat (the = key) throws paint onto a table seen from above. Cubes (the [ key) flies through floating cubes towards a glowing light, in 3D.</dd>
+            <dt>Channels</dt><dd>Ready-made looks. 9 (Twins) and 0 (Weave) use both loops. Ink (the minus key) drops colored ink into swirling water. Splat (the = key) throws paint onto a table seen from above. Cubes (the [ key) flies through floating cubes towards a glowing light, in 3D. Horizon (the ] key) flies low over a glowing valley towards a striped sunset. Cavern (the \ key) flies down a winding cave with glowing veins.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
@@ -977,7 +979,7 @@
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
-            <dt>Wave, Shape, Bars, Sparks, Ink, Paint, Cubes</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. Paint throws solid splats that cover whatever is underneath, like paint on a table. Cubes is a 3D flight through floating cubes towards a glowing light; Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the light flares on the beat.</dd>
+            <dt>Wave, Shape, Bars, Sparks, Ink, Paint, Cubes, Horizon, Cavern</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. Paint throws solid splats that cover whatever is underneath, like paint on a table. Cubes, Horizon and Cavern are 3D flights: through floating cubes towards a glowing light, low over a glowing valley towards a sunset, and down a winding cave with glowing veins. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
             <dt>Picture and Video</dt><dd>Your own files. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
@@ -1105,8 +1107,8 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, splat: 12, cubes: 13 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', splat: 'Paint', cubes: 'Cubes', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, splat: 12, cubes: 13, horizon: 14, cavern: 15 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', splat: 'Paint', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
@@ -1153,6 +1155,10 @@ const CHANNELS = [
     sw: 'radial-gradient(circle at 28% 38%,#dc1a14 0 16%,transparent 17%),radial-gradient(circle at 70% 60%,#f9c61a 0 20%,transparent 21%),radial-gradient(circle at 52% 22%,#f2f0e6 0 7%,transparent 8%),radial-gradient(circle at 20% 78%,#1a3dcc 0 9%,transparent 10%),#0b0a09' },
   { name: 'Cubes', A: { in1: 'cubes', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
     sw: 'radial-gradient(circle at 55% 50%,#fff 0 6%,#ff5ccf 8%,rgba(70,190,255,.7) 12%,transparent 34%),linear-gradient(#9aa6b4,#9aa6b4) 24% 26%/6px 6px no-repeat,linear-gradient(#c8202e,#c8202e) 74% 28%/5px 5px no-repeat,linear-gradient(#4a1420,#4a1420) 10% 90%/11px 11px no-repeat,linear-gradient(#b8c4d0,#b8c4d0) 84% 76%/4px 4px no-repeat,linear-gradient(#3a0f18,#3a0f18) 96% 8%/10px 10px no-repeat,linear-gradient(#6d7784,#6d7784) 38% 78%/4px 4px no-repeat,#050306' },
+  { name: 'Horizon', A: { in1: 'horizon', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'radial-gradient(circle at 50% 58%,#ffd23b 0 14%,#ff4fae 22%,transparent 23%),repeating-linear-gradient(90deg,#ff3bd0 0 1px,transparent 1px 8px) 0 100%/100% 42% no-repeat,repeating-linear-gradient(0deg,#ff3bd0 0 1px,transparent 1px 4px) 0 100%/100% 42% no-repeat,linear-gradient(#12031f,#6a1756 56%,#1a0624 58%)' },
+  { name: 'Cavern', A: { in1: 'cavern', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
+    sw: 'radial-gradient(circle at 78% 28%,#7dff9a 0 3%,transparent 4%),radial-gradient(circle at 22% 70%,#6fe3ff 0 2%,transparent 3%),radial-gradient(circle at 50% 55%,#04060c 0 12%,transparent 13%),radial-gradient(circle at 50% 55%,transparent 0 22%,#c23bff 23% 25%,transparent 26%),radial-gradient(circle at 50% 55%,transparent 0 36%,#2de0c0 37% 39%,transparent 40%),radial-gradient(circle at 30% 30%,#3a2a6a,#0a1420 75%)' }
 ];
 
 /* ================= state ================= */
@@ -1206,12 +1212,12 @@ vec3 hsv(float h, float s, float v) {
 
 const FS_FEEDBACK = `#version 300 es
 precision highp float;
-uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev, uCube;
+uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev, uScene1, uScene2;
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
-uniform float uCubeK;   // how much of each new Cubes frame gets in (less as Trails rise, so it never whites out)
+uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
 uniform vec2 uWave[81];     // the Wave curve's 81 points, worked out once per frame
@@ -1456,7 +1462,7 @@ vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, f
   }
   return c * e.x * e.y;
 }
-vec3 source(int id, vec2 p) {
+vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
   if (id == 1) return seedShape(g, uTime);
@@ -1464,8 +1470,8 @@ vec3 source(int id, vec2 p) {
   if (id == 3) return seedSparks(g, uTime);
   if (id == 11) return seedInk(p);
   if (id == 12) return vec3(0.0);   // Paint is laid on top in main()
-  // Cubes: the 3D flight, drawn just before this pass (see drawCubes) filling the screen; Input size is its lens
-  if (id == 13) return uCubeK * texture(uCube, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
+  // Cubes, Horizon and Cavern: 3D flights, each drawn just before this pass (see draw3D) filling the screen
+  if (id >= 13 && id <= 15) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);
   if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
   if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);
@@ -1511,9 +1517,9 @@ void main() {
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec2 ps = pf + vec2(uSplitOff * side, 0.0);
-  vec3 s = source(uIn1, ps);
+  vec3 s = source(uIn1, ps, uScene1);
   if (uIn2 != 9) {
-    vec3 s2 = source(uIn2, ps);
+    vec3 s2 = source(uIn2, ps, uScene2);
     float w1 = min(1.0, 2.0 * (1.0 - uBlend)), w2 = min(1.0, 2.0 * uBlend);
     s = 1.0 - (1.0 - clamp(s * w1, 0.0, 1.0)) * (1.0 - clamp(s2 * w2, 0.0, 1.0));
   }
@@ -1599,8 +1605,9 @@ void main() {
 }`;
 
 
-// Cubes: a flight down a lane through floating cubes towards a glowing light, drawn in 3D.
-// It gets its own pass (see drawCubes) so the feedback pass stays as quick as before for every other input.
+// The 3D flights. Each draws its picture in a pass of its own (see draw3D), only while something uses it,
+// so the feedback pass stays as quick as before for every other input.
+// Cubes: a flight down a lane through floating cubes towards a glowing light.
 const FS_CUBES = `#version 300 es
 precision highp float;
 uniform vec2 uSim;
@@ -1771,6 +1778,248 @@ void main() {
   o = vec4(col, 1.0);
 }`;
 
+// Horizon: a low flight along a wet valley floor towards a striped sunset, glowing grid mountains either side.
+const FS_HORIZON = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; sways and banks the flight
+uniform float uTravel;   // how far the flight has come (wraps every ZP, where the land repeats)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the sun and the lines are (the music pushes it up)
+uniform float uSeed;     // loop B flies over land of its own
+out vec4 o;
+const float ZP = 512.0;
+float h21(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+// Smooth random hills that repeat every per squares going forward, so the land repeats every ZP
+float vnoise(vec2 p, float per) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float z0 = mod(i.y, per), z1 = mod(i.y + 1.0, per);
+  float a = h21(vec2(i.x, z0) + uSeed), b = h21(vec2(i.x + 1.0, z0) + uSeed);
+  float c = h21(vec2(i.x, z1) + uSeed), d = h21(vec2(i.x + 1.0, z1) + uSeed);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float lift() { return 1.0 + (uGlow - 1.0) * 0.5; }   // the mountains swell a little with the music
+// Mountains on both sides of a flat valley floor that the flight follows
+float terrain(vec2 p) {
+  float side = smoothstep(2.5, 13.0, abs(p.x));
+  if (side <= 0.0) return 0.0;
+  float n = 0.0, a = 0.62, fr = 0.1, per = 51.2;
+  for (int i = 0; i < 2; i++) {
+    float v = vnoise(p * fr + vec2(float(i) * 37.0, 0.0), per);
+    n += a * (i == 0 ? 1.0 - abs(2.0 * v - 1.0) : v);   // sharp ridges, then some rolling detail
+    a *= 0.4; fr *= 2.0; per *= 2.0;
+  }
+  return side * side * (n * n * 13.0 + abs(p.x) * 0.12) * lift();
+}
+const vec3 SUN = vec3(0.0, 0.06, 0.9982);
+vec3 sky(vec3 rd) {
+  float y = rd.y;
+  vec3 c = mix(vec3(0.95, 0.32, 0.45), vec3(0.2, 0.03, 0.28), smoothstep(-0.02, 0.22, y));
+  c = mix(c, vec3(0.02, 0.0, 0.06), smoothstep(0.18, 0.6, y));
+  // The sun: a big disc going from gold to magenta, cut by stripes that thicken towards its foot
+  vec2 sp = rd.xy / max(rd.z, 0.01) - SUN.xy / SUN.z;
+  float r = length(sp), R = 0.2;
+  vec3 sunCol = mix(vec3(1.0, 0.18, 0.6), vec3(1.0, 0.78, 0.25), smoothstep(-R * 0.7, R, sp.y));
+  float band = sp.y < R * 0.15 ? step(0.18 + 0.55 * smoothstep(R * 0.15, -R, sp.y), fract(sp.y * 28.0 + uTime * 0.25)) : 1.0;
+  float disc = smoothstep(R, R - 0.004, r) * band;
+  c = mix(c, sunCol * 1.25 * uGlow, disc);
+  c += vec3(1.0, 0.3, 0.55) * 0.35 * exp(-max(r - R, 0.0) * 9.0) * uGlow;
+  // Stars higher up
+  vec2 sg = rd.xz / max(rd.y, 0.02) * 60.0;
+  vec2 si = floor(sg);
+  float sh = h21(si + 7.0);
+  float star = step(0.985, sh) * smoothstep(0.12, 0.0, length(fract(sg) - 0.5)) * smoothstep(0.08, 0.3, y);
+  c += vec3(0.8, 0.85, 1.0) * star * (0.5 + 0.5 * sin(uTime * 3.0 + sh * 50.0));
+  return c;
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float t = uTime;
+  // Flying low along the valley floor, drifting side to side and banking gently
+  vec3 ro = vec3(0.7 * sin(t * 0.13), 1.3 + 0.35 * sin(t * 0.21), uTravel);
+  vec3 fw = normalize(vec3(-0.08 * cos(t * 0.13), -0.075 + 0.03 * sin(t * 0.17), 1.0));
+  float roll = -0.07 * cos(t * 0.13) + 0.03 * sin(t * 0.29);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+  float pix = 2.0 * uLens / uSim.y;
+
+  // March until the ray meets the land, or leaves over the top of every mountain
+  const float FAR = 140.0;
+  float top = 15.0 * lift();
+  float tt = 0.05, tPrev = 0.05, hit = 0.0;
+  vec3 pos;
+  for (int i = 0; i < 110; i++) {
+    pos = ro + rd * tt;
+    float d = pos.y - terrain(pos.xz);
+    if (d < 0.0015 * tt) { hit = 1.0; break; }
+    if (tt > FAR || (pos.y > top && rd.y > 0.0)) break;
+    tPrev = tt;
+    tt += max(d * 0.42, 0.012 * tt);
+  }
+  // Pin down exactly where it met the land, so the lines on the slopes stay crisp
+  if (hit > 0.5) {
+    float a = tPrev, b = tt;
+    for (int i = 0; i < 5; i++) {
+      float m = 0.5 * (a + b);
+      vec3 q = ro + rd * m;
+      if (q.y - terrain(q.xz) < 0.0) b = m; else a = m;
+    }
+    tt = b;
+    pos = ro + rd * tt;
+  }
+  vec3 col;
+  vec3 haze = mix(vec3(0.95, 0.3, 0.5), vec3(0.35, 0.06, 0.4), smoothstep(0.0, 0.25, rd.y));
+  if (hit > 0.5) {
+    vec2 e = vec2(0.04, 0.0);
+    vec3 n = normalize(vec3(terrain(pos.xz - e.xy) - terrain(pos.xz + e.xy), 2.0 * e.x,
+                            terrain(pos.xz - e.yx) - terrain(pos.xz + e.yx)));
+    // A glowing grid laid over the land: magenta low down, cyan up on the peaks.
+    // Far away the lines blend into their average glow instead of flickering.
+    float foot = tt * pix / max(abs(dot(rd, n)), 0.2);
+    vec2 g = abs(fract(pos.xz + 0.5) - 0.5);
+    float w0 = 0.035;
+    vec2 w = vec2(w0) + foot;
+    vec2 ln = (1.0 - smoothstep(vec2(0.0), w, g)) * (w0 / w);
+    float line = max(ln.x, ln.y);
+    vec3 lineCol = mix(vec3(1.0, 0.15, 0.75), vec3(0.2, 0.9, 1.0), smoothstep(0.5, 7.0, pos.y));
+    vec3 base = vec3(0.05, 0.0, 0.1) * (0.6 + 0.4 * n.y);
+    // The sun behind the mountains lights their ridges and shines along the wet valley floor
+    float back = pow(1.0 - max(dot(n, -rd), 0.0), 3.0) * max(dot(n, SUN), 0.0);
+    col = base + lineCol * line * 1.3 * uGlow + vec3(1.0, 0.35, 0.55) * back * 0.5;
+    // The valley floor is wet and glossy: it mirrors the sky and the sun, rippling as the flight rushes over it
+    float wet = smoothstep(0.35, 0.02, pos.y) * smoothstep(0.97, 1.0, n.y);
+    if (wet > 0.0) {
+      vec3 rf = reflect(rd, n);
+      rf.x += 0.02 * sin(pos.z * 3.1 + t * 2.0) + 0.01 * sin(pos.z * 7.3 - pos.x * 2.0);
+      rf.y += 0.012 * sin(pos.z * 5.3 - t * 1.3);
+      rf = normalize(rf);
+      float fres = 0.25 + 0.75 * pow(1.0 - max(-rd.y, 0.0), 5.0);
+      col += sky(rf) * wet * fres * 0.55 * (1.0 - line * 0.6);
+    }
+    col = mix(col, haze * 0.8, 1.0 - exp(-tt * 0.022));
+  } else {
+    col = sky(rd);
+  }
+  o = vec4(col, 1.0);
+}`;
+
+// Cavern: a flight down a winding lane through an endless coral-like sheet, with light pulsing along its veins.
+const FS_CAVERN = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; colours drift with it
+uniform float uTravel;   // how far the flight has come (wraps every ZP, where the cave repeats)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the veins burn (the music pushes it up)
+uniform float uSeed;     // loop B flies through another stretch of cave
+out vec4 o;
+// Every wave in the cave repeats a whole number of times in ZP, so after ZP the cave is exactly the same
+const float ZP = 251.327412;   // 80π
+// The winding line the flight follows
+vec2 path(float z) { return vec2(2.4 * sin(z * 0.075), 1.5 * sin(z * 0.05 + 1.3)); }
+// A gyroid: one smooth sheet that curls through space as endless linked tunnels, like coral or bone
+float gyroid(vec3 p, float s) { vec3 q = p * s; return dot(sin(q), cos(q.zxy)) / s; }
+float map(vec3 p) {
+  vec3 q = p + vec3(0.0, 0.0, uSeed);
+  // The main sheet, made lumpy and pitted by a finer one, like coral
+  float sheet = abs(gyroid(q, 1.6)) - 0.17 + 0.1 * gyroid(q, 5.6);
+  float lane = 1.1 - length(p.xy - path(p.z));   // a winding lane carved clear for the flight
+  return max(sheet, lane);
+}
+vec3 normalAt(vec3 p) {
+  const vec2 k = vec2(1.0, -1.0);
+  const float h = 0.01;
+  return normalize(k.xyy * map(p + k.xyy * h) + k.yyx * map(p + k.yyx * h) +
+                   k.yxy * map(p + k.yxy * h) + k.xxx * map(p + k.xxx * h));
+}
+vec3 palette(float x) { return 0.5 + 0.5 * cos(6.28318 * (x + vec3(0.0, 0.33, 0.67))); }
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float z = uTravel;
+  vec3 ro = vec3(path(z), z);
+  vec3 ta = vec3(path(z + 2.5), z + 2.5);
+  vec3 fw = normalize(ta - ro);
+  // Bank into the bends
+  float roll = -0.35 * (path(z + 1.5).x - path(z).x) + 0.08 * sin(uTime * 0.21);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+
+  const float FAR = 30.0;
+  float t = 0.0, hit = 0.0;
+  float glow = 0.0;
+  for (int i = 0; i < 100; i++) {
+    vec3 q = ro + rd * t;
+    float d = map(q);
+    glow += exp(-max(d, 0.0) * 12.0) * 0.012;   // light gathering near the walls, for a soft haze
+    if (d < 0.0015 * (1.0 + t)) { hit = 1.0; break; }
+    t += d * 0.6;
+    if (t > FAR) break;
+  }
+  vec3 fogCol = vec3(0.01, 0.02, 0.05);
+  vec3 col = fogCol;
+  float hue = uTime * 0.02 + z * 0.004;
+  if (hit > 0.5) {
+    vec3 q = ro + rd * t;
+    vec3 n = normalAt(q);
+    // Soft shadows in the folds
+    float ao = clamp(map(q + n * 0.25) / 0.25, 0.0, 1.0) * clamp(0.3 + map(q + n * 0.6) / 0.6, 0.0, 1.0);
+    // A lamp just ahead of the camera, so the walls rushing past catch the light and the far ones stay dark
+    vec3 lp = ro + fw * 0.6 + up * 0.3;
+    vec3 L = lp - q;
+    float dl = length(L);
+    L /= dl;
+    float wrap = max(dot(n, L) * 0.6 + 0.4, 0.0);
+    float dif = wrap * wrap / (1.0 + dl * dl * 0.1);
+    float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+    float spec = pow(max(dot(reflect(-L, n), -rd), 0.0), 24.0) / (1.0 + dl * dl * 0.12);
+    // Mother-of-pearl: the colour shifts with the angle you see it from, like oil on water
+    float facing = max(dot(n, -rd), 0.0);
+    vec3 nacre = palette(hue + 0.45 + facing * 0.7 + n.y * 0.1);
+    vec3 shell = mix(vec3(0.14, 0.18, 0.24), nacre * 0.5, 0.55);
+    col = shell * (dif * 1.6 + 0.03) * ao + vec3(0.8, 0.9, 1.0) * spec * 0.4 * ao;
+    col += nacre * fres * 0.35 * ao / (1.0 + t * 0.2);
+    // Glowing veins where a finer gyroid crosses the walls, drifting through the colours down the cave
+    float v = abs(gyroid(q + vec3(0.0, 0.0, uSeed), 3.2));
+    float vein = exp(-v * v / 0.0005) + 0.3 * exp(-v * v / 0.008);
+    vec3 veinCol = palette(hue + q.z * 0.03);
+    // Pulses of light run along the veins towards the camera
+    float pulse = 0.55 + 0.45 * pow(0.5 + 0.5 * sin(q.z * 0.9 + uTime * 3.0), 4.0) * 2.0;
+    col += veinCol * vein * 0.8 * pulse * uGlow * (0.4 + 0.6 * ao);
+    col = mix(col, fogCol, 1.0 - exp(-t * 0.1));
+  }
+  col += palette(hue + 0.15) * glow * 0.35 * uGlow;
+  // Glowing spores hanging in the air: a few slices of them ahead, each slice fixed in the cave
+  // so they stream past as the flight moves on; the walls hide the ones behind them
+  float tEnd = hit > 0.5 ? t : FAR;
+  const float GAP = ZP / 180.0;   // a whole number of slices in ZP, so they line up when the flight wraps
+  float z0 = (floor(ro.z / GAP) + 1.0) * GAP;
+  for (int k = 0; k < 7; k++) {
+    float zs = z0 + float(k) * GAP;
+    float ts = (zs - ro.z) / max(rd.z, 0.05);
+    if (ts <= 0.0 || ts > tEnd) continue;
+    vec2 xy = (ro + rd * ts).xy - path(zs);
+    vec2 cell = floor(xy / 0.7);
+    vec3 hs = vec3(fract(sin(dot(cell + mod(zs, ZP) * 1.37, vec2(12.9898, 78.233))) * 43758.5453),
+                   fract(sin(dot(cell + mod(zs, ZP) * 2.11, vec2(39.346, 11.135))) * 24634.6345),
+                   fract(sin(dot(cell + mod(zs, ZP) * 0.73, vec2(73.156, 52.235))) * 35758.2341));
+    if (hs.z > 0.35) continue;
+    vec2 c = (cell + 0.2 + 0.6 * hs.xy) * 0.7;
+    float r = length(xy - c);
+    float w = 0.012 + ts * 2.0 * uLens / uSim.y;
+    col += palette(hue + hs.x * 0.3 + 0.3) * exp(-r * r / (w * w)) * min(1.0, 0.02 / w) * 1.2 * uGlow * exp(-ts * 0.08);
+  }
+  o = vec4(col, 1.0);
+}`;
+
 function compile(type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -1806,9 +2055,21 @@ try {
   fail('The screen couldn’t start on this graphics card. Try another browser, or update your graphics drivers.');
   return;
 }
-// If this graphics card can't draw the cubes, everything else still works and the Cubes input stays hidden
-let cubesProg = null;
-try { cubesProg = program(FS_CUBES); } catch (_) { cubesProg = null; }
+// The 3D flights: how fast each flies (in its own units a second) and after how far its world repeats.
+// If this graphics card can't draw one, everything else still works and that input stays hidden.
+const SCENES = {
+  cubes:   { fs: FS_CUBES,   speed: 0.9, period: 2048,          offB: 1000, prog: null, z: 0 },
+  horizon: { fs: FS_HORIZON, speed: 6.5, period: 512,           offB: 256,  prog: null, z: 0 },
+  cavern:  { fs: FS_CAVERN,  speed: 1.6, period: 80 * Math.PI,  offB: 40,   prog: null, z: 0 },
+};
+for (const sc of Object.values(SCENES)) { try { sc.prog = program(sc.fs); } catch (_) { sc.prog = null; } }
+const is3D = (src) => !!SCENES[src];
+const HINT_3D = {
+  cubes: 'A 3D flight through floating cubes towards a glowing light.',
+  horizon: 'A 3D flight low over a wet valley floor towards a striped sunset, with glowing mountains on both sides. The mountains swell with the bass.',
+  cavern: 'A 3D flight down a winding cave with coral-like walls, light pulsing along glowing veins and spores drifting past.',
+};
+const SCENES_OK = Object.keys(SCENES).filter((k) => SCENES[k].prog);
 
 const U = (prog, name) => prog.u[name] || null;
 function set1f(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1f(l, v); }
@@ -1818,7 +2079,7 @@ function set4f(prog, name, a, b, c, d) { const l = U(prog, name); if (l) gl.unif
 function set1i(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1i(l, v); }
 
 // Texture units for the feedback pass never change, so set them once
-const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev', 'uCube'];
+const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev', 'uScene1', 'uScene2'];
 gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
 gl.useProgram(compProg.p);
@@ -2037,7 +2298,7 @@ CHANNELS.forEach((c, i) => {
   b.className = 'ch';
   b.setAttribute('aria-pressed', 'false');
   b.dataset.ch = i;
-  const key = i < 10 ? (i + 1) % 10 : ['-', '=', '['][i - 10] || '';
+  const key = i < 10 ? (i + 1) % 10 : ['-', '=', '[', ']', '\\'][i - 10] || '';
   b.title = `Channel ${i + 1}: ${c.name} (key ${key})`;
   b.innerHTML = `<span class="sw" style="--sw:${c.sw}"><b>${key}</b></span><span class="nm">${c.name}</span>`;
   b.addEventListener('click', () => loadChannel(i));
@@ -2102,10 +2363,10 @@ function paintSlider(k) {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['splat', 'Paint splats'], ['cubes', 'Cubes (3D flight)'],
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['splat', 'Paint splats'], ['cubes', 'Cubes (3D flight)'], ['horizon', 'Horizon (3D flight)'], ['cavern', 'Cavern (3D flight)'],
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
-    if ((inArtifact && DEVICE.includes(v)) || (APP && v === 'screen') || (v === 'cubes' && !cubesProg)) continue;
+    if ((inArtifact && DEVICE.includes(v)) || (APP && v === 'screen') || (is3D(v) && !SCENES_OK.includes(v))) continue;
     const o = document.createElement('option');
     o.value = v; o.textContent = label;
     in2Sel.appendChild(o);
@@ -2115,7 +2376,7 @@ buildIn2();
 if (inArtifact) $$('#inputs [data-device]').forEach((b) => { b.hidden = true; });
 // Phones can't share their screen with a page, so the app leaves Screen out
 if (APP) $$('#inputs [data-src="screen"]').forEach((b) => { b.hidden = true; });
-if (!cubesProg) $$('#inputs [data-src="cubes"]').forEach((b) => { b.hidden = true; });
+for (const name of Object.keys(SCENES)) if (!SCENES[name].prog) $$(`#inputs [data-src="${name}"]`).forEach((b) => { b.hidden = true; });
 // The other loop's button fills whatever room the last row of input buttons leaves
 {
   const n = $$('#inputs button').filter((b) => !b.hidden && b.dataset.src !== 'loop').length;
@@ -2252,7 +2513,10 @@ function syncUI() {
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
   $$('.ch').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ch === channel)));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'cubes']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop']) $('#row-' + s).hidden = !usesHere(s);
+  const fly = [t.in1, t.in2].find(is3D);
+  $('#row-3d').hidden = !fly;
+  if (fly) $('#hint3d').textContent = HINT_3D[fly];
   const otherK = edit === 'A' ? 'B' : 'A';
   $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
   $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
@@ -2300,7 +2564,7 @@ function loadChannel(i) {
 }
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', ...(cubesProg ? ['cubes'] : [])]);
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', ...SCENES_OK]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : 100,
     form: 2 + Math.floor(Math.random() * 4),
@@ -2851,7 +3115,7 @@ apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
 
 function apPool() {
   const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', 'loop'];
-  if (cubesProg) pool.push('cubes');
+  pool.push(...SCENES_OK);
   if (vid.on) pool.push('video', 'video');
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
   return pool;
@@ -3830,6 +4094,8 @@ function onKey(e) {
   else if (e.key === '-' && CHANNELS[10]) { loadChannel(10); e.preventDefault(); }
   else if (e.key === '=' && CHANNELS[11]) { loadChannel(11); e.preventDefault(); }
   else if (e.key === '[' && CHANNELS[12]) { loadChannel(12); e.preventDefault(); }
+  else if (e.key === ']' && CHANNELS[13]) { loadChannel(13); e.preventDefault(); }
+  else if (e.key === '\\' && CHANNELS[14]) { loadChannel(14); e.preventDefault(); }
   else if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
@@ -4887,28 +5153,30 @@ function computeSplats(t, scale) {
     splatCol.set([col[0], col[1], col[2], Math.floor(rand3(n, i, 15) * 997)], slot * 4);
   });
 }
-// The Cubes flight: how far the camera has come (the field repeats every CUBE_PERIOD cubes, far too
-// far to notice), and how brightly the light burns. Both follow the music; see frame().
-const CUBE_PERIOD = 2048;
-let cubeRT = null, cubeZ = 0, cubeGlow = 1;
-function drawCubes(k, scale) {
-  if (!cubesProg) return;
-  if (!cubeRT || cubeRT.w !== simW) {
-    if (cubeRT) dropTarget(cubeRT);
-    cubeRT = makeTarget();
-    cubeRT.w = simW;
+// The 3D flights are drawn into one of two pictures: the loop's main input's flight into the first,
+// its second input's into the other. How brightly they glow follows the music; see frame().
+const sceneRT = [null, null];
+let sceneGlow = 1;
+function draw3D(k, name, slot, scale) {
+  const sc = SCENES[name];
+  let rt = sceneRT[slot];
+  if (!rt || rt.w !== simW) {
+    if (rt) dropTarget(rt);
+    rt = sceneRT[slot] = makeTarget();
+    rt.w = simW;
   }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, cubeRT.fbo);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, rt.fbo);
   gl.viewport(0, 0, simW, simH);
-  gl.useProgram(cubesProg.p);
-  set2f(cubesProg, 'uSim', simW, simH);
-  set1f(cubesProg, 'uTime', simT + (k === 'B' ? 11.0 : 0));
-  set1f(cubesProg, 'uTravel', (cubeZ + (k === 'B' ? 1000 : 0)) % CUBE_PERIOD);
+  gl.useProgram(sc.prog.p);
+  set2f(sc.prog, 'uSim', simW, simH);
+  set1f(sc.prog, 'uTime', simT + (k === 'B' ? 11.0 : 0));
+  set1f(sc.prog, 'uTravel', (sc.z + (k === 'B' ? sc.offB : 0)) % sc.period);
   // Input size is the lens: at 100 it sees about as much as your eye, lower sees wider
-  set1f(cubesProg, 'uLens', 0.47 * Math.pow(2.5 / scale, 0.6));
-  set1f(cubesProg, 'uGlow', cubeGlow);
-  set1f(cubesProg, 'uSeed', k === 'B' ? 37 : 0);
+  set1f(sc.prog, 'uLens', 0.47 * Math.pow(2.5 / scale, 0.6));
+  set1f(sc.prog, 'uGlow', sceneGlow);
+  set1f(sc.prog, 'uSeed', k === 'B' ? 37 : 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return rt.tex;
 }
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
@@ -4919,8 +5187,8 @@ function runLoop(k, xf, brush, f) {
     const d = driftT + (k === 'B' ? 37.0 : 0);
     // Flow brings its own motion, so Auto-drift barely zooms or turns a flowing loop.
     // Paint sits still on its table, so there Auto-drift only tints the paint that has faded.
-    // Cubes fly by themselves, so there too Auto-drift only tints.
-    const still = t.in1 === 'splat' || t.in1 === 'cubes' ? 0 : 1;
+    // The 3D flights move by themselves, so there too Auto-drift only tints.
+    const still = t.in1 === 'splat' || is3D(t.in1) ? 0 : 1;
     const calm = still * Math.max(0, 1 - 1.2 * clamp(c.flow, 0, 100) / 100);
     z += 22 * calm * Math.sin(d * 0.13);
     s += 26 * calm * Math.sin(d * 0.071 + 1.3);
@@ -4947,15 +5215,17 @@ function runLoop(k, xf, brush, f) {
 
   // The music can swell the input past the slider's top, so it still pulses when Size is already at 100
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
-  const cubesOn = t.in1 === 'cubes' || t.in2 === 'cubes';
-  if (cubesOn) drawCubes(k, scale);
+  const fly1 = SCENES_OK.includes(t.in1) ? t.in1 : null;
+  const fly2 = t.in2 !== t.in1 && SCENES_OK.includes(t.in2) ? t.in2 : null;
+  const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
+  const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(fbProg.p);
-  const cubeTex = cubesOn && cubeRT ? cubeRT.tex : src.tex;
-  const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev, otherPrev, cubeTex];
+  const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev, otherPrev,
+                flyTex1 || src.tex, flyTex2 || src.tex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
 
   set2f(fbProg, 'uSim', simW, simH);
@@ -4963,9 +5233,9 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uZoom', (z / 100) * 0.03 * f);
   set1f(fbProg, 'uSpin', -(s / 100) * 0.045 * f);
   set1f(fbProg, 'uDecay', Math.pow(decay60, f));
-  // Cubes fill the whole screen, so rather than piling up into white as the trails build, each frame only
-  // adds what the trails let fade: still parts keep their brightness and the moving cubes leave streaks
-  set1f(fbProg, 'uCubeK', Math.max(0.03, 1 - Math.pow(decay60, f)));
+  // A 3D flight fills the whole screen, so rather than piling up into white as the trails build, each frame
+  // only adds what the trails let fade: still parts keep their brightness and moving ones leave streaks
+  set1f(fbProg, 'uSceneK', Math.max(0.03, 1 - Math.pow(decay60, f)));
   set1f(fbProg, 'uHue', Math.pow(col / 100, 1.5) * 0.08 * f);
   set1f(fbProg, 'uWarp', (w / 100) * 0.006 * f);
   const fl = (clamp(c.flow, 0, 100) / 100) * FLOW_K;
@@ -5058,15 +5328,19 @@ function frame() {
   packAdj();
   analyzeSound(dt, now);
   drawMeter();
-  if (uses('cubes')) {
-    let speed = reduceMotion ? 0.4 : 0.9, glow = 1;
+  // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
+  if (SCENES_OK.some(uses)) {
+    let surge = reduceMotion ? 0.45 : 1, glow = 1;
     if (snd.analyser) {
       const a = sndPower(), E = snd.env, m = snd.map;
-      if (m.kick) speed *= 1 + a * (E.low * 1.2 + E.beat * 2.5);
+      if (m.kick) surge *= 1 + a * (E.low * 1.2 + E.beat * 2.5);
       if (m.flash) glow += a * (E.beat * 0.35 + E.low * 0.2);
     }
-    if (!frozen) cubeZ = (cubeZ + dt * speed) % CUBE_PERIOD;
-    cubeGlow = glow;
+    for (const name of SCENES_OK) {
+      const sc = SCENES[name];
+      if (!frozen && uses(name)) sc.z = (sc.z + dt * sc.speed * surge) % sc.period;
+    }
+    sceneGlow = glow;
   }
 
   const [wA, wB] = weights(mix.cur.view);
