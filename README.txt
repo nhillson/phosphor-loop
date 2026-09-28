@@ -127,6 +127,10 @@ TIPS
   - Loop B: slide "What you see" to Both, then raise "Feed A into B" and/or
     "Feed B into A". Or pick "Loop A's picture" as loop B's input to feed it
     in directly. Channels 9 (Twins) and 0 (Weave) show it off.
+  - The Feed sliders pour one loop into the other loop's trails, so the loop
+    being fed has to be on screen and have some Trails. Raising a feed brings
+    that loop on screen by itself, and if its Trails are at 0 a note under the
+    sliders offers a one-click fix.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself. Touch any control
     to take over again.

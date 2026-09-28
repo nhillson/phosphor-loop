@@ -268,6 +268,9 @@
   }
   .preset-row input:focus-visible { outline: 2px solid var(--loop-a); outline-offset: 1px; }
   .hint { margin: 0; font-size: 13px; color: var(--faint); }
+  .feed-note { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid #5a4630; background: rgba(255,174,59,.07); color: #ffc98a; }
+  .feed-note .linkish { align-self: flex-start; font-size: 13px; }
 
   .channels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
   .ch {
@@ -641,6 +644,7 @@
           <input type="range" id="xba" min="0" max="100" step="1" value="0">
           <div class="ends"><span>Off</span><span>Strong</span></div>
         </div>
+        <div class="hint feed-note" id="feedNote" role="status" hidden></div>
         <p class="hint">Each feed pours one loop’s picture into the other loop’s trails. Turn both up and the loops trade shapes. You can also choose the other loop as an input below.</p>
       </section>
 
@@ -969,7 +973,7 @@
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
-            <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes.</dd>
+            <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes. The loop being fed has to be on screen and have some Trails; raising a feed brings that loop on screen, and if its Trails are at 0 a note offers to fix it.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
@@ -2051,7 +2055,8 @@ const sliderEls = {}, outputs = {};
     if (k !== 'tv') takeOver();
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     paintSlider(k);
-    if (k === 'view' || k === 'xab' || k === 'xba') syncVisibility();
+    if ((k === 'xab' || k === 'xba') && +el.value > 0) showFedLoop(k);
+    if (k === 'view' || k === 'xab' || k === 'xba' || k === 'trails') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
     if (k !== 'tv') takeOver();
@@ -2180,6 +2185,44 @@ $('#showLoop').addEventListener('click', () => {
   syncUI();
 });
 function weights(v) { return [Math.min(1, 2 * (1 - v / 100)), Math.min(1, 2 * v / 100)]; }
+// A feed pours into the other loop, so if that loop isn't on screen, raising the slider slides
+// What you see to Both. (Only for the slider itself: a MIDI fader leaves the view alone and the note explains.)
+function showFedLoop(k) {
+  const from = k === 'xab' ? 'A' : 'B', to = k === 'xab' ? 'B' : 'A';
+  const [wA, wB] = weights(mix.tgt.view);
+  if ((to === 'A' ? wA : wB) > 0) return;
+  mix.tgt.view = 50;
+  sliderEls.view.value = 50;
+  paintSlider('view');
+  toast(`Showing both loops, so you can see loop ${from} pouring into loop ${to}.`);
+}
+// Says why a raised Feed slider shows nothing, with a button that fixes it
+const feedNote = $('#feedNote');
+function syncFeedNote(wA, wB) {
+  const notes = [];
+  for (const [key, from, to] of [['xab', 'A', 'B'], ['xba', 'B', 'A']]) {
+    if (!(mix.tgt[key] > 0)) continue;
+    if ((to === 'A' ? wA : wB) === 0) {
+      notes.push([`Loop ${to} isn’t on screen, so you can’t see what loop ${from} pours into it.`, 'Show both loops',
+        () => { mix.tgt.view = 50; }]);
+    } else if (loops[to].tgt.trails < 10) {
+      notes.push([`Loop ${to} has no trails, so what loop ${from} pours in disappears straight away.`, `Give loop ${to} trails`,
+        () => { loops[to].tgt.trails = 60; }]);
+    }
+  }
+  feedNote.textContent = '';
+  for (const [text, label, fix] of notes) {
+    const line = document.createElement('span');
+    line.textContent = text;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'linkish';
+    b.textContent = label;
+    b.addEventListener('click', () => { takeOver(); fix(); syncUI(); });
+    feedNote.append(line, b);
+  }
+  feedNote.hidden = notes.length === 0;
+}
 function syncVisibility() {
   const [wA, wB] = weights(mix.tgt.view);
   for (const [id, w] of [['#visA', wA], ['#visB', wB]]) {
@@ -2195,6 +2238,7 @@ function syncVisibility() {
   $('#hiddenText').textContent = feedsOther
     ? `Loop ${edit} isn’t on screen, but it still feeds loop ${other}.`
     : `Loop ${edit} isn’t on screen right now.`;
+  syncFeedNote(wA, wB);
 }
 
 function syncUI() {
@@ -4442,6 +4486,7 @@ function setTarget(t, v) {
     takeOver();
     loops[t.loop].tgt[t.key] = v;
     if (t.loop === edit) { sliderEls[t.key].value = v; paintSlider(t.key); }
+    if (t.key === 'trails') syncVisibility();
   } else if (t.kind === 'mix') {
     if (t.key !== 'tv') takeOver();
     mix.tgt[t.key] = v;
