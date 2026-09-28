@@ -127,8 +127,9 @@ TIPS
   - Loop B: slide "What you see" to Both, then raise "Feed A into B" and/or
     "Feed B into A". Or pick "Loop A's picture" as loop B's input to feed it
     in directly. Channels 9 (Twins) and 0 (Weave) show it off.
-  - Autopilot (next to Surprise me, or the P key) changes the settings slowly
-    by itself. Touch any control to take over again.
+  - Autopilot (in the row of buttons under the picture, next to Surprise me,
+    or the P key) changes the settings slowly by itself. Touch any control
+    to take over again.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),

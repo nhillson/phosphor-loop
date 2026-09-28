@@ -578,6 +578,7 @@
         <button class="btn" id="freeze" aria-pressed="false"><span class="led"></span>Freeze</button>
         <button class="btn" id="clear">Clear</button>
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
+        <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <button class="btn special" id="phoneMotion" title="Sets this loop's input to your phone, showing only what moves">Phone: movement only</button>
@@ -2443,10 +2444,12 @@ $('#neutral').addEventListener('click', neutral);
 // Every 20-40 seconds the hidden loop gets a new look, then the view glides over to it,
 // sometimes resting on both loops at once. The loop on screen keeps drifting in between.
 const ap = { on: false, next: 0 };
-const apBtn = $('#autopilot');
+// Two Autopilot buttons: one under Channels, and one in the row under the picture,
+// which never folds away or hides, so it's always easy to find
+const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
 function setAutopilot(on, quiet) {
   ap.on = on;
-  apBtn.setAttribute('aria-pressed', String(on));
+  apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
   if (on) {
     setDrift(true);
     channel = -1;
@@ -2466,7 +2469,7 @@ function takeOver() {
   setAutopilot(false, true);
   toast('Autopilot off. You’re steering now.');
 }
-apBtn.addEventListener('click', () => setAutopilot(!ap.on));
+apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
 
 function apPool() {
   const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', 'loop'];
