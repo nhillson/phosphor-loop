@@ -178,6 +178,14 @@ TIPS
     widens or narrows the view. With React to sound on, the flight surges
     forward on the kick and the lights flare on the beat. For warp-speed
     streaks, raise Trails to about 60 and Zoom to about 30.
+  - Spectrograph: a picture of the sound itself. Under "What feeds the
+    loop" press Spectrograph, then Computer sound or Microphone right
+    underneath. Low sounds sit at the bottom, high ones at the top, and the
+    louder, the brighter. Scrolling slides left like a heart monitor; Round
+    ripples out from the middle (try the Sound tunnel recipe in the Guide).
+    It sets its own brightness, and its loud parts lie over the trails
+    instead of adding to them, so it never washes out to white. Set Amount
+    under React to sound to 0 to see it without the picture pumping.
   - Split lines (under Mirror): every other line of the picture slides left
     and the lines between slide right, like a scrambled TV.
   - Camera: a phone's back camera shows the world the right way round; a
