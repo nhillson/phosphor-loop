@@ -131,6 +131,10 @@ TIPS
     being fed has to be on screen and have some Trails. Raising a feed brings
     that loop on screen by itself, and if its Trails are at 0 a note under the
     sliders offers a one-click fix.
+  - Melt (in "Shape loop", under Flow) makes the picture push itself around:
+    how bright each spot is decides which way it slides, so the echoes fold
+    into each other like marbled paint. Low is a gentle drip, high is wild.
+    Keep Trails high. The Guide's "Marbled" recipe sets it up in one click.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself. Touch any control
     to take over again.
