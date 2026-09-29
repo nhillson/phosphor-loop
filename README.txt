@@ -161,7 +161,7 @@ TIPS
     table seen from above. Each splat stays wet for a few seconds, then
     fades as new ones land on top. Paint under "What feeds the loop" adds
     splats to any look; Input size makes them bigger or smaller.
-  - 3D worlds: nine channels take you into a 3D world.
+  - 3D worlds: ten channels take you into a 3D world.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
         glowing grid mountains on both sides.
@@ -173,6 +173,8 @@ TIPS
       Fractal: down a hall where bubbles grow on bubbles without end.
       Crystals: through a grove of giant glowing crystals in violet mist.
       Nebula: through glowing clouds of gas and dark dust.
+      City: drifting sideways along a wet street at night, past shops,
+        lamps and cars, with rows of buildings and a skyline behind.
     "3D world" under "What feeds the loop" adds any of them to any look;
     pick which one in the row of buttons that opens underneath. Input size
     widens or narrows the view. With React to sound on, the flight surges
