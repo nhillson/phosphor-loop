@@ -4615,7 +4615,8 @@ function syncPins() {
 }
 
 function apPool() {
-  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture'];
+  // Paint is left out: its splats land too suddenly for a look that should drift. (Pinned as the input, it stays.)
+  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'picture'];
   // Using the other loop as an input is one more way of mixing the loops
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
