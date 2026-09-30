@@ -425,6 +425,8 @@
   .ap-state b { color: var(--ink); font-weight: 600; }
   .ap-state .live { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
   .ap-reset { align-self: flex-start; font-size: 13px; font-weight: 500; }
+  #whiteWhen { margin: 8px 0 4px; }
+  .white-state.busy { color: #ffc98a; }
 
   /* fader */
   input[type="range"] {
@@ -654,12 +656,6 @@
           <span class="hint">How often it shows both loops at once and pours one into the other.</span>
         </div>
         <div class="ctl">
-          <div class="ctl-head"><label for="apWhite">Keep it from going white</label><output id="apWhiteOut" for="apWhite"></output></div>
-          <input type="range" id="apWhite" min="0" max="100" step="1" value="50">
-          <div class="ends"><span>Off</span><span>Keep it darker</span></div>
-          <span class="hint">Watches how bright the picture is and eases off the trails before it turns white.</span>
-        </div>
-        <div class="ctl">
           <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
@@ -675,6 +671,7 @@
           <p class="hint" id="apPinList">Nothing pinned.</p>
           <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
         </div>
+        <p class="hint">Keep it from going white is under Screen, so it can work while you steer too.</p>
         <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
       </section>
 
@@ -991,6 +988,16 @@
           <input type="range" id="tv" min="0" max="100" step="1" value="60">
           <div class="ends"><span>Clean</span><span>Worn</span></div>
         </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apWhite">Keep it from going white</label><output id="apWhiteOut" for="apWhite"></output></div>
+          <input type="range" id="apWhite" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Off</span><span>Keep it darker</span></div>
+          <div class="seg seg-2" id="whiteWhen" role="group" aria-label="When to keep it from going white">
+            <button data-when="always" aria-pressed="true">Always</button>
+            <button data-when="autopilot" aria-pressed="false">Only with Autopilot</button>
+          </div>
+          <span class="hint white-state" id="whiteState">Watches how bright the picture is and eases off the trails before it turns white. Your sliders stay where you put them.</span>
+        </div>
         <p class="hint">Double-click a slider to put it back where the channel had it.</p>
       </section>
 
@@ -1057,13 +1064,13 @@
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
           <div class="g-card"><h3>Channels</h3><dl>
-            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Splat throws paint onto a table seen from above. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a crystal grove, a nebula and a wet city street at night drifting sideways.</dd>
+            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a crystal grove, a nebula and a wet city street at night drifting sideways.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Press it again to stop.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on both loops while Autopilot keeps changing the rest. Tap a lit pin to let it go. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
-            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, how often it shows both loops at once, and Keep it from going white, which eases off the trails before the picture washes out. Change on the beat makes each new look cut in on a beat of the music. Double-click a slider there to put it back.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Double-click a slider there to put it back.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
@@ -1103,6 +1110,7 @@
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
+            <dt>Keep it from going white</dt><dd>Watches how bright the picture is and quietly eases off the trails before it washes out to white. Your sliders stay where you put them. Always works whether you or Autopilot are steering; Only with Autopilot leaves you free to push it into white. Slide it right to keep things darker, or all the way left to turn it off.</dd>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
@@ -1152,7 +1160,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Lower Trails, Input size or Color shift a little, or press Clear. With Autopilot on, raise Keep it from going white under Autopilot settings.</dd>
+          <dt>The screen went white</dt><dd>Under Screen, check that Keep it from going white isn’t Off and is set to Always, or slide it further right. Otherwise lower Trails, Input size or Color shift a little, or press Clear.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
@@ -1244,8 +1252,6 @@ const CHANNELS = [
     sw: 'repeating-linear-gradient(45deg,rgba(255,174,59,.95) 0 4px,transparent 4px 9px),repeating-linear-gradient(-45deg,rgba(79,209,197,.95) 0 4px,transparent 4px 9px),#101418' },
   { name: 'Ink', A: { in1: 'ink', size: 70, zoom: 0, spin: 0, trails: 100, color: 3, flow: 75, blur: 0.03 },
     sw: 'radial-gradient(ellipse at 30% 40%,#ff4fa3 0 8%,transparent 26%),radial-gradient(ellipse at 68% 62%,#3b8bff 0 10%,transparent 30%),radial-gradient(ellipse at 60% 25%,#3bffd0 0 5%,transparent 18%),#07080f' },
-  { name: 'Splat', A: { in1: 'splat', size: 60, zoom: 0, spin: 0, trails: 100, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 28% 38%,#dc1a14 0 16%,transparent 17%),radial-gradient(circle at 70% 60%,#f9c61a 0 20%,transparent 21%),radial-gradient(circle at 52% 22%,#f2f0e6 0 7%,transparent 8%),radial-gradient(circle at 20% 78%,#1a3dcc 0 9%,transparent 10%),#0b0a09' },
   { name: 'Cubes', A: { in1: 'cubes', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
     sw: 'radial-gradient(circle at 55% 50%,#fff 0 6%,#ff5ccf 8%,rgba(70,190,255,.7) 12%,transparent 34%),linear-gradient(#9aa6b4,#9aa6b4) 24% 26%/6px 6px no-repeat,linear-gradient(#c8202e,#c8202e) 74% 28%/5px 5px no-repeat,linear-gradient(#4a1420,#4a1420) 10% 90%/11px 11px no-repeat,linear-gradient(#b8c4d0,#b8c4d0) 84% 76%/4px 4px no-repeat,linear-gradient(#3a0f18,#3a0f18) 96% 8%/10px 10px no-repeat,linear-gradient(#6d7784,#6d7784) 38% 78%/4px 4px no-repeat,#050306' },
   { name: 'Horizon', A: { in1: 'horizon', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
@@ -3792,6 +3798,7 @@ function patchLoop(k, p, force) {
   L.base = { ...L.tgt };
 }
 function applyPatch(c) {
+  guardReset();
   patchLoop('A', c.A);
   patchLoop('B', c.B || B_PARTNER);
   mix.tgt.view = c.view ?? 0;
@@ -4402,6 +4409,7 @@ function writeSpec(dt) {
 const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (ap.on) setAutopilot(false, true);
+  guardReset();
   markPreset(null);
   setDrift(false);
   if (frozen) toggleFreeze(false);
@@ -4457,7 +4465,7 @@ const PINS = {
 };
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, white: 50, beat: false, touch: 'pin' };
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, white: 50, whiteWhen: 'always', beat: false, touch: 'pin' };
 const apSet = { ...AP_DEFAULTS };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
@@ -4465,6 +4473,7 @@ try {
     for (const k of ['every', 'fade', 'wild', 'mix', 'white']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
+    apSet.whiteWhen = s.whiteWhen === 'autopilot' ? 'autopilot' : 'always';
     if (Array.isArray(s.pins)) s.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
   }
 } catch (_) {}
@@ -4474,9 +4483,16 @@ function saveAp() {
 const apEverySec = () => 10 * Math.pow(12, apSet.every / 100);   // 10 seconds to 2 minutes; 30 by default
 const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100);    // 1.5 to 30 seconds; 10 by default
 const pinned = (k) => ap.on && ap.pins.has(k);
+// Keep it from going white works while Autopilot runs, and also while you steer if it's set to Always
+const watching = () => apSet.white > 0 && (ap.on || apSet.whiteWhen === 'always');
 // How hard the white-out watch is leaning on each loop right now (0 to 1); see watchBrightness
 const guard = { A: 0, B: 0, stuckA: 0, stuckB: 0, hotA: 0, hotB: 0 };
 const lum = { A: { mean: 0, white: 0 }, B: { mean: 0, white: 0 }, comp: { mean: 0, white: 0 } };
+// A whole new look (a channel, preset, recipe, Neutral, Clear) starts with nothing held back
+function guardReset() {
+  for (const k of Object.keys(guard)) guard[k] = 0;
+  for (const k of ['A', 'B', 'comp']) { lum[k].mean = 0; lum[k].white = 0; }
+}
 
 // Two Autopilot buttons: one under Channels, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
@@ -4775,10 +4791,14 @@ function updateGuard(dt, wA, wB, now) {
     let p = pressure(own);
     // The mixed picture can wash out even when neither loop does on its own
     if ((k === 'A' ? wA : wB) > 0 && own.mean > 0.3) p = Math.max(p, pressure(lum.comp));
-    // Too bright: lean in, harder the further over it is. Just under the limit: hold steady, so the picture
-    // settles there instead of swinging bright and dark. Well under: let go slowly.
-    if (p > 0) guard[k] = Math.min(1, guard[k] + dt * (0.35 + 1.4 * Math.min(1, p)));
-    else if (p < -0.35) guard[k] = Math.max(0, guard[k] - dt * 0.1);
+    // Too bright: lean in, gently when it's only just over and fast for a real white wall. Just under the limit:
+    // hold steady, so the picture settles there instead of swinging bright and dark. Well under: let go,
+    // slowly at first and faster the darker it is.
+    if (p > 0) guard[k] = Math.min(1, guard[k] + dt * (0.06 + 1.0 * Math.min(1, p)));
+    else if (p < -0.35) guard[k] = Math.max(0, guard[k] - dt * (0.03 + 0.1 * Math.min(1, (-p - 0.35) / 0.5)));
+    // The rest is only for Autopilot. When a person is steering, the watch never moves their sliders,
+    // clears the screen or changes the look; the easing above is all it does.
+    if (!ap.on) continue;
     // Still leaning hard after five seconds: turn that loop's own settings down a notch (unless they're pinned),
     // so the look can settle without the watch holding it back
     const hot = 'hot' + k;
@@ -4831,6 +4851,7 @@ function syncApUI() {
   Object.keys(apCtl).forEach(paintAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
+  $$('#whiteWhen button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.when === apSet.whiteWhen)));
   syncPins();
   apStatus();
 }
@@ -4855,6 +4876,12 @@ $('#apBeat').addEventListener('click', () => {
   syncApUI();
   if (apSet.beat && !snd.analyser) toast('Change on the beat needs music: under React to sound, pick Computer sound or Microphone.');
 });
+$$('#whiteWhen button').forEach((b) => b.addEventListener('click', () => {
+  apSet.whiteWhen = b.dataset.when;
+  saveAp();
+  syncApUI();
+  if (apSet.white === 0) toast('Keep it from going white is at Off. Slide it up to turn it on.');
+}));
 $$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
   apSet.touch = b.dataset.touch;
   saveAp();
@@ -4868,7 +4895,7 @@ $('#apUnpin').addEventListener('click', () => {
   toast(ap.on ? 'Nothing is pinned now. Autopilot changes everything from its next look.' : 'Nothing is pinned now.');
 });
 $('#apReset').addEventListener('click', () => {
-  Object.assign(apSet, AP_DEFAULTS);
+  for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'touch']) apSet[k] = AP_DEFAULTS[k];
   saveAp();
   syncApUI();
   toast(ap.pins.size ? 'Autopilot settings are back to normal. Your pins are still pinned.' : 'Autopilot settings are back to normal.');
@@ -4887,7 +4914,15 @@ function apStatus() {
     if (easing.length) html += ` Easing off loop ${easing.join(' and ')} so it doesn’t turn white.`;
   }
   if (html !== apStatus.shown) { apStatus.shown = html; $('#apState').innerHTML = html; }
+  const easing = ['A', 'B'].filter((k) => guard[k] > 0.15);
+  let note, busy = false;
+  if (!apSet.white) note = 'Off: the picture is free to wash out to white.';
+  else if (!watching()) note = 'Resting: it only works while Autopilot is on. Choose Always to have it work while you steer too.';
+  else if (easing.length) { busy = true; note = `Easing off loop ${easing.join(' and ')} right now so it doesn’t turn white. Your sliders stay where you put them.`; }
+  else note = 'Watches how bright the picture is and eases off the trails before it turns white. Your sliders stay where you put them.';
+  if (note !== apStatus.note) { apStatus.note = note; whiteStateEl.textContent = note; whiteStateEl.classList.toggle('busy', busy); }
 }
+const whiteStateEl = $('#whiteState');
 setInterval(apStatus, 500);
 syncApUI();
 
@@ -4899,7 +4934,7 @@ function toggleFreeze(force) {
   if (frozen) showOSD('II', 'FROZEN');
 }
 freezeBtn.addEventListener('click', () => toggleFreeze());
-function clearScreen() { clearTargets(); burst(); }
+function clearScreen() { clearTargets(); guardReset(); burst(); }
 $('#clear').addEventListener('click', clearScreen);
 const driftBtn = $('#drift');
 function setDrift(on) { drift = on; driftBtn.setAttribute('aria-pressed', String(on)); }
@@ -5581,6 +5616,7 @@ RECIPES.forEach((r) => {
 });
 function applyRecipe(r) {
   if (ap.on) setAutopilot(false, true);
+  guardReset();
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
   if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
@@ -5741,6 +5777,7 @@ presetForm.addEventListener('submit', async (e) => {
 
 function loadPreset(pr, quiet) {
   if (ap.on) setAutopilot(false, true);
+  guardReset();
   const d = pr.data || {};
   channel = -1;
   patchLoop('A', d.A || {}, true);
@@ -6967,7 +7004,7 @@ function measCollect() {
   lum[meas.key].white = white / n;
 }
 function watchBrightness(dt, now, wA, wB) {
-  if (!ap.on || !apSet.white) {
+  if (!watching()) {
     // Off: let go of whatever it was holding back, over a couple of seconds
     guard.A = Math.max(0, guard.A - dt * 0.4);
     guard.B = Math.max(0, guard.B - dt * 0.4);

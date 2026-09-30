@@ -141,11 +141,14 @@ TIPS
     it, or just move that slider, and the setting stays put while Autopilot
     keeps changing everything else. Tap a lit pin to let it go again.
   - Autopilot settings (the section under Channels): how often a new look
-    comes, how slowly it fades in, how wild it gets, how often it mixes the
-    two loops, and "Keep it from going white", which watches the brightness
-    and eases off the trails before the picture washes out. It never makes
-    the graphics chip wait, so it doesn't cause stutter. "Change on the beat"
-    makes each new look cut in on a beat when music is playing.
+    comes, how slowly it fades in, how wild it gets, and how often it mixes
+    the two loops. "Change on the beat" makes each new look cut in on a beat
+    when music is playing.
+  - Keep it from going white (under Screen) watches the brightness and
+    quietly eases off the trails before the picture washes out; your sliders
+    stay where you put them. "Always" works while you steer too; "Only with
+    Autopilot" leaves you free to push it into white. It never makes the
+    graphics chip wait, so it doesn't cause stutter.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
@@ -169,10 +172,10 @@ TIPS
   - Ink in water: the Ink channel drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look, and Ink under "What feeds the loop" gives you the drops.
-  - Paint splats: the Splat channel throws solid paint onto a
-    table seen from above. Each splat stays wet for a few seconds, then
-    fades as new ones land on top. Paint under "What feeds the loop" adds
-    splats to any look; Input size makes them bigger or smaller.
+  - Paint splats: Paint under "What feeds the loop" throws solid paint
+    onto a table seen from above. Each splat stays wet for a few seconds,
+    then fades as new ones land on top. Input size makes them bigger or
+    smaller.
   - 3D worlds: ten channels take you into a 3D world.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
