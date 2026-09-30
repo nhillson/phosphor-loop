@@ -409,6 +409,23 @@
   .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); letter-spacing: .02em; }
   .ctl select { margin-top: 4px; }
 
+  /* Autopilot pins: shown beside each setting while Autopilot runs, and whenever one is pinned */
+  .pin {
+    display: none; place-items: center; flex: none; align-self: center; margin-left: auto;
+    width: 30px; height: 24px; padding: 0; border-radius: 5px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--well); color: var(--faint);
+  }
+  .pin svg { width: 14px; height: 14px; display: block; }
+  .pin:hover { color: var(--ink); border-color: #564f47; }
+  .pin[aria-pressed="true"] { color: var(--amber); border-color: var(--amber); background: rgba(255,174,59,.12); }
+  .editor[data-loop="B"] .pin[aria-pressed="true"] { background: rgba(79,209,197,.12); }
+  .ap-on .pin, .pin[aria-pressed="true"] { display: inline-grid; }
+  .ctl-head:has(.pin) { align-items: center; }
+  .ap-state { margin: 0; font-size: 14px; color: var(--dim); }
+  .ap-state b { color: var(--ink); font-weight: 600; }
+  .ap-state .live { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
+  .ap-reset { align-self: flex-start; font-size: 13px; font-weight: 500; }
+
   /* fader */
   input[type="range"] {
     -webkit-appearance: none; appearance: none; width: 100%; height: 30px; margin: 0;
@@ -612,6 +629,55 @@
         </div>
       </section>
 
+      <section class="group" id="apGroup" aria-labelledby="h-ap">
+        <h2 id="h-ap">Autopilot settings</h2>
+        <p class="ap-state" id="apState" role="status">Autopilot is off.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apEvery">New look every</label><output id="apEveryOut" for="apEvery"></output></div>
+          <input type="range" id="apEvery" min="0" max="100" step="1" value="44">
+          <div class="ends"><span>10 seconds</span><span>2 minutes</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apFade">Fade time</label><output id="apFadeOut" for="apFade"></output></div>
+          <input type="range" id="apFade" min="0" max="100" step="1" value="63">
+          <div class="ends"><span>Quick</span><span>Slow</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apWild">How wild</label><output id="apWildOut" for="apWild"></output></div>
+          <input type="range" id="apWild" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Calm</span><span>Wild</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apMix">Mix the two loops</label><output id="apMixOut" for="apMix"></output></div>
+          <input type="range" id="apMix" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Never</span><span>Often</span></div>
+          <span class="hint">How often it shows both loops at once and pours one into the other.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apWhite">Keep it from going white</label><output id="apWhiteOut" for="apWhite"></output></div>
+          <input type="range" id="apWhite" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Off</span><span>Keep it darker</span></div>
+          <span class="hint">Watches how bright the picture is and eases off the trails before it turns white.</span>
+        </div>
+        <div class="ctl">
+          <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
+          <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
+          <div class="seg seg-2" id="apTouch" role="group" aria-labelledby="apTouchLbl">
+            <button data-touch="pin" aria-pressed="true">Pin it, keep going</button>
+            <button data-touch="stop" aria-pressed="false">Stop Autopilot</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="lbl">Pinned</span>
+          <p class="hint" id="apPinList">Nothing pinned.</p>
+          <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
+        </div>
+        <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
+      </section>
+
       <section class="group" id="presetGroup" aria-labelledby="h-pre">
         <h2 id="h-pre">My presets</h2>
         <p class="hint" id="presetEmpty">Nothing saved yet. Set up a look you like, then save it here.</p>
@@ -702,6 +768,7 @@
 
         <div class="group">
           <h2 id="h-in">What feeds loop A</h2>
+          <div class="ctl-head" id="in1Head"><span class="lbl" id="in1Lbl">Main input</span></div>
           <div class="seg seg-5" id="inputs">
             <button data-src="wave" aria-pressed="false">Wave</button>
             <button data-src="shape" aria-pressed="false">Shape</button>
@@ -831,7 +898,7 @@
           </div>
 
           <div class="ctl">
-            <label for="in2" class="lbl">Mix in a second input</label>
+            <div class="ctl-head"><label for="in2" class="lbl">Mix in a second input</label></div>
             <select id="in2"></select>
           </div>
           <div class="ctl" id="blendCtl" hidden>
@@ -994,7 +1061,9 @@
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
-            <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Touch any control and you’re back in charge.</dd>
+            <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Press it again to stop.</dd>
+            <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on both loops while Autopilot keeps changing the rest. Tap a lit pin to let it go. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, how often it shows both loops at once, and Keep it from going white, which eases off the trails before the picture washes out. Change on the beat makes each new look cut in on a beat of the music. Double-click a slider there to put it back.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
@@ -1083,7 +1152,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Lower Trails, Input size or Color shift a little, or press Clear.</dd>
+          <dt>The screen went white</dt><dd>Lower Trails, Input size or Color shift a little, or press Clear. With Autopilot on, raise Keep it from going white under Autopilot settings.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
@@ -1254,6 +1323,7 @@ uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1,
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
+uniform float uKnee;     // Autopilot's white-out watch: how hard to squeeze the brightest trails (0 = not at all)
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
@@ -1624,6 +1694,7 @@ void main() {
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   fb = max(hueRot(fb, uHue), 0.0);
+  if (uKnee > 0.0) fb = fb / (1.0 + uKnee * fb);   // the brightest parts are squeezed most
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec2 ps = pf + vec2(uSplitOff * side, 0.0);
@@ -3456,14 +3527,14 @@ const sliderEls = {}, outputs = {};
   outputs[k] = $('#' + k + 'Out');
   const isMix = MIX_SLIDERS.includes(k);
   el.addEventListener('input', () => {
-    if (k !== 'tv') takeOver();
+    if (k !== 'tv') takeOver(k);
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     paintSlider(k);
     if ((k === 'xab' || k === 'xba') && +el.value > 0) showFedLoop(k);
     if (k === 'view' || k === 'xab' || k === 'xba' || k === 'trails') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
-    if (k !== 'tv') takeOver();
+    if (k !== 'tv') takeOver(k);
     const v = (isMix ? mix.base : loops[edit].base)[k];
     (isMix ? mix.tgt : loops[edit].tgt)[k] = v;
     el.value = v;
@@ -3550,10 +3621,10 @@ $$('#inputs button').forEach((b) => b.addEventListener('click', () => {
   chooseSource('in1', b.dataset.src === 'world' ? (is3D(t.in1) ? t.in1 : lastWorld) : b.dataset.src);
 }));
 in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
-$$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver(); loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
-$('#motion').addEventListener('click', () => { takeOver(); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
+$$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver('mirror'); loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
+$('#motion').addEventListener('click', () => { takeOver('in1'); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
 $$('#specShape button').forEach((b) => b.addEventListener('click', () => {
-  takeOver();
+  takeOver('in1');
   loops[edit].tgt.specRound = b.dataset.round === '1';
   syncUI();
   showOSD('SPECTROGRAPH', b.dataset.round === '1' ? 'ROUND' : 'SCROLLING');
@@ -3564,7 +3635,7 @@ function uses(src) { return ['A', 'B'].some((k) => loops[k].tgt.in1 === src || l
 // Pick an input for the loop being edited. Devices start right here, inside the click, so the
 // browser treats the camera or screen request as something the person asked for.
 function chooseSource(slot, src) {
-  takeOver();
+  takeOver(slot);
   loops[edit].tgt[slot] = src;
   if (is3D(src)) lastWorld = src;
   if (src === 'camera' && !cam.on) startCamera();
@@ -3613,7 +3684,7 @@ function setEdit(k) {
   syncUI();
 }
 $('#showLoop').addEventListener('click', () => {
-  takeOver();
+  takeOver('view');
   mix.tgt.view = 50;
   syncUI();
 });
@@ -3637,21 +3708,21 @@ function syncFeedNote(wA, wB) {
     if (!(mix.tgt[key] > 0)) continue;
     if ((to === 'A' ? wA : wB) === 0) {
       notes.push([`Loop ${to} isn’t on screen, so you can’t see what loop ${from} pours into it.`, 'Show both loops',
-        () => { mix.tgt.view = 50; }]);
+        () => { mix.tgt.view = 50; }, 'view']);
     } else if (loops[to].tgt.trails < 10) {
       notes.push([`Loop ${to} has no trails, so what loop ${from} pours in disappears straight away.`, `Give loop ${to} trails`,
-        () => { loops[to].tgt.trails = 60; }]);
+        () => { loops[to].tgt.trails = 60; }, 'trails', to]);
     }
   }
   feedNote.textContent = '';
-  for (const [text, label, fix] of notes) {
+  for (const [text, label, fix, key, loopKey] of notes) {
     const line = document.createElement('span');
     line.textContent = text;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'linkish';
     b.textContent = label;
-    b.addEventListener('click', () => { takeOver(); fix(); syncUI(); });
+    b.addEventListener('click', () => { takeOver(key, loopKey); fix(); syncUI(); });
     feedNote.append(line, b);
   }
   feedNote.hidden = notes.length === 0;
@@ -4361,109 +4432,464 @@ function neutral() {
 $('#neutral').addEventListener('click', neutral);
 
 /* ================= autopilot ================= */
-// Every 20-40 seconds the hidden loop gets a new look, then the view glides over to it,
-// sometimes resting on both loops at once. The loop on screen keeps drifting in between.
-const ap = { on: false, next: 0 };
+// Every half minute or so (New look every, under Autopilot settings) the hidden loop gets a new look, then the
+// view glides over to it, sometimes resting on both loops at once. The loop on screen keeps drifting in between.
+// Pinned settings stay where they are on both loops; Autopilot changes everything else.
+const ap = { on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {} };
+// What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
+const PINS = {
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'motion'] },
+  in2: { name: 'Second input', fields: ['in2'] },
+  blend: { name: 'Blend', fields: ['blend'] },
+  size: { name: 'Input size', fields: ['size'] },
+  zoom: { name: 'Zoom', fields: ['zoom', 'edge'] },
+  spin: { name: 'Spin', fields: ['spin'] },
+  trails: { name: 'Trails', fields: ['trails'] },
+  color: { name: 'Color shift', fields: ['color'] },
+  warp: { name: 'Warp', fields: ['warp'] },
+  flow: { name: 'Flow', fields: ['flow'] },
+  melt: { name: 'Melt', fields: ['melt'] },
+  mirror: { name: 'Mirror', fields: ['mirror'] },
+  split: { name: 'Split lines', fields: ['split'] },
+  view: { name: 'What you see', fields: ['view'], mix: true },
+  xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
+  xba: { name: 'Feed B into A', fields: ['xba'], mix: true },
+};
+// Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
+const AP_KEY = 'phosphor-autopilot-v1';
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, white: 50, beat: false, touch: 'pin' };
+const apSet = { ...AP_DEFAULTS };
+try {
+  const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
+  if (s && typeof s === 'object') {
+    for (const k of ['every', 'fade', 'wild', 'mix', 'white']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
+    apSet.beat = s.beat === true;
+    apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
+    if (Array.isArray(s.pins)) s.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
+  }
+} catch (_) {}
+function saveAp() {
+  try { localStorage.setItem(AP_KEY, JSON.stringify({ ...apSet, pins: [...ap.pins] })); } catch (_) {}
+}
+const apEverySec = () => 10 * Math.pow(12, apSet.every / 100);   // 10 seconds to 2 minutes; 30 by default
+const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100);    // 1.5 to 30 seconds; 10 by default
+const pinned = (k) => ap.on && ap.pins.has(k);
+// How hard the white-out watch is leaning on each loop right now (0 to 1); see watchBrightness
+const guard = { A: 0, B: 0, stuckA: 0, stuckB: 0, hotA: 0, hotB: 0 };
+const lum = { A: { mean: 0, white: 0 }, B: { mean: 0, white: 0 }, comp: { mean: 0, white: 0 } };
+
 // Two Autopilot buttons: one under Channels, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
 const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
 function setAutopilot(on, quiet) {
   ap.on = on;
+  ap.quick = 0;
+  ap.beatWait = null;
+  document.documentElement.classList.toggle('ap-on', on);
   apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
+  for (const k of ['A', 'B', 'comp']) { lum[k].mean = 0; lum[k].white = 0; }
+  for (const k of ['stuckA', 'stuckB', 'hotA', 'hotB']) guard[k] = 0;
   if (on) {
     setDrift(true);
     channel = -1;
-    ap.next = performance.now() + 7000;
+    ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
+    // Pinned settings start from what the sliders show now, on both loops
+    for (const k of ap.pins) holdPin(k, edit);
+    settleDevices();
     syncUI();
     if (!quiet) {
       showOSD('AUTOPILOT', 'ON');
-      toast('Autopilot is on. It changes a little at a time. Touch any control to take over.');
+      toast(apSet.touch === 'pin'
+        ? 'Autopilot is on. Move any slider to pin it where you want it; Autopilot keeps changing the rest.'
+        : 'Autopilot is on. It changes a little at a time. Touch any control to take over.');
     }
   } else {
     settleDevices();
     if (!quiet) showOSD('AUTOPILOT', 'OFF');
   }
+  apStatus();
 }
-function takeOver() {
+// Someone moved a control. With "Pin it, keep going" that setting is pinned where they put it and Autopilot
+// carries on; otherwise Autopilot stops. The new value is read just after the control has finished handling
+// the move, which is why holdPin waits for a microtask.
+function takeOver(key, from) {
   if (!ap.on) return;
+  if (key && PINS[key] && apSet.touch === 'pin') {
+    const fresh = !ap.pins.has(key);
+    ap.pins.add(key);
+    const loopKey = from || edit;
+    queueMicrotask(() => holdPin(key, loopKey));
+    if (fresh) {
+      syncPins();
+      saveAp();
+      apStatus();
+      toast(`Pinned ${PINS[key].name}. Autopilot keeps changing the rest. Tap its pin to let it go.`);
+    }
+    return;
+  }
   setAutopilot(false, true);
   toast('Autopilot off. You’re steering now.');
 }
 apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
 
+// Holds a pinned setting at the value it has on loop `from`, and while Autopilot runs puts it on both loops,
+// so it stays put whichever loop is on screen
+function holdPin(key, from) {
+  const P = PINS[key];
+  if (!P || !ap.pins.has(key)) return;
+  const src = P.mix ? mix.tgt : loops[from].tgt;
+  const v = {};
+  for (const f of P.fields) v[f] = src[f];
+  ap.pinVal[key] = v;
+  if (P.mix || !ap.on) return;
+  // "The other loop's picture" means something different on each loop, so that input stays on its own loop
+  if (key === 'in1' && v.in1 === 'loop') return;
+  Object.assign(loops[from === 'A' ? 'B' : 'A'].tgt, v);
+  if (key === 'in1' || key === 'in2') settleDevices();
+}
+// Puts the pinned values into a new look
+function withPins(sc, only) {
+  for (const k of ap.pins) {
+    if (PINS[k].mix || (only && !only.includes(k)) || !ap.pinVal[k]) continue;
+    Object.assign(sc, ap.pinVal[k]);
+  }
+  return sc;
+}
+function togglePin(key) {
+  if (ap.pins.has(key)) {
+    ap.pins.delete(key);
+    delete ap.pinVal[key];
+    toast(ap.on ? `${PINS[key].name} is free again. Autopilot changes it from its next look.` : `${PINS[key].name} is no longer pinned.`);
+  } else {
+    ap.pins.add(key);
+    holdPin(key, edit);
+    toast(ap.on ? `Pinned ${PINS[key].name}. Autopilot keeps changing the rest.` : `Pinned ${PINS[key].name}. Autopilot will leave it where it is.`);
+  }
+  syncPins();
+  saveAp();
+  apStatus();
+}
+// A small pin beside each setting Autopilot can change. They show while Autopilot runs, and whenever one is pinned.
+const PIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h6v1.2L10 3v3.5L12.5 9v1.2H8.6V15H7.4v-4.8H3.5V9L6 6.5V3L5 2.2z" fill="currentColor"/></svg>';
+for (const key of Object.keys(PINS)) {
+  const anchor = key === 'in1' ? $('#in1Head') : $('#' + key);
+  const head = key === 'in1' ? anchor : anchor && anchor.closest('.ctl') && anchor.closest('.ctl').querySelector('.ctl-head');
+  if (!head) continue;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'pin';
+  b.dataset.pin = key;
+  b.setAttribute('aria-pressed', 'false');
+  b.setAttribute('aria-label', `Pin ${PINS[key].name}`);
+  b.innerHTML = PIN_ICON;
+  b.addEventListener('click', () => togglePin(key));
+  head.insertBefore(b, head.querySelector('output'));
+}
+function syncPins() {
+  $$('.pin').forEach((b) => {
+    const on = ap.pins.has(b.dataset.pin), name = PINS[b.dataset.pin].name;
+    b.setAttribute('aria-pressed', String(on));
+    b.title = on ? `${name} is pinned: Autopilot leaves it alone. Tap to let Autopilot change it again.`
+                 : `Pin ${name}: Autopilot leaves it where it is`;
+  });
+  const names = [...ap.pins].map((k) => PINS[k].name);
+  $('#apPinList').textContent = names.length ? names.join(' · ')
+    : 'Nothing pinned. While Autopilot runs, a pin shows beside each setting. Tap it, or just move that slider, to keep the setting where it is.';
+  $('#apUnpin').hidden = !names.length;
+}
+
 function apPool() {
-  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', 'loop'];
+  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture'];
+  // Using the other loop as an input is one more way of mixing the loops
+  if (apSet.mix > 10) pool.push('loop');
+  if (apSet.mix > 75) pool.push('loop');
   pool.push(...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2));
   if (vid.on) pool.push('video', 'video');
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
   if (snd.analyser) pool.push('spectro', 'spectro');
   return pool;
 }
+// A new look. How wild (w) stretches how far it zooms, spins and tints, and how often it warps, flows and melts;
+// at the middle of the slider it behaves as Autopilot always has.
 function apScene() {
-  const pool = apPool();
+  const pool = apPool(), w = apSet.wild / 100;
   let sc;
   if (Math.random() < 0.45) {
     // Start from one of the channels and vary it
-    const c = pick(CHANNELS);
+    const c = pick(CHANNELS), j = 2 * w;
     sc = { ...((c.B && Math.random() < 0.5) ? c.B : c.A) };
-    sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12), -60, 80));
-    sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15), -70, 70));
-    sc.color = Math.round(clamp((sc.color ?? 10) + rnd(-6, 10), 0, 45));
+    sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12) * j, -60, 80));
+    sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15) * j, -70, 70));
+    sc.color = Math.round(clamp((sc.color ?? 10) + rnd(-6, 10) * j, 0, 30 + 30 * w));
     if (Math.random() < 0.35) sc.in1 = pick(pool);
     if (sc.in2 && !pool.includes(sc.in2)) sc.in2 = 'none';
   } else {
-    const zoom = Math.round(Math.random() < 0.25 ? rnd(-40, -10) : rnd(5, 60));
+    const zoom = Math.round(Math.random() < 0.25 ? rnd(-(10 + 60 * w), -10) : Math.min(85, rnd(5, 15 + 90 * w)));
     sc = {
       in1: pick(pool), form: 2 + Math.floor(Math.random() * 4), zoom,
-      spin: Math.round(rnd(-45, 45)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 32)),
-      warp: Math.round(Math.random() < 0.6 ? rnd(0, 15) : rnd(15, 45)),
-      flow: Math.random() < 0.25 ? Math.round(rnd(30, 80)) : 0,
-      melt: Math.random() < 0.2 ? Math.round(rnd(20, 60)) : 0,
+      spin: Math.round(rnd(-1, 1) * (10 + 70 * w)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 8 + 48 * w)),
+      warp: Math.round(Math.random() < 0.9 - 0.6 * w ? rnd(0, 5 + 20 * w) : rnd(15, 15 + 60 * w)),
+      flow: Math.random() < 0.5 * w ? Math.round(rnd(30, 80)) : 0,
+      melt: Math.random() < 0.4 * w ? Math.round(rnd(20, 20 + 80 * w)) : 0,
+      split: Math.random() < 0.2 * w ? Math.round(rnd(10, 10 + 60 * w)) : 0,
       mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
       edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
     };
     if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
   }
+  // Pinned inputs go in first, so the size below suits the input really used
+  withPins(sc, ['in1', 'in2']);
+  if (sc.in2 && sc.in2 === sc.in1 && !ap.pins.has('in2')) sc.in2 = 'none';
   if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
   if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
-  if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) { sc.size = Math.round(rnd(60, 100)); sc.motion = Math.random() < 0.35; }
-  if (sc.in1 === 'spectro' || sc.in2 === 'spectro') { sc.specRound = Math.random() < 0.5; if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100)); }
+  if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
+    sc.size = Math.round(rnd(60, 100));
+    if (!ap.pins.has('in1')) sc.motion = Math.random() < 0.35;
+  }
+  if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
+    if (!ap.pins.has('in1')) sc.specRound = Math.random() < 0.5;
+    if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
+  }
+  withPins(sc);
+  whiteSafe(sc);
   return sc;
+}
+// Big bright inputs (a camera, a video, a picture filling the screen) pile up into white fastest,
+// so with Keep it from going white on they come in with shorter trails and a little less light
+function whiteSafe(sc) {
+  if (!apSet.white) return;
+  const s = apSet.white / 100;
+  const big = ['camera', 'screen', 'phone', 'video', 'picture'].includes(sc.in1) && (sc.size ?? 100) >= 70 && !sc.motion;
+  const two = !!sc.in2 && sc.in2 !== 'none';
+  if ((big || two) && !ap.pins.has('trails')) sc.trails = Math.min(sc.trails ?? 88, Math.round(rnd(88, 94) - 16 * s));
+  if (big) sc.gain = 1 - 0.3 * s;
 }
 function clearLoop(k) {
   gl.clearColor(0, 0, 0, 1);
   for (const t of loops[k].rt) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.clear(gl.COLOR_BUFFER_BIT); }
 }
 function nudge(k) {
-  const t = loops[k].tgt;
-  t.zoom = Math.round(clamp(t.zoom + rnd(-15, 15), -60, 80));
-  t.spin = Math.round(clamp(t.spin + rnd(-15, 15), -70, 70));
-  t.color = Math.round(clamp(t.color + rnd(-8, 8), 0, 45));
-  t.warp = Math.round(clamp(t.warp + rnd(-10, 10), 0, 50));
+  const t = loops[k].tgt, j = 0.2 + 1.6 * apSet.wild / 100;
+  const move = (key, by, lo, hi) => { if (!ap.pins.has(key)) t[key] = Math.round(clamp(t[key] + rnd(-by, by) * j, lo, hi)); };
+  move('zoom', 15, -60, 80);
+  move('spin', 15, -70, 70);
+  move('color', 8, 0, 45);
+  move('warp', 10, 0, 50);
 }
-function apStep(now) {
-  ap.next = now + rnd(22000, 38000);
-  const v = mix.tgt.view;
-  if (v <= 1 || v >= 99) {
-    const hidden = v <= 1 ? 'B' : 'A', shown = hidden === 'A' ? 'B' : 'A';
-    const sc = apScene();
-    // Two loops that only feed on each other fade to black, so one of them keeps a real input
-    if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) sc.in1 = 'wave';
-    patchLoop(hidden, sc, true);
-    const L = loops[hidden];
-    for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
-    clearLoop(hidden);
-    nudge(shown);
-    mix.tgt.view = Math.random() < 0.4 ? 50 : (hidden === 'B' ? 100 : 0);
-  } else {
-    mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
-    nudge('A'); nudge('B');
+// A hidden loop gets a whole new look at once, from a clean slate
+function freshLook(k, shown) {
+  const sc = apScene();
+  // Two loops that only feed on each other fade to black, so one of them keeps a real input
+  if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) {
+    if (!ap.pins.has('in1')) sc.in1 = 'wave';
+    else if (!ap.pins.has('in2')) { sc.in2 = pick(apPool().filter((x) => x !== 'loop')); sc.blend = 50; }
   }
-  mix.tgt.xab = Math.random() < 0.5 ? 0 : Math.round(rnd(10, 55));
-  mix.tgt.xba = Math.random() < 0.5 ? 0 : Math.round(rnd(10, 55));
+  patchLoop(k, sc, true);
+  const L = loops[k];
+  for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+  clearLoop(k);
+  guard[k] = 0; guard['stuck' + k] = 0; guard['hot' + k] = 0;
+  lum[k].mean = 0; lum[k].white = 0;
+}
+// With What you see pinned, a loop on screen changes in place instead, gliding into its new look.
+// Most of the time it keeps its input and mirror, so the picture changes shape rather than jumping.
+function glideLook(k) {
+  const L = loops[k], sc = apScene();
+  if (Math.random() < 0.7) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
+  if (Math.random() < 0.65) for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
+  withPins(sc);
+  const other = k === 'A' ? 'B' : 'A';
+  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = 'wave';
+  patchLoop(k, sc, true);
+}
+// Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat.
+function apTick(now) {
+  if (apSet.beat && snd.analyser && snd.amount > 0) {
+    if (!ap.beatWait) ap.beatWait = { beats: snd.beats, until: now + 4000 };
+    if (snd.beats === ap.beatWait.beats && now < ap.beatWait.until) return;
+    const onBeat = snd.beats !== ap.beatWait.beats;
+    ap.beatWait = null;
+    apStep(now, onBeat);
+  } else {
+    ap.beatWait = null;
+    apStep(now, false);
+  }
+}
+function apStep(now, onBeat) {
+  ap.next = now + apEverySec() * 1000 * rnd(0.75, 1.25);
+  ap.quick = onBeat ? now + 1500 : 0;   // on a beat the new look cuts in fast
+  const m = apSet.mix / 100;
+  const v = mix.tgt.view;
+  if (!ap.pins.has('view')) {
+    if (v <= 1 || v >= 99) {
+      const hidden = v <= 1 ? 'B' : 'A', shown = hidden === 'A' ? 'B' : 'A';
+      // Still fading away from the last change (a long Fade time): look again in a moment,
+      // rather than swap out a loop that's still on screen
+      const [cA, cB] = weights(mix.cur.view);
+      if ((hidden === 'A' ? cA : cB) > 0.02) { ap.next = now + 1000; ap.quick = 0; return; }
+      freshLook(hidden, shown);
+      nudge(shown);
+      mix.tgt.view = Math.random() < 0.8 * m ? 50 : (hidden === 'B' ? 100 : 0);
+    } else {
+      mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
+      nudge('A'); nudge('B');
+    }
+  } else {
+    const [wA, wB] = weights(v);
+    const onScreen = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0);
+    const k = pick(onScreen.length ? onScreen : ['A']);
+    glideLook(k);
+    nudge(k === 'A' ? 'B' : 'A');
+  }
+  const feed = () => (Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0);
+  if (!ap.pins.has('xab')) mix.tgt.xab = feed();
+  if (!ap.pins.has('xba')) mix.tgt.xba = feed();
+  // Two strong feeds pour so much light back and forth that the picture turns white
+  if (apSet.white) {
+    let over = mix.tgt.xab + mix.tgt.xba - 90;
+    for (const f of ['xab', 'xba']) {
+      if (over <= 0 || ap.pins.has(f)) continue;
+      const cut = Math.min(over, mix.tgt[f]);
+      mix.tgt[f] -= cut; over -= cut;
+    }
+  }
   if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
   syncUI();
+  apStatus();
 }
+
+/* ================= autopilot's white-out watch ================= */
+// Feedback piles brightness on brightness, so long trails, big inputs and strong feeds can drift to solid white.
+// When too much of a loop (or the mixed picture) is near white, that loop's trails, brightness and feed ease off
+// and its brightest parts are squeezed, then let go slowly so the picture doesn't pump. (How it measures is
+// further down, in measAsk and measCollect.)
+// How far past its limit a picture is: above 0 it's too bright, below 0 it has room to spare
+function pressure(b) {
+  const s = apSet.white / 100;
+  const meanLim = 0.78 - 0.4 * s, whiteLim = 0.40 - 0.36 * s;   // at 50: a mean of 0.58, or 22% of it near white
+  return Math.max((b.white - whiteLim) / 0.35, (b.mean - meanLim) / 0.3);
+}
+function updateGuard(dt, wA, wB, now) {
+  for (const k of ['A', 'B']) {
+    const own = lum[k];
+    let p = pressure(own);
+    // The mixed picture can wash out even when neither loop does on its own
+    if ((k === 'A' ? wA : wB) > 0 && own.mean > 0.3) p = Math.max(p, pressure(lum.comp));
+    // Too bright: lean in, harder the further over it is. Just under the limit: hold steady, so the picture
+    // settles there instead of swinging bright and dark. Well under: let go slowly.
+    if (p > 0) guard[k] = Math.min(1, guard[k] + dt * (0.35 + 1.4 * Math.min(1, p)));
+    else if (p < -0.35) guard[k] = Math.max(0, guard[k] - dt * 0.1);
+    // Still leaning hard after five seconds: turn that loop's own settings down a notch (unless they're pinned),
+    // so the look can settle without the watch holding it back
+    const hot = 'hot' + k;
+    guard[hot] = guard[k] > 0.5 ? guard[hot] + dt : 0;
+    if (guard[hot] > 5) { guard[hot] = 0; coolLoop(k); }
+    // Solid white even with the watch all the way on: wipe that loop and move on to a new look
+    const stuck = 'stuck' + k;
+    if (guard[k] > 0.95 && own.mean > 0.9 && own.white > 0.8) {
+      guard[stuck] += dt;
+      if (guard[stuck] > 2.5) {
+        guard[stuck] = 0;
+        clearLoop(k);
+        own.mean = 0; own.white = 0;
+        burst();
+        ap.next = Math.min(ap.next, now + 1500);
+      }
+    } else guard[stuck] = 0;
+  }
+}
+function coolLoop(k) {
+  const t = loops[k].tgt;
+  if (!ap.pins.has('trails')) t.trails = Math.max(55, Math.round(t.trails - 6));
+  if (!ap.pins.has('size') && IMAGE_INPUTS.includes(t.in1)) t.size = Math.max(40, Math.round(t.size - 8));
+  const feedIn = k === 'A' ? 'xba' : 'xab';
+  if (!ap.pins.has(feedIn)) mix.tgt[feedIn] = Math.round(mix.tgt[feedIn] * 0.7);
+  if (k === edit) syncUI();
+}
+
+/* ================= autopilot settings ================= */
+function fmtDur(s) {
+  if (s < 9.5) return `${s.toFixed(1)} SEC`;
+  if (s < 59.5) return `${Math.round(s)} SEC`;
+  const r = Math.round(s);
+  return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')} MIN`;
+}
+const apCtl = {
+  every: { text: () => fmtDur(apEverySec()) },
+  fade: { text: () => fmtDur(apFadeSec()) },
+  wild: { text: (v) => (v === 50 ? 'USUAL' : String(v)) },
+  mix: { text: (v) => (v === 0 ? 'NEVER' : v === 50 ? 'USUAL' : String(v)) },
+  white: { text: (v) => (v === 0 ? 'OFF' : String(v)) },
+};
+function paintAp(k) {
+  const c = apCtl[k];
+  c.el.value = apSet[k];
+  paintFill(c.el);
+  c.out.textContent = c.text(apSet[k]);
+}
+function syncApUI() {
+  Object.keys(apCtl).forEach(paintAp);
+  $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
+  $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
+  syncPins();
+  apStatus();
+}
+for (const [k, c] of Object.entries(apCtl)) {
+  const id = 'ap' + k[0].toUpperCase() + k.slice(1);
+  c.el = $('#' + id);
+  c.out = $('#' + id + 'Out');
+  const set = (v) => {
+    apSet[k] = v;
+    paintAp(k);
+    saveAp();
+    // A shorter wait takes effect straight away
+    if (k === 'every' && ap.on) ap.next = Math.min(ap.next, performance.now() + apEverySec() * 1000);
+    apStatus();
+  };
+  c.el.addEventListener('input', () => set(+c.el.value));
+  c.el.addEventListener('dblclick', () => set(AP_DEFAULTS[k]));
+}
+$('#apBeat').addEventListener('click', () => {
+  apSet.beat = !apSet.beat;
+  saveAp();
+  syncApUI();
+  if (apSet.beat && !snd.analyser) toast('Change on the beat needs music: under React to sound, pick Computer sound or Microphone.');
+});
+$$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
+  apSet.touch = b.dataset.touch;
+  saveAp();
+  syncApUI();
+}));
+$('#apUnpin').addEventListener('click', () => {
+  ap.pins.clear();
+  ap.pinVal = {};
+  saveAp();
+  syncApUI();
+  toast(ap.on ? 'Nothing is pinned now. Autopilot changes everything from its next look.' : 'Nothing is pinned now.');
+});
+$('#apReset').addEventListener('click', () => {
+  Object.assign(apSet, AP_DEFAULTS);
+  saveAp();
+  syncApUI();
+  toast(ap.pins.size ? 'Autopilot settings are back to normal. Your pins are still pinned.' : 'Autopilot settings are back to normal.');
+});
+// The line at the top of Autopilot settings: on or off, when the next look comes, what's pinned,
+// and whether the white-out watch is easing off right now
+function apStatus() {
+  let html;
+  if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (under Channels, under the picture, or the P key) to start it.';
+  else {
+    const s = Math.max(0, Math.round((ap.next - performance.now()) / 1000));
+    html = '<span class="live"></span><b>Autopilot is on.</b> ' +
+      (ap.beatWait ? 'New look on the next beat.' : s <= 1 ? 'New look coming now.' : `Next new look in about ${s < 60 ? s + ' seconds' : fmtDur(s).toLowerCase()}.`);
+    if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
+    const easing = ['A', 'B'].filter((k) => guard[k] > 0.15);
+    if (easing.length) html += ` Easing off loop ${easing.join(' and ')} so it doesn’t turn white.`;
+  }
+  if (html !== apStatus.shown) { apStatus.shown = html; $('#apState').innerHTML = html; }
+}
+setInterval(apStatus, 500);
+syncApUI();
 
 /* ================= transport ================= */
 const freezeBtn = $('#freeze');
@@ -5106,7 +5532,7 @@ const RECIPES = [
     patch: { A: { in1: 'wave', size: 50, form: 2, zoom: 6, spin: 3, trails: 96, color: 5, warp: 12, mirror: 2, blur: 0.35 },
              B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xab: 30, xba: 30, view: 50 },
     drift: true },
-  { name: 'Hands-free show', autopilot: true, after: 'Autopilot is on. Leave it running, or touch any control to take over.',
+  { name: 'Hands-free show', autopilot: true, after: 'Autopilot is on. Leave it running, or move a slider to pin it where you want it.',
     text: 'Autopilot gives each loop a new look every half minute or so and fades slowly between them. Leave it on a TV or projector.',
     how: 'AUTOPILOT · AUTO-DRIFT · OLD TV 65',
     sw: 'linear-gradient(90deg,#ffae3b,#ff4fa3 35%,#6a2bd9 65%,#4fd1c5)',
@@ -6125,12 +6551,12 @@ function getTarget(t) {
 }
 function setTarget(t, v) {
   if (t.kind === 'loop') {
-    takeOver();
+    takeOver(t.key, t.loop);
     loops[t.loop].tgt[t.key] = v;
     if (t.loop === edit) { sliderEls[t.key].value = v; paintSlider(t.key); }
     if (t.key === 'trails') syncVisibility();
   } else if (t.kind === 'mix') {
-    if (t.key !== 'tv') takeOver();
+    if (t.key !== 'tv') takeOver(t.key);
     mix.tgt[t.key] = v;
     sliderEls[t.key].value = v;
     paintSlider(t.key);
@@ -6478,6 +6904,88 @@ function draw3D(k, name, slot, scale) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return rt.tex;
 }
+/* ================= autopilot's white-out watch: measuring ================= */
+// While Autopilot runs, a tiny 32 x 18 copy of loop A, loop B or the mixed picture is taken every few frames and
+// its brightness added up. The graphics chip hands the copy over once it's ready, a frame or two later, and until
+// then the page just carries on: nothing ever stops to wait for it. (The first white-out guard did wait, and that
+// wait could make the picture hitch.) What to do about a bright picture is decided in updateGuard.
+const MEAS_W = 32, MEAS_H = 18, MEAS_ORDER = ['A', 'comp', 'B', 'comp'];
+const meas = { tgt: null, pbo: null, sync: null, key: '', age: 0, gap: 0, turn: 0, buf: new Uint8Array(MEAS_W * MEAS_H * 4) };
+function measSetup() {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, MEAS_W, MEAS_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  meas.tgt = { tex, fbo };
+  meas.pbo = gl.createBuffer();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, meas.pbo);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, meas.buf.byteLength, gl.STREAM_READ);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+}
+// Asks for a small copy of one picture, and returns straight away
+function measAsk(key, tex) {
+  if (!meas.tgt) measSetup();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, meas.tgt.fbo);
+  gl.viewport(0, 0, MEAS_W, MEAS_H);
+  gl.useProgram(copyProg.p);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  set2f(copyProg, 'uSim', MEAS_W, MEAS_H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // Into a buffer the graphics chip fills in its own time, with a marker that says when it's done
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, meas.pbo);
+  gl.readPixels(0, 0, MEAS_W, MEAS_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  meas.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  meas.key = key;
+  meas.age = 0;
+}
+// If the copy has arrived, reads it (instant, since it's already here) and notes how bright that picture is
+function measCollect() {
+  if (!meas.sync) return;
+  const st = gl.clientWaitSync(meas.sync, 0, 0);   // a timeout of 0: only asks, never waits
+  if (st === gl.TIMEOUT_EXPIRED && ++meas.age < 60) return;
+  gl.deleteSync(meas.sync);
+  meas.sync = null;
+  if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return;
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, meas.pbo);
+  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, meas.buf);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  const b = meas.buf;
+  let sum = 0, white = 0;
+  for (let i = 0; i < b.length; i += 4) {
+    const l = (0.299 * b[i] + 0.587 * b[i + 1] + 0.114 * b[i + 2]) / 255;
+    sum += l;
+    if (l > 0.88) white++;
+  }
+  const n = MEAS_W * MEAS_H;
+  lum[meas.key].mean = sum / n;
+  lum[meas.key].white = white / n;
+}
+function watchBrightness(dt, now, wA, wB) {
+  if (!ap.on || !apSet.white) {
+    // Off: let go of whatever it was holding back, over a couple of seconds
+    guard.A = Math.max(0, guard.A - dt * 0.4);
+    guard.B = Math.max(0, guard.B - dt * 0.4);
+    return;
+  }
+  measCollect();
+  if (!meas.sync && !frozen && ++meas.gap >= 3) {
+    meas.gap = 0;
+    // Take turns: loop A, the mixed picture, loop B, the mixed picture; skip a loop that isn't in use
+    for (let i = 0; i < MEAS_ORDER.length; i++) {
+      const key = MEAS_ORDER[meas.turn++ % MEAS_ORDER.length];
+      const busy = key === 'comp' || (key === 'A' ? (wA > 0.001 || mix.cur.xab > 0.1) : (wB > 0.001 || mix.cur.xba > 0.1));
+      if (busy) { measAsk(key, key === 'comp' ? comp.tex : loops[key].rt[loops[key].front].tex); break; }
+    }
+  }
+  if (!frozen) updateGuard(dt, wA, wB, now);
+}
+
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const O = loops[k === 'A' ? 'B' : 'A'];
@@ -6490,12 +6998,15 @@ function runLoop(k, xf, brush, f) {
     // The 3D flights move by themselves, so there too Auto-drift only tints.
     const still = t.in1 === 'splat' || is3D(t.in1) ? 0 : 1;
     const calm = still * Math.max(0, 1 - 1.2 * clamp(c.flow, 0, 100) / 100);
-    z += 22 * calm * Math.sin(d * 0.13);
-    s += 26 * calm * Math.sin(d * 0.071 + 1.3);
-    col += 12 * (0.5 + 0.5 * Math.sin(d * 0.05));
-    w += 16 * still * (0.5 + 0.5 * Math.sin(d * 0.09 + 2.0));
-    sx += 0.0012 * still * Math.sin(d * 0.11);
-    sy += 0.0012 * still * Math.cos(d * 0.083);
+    // Under Autopilot, How wild sets how far it drifts, and a pinned setting doesn't drift at all
+    const amt = ap.on ? 0.4 + 1.2 * apSet.wild / 100 : 1;
+    const free = (key) => (pinned(key) ? 0 : amt);
+    z += 22 * calm * free('zoom') * Math.sin(d * 0.13);
+    s += 26 * calm * free('spin') * Math.sin(d * 0.071 + 1.3);
+    col += 12 * free('color') * (0.5 + 0.5 * Math.sin(d * 0.05));
+    w += 16 * still * free('warp') * (0.5 + 0.5 * Math.sin(d * 0.09 + 2.0));
+    sx += 0.0012 * still * amt * Math.sin(d * 0.11);
+    sy += 0.0012 * still * amt * Math.cos(d * 0.083);
   }
   let sizeBoost = 0, gainBoost = 1;
   if (snd.analyser) {
@@ -6511,7 +7022,9 @@ function runLoop(k, xf, brush, f) {
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
   const ramp = tr >= 0.1 ? 1 : (tr / 0.1) * (tr / 0.1) * (3 - 2 * tr / 0.1);
-  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp;
+  // G: how hard Autopilot's white-out watch is leaning on this loop (0 = not at all)
+  const G = guard[k];
+  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp * (1 - 0.14 * G);
 
   // The music can swell the input past the slider's top, so it still pulses when Size is already at 100
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
@@ -6556,7 +7069,8 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
-  set1f(fbProg, 'uGain', c.gain * gainBoost);
+  set1f(fbProg, 'uGain', c.gain * gainBoost * (1 - 0.5 * G));
+  set1f(fbProg, 'uKnee', 0.35 * G);
   set1f(fbProg, 'uForm', t.form);
   if (t.in1 === 'wave' || t.in2 === 'wave') {
     computeWave(simT + (k === 'B' ? 11.0 : 0), t.form);
@@ -6565,7 +7079,7 @@ function runLoop(k, xf, brush, f) {
     if (lb) gl.uniform4fv(lb, waveBoxes);
   }
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
-  set1f(fbProg, 'uXfeed', xf);
+  set1f(fbProg, 'uXfeed', xf * (1 - 0.6 * G));
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
   set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
   set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
@@ -6621,14 +7135,17 @@ function frame() {
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
   const k = 1 - Math.exp(-dt * 5);
-  const kLoop = ap.on ? 1 - Math.exp(-dt * 0.3) : k;    // autopilot glides over ~10 seconds
-  const kMix = ap.on ? 1 - Math.exp(-dt * 0.22) : k;
+  // Autopilot glides over its Fade time (about 10 seconds unless changed), or fast when a look cuts in on a beat.
+  // Pinned settings answer their sliders straight away.
+  const glide = now < ap.quick ? 4 : 3 / apFadeSec();
+  const kLoop = ap.on ? 1 - Math.exp(-dt * glide) : k;
+  const kMix = ap.on ? 1 - Math.exp(-dt * glide * 0.73) : k;
   for (const key of ['A', 'B']) {
     const L = loops[key];
-    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * kLoop;
+    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p) ? k : kLoop);
   }
-  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (p === 'tv' ? k : kMix);
-  if (ap.on && !frozen && now >= ap.next) apStep(now);
+  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (p === 'tv' || pinned(p) ? k : kMix);
+  if (ap.on && !frozen && now >= ap.next) apTick(now);
   if (!frozen) simT += dt;
   if (drift && !frozen) driftT += dt;
   staticAmt = Math.max(0, staticAmt - dt * 3);
@@ -6677,6 +7194,7 @@ function frame() {
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  watchBrightness(dt, now, wA, wB);
 
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);

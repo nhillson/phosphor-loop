@@ -136,8 +136,16 @@ TIPS
     into each other like marbled paint. Low is a gentle drip, high is wild.
     Keep Trails high. The Guide's "Marbled" recipe sets it up in one click.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
-    or the P key) changes the settings slowly by itself. Touch any control
-    to take over again.
+    or the P key) changes the settings slowly by itself.
+  - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
+    it, or just move that slider, and the setting stays put while Autopilot
+    keeps changing everything else. Tap a lit pin to let it go again.
+  - Autopilot settings (the section under Channels): how often a new look
+    comes, how slowly it fades in, how wild it gets, how often it mixes the
+    two loops, and "Keep it from going white", which watches the brightness
+    and eases off the trails before the picture washes out. It never makes
+    the graphics chip wait, so it doesn't cause stutter. "Change on the beat"
+    makes each new look cut in on a beat when music is playing.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
