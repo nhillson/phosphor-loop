@@ -172,7 +172,7 @@ TIPS
   - Ink in water: the Ink channel drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look, and Ink under "What feeds the loop" gives you the drops.
-  - 3D worlds: ten channels take you into a 3D world.
+  - 3D worlds: nine channels take you into a 3D world.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
         glowing grid mountains on both sides.
@@ -182,7 +182,6 @@ TIPS
       Aurora: gliding over a frozen lake under the northern lights.
       Mercury: circling drops of liquid metal that merge and split.
       Fractal: down a hall where bubbles grow on bubbles without end.
-      Crystals: through a grove of giant glowing crystals in violet mist.
       Nebula: through glowing clouds of gas and dark dust.
       City: drifting sideways along a wet street at night, past shops,
         lamps and cars, with rows of buildings and a skyline behind.

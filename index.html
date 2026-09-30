@@ -1063,7 +1063,7 @@
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
           <div class="g-card"><h3>Channels</h3><dl>
-            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a crystal grove, a nebula and a wet city street at night drifting sideways.</dd>
+            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
@@ -1210,9 +1210,9 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, cubes: 13, horizon: 14, cavern: 15,
-                 blackhole: 16, aurora: 17, mercury: 18, fractal: 19, crystals: 20, nebula: 21, spectro: 22, city: 23 };
+                 blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', crystals: 'Crystals', nebula: 'Nebula', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
@@ -1265,8 +1265,6 @@ const CHANNELS = [
     sw: 'radial-gradient(circle at 36% 44%,#fff 0 5%,#c3cddd 11%,#3b4454 25%,transparent 27%),radial-gradient(circle at 64% 58%,#fff 0 4%,#cdb2ee 10%,#3a3150 21%,transparent 23%),linear-gradient(#2a1540,#0b0b12)' },
   { name: 'Fractal', A: { in1: 'fractal', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
     sw: 'radial-gradient(circle at 30% 42%,#ffb34a 0 12%,transparent 13%),radial-gradient(circle at 62% 36%,#4ad0a0 0 15%,transparent 16%),radial-gradient(circle at 50% 78%,#b44aff 0 10%,transparent 11%),radial-gradient(circle at 82% 72%,#ff4a8a 0 8%,transparent 9%),radial-gradient(circle at 14% 80%,#4a9aff 0 7%,transparent 8%),#1a0f22' },
-  { name: 'Crystals', A: { in1: 'crystals', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'linear-gradient(100deg,transparent 0 18%,#a45cff 18% 26%,transparent 26%),linear-gradient(82deg,transparent 0 55%,#3ad8ff 55% 63%,transparent 63%),linear-gradient(95deg,transparent 0 76%,#ff5caa 76% 81%,transparent 81%),linear-gradient(#0a0414,#1c0c30)' },
   { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
     sw: 'radial-gradient(circle at 56% 40%,#fff 0 3%,transparent 7%),radial-gradient(ellipse at 34% 46%,rgba(255,80,170,.85) 0,transparent 48%),radial-gradient(ellipse at 66% 56%,rgba(90,110,255,.85) 0,transparent 52%),#0a0514' },
   { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
@@ -2534,143 +2532,6 @@ void main() {
   o = vec4(col, 1.0);
 }`;
 
-// Crystals: a flight through a grove of giant glowing crystals rising from violet mist.
-const FS_CRYSTALS = `#version 300 es
-precision highp float;
-uniform vec2 uSim;
-uniform float uTime;     // seconds; the crystals shimmer and the view sways with it
-uniform float uTravel;   // how far the flight has come (wraps every ROWS rows of crystals)
-uniform float uLens;     // how wide the lens is: tan of half the height of the view
-uniform float uGlow;     // how bright the crystals burn (the music pushes it up)
-uniform float uSeed;     // loop B flies through another grove
-out vec4 o;
-const float C = 3.2;       // each crystal stands in its own C by C square of ground
-const float ROWS = 160.0;  // the grove repeats after this many rows
-float h31(vec3 p) {
-  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
-  p += dot(p, p.yxz + 33.33);
-  return fract((p.x + p.y) * p.z);
-}
-float cellHash(vec2 id, float k) { return h31(vec3(id.x, mod(id.y, ROWS), k + uSeed)); }
-vec3 hue(float x) { return 0.5 + 0.5 * cos(6.28318 * (x + vec3(0.0, 0.33, 0.67))); }
-// A crystal's colour: amethyst, aquamarine, rose or ice
-vec3 crystalCol(vec2 id) {
-  float h = cellHash(id, 9.0);
-  return h < 0.3 ? vec3(0.65, 0.3, 1.0) : h < 0.55 ? vec3(0.2, 0.85, 1.0) : h < 0.8 ? vec3(1.0, 0.35, 0.7) : vec3(0.75, 0.9, 1.0);
-}
-// A six-sided crystal in local space: its cross-section and how far it is from the edges and the point
-const vec3 HK = vec3(-0.866025404, 0.5, 0.577350269);
-float crystal(vec3 q, float r, float hgt, out float edge) {
-  vec2 p = abs(q.xz);
-  p -= 2.0 * min(dot(HK.xy, p), 0.0) * HK.xy;
-  edge = HK.z * r - abs(p.x);
-  vec2 s = p - vec2(clamp(p.x, -HK.z * r, HK.z * r), r);
-  float side = length(s) * sign(s.y);
-  float tip = (q.y - hgt + 1.7 * p.y) * 0.5;   // six sloping faces meeting in a point
-  return max(max(side, tip), -q.y);
-}
-struct Hit { float d; vec2 id; float edge; float y; float r; float hgt; };
-Hit scene(vec3 p) {
-  Hit h;
-  vec2 id = floor(p.xz / C + 0.5);
-  vec2 lc = p.xz - id * C;
-  h.id = id; h.edge = 1.0; h.y = p.y; h.r = 0.0; h.hgt = 0.0;
-  h.d = p.y + 0.02;   // the ground
-  // The lane down the middle stays clear
-  if (id.x != 0.0 && abs(id.x) < 6.0 && cellHash(id, 1.0) < 0.85) {
-    float r = 0.35 + 0.45 * cellHash(id, 2.0);
-    float hgt = 1.8 + 6.0 * pow(cellHash(id, 3.0), 1.6) + abs(id.x) * 0.3;
-    vec2 off = (vec2(cellHash(id, 4.0), cellHash(id, 5.0)) - 0.5) * (C - 2.6 * r);
-    float lean = (cellHash(id, 6.0) - 0.5) * 0.5, turn = cellHash(id, 7.0) * 6.28;
-    vec3 q = vec3(lc - off, p.y).xzy;
-    float cl = cos(lean), sl = sin(lean);
-    q.xy = mat2(cl, -sl, sl, cl) * q.xy;
-    float ct = cos(turn), st = sin(turn);
-    q.xz = mat2(ct, -st, st, ct) * q.xz;
-    float e;
-    float dc = crystal(q, r, hgt, e);
-    if (dc < h.d) { h.d = dc; h.edge = e / r; h.y = q.y; h.r = r; h.hgt = hgt; }
-  }
-  return h;
-}
-void main() {
-  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
-  float t = uTime;
-  vec3 ro = vec3(0.5 * sin(t * 0.11), 1.3 + 0.4 * sin(t * 0.07), uTravel);
-  vec3 fw = normalize(vec3(0.15 * sin(t * 0.06), 0.06 + 0.05 * sin(t * 0.09), 1.0));
-  float roll = 0.05 * sin(t * 0.08);
-  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
-  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
-  vec2 sp = p * 2.0 * uLens;
-  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
-
-  const float FAR = 60.0;
-  float tt = 0.0;
-  Hit h;
-  bool hit = false;
-  vec2 inv = 1.0 / max(abs(rd.xz), vec2(1e-4));
-  for (int i = 0; i < 120; i++) {
-    vec3 pos = ro + rd * tt;
-    h = scene(pos);
-    if (h.d < 0.002 * (1.0 + tt)) { hit = true; break; }
-    // Never step past the edge of this square along the ray: the next crystal might be just over it
-    vec2 lc = pos.xz - floor(pos.xz / C + 0.5) * C;
-    vec2 tx = (0.5 * C - lc * sign(rd.xz)) * inv;
-    tt += min(h.d * 0.8, min(tx.x, tx.y) + 0.01);
-    if (tt > FAR) break;
-    if (ro.y + rd.y * tt > 12.0 && rd.y > 0.0) break;
-  }
-  vec3 sky = mix(vec3(0.09, 0.04, 0.16), vec3(0.005, 0.0, 0.02), smoothstep(0.0, 0.45, rd.y));
-  vec3 g = rd * 200.0;
-  float hs = h31(floor(g) + uSeed);
-  if (hs > 0.996 && rd.y > 0.05) sky += vec3(0.8, 0.85, 1.0) * smoothstep(0.35, 0.0, length(fract(g) - 0.5)) * 0.8;
-  vec3 mistCol = vec3(0.25, 0.12, 0.4);
-  vec3 col = sky;
-  if (hit) {
-    vec3 q = ro + rd * tt;
-    if (h.r > 0.0) {
-      // Inside, the crystal glows, brightest at its point; its edges catch the light;
-      // faces seen side-on shine like glass
-      vec3 cc = crystalCol(h.id);
-      vec2 e = vec2(0.003, 0.0);
-      vec3 n = normalize(vec3(scene(q + e.xyy).d - scene(q - e.xyy).d, scene(q + e.yxy).d - scene(q - e.yxy).d,
-                              scene(q + e.yyx).d - scene(q - e.yyx).d));
-      float along = clamp(h.y / h.hgt, 0.0, 1.0);
-      float fine = smoothstep(22.0, 6.0, tt);   // far away, fine detail fades instead of flickering
-      float ew = mix(0.35, 0.12, fine);
-      float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
-      float streak = 1.0 - 0.25 * fine * (0.5 + 0.5 * sin(h.y * 7.0 + cellHash(h.id, 8.0) * 20.0 + t * 0.7));
-      float pulse = 0.8 + 0.2 * sin(t * 1.3 + cellHash(h.id, 10.0) * 6.28);
-      col = cc * (0.2 + 0.75 * along * along) * streak * pulse * uGlow;
-      col += cc * smoothstep(ew, 0.0, h.edge) * (0.5 + 0.8 * along) * uGlow * mix(0.35, 1.0, fine);
-      col += mix(cc, vec3(1.0), 0.5) * fres * 0.6 * fine;
-      vec3 rf = reflect(rd, n);
-      col += vec3(0.9, 0.9, 1.0) * pow(max(rf.y, 0.0), 8.0) * 0.25 * fine;
-    } else {
-      // The dark glassy ground mirrors the sky and pools with the colour of the nearest crystals
-      vec2 base = floor(q.xz / C);
-      vec3 pool = vec3(0.0);
-      for (int k = 0; k < 4; k++) {
-        vec2 cid = base + vec2(float(k % 2), float(k / 2));
-        if (cid.x != 0.0 && abs(cid.x) < 6.0 && cellHash(cid, 1.0) < 0.85) {
-          float r = 0.35 + 0.45 * cellHash(cid, 2.0);
-          vec2 off = (vec2(cellHash(cid, 4.0), cellHash(cid, 5.0)) - 0.5) * (C - 2.6 * r);
-          pool += crystalCol(cid) * exp(-length(q.xz - cid * C - off) * 1.1) * 0.6;
-        }
-      }
-      float fres = 0.3 + 0.7 * pow(1.0 - max(-rd.y, 0.0), 4.0);
-      col = pool * uGlow + sky * fres * 0.6;
-    }
-    // Low mist glowing faintly violet, thicker far away
-    float mist = (1.0 - exp(-tt * 0.075)) * exp(-max(q.y, 0.0) * 0.2);
-    col = mix(col, mistCol * 0.35, clamp(mist, 0.0, 1.0));
-    col = mix(col, mistCol * 0.3, smoothstep(FAR * 0.45, FAR, tt));
-  } else {
-    col = mix(sky, mistCol * 0.3, exp(-max(rd.y, 0.0) * 10.0));
-  }
-  o = vec4(col, 1.0);
-}`;
-
 // Nebula: a flight through glowing clouds of gas and dark dust, lit by a nearby star.
 const FS_NEBULA = `#version 300 es
 precision highp float;
@@ -3168,7 +3029,6 @@ const SCENES = {
   aurora:    { fs: FS_AURORA,    label: 'Aurora',     speed: 2.5,   period: 55,            offB: 20 },
   mercury:   { fs: FS_MERCURY,   label: 'Mercury',    speed: 0.12,  period: 2 * Math.PI,   offB: 2 },
   fractal:   { fs: FS_FRACTAL,   label: 'Fractal',    speed: 0.09,  period: 2,             offB: 0.7 },
-  crystals:  { fs: FS_CRYSTALS,  label: 'Crystals',   speed: 2.2,   period: 512,           offB: 100 },
   nebula:    { fs: FS_NEBULA,    label: 'Nebula',     speed: 2.0,   period: 400,           offB: 150, res: 0.5 },
   // A calm drift, so the kick only nudges it along a little
   city:      { fs: FS_CITY,      label: 'City',       speed: 2.2,   period: 3072,          offB: 1536, kick: 0.35 },
@@ -3181,11 +3041,10 @@ const HINT_3D = {
   aurora: 'A slow glide over a frozen lake under curtains of northern lights, mirrored in the ice.',
   mercury: 'Circling drops of liquid metal that drift, merge and split, mirroring a neon-lit room. They swell with the bass.',
   fractal: 'A flight down a hall folded out of spheres, where bubbles grow on bubbles, smaller without end.',
-  crystals: 'A flight through a grove of giant glowing crystals rising from violet mist.',
   nebula: 'A flight through glowing clouds of gas and dark dust, lit by a nearby star.',
   city: 'A slow drift sideways along a wet street at night, past shops, lamps and cars, with the skyline behind. The windows and lamps glow brighter with the music.',
 };
-// The worlds are built in the background as the page opens, so ten big shaders don't hold up the start.
+// The worlds are built in the background as the page opens, so nine big shaders don't hold up the start.
 // Where the browser can (KHR_parallel_shader_compile) that happens on other threads; picking a world
 // before it's built just waits for it. A world this graphics card can't draw is left out of the picker.
 const parallelBuild = gl.getExtension('KHR_parallel_shader_compile');
