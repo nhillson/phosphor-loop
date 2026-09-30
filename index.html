@@ -587,10 +587,10 @@
       <div class="stage" id="stage">
         <div class="bezel" id="bezel">
           <div class="screen" id="screenWrap">
-            <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to paint light."></canvas>
+            <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to draw light."></canvas>
             <div class="osd on" id="osd" aria-hidden="true"><span class="osd-a">CH 01</span><span class="osd-b">TUNNEL</span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
-            <div class="tip" id="tip">Drag on the screen to paint light into the loop. New here? Open the Guide.</div>
+            <div class="tip" id="tip">Drag on the screen to draw light into the loop. New here? Open the Guide.</div>
             <div class="drop" id="drop" hidden>Drop to feed it into the loop</div>
             <div class="screen-msg" id="msg" hidden></div>
           </div>
@@ -618,7 +618,7 @@
     </section>
 
     <aside class="panel" aria-label="Controls">
-      <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick a channel</b>, move a slider, or <b>drag on the screen</b> to paint.</p>
+      <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick a channel</b>, move a slider, or <b>drag on the screen</b> to draw.</p>
       <div class="panel-tools"><button class="linkish" id="foldAll">Collapse all</button><button class="linkish" id="openAll">Expand all</button></div>
 
       <section class="group" aria-labelledby="h-ch">
@@ -772,7 +772,6 @@
             <button data-src="bars" aria-pressed="false">Bars</button>
             <button data-src="sparks" aria-pressed="false">Sparks</button>
             <button data-src="ink" aria-pressed="false">Ink</button>
-            <button data-src="splat" aria-pressed="false">Paint</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
             <button data-src="none" aria-pressed="false">Nothing</button>
@@ -1054,7 +1053,7 @@
         <h2><small>Start here</small>Your first 30 seconds</h2>
         <ol class="g-steps">
           <li><b>Pick a channel.</b> The buttons at the top of the controls are ready-made looks.</li>
-          <li><b>Drag on the screen.</b> You paint light straight into the loop and watch it echo.</li>
+          <li><b>Drag on the screen.</b> You draw light straight into the loop and watch it echo.</li>
           <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
           <li><b>Press Surprise me</b> for something new, or <b>Autopilot</b> to let it run by itself.</li>
         </ol>
@@ -1078,7 +1077,7 @@
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
-            <dt>Wave, Shape, Bars, Sparks, Ink, Paint, 3D world</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. Paint throws solid splats that cover whatever is underneath, like paint on a table. 3D world opens a picker of ten 3D worlds to fly through, circle round or drift past. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
+            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of ten 3D worlds to fly through, circle round or drift past. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Picture and Video</dt><dd>Your own files. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
@@ -1095,7 +1094,7 @@
             <dt>Color shift</dt><dd>Moves each echo a little further round the rainbow.</dd>
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Flow</dt><dd>Slow currents curl the echoes into threads and swirls, like ink in water. Works best with Trails high.</dd>
-            <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbled paint. Low is a gentle drip; high is wild. Works best with Trails high.</dd>
+            <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
           </dl></div>
@@ -1115,7 +1114,7 @@
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
             <dt>Full screen and Hide controls</dt><dd>Show only the picture.</dd>
-            <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can paint on the projected picture too.</dd>
+            <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
             <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. Videos are large, up to about 75 MB a minute.</dd>
             <dt>Include mic</dt><dd>When its light is on, videos you record include the microphone, so you can talk over the picture or catch the room. The first time, the browser asks to use the microphone: choose Allow. Press it again to turn the mic off.</dd>
           </dl></div>
@@ -1131,7 +1130,7 @@
       <section>
         <h2><small>Hands on</small>Things you can do with the screen</h2>
         <ul class="g-list">
-          <li><b>Paint</b> by dragging on the screen with a mouse or finger. Paint goes into whichever loops are showing, and Mirror copies every stroke.</li>
+          <li><b>Draw</b> by dragging on the screen with a mouse or finger. What you draw goes into whichever loops are showing, and Mirror copies every stroke.</li>
           <li><b>Drop a file</b>, a picture or a video, onto the screen to feed it in.</li>
           <li><b>Double-click any slider</b> to put it back where the channel had it.</li>
           <li><b>Fold away sections</b> you’re not using by clicking their headings, or use Collapse all at the top of the controls.</li>
@@ -1210,9 +1209,9 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, splat: 12, cubes: 13, horizon: 14, cavern: 15,
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, crystals: 20, nebula: 21, spectro: 22, city: 23 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', splat: 'Paint', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', crystals: 'Crystals', nebula: 'Nebula', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
@@ -1464,74 +1463,11 @@ vec2 inkPush(vec2 p) {
   }
   return v;
 }
-// Paint splats, worked out once per frame (see computeSplats), oldest first so newer paint lands on top.
-// For each splat: where it hit (xy), how far it has spread (z, 0 = not landed) and its full size (w);
-// its color (rgb) and a number that shapes its spikes and droplets (a).
-uniform vec4 uSplat[10];
-uniform vec4 uSplatCol[10];
-uniform float uSplatOn;   // how much the paint covers the picture (0 when no input is Paint)
-// Paint is opaque, so it comes back as color and coverage and is laid over the picture, not added as light
-vec4 seedSplat(vec2 p) {
-  vec3 c = vec3(0.0);
-  float cover = 0.0;
-  const vec2 LIGHT = vec2(-0.6, 0.8);
-  float aa = 1.5 / uSim.y;
-  for (int i = 0; i < 10; i++) {
-    vec4 sp = uSplat[i];
-    if (sp.z <= 0.0) continue;
-    vec2 d = p - sp.xy;
-    if (dot(d, d) > sq(sp.w * 3.2)) continue;
-    float id = uSplatCol[i].a, R = sp.z, grow = sp.z / sp.w;
-    // Paint thrown at an angle lands stretched out along the throw
-    float th = hash(vec2(id, 1.3)) * TAU, stretch = 1.0 + 0.55 * hash(vec2(id, 2.9));
-    vec2 q = rot(th) * d;
-    q.x /= stretch;
-    float r = length(q);
-    float ang = atan(q.y, q.x);
-    vec2 dir = d / max(length(d), 1e-5);
-    // The main blob, with a lumpy edge of its own
-    float edge = R * (1.0 + 0.10 * sin(ang * 3.0 + id) + 0.07 * sin(ang * 7.0 + id * 2.3)
-                          + 0.04 * sin(ang * 13.0 - id * 1.1) + 0.025 * sin(ang * 29.0 + id * 0.7));
-    float blob = smoothstep(edge + aa, edge - aa, r);
-    // Wet paint catches the light on one side of its rim and is shadowed on the other
-    float rimZone = smoothstep(edge - R * 0.3, edge, r) * blob;
-    float lit = dot(dir, LIGHT);
-    vec3 col = uSplatCol[i].rgb;
-    vec3 blobCol = col * (1.0 - 0.28 * max(-lit, 0.0) * rimZone) + vec3(0.5) * pow(max(lit, 0.0), 5.0) * rimZone;
-    // Streaks flung out of the blob: wide where they leave it, thinning out, some ending in a bead
-    float N = 9.0 + floor(hash(vec2(id, 4.1)) * 8.0), seg = TAU / N;
-    float cell = floor((ang + TAU * 0.5) / seg);
-    float h1 = hash(vec2(cell, id)), h2 = hash(vec2(id, cell + 7.3)), h3 = hash(vec2(cell + 3.1, id * 1.7));
-    float sa = (cell + 0.34 + 0.32 * h1) * seg - TAU * 0.5;
-    vec2 sd = vec2(cos(sa), sin(sa));
-    float along = dot(q, sd), across = abs(q.x * sd.y - q.y * sd.x);
-    float len = R * (1.05 + 1.4 * h3 * h3) * (1.0 + 0.5 * max(sd.x, 0.0)) * smoothstep(0.3, 1.0, grow);
-    float w0 = sp.w * (0.05 + 0.07 * h2);
-    float tt = clamp((along - R * 0.5) / max(len - R * 0.5, 1e-4), 0.0, 1.0);
-    float wid = w0 * pow(1.0 - tt, 0.8) + w0 * 0.12;
-    float spike = step(0.25, h2) * step(R * 0.5, along) * step(along, len) * smoothstep(wid + aa, wid - aa, across);
-    float beadR = w0 * 0.9 * step(0.55, h2);
-    float bead = smoothstep(beadR + aa, beadR - aa, length(q - sd * (len + beadR * 0.5))) * step(0.4, grow);
-    // Loose droplets thrown further out, smaller the further they fly
-    float M = 25.0, seg2 = TAU / M;
-    float cell2 = floor((ang + TAU * 0.5) / seg2);
-    float g1 = hash(vec2(cell2 + 11.0, id)), g2 = hash(vec2(id + 5.0, cell2)), g3 = hash(vec2(cell2, id + 2.9));
-    float da = (cell2 + 0.3 + 0.4 * g1) * seg2 - TAU * 0.5;
-    float far = 1.4 + 1.3 * g2;
-    float dropR = sp.w * (0.015 + 0.04 * g3) * (1.5 - 0.45 * far) * step(0.35, g1 + g3 * 0.3);
-    float drop = smoothstep(dropR + aa, dropR - aa, length(q - vec2(cos(da), sin(da)) * R * far * smoothstep(0.45, 1.0, grow)));
-    float m = max(blob, max(spike, max(bead, drop)));
-    vec3 here = mix(col * 0.94, blobCol, blob);
-    c = c * (1.0 - m) + here * m;
-    cover = cover * (1.0 - m) + m;
-  }
-  return vec4(c, cover);
-}
 vec2 edgeMask(vec2 q) { return smoothstep(vec2(0.0), vec2(0.012), q) * smoothstep(vec2(1.0), vec2(0.988), q); }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 // Melt: the picture pushes itself around. Each spot checks how bright the last frame is around it, and that
 // brightness picks the way it slides (bright one way, dim another), while edges curl along themselves.
-// Frame after frame the picture folds into itself, like marbled paint.
+// Frame after frame the picture folds into itself, like marbling.
 vec2 meltAt(vec2 q, float asp) {
   vec2 st = q / vec2(asp, 1.0) + 0.5;
   vec2 r = vec2(0.012 / asp, 0.012), d = r * 0.7071;
@@ -1653,7 +1589,6 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 2) return seedBars(g, uTime);
   if (id == 3) return seedSparks(g, uTime);
   if (id == 11) return seedInk(p);
-  if (id == 12) return vec3(0.0);   // Paint is laid on top in main()
   if (id == 22) return seedSpec(p);
   // The 3D worlds (Cubes to Nebula, and City), each drawn just before this pass (see draw3D) filling the screen
   if ((id >= 13 && id <= 21) || id == 23) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
@@ -1723,10 +1658,6 @@ void main() {
   vec3 outc = 1.0 - (1.0 - fb) * (1.0 - s);
   // Where the spectrograph is loud it shows as itself over the trails; where it's quiet the trails show through
   if (specA > 0.0) outc = mix(outc, s, specA);
-  if (uSplatOn > 0.0) {
-    vec4 paint = seedSplat(ps);
-    outc = outc * (1.0 - paint.a * uSplatOn) + paint.rgb * uSplatOn;
-  }
   o = vec4(outc, 1.0);
 }`;
 
@@ -3094,7 +3025,7 @@ vec4 cars(float X, float Y, float px, int lane) {
   if (cx < -0.6 || cx > 2.4) return vec4(0.0);
   float kind = rnd(cell, n, kk + 2.0);
   float van = step(kind, 0.2);
-  vec3 paint = kind < 0.2 ? vec3(0.85, 0.84, 1.0) : kind < 0.35 ? vec3(1.0, 0.78, 0.25) : kind < 0.55 ? vec3(1.0, 0.24, 0.38) :
+  vec3 lampCol = kind < 0.2 ? vec3(0.85, 0.84, 1.0) : kind < 0.35 ? vec3(1.0, 0.78, 0.25) : kind < 0.55 ? vec3(1.0, 0.24, 0.38) :
                kind < 0.7 ? vec3(0.22, 0.78, 0.95) : kind < 0.85 ? vec3(1.0, 0.55, 0.25) : vec3(0.2, 0.18, 0.55);
   float bodyT = mix(0.38, 0.62, van);
   float body = sdRound(q, vec2(0.9, 0.12 + 0.5 * (bodyT - 0.12)), vec2(0.9, 0.5 * (bodyT - 0.12)), 0.08);
@@ -3102,7 +3033,7 @@ vec4 cars(float X, float Y, float px, int lane) {
   float shape = min(body, cab);
   float wheel = min(length(q - vec2(0.38, 0.13)), length(q - vec2(1.42, 0.13))) - 0.13;
   float a = max(cov(shape, px), cov(wheel, px));
-  vec3 col = paint * mix(0.6, 1.05, smoothstep(0.1, 0.5, q.y));
+  vec3 col = lampCol * mix(0.6, 1.05, smoothstep(0.1, 0.5, q.y));
   // Windows
   float win = van > 0.5 ? sdRound(q, vec2(1.1, 0.5), vec2(0.62, 0.07), 0.03) : cab + 0.035;
   col = mix(col, vec3(0.12, 0.12, 0.42) + vec3(0.25, 0.25, 0.5) * smoothstep(0.03, 0.0, abs(q.x - q.y * 0.6 - 0.72)), cov(win, px));
@@ -3535,7 +3466,7 @@ const sliderEls = {}, outputs = {};
   el.addEventListener('input', () => {
     if (k !== 'tv') takeOver(k);
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
-    paintSlider(k);
+    showSlider(k);
     if ((k === 'xab' || k === 'xba') && +el.value > 0) showFedLoop(k);
     if (k === 'view' || k === 'xab' || k === 'xba' || k === 'trails') syncVisibility();
   });
@@ -3544,7 +3475,7 @@ const sliderEls = {}, outputs = {};
     const v = (isMix ? mix.base : loops[edit].base)[k];
     (isMix ? mix.tgt : loops[edit].tgt)[k] = v;
     el.value = v;
-    paintSlider(k);
+    showSlider(k);
     syncVisibility();
   });
 });
@@ -3562,7 +3493,7 @@ function sliderText(k, v) {
     default: return String(v);
   }
 }
-function paintFill(el) {
+function fillTrack(el) {
   const min = +el.min, max = +el.max, v = +el.value;
   const pct = (v - min) / (max - min) * 100;
   if (el.classList.contains('bipolar')) {
@@ -3573,9 +3504,9 @@ function paintFill(el) {
     el.style.setProperty('--b', pct + '%');
   }
 }
-function paintSlider(k) {
+function showSlider(k) {
   const el = sliderEls[k];
-  paintFill(el);
+  fillTrack(el);
   outputs[k].textContent = sliderText(k, +el.value);
 }
 
@@ -3583,7 +3514,7 @@ function paintSlider(k) {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['splat', 'Paint splats'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (3D world)`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (3D world)`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -3703,7 +3634,7 @@ function showFedLoop(k) {
   if ((to === 'A' ? wA : wB) > 0) return;
   mix.tgt.view = 50;
   sliderEls.view.value = 50;
-  paintSlider('view');
+  showSlider('view');
   toast(`Showing both loops, so you can see loop ${from} pouring into loop ${to}.`);
 }
 // Says why a raised Feed slider shows nothing, with a button that fixes it
@@ -3753,8 +3684,8 @@ function syncVisibility() {
 
 function syncUI() {
   const t = loops[edit].tgt;
-  LOOP_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(t[k]); paintSlider(k); });
-  MIX_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(mix.tgt[k]); paintSlider(k); });
+  LOOP_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(t[k]); showSlider(k); });
+  MIX_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(mix.tgt[k]); showSlider(k); });
   $$('#inputs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.src === t.in1 || (b.dataset.src === 'world' && is3D(t.in1)))));
   in2Sel.value = t.in2;
   $('#blendCtl').hidden = t.in2 === 'none';
@@ -3794,6 +3725,9 @@ function patchLoop(k, p, force) {
   delete n.shift;
   n.motion = p.motion ?? (force ? false : L.tgt.motion);
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
+  // A look saved with an input that no longer exists falls back to Wave (or no second input)
+  if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
+  if (!(n.in2 in SRC_ID)) n.in2 = 'none';
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
 }
@@ -3818,7 +3752,7 @@ function loadChannel(i) {
 }
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'splat', 'picture', ...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', ...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : 100, specRound: Math.random() < 0.5,
@@ -4032,7 +3966,7 @@ function syncSoundUI() {
   $('#micPick').hidden = snd.src !== 'mic' || micSel.options.length < 2;
   $$('#sndMap button').forEach((b) => b.setAttribute('aria-pressed', String(!!snd.map[b.dataset.map])));
   sndAmt.value = snd.amount;
-  paintFill(sndAmt);
+  fillTrack(sndAmt);
   $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
 }
 // Does the same sums as the browser's own sound analyser (Blackman window, FFT, smoothing, 0-255 levels,
@@ -4615,7 +4549,6 @@ function syncPins() {
 }
 
 function apPool() {
-  // Paint is left out: its splats land too suddenly for a look that should drift. (Pinned as the input, it stays.)
   const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'picture'];
   // Using the other loop as an input is one more way of mixing the loops
   if (apSet.mix > 10) pool.push('loop');
@@ -4842,14 +4775,14 @@ const apCtl = {
   mix: { text: (v) => (v === 0 ? 'NEVER' : v === 50 ? 'USUAL' : String(v)) },
   white: { text: (v) => (v === 0 ? 'OFF' : String(v)) },
 };
-function paintAp(k) {
+function showAp(k) {
   const c = apCtl[k];
   c.el.value = apSet[k];
-  paintFill(c.el);
+  fillTrack(c.el);
   c.out.textContent = c.text(apSet[k]);
 }
 function syncApUI() {
-  Object.keys(apCtl).forEach(paintAp);
+  Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
   $$('#whiteWhen button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.when === apSet.whiteWhen)));
@@ -4862,7 +4795,7 @@ for (const [k, c] of Object.entries(apCtl)) {
   c.out = $('#' + id + 'Out');
   const set = (v) => {
     apSet[k] = v;
-    paintAp(k);
+    showAp(k);
     saveAp();
     // A shorter wait takes effect straight away
     if (k === 'every' && ap.on) ap.next = Math.min(ap.next, performance.now() + apEverySec() * 1000);
@@ -5070,7 +5003,7 @@ vidPos.addEventListener('input', () => {
   if (!v || !isFinite(v.duration)) return;
   scrubbing = true;
   v.currentTime = (+vidPos.value / 1000) * v.duration;
-  paintFill(vidPos);
+  fillTrack(vidPos);
   vidTime.textContent = fmtT(v.currentTime);
 });
 vidPos.addEventListener('change', () => { scrubbing = false; });
@@ -5111,12 +5044,12 @@ function vcrTick() {
   else if (vidLoopA != null && v.currentTime < vidLoopA - 0.25 && !v.seeking) v.currentTime = vidLoopA;
   if (isFinite(v.duration) && v.duration > 0) {
     const pos = String(Math.round(v.currentTime / v.duration * 1000));
-    if (vidPos.value !== pos) { vidPos.value = pos; paintFill(vidPos); }
+    if (vidPos.value !== pos) { vidPos.value = pos; fillTrack(vidPos); }
     const txt = fmtT(v.currentTime);
     if (txt !== vidTxt) { vidTxt = txt; vidTime.textContent = txt; }
   }
 }
-paintFill(vidPos);
+fillTrack(vidPos);
 
 /* ================= picture adjustments ================= */
 const ADJ_SRC = ['picture', 'video', 'camera', 'screen', 'phone', 'loop'];
@@ -5157,15 +5090,15 @@ function buildAdjust(src) {
       `<div class="ends"><span>${lo}</span><span>${hi}</span></div>`;
     body.appendChild(c);
     const el = c.querySelector('input'), out = c.querySelector('output');
-    const paint = () => {
-      paintFill(el);
+    const refresh = () => {
+      fillTrack(el);
       const v = +el.value;
       out.textContent = v === 0 ? (bip ? '0' : 'OFF') : (bip && v > 0 ? '+' + v : String(v));
     };
-    el.addEventListener('input', () => { adj[src][k] = +el.value; paint(); });
-    el.addEventListener('dblclick', () => { el.value = 0; adj[src][k] = 0; paint(); });
-    adjEls.push({ src, k, el, paint });
-    paint();
+    el.addEventListener('input', () => { adj[src][k] = +el.value; refresh(); });
+    el.addEventListener('dblclick', () => { el.value = 0; adj[src][k] = 0; refresh(); });
+    adjEls.push({ src, k, el, refresh });
+    refresh();
   }
   const actions = document.createElement('div');
   actions.className = 'dev-actions';
@@ -5192,7 +5125,7 @@ function buildAdjust(src) {
   const hintEl = row.querySelector(':scope > .hint');
   row.insertBefore(d, hintEl || null);
 }
-function syncAdjUI() { adjEls.forEach(({ src, k, el, paint }) => { el.value = adj[src][k]; paint(); }); }
+function syncAdjUI() { adjEls.forEach(({ src, k, el, refresh }) => { el.value = adj[src][k]; refresh(); }); }
 ADJ_SRC.forEach(buildAdjust);
 
 /* ================= camera ================= */
@@ -5489,8 +5422,8 @@ phoOff.addEventListener('click', () => {
   phoneGone('Phone disconnected.');
 });
 
-/* ================= painting ================= */
-let painting = false, pCur = null, pPrev = null;
+/* ================= drawing on the screen ================= */
+let drawing = false, pCur = null, pPrev = null;
 function pointerToP(e, el = canvas) {
   const r = el.getBoundingClientRect();
   let u = (e.clientX - r.left) / r.width;
@@ -5502,20 +5435,20 @@ function pointerToP(e, el = canvas) {
   u = cx * 0.5 + 0.5; v = cy * 0.5 + 0.5;
   return [(u - 0.5) * simAspect, v - 0.5];
 }
-function startPaint(e, el) {
+function startDraw(e, el) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  painting = true;
+  drawing = true;
   try { el.setPointerCapture(e.pointerId); } catch (_) {}
   pCur = pointerToP(e, el); pPrev = pCur;
   hideTip();
   if (frozen) toggleFreeze(false);
   e.preventDefault();
 }
-function movePaint(e, el) { if (painting) pCur = pointerToP(e, el); }
-function endPaint() { painting = false; }
-canvas.addEventListener('pointerdown', (e) => startPaint(e, canvas));
-canvas.addEventListener('pointermove', (e) => movePaint(e, canvas));
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => canvas.addEventListener(ev, endPaint));
+function moveDraw(e, el) { if (drawing) pCur = pointerToP(e, el); }
+function endDraw() { drawing = false; }
+canvas.addEventListener('pointerdown', (e) => startDraw(e, canvas));
+canvas.addEventListener('pointermove', (e) => moveDraw(e, canvas));
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => canvas.addEventListener(ev, endDraw));
 
 /* ================= guide & recipes ================= */
 const RECIPES = [
@@ -5524,13 +5457,13 @@ const RECIPES = [
     how: 'SCREEN · ZOOM IN 12 · SPIN 4 · TRAILS 72',
     sw: 'repeating-radial-gradient(circle at 50% 50%,#0d0c0b 0 6px,#ffae3b 6px 8px,#0d0c0b 8px 12px)',
     patch: { A: { in1: 'screen', size: 100, zoom: 12, spin: 4, trails: 72, color: 6 }, tv: 70 } },
-  { name: 'Kaleidoscope painting', after: 'Now drag on the screen.',
+  { name: 'Kaleidoscope drawing', after: 'Now drag on the screen.',
     text: 'A blank loop with an eight-way mirror. Every stroke you draw is copied eight times and slowly drifts outward.',
     how: 'NOTHING · MIRROR 8 · TRAILS 97 · ZOOM IN 10',
     sw: 'conic-gradient(from 0deg,#ff4fa3,#ffcf6b,#3bff9a,#3b8bff,#c43bff,#ff4fa3)',
     patch: { A: { in1: 'none', mirror: 8, trails: 97, zoom: 10, spin: 6, color: 18, blur: 0.1 } }, drift: false },
   { name: 'Marbled', after: 'Slide Melt up and down to watch the picture fold into itself.',
-    text: 'The picture pushes itself around by its own bright and dark parts, so the echoes fold into each other like marbled paint.',
+    text: 'The picture pushes itself around by its own bright and dark parts, so the echoes fold into each other like marbling.',
     how: 'SHAPE · ZOOM IN 45 · MELT 80 · TRAILS 86',
     sw: 'repeating-radial-gradient(ellipse at 35% 45%,#1b0f3d 0 5px,#c77dff 5px 8px,#ffe6ff 8px 9px,#1b0f3d 9px 14px)',
     patch: { A: { in1: 'shape', form: 3, zoom: 45, spin: 14, trails: 86, color: 22, blur: -0.12, melt: 80 } } },
@@ -6295,9 +6228,9 @@ function openOutput() {
     else onKey(e);
   });
   doc.addEventListener('fullscreenchange', () => { hint.classList.toggle('gone', !!doc.fullscreenElement); setTimeout(fit, 60); });
-  outCanvas.addEventListener('pointerdown', (e) => startPaint(e, outCanvas));
-  outCanvas.addEventListener('pointermove', (e) => movePaint(e, outCanvas));
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => outCanvas.addEventListener(ev, endPaint));
+  outCanvas.addEventListener('pointerdown', (e) => startDraw(e, outCanvas));
+  outCanvas.addEventListener('pointermove', (e) => moveDraw(e, outCanvas));
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => outCanvas.addEventListener(ev, endDraw));
   let idle = null;
   const wake = () => { doc.body.classList.remove('idle'); clearTimeout(idle); idle = setTimeout(() => doc.body.classList.add('idle'), 2000); };
   doc.addEventListener('pointermove', wake);
@@ -6463,6 +6396,9 @@ let midiSaved = { enabled: false, maps: [] };
 try {
   const v = JSON.parse(lsGet(MIDI_KEY) || 'null');
   if (v && Array.isArray(v.maps)) midiSaved = { enabled: !!v.enabled, maps: v.maps.filter((m) => m && m.t && m.key) };
+  // An input or channel that has been taken out of Phosphor Loop loses its mappings
+  const kept = midiSaved.maps.filter((m) => !(m.t.sel && /data-(src|look)=/.test(m.t.sel) && !document.querySelector(m.t.sel)));
+  if (kept.length !== midiSaved.maps.length) { midiSaved.maps = kept; lsSet(MIDI_KEY, JSON.stringify(midiSaved)); }
 } catch (_) {}
 const midi = { access: null, learning: false, target: null, pending: null, pendTimer: null, st: new Map(), lastHint: 0 };
 const midiStatus = $('#midiStatus'), midiConnect = $('#midiConnect'), midiLearnBtn = $('#midiLearn');
@@ -6591,13 +6527,13 @@ function setTarget(t, v) {
   if (t.kind === 'loop') {
     takeOver(t.key, t.loop);
     loops[t.loop].tgt[t.key] = v;
-    if (t.loop === edit) { sliderEls[t.key].value = v; paintSlider(t.key); }
+    if (t.loop === edit) { sliderEls[t.key].value = v; showSlider(t.key); }
     if (t.key === 'trails') syncVisibility();
   } else if (t.kind === 'mix') {
     if (t.key !== 'tv') takeOver(t.key);
     mix.tgt[t.key] = v;
     sliderEls[t.key].value = v;
-    paintSlider(t.key);
+    showSlider(t.key);
     if (t.key !== 'tv') syncVisibility();
   } else if (t.kind === 'snd') {
     snd.amount = v;
@@ -6605,7 +6541,7 @@ function setTarget(t, v) {
   } else if (t.kind === 'adj' && adj[t.src]) {
     adj[t.src][t.key] = v;
     const a = adjEls.find((x) => x.src === t.src && x.k === t.key);
-    if (a) { a.el.value = v; a.paint(); }
+    if (a) { a.el.value = v; a.refresh(); }
   }
 }
 function pressTarget(t) {
@@ -6840,12 +6776,11 @@ function computeWave(t, form) {
 const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
 const MELT_K = 0.02;     // how far Melt at 100 lets the picture push itself in one frame
 
-/* ================= ink drops and paint splats ================= */
+/* ================= ink drops ================= */
 // Six droppers, each on its own uneven rhythm, land a drop of ink somewhere on screen about twice a second.
 // While it bleeds, a drop drifts with the same currents Flow uses (flowAtJS mirrors flowAt in the shader).
-const INK_N = 6, SPLAT_N = 10;
+const INK_N = 6;
 const inkPos = new Float32Array(INK_N * 4), inkAmt = new Float32Array(INK_N * 4), inkCol = new Float32Array(INK_N * 3);
-const splatPos = new Float32Array(SPLAT_N * 4), splatCol = new Float32Array(SPLAT_N * 4);
 const fract = (x) => x - Math.floor(x);
 function hashJS(x, y) {
   let px = fract(x * 123.34), py = fract(y * 456.21);
@@ -6892,27 +6827,6 @@ function computeInk(t, scale, flowPerSec) {
     const h = rand3(n, i, 4);
     inkCol.set(hsv(h < 0.7 ? 0.58 + h * 0.43 : h < 0.86 ? 0.49 : 0.1, 0.97, 1), i * 3);
   }
-}
-// Ten splatters, each throwing a splat of paint about every nine seconds, so a new one hits about
-// every second. A splat stays wet on the table until its splatter throws the next one.
-const PAINT = [[0.86, 0.1, 0.08], [0.98, 0.78, 0.1], [0.1, 0.24, 0.8], [0.95, 0.94, 0.9], [0.92, 0.18, 0.55],
-               [0.02, 0.62, 0.6], [1, 0.46, 0.05], [0.36, 0.78, 0.3], [0.48, 0.22, 0.78], [0.45, 0.72, 0.95]];
-const splatOrder = Array.from({ length: SPLAT_N }, (_, i) => i), splatAge = new Float32Array(SPLAT_N);
-function computeSplats(t, scale) {
-  for (let i = 0; i < SPLAT_N; i++) {
-    const per = 8.1 + 0.9 * (i % 3), tt = t + i * 0.93;
-    splatAge[i] = tt - Math.floor(tt / per) * per;
-  }
-  splatOrder.sort((a, b) => splatAge[b] - splatAge[a]);   // oldest first, so the newest lands on top
-  splatOrder.forEach((i, slot) => {
-    const per = 8.1 + 0.9 * (i % 3), tt = t + i * 0.93, n = Math.floor(tt / per), lt = splatAge[i];
-    const full = (0.07 + 0.09 * rand3(n, i, 13)) * scale;
-    // A splat hits and spreads out in a fraction of a second
-    splatPos.set([(rand3(n, i, 11) - 0.5) * simAspect * 0.9, (rand3(n, i, 12) - 0.5) * 0.9,
-                  full * (1 - Math.exp(-lt * 22)), full], slot * 4);
-    const col = PAINT[Math.floor(rand3(n, i, 14) * PAINT.length)];
-    splatCol.set([col[0], col[1], col[2], Math.floor(rand3(n, i, 15) * 997)], slot * 4);
-  });
 }
 // The 3D flights are drawn into one of two pictures: the loop's main input's flight into the first,
 // its second input's into the other. How brightly they glow follows the music; see frame().
@@ -7032,9 +6946,8 @@ function runLoop(k, xf, brush, f) {
   if (drift) {
     const d = driftT + (k === 'B' ? 37.0 : 0);
     // Flow brings its own motion, so Auto-drift barely zooms or turns a flowing loop.
-    // Paint sits still on its table, so there Auto-drift only tints the paint that has faded.
-    // The 3D flights move by themselves, so there too Auto-drift only tints.
-    const still = t.in1 === 'splat' || is3D(t.in1) ? 0 : 1;
+    // The 3D flights move by themselves, so there Auto-drift only tints.
+    const still = is3D(t.in1) ? 0 : 1;
     const calm = still * Math.max(0, 1 - 1.2 * clamp(c.flow, 0, 100) / 100);
     // Under Autopilot, How wild sets how far it drifts, and a pinned setting doesn't drift at all
     const amt = ap.on ? 0.4 + 1.2 * apSet.wild / 100 : 1;
@@ -7132,16 +7045,6 @@ function runLoop(k, xf, brush, f) {
     if (la) gl.uniform4fv(la, inkAmt);
     if (lc) gl.uniform3fv(lc, inkCol);
   }
-  // Paint covers the picture fully as the main input, or as much as Blend gives it as the second input
-  const bl = clamp(c.blend, 0, 100) / 100;
-  const paintOn = t.in1 === 'splat' ? (t.in2 === 'none' ? 1 : Math.min(1, 2 * (1 - bl))) : t.in2 === 'splat' ? Math.min(1, 2 * bl) : 0;
-  set1f(fbProg, 'uSplatOn', paintOn);
-  if (paintOn > 0) {
-    computeSplats(simT + (k === 'B' ? 11.0 : 0), scale);
-    const lp = U(fbProg, 'uSplat[0]'), lq = U(fbProg, 'uSplatCol[0]');
-    if (lp) gl.uniform4fv(lp, splatPos);
-    if (lq) gl.uniform4fv(lq, splatCol);
-  }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
   set1f(fbProg, 'uAspPic', picAspect);
   set1f(fbProg, 'uAspVid', vid.aspect);
@@ -7215,7 +7118,7 @@ function frame() {
   const f = dt * 60;
   if (!frozen) {
     let brush = null;
-    if (painting && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
+    if (drawing && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
     const feedsFromOther = (k) => [loops[k].tgt.in1, loops[k].tgt.in2].includes('loop');
     const needA = wA > 0.001 || xab > 0.001 || feedsFromOther('B');
     const needB = wB > 0.001 || xba > 0.001 || feedsFromOther('A');

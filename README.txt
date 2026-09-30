@@ -46,7 +46,7 @@ ANDROID APP
 
 YOU CAN JUST DOUBLE-CLICK index.html
 Everything works that way except the phone link: channels, both loops,
-cross-feed, painting, pictures, video files, your webcam and screen sharing.
+cross-feed, drawing, pictures, video files, your webcam and screen sharing.
 Use Chrome or Edge.
 
 TO CONNECT YOUR PHONE, PUT THE FOLDER ONLINE (free, one time, about 5 minutes)
@@ -133,7 +133,7 @@ TIPS
     sliders offers a one-click fix.
   - Melt (in "Shape loop", under Flow) makes the picture push itself around:
     how bright each spot is decides which way it slides, so the echoes fold
-    into each other like marbled paint. Low is a gentle drip, high is wild.
+    into each other like marbling. Low is a gentle drip, high is wild.
     Keep Trails high. The Guide's "Marbled" recipe sets it up in one click.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself.
@@ -172,10 +172,6 @@ TIPS
   - Ink in water: the Ink channel drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look, and Ink under "What feeds the loop" gives you the drops.
-  - Paint splats: Paint under "What feeds the loop" throws solid paint
-    onto a table seen from above. Each splat stays wet for a few seconds,
-    then fades as new ones land on top. Input size makes them bigger or
-    smaller.
   - 3D worlds: ten channels take you into a 3D world.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
