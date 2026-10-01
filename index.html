@@ -89,6 +89,19 @@
   .stage:fullscreen .screen { border-radius: 0; }
   .stage:-webkit-full-screen .bezel { padding: 0; border-radius: 0; background: #000; box-shadow: none; }
   .stage:-webkit-full-screen .screen { border-radius: 0; }
+  /* Full screen: a big way out, shown when the mouse moves or the picture is tapped, gone again when still */
+  .fs-exit {
+    position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); z-index: 6;
+    display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 20px; border-radius: 999px;
+    border: 1px solid var(--loop-a); background: rgba(12, 11, 10, .82); color: #ffe2b8;
+    font: 600 18px/1 var(--f-body); cursor: pointer; box-shadow: 0 6px 24px rgba(0, 0, 0, .5); transition: opacity .4s;
+  }
+  .fs-exit:hover { background: rgba(74, 58, 34, .92); }
+  .fs-exit .x { font-size: 22px; line-height: 1; }
+  .fs-exit kbd { font: 16px/1 var(--f-osd); padding: 3px 6px; border: 1px solid rgba(255, 255, 255, .25); border-radius: 4px; color: var(--dim); }
+  @media (hover: none) { .fs-exit kbd { display: none; } }
+  .fs-exit.away { opacity: 0; pointer-events: none; }
+  .stage.idle canvas { cursor: none; }
   /* Hide controls: the monitor takes the whole window */
   .app.bare .deck { grid-template-columns: minmax(0, 1fr); }
   .app.bare .panel { display: none; }
@@ -638,6 +651,7 @@
             <div class="screen-msg" id="msg" hidden></div>
           </div>
         </div>
+        <button class="fs-exit" id="fsExit" hidden><span class="x" aria-hidden="true">✕</span>Exit full screen <kbd>Esc</kbd></button>
       </div>
 
       <div class="transport">
@@ -1192,7 +1206,7 @@
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
-            <dt>Full screen and Hide controls</dt><dd>Show only the picture.</dd>
+            <dt>Full screen and Hide controls</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
             <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. Videos are large, up to about 75 MB a minute.</dd>
             <dt>Include mic</dt><dd>When its light is on, videos you record include the microphone, so you can talk over the picture or catch the room. The first time, the browser asks to use the microphone: choose Allow. Press it again to turn the mic off.</dd>
@@ -4777,9 +4791,32 @@ function toggleFS() {
   } catch (e) { toast('Full screen isn’t available here.'); }
 }
 fullBtn.addEventListener('click', toggleFS);
+// In full screen the Exit button shows whenever the mouse moves or the picture is tapped, and fades
+// (with the mouse pointer) after a few still seconds, so it never sits on top of the picture for long
+const fsExit = $('#fsExit');
+let fsIdleT = null;
+const isFS = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function fsWake(ms = 3000) {
+  if (!isFS()) return;
+  fsExit.classList.remove('away');
+  stage.classList.remove('idle');
+  clearTimeout(fsIdleT);
+  fsIdleT = setTimeout(() => {
+    if (fsExit.matches(':hover')) { fsWake(); return; }
+    fsExit.classList.add('away');
+    stage.classList.add('idle');
+  }, ms);
+}
+// A mouse shows it just by moving; a finger or pen by tapping. Drawing with the mouse button held leaves it away.
+stage.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && !e.buttons) fsWake(); }, { passive: true });
+stage.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') fsWake(); }, { passive: true });
+fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
 ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
-  const active = document.fullscreenElement || document.webkitFullscreenElement;
+  const active = isFS();
   fullBtn.textContent = active ? 'Exit full screen' : 'Full screen';
+  fsExit.hidden = !active;
+  if (active) fsWake(4000);
+  else { clearTimeout(fsIdleT); fsExit.classList.remove('away'); stage.classList.remove('idle'); }
   fit();
 }));
 
@@ -6475,6 +6512,13 @@ const OUTPUT_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 html,body{margin:0;height:100%;background:#000;overflow:hidden}
 canvas{display:block;width:100vw;height:100vh;touch-action:none}
 body.idle,body.idle canvas{cursor:none}
+.fsx{position:fixed;top:16px;right:16px;display:none;align-items:center;gap:10px;min-height:52px;padding:10px 20px;border-radius:999px;
+  border:1px solid #ffae3b;background:rgba(12,11,10,.82);color:#ffe2b8;font:600 18px/1 Barlow,"Helvetica Neue",Arial,sans-serif;
+  cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .4s}
+.fsx:hover{background:rgba(74,58,34,.92)}
+.fsx .x{font-size:22px;line-height:1}
+body.fs .fsx{display:inline-flex}
+body.idle .fsx{opacity:0;pointer-events:none}
 .hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;max-width:min(560px,90vw);box-sizing:border-box;
   padding:12px 16px;border-radius:10px;background:rgba(12,11,10,.86);border:1px solid rgba(255,255,255,.14);
   color:#ece5d6;font:15px/1.45 Barlow,"Helvetica Neue",Arial,sans-serif;text-align:center;transition:opacity .4s}
@@ -6484,6 +6528,7 @@ body.idle,body.idle canvas{cursor:none}
 .show .hint button{min-height:60px;padding:12px 30px;font-size:21px;font-weight:600;border-color:#ffae3b;background:#4a3a22;color:#ffe2b8}
 </style></head><body><canvas id="out"></canvas>
 <div class="hint" id="hint"><span id="hintText">Drag this window onto your projector or second screen, then <b>double-click the picture</b> (or press F) to fill it.</span><br><button id="other" hidden>Fill my other screen</button></div>
+<button class="fsx" id="fsx"><span class="x" aria-hidden="true">✕</span>Exit full screen</button>
 </body></html>`;
 function openOutput() {
   let w = null;
@@ -6514,13 +6559,24 @@ function openOutput() {
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleOutFS(); e.preventDefault(); }
     else onKey(e);
   });
-  doc.addEventListener('fullscreenchange', () => { hint.classList.toggle('gone', !!doc.fullscreenElement); setTimeout(fit, 60); });
+  doc.addEventListener('fullscreenchange', () => {
+    hint.classList.toggle('gone', !!doc.fullscreenElement);
+    doc.body.classList.toggle('fs', !!doc.fullscreenElement);
+    setTimeout(fit, 60);
+  });
+  doc.getElementById('fsx').addEventListener('click', () => { if (doc.fullscreenElement) toggleOutFS(); });
   outCanvas.addEventListener('pointerdown', (e) => startDraw(e, outCanvas));
   outCanvas.addEventListener('pointermove', (e) => moveDraw(e, outCanvas));
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => outCanvas.addEventListener(ev, endDraw));
   let idle = null;
-  const wake = () => { doc.body.classList.remove('idle'); clearTimeout(idle); idle = setTimeout(() => doc.body.classList.add('idle'), 2000); };
+  const fsx = doc.getElementById('fsx');
+  const wake = () => {
+    doc.body.classList.remove('idle');
+    clearTimeout(idle);
+    idle = setTimeout(() => { if (fsx.matches(':hover')) wake(); else doc.body.classList.add('idle'); }, 3000);
+  };
   doc.addEventListener('pointermove', wake);
+  doc.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') wake(); });
   wake();
   // With two or more screens, Chrome can fill the other one directly
   const other = doc.getElementById('other');

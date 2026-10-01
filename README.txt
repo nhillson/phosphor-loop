@@ -231,5 +231,8 @@ TIPS
   - Camera: a phone's back camera shows the world the right way round; a
     front camera or computer webcam works like a mirror. With more than one
     camera, a list under Camera picks which one.
+  - Leaving full screen: move the mouse or tap the picture and an "Exit full
+    screen" button shows at the top right (it fades again when you stop).
+    Esc works too. The output window has the same button.
   - Keys: Space freeze, N neutral, R surprise,
     P autopilot, C clear, F full screen, H hide controls, G guide.
