@@ -252,19 +252,14 @@
   }
   #presetApNote { display: none; color: var(--amber); }
   .ap-on #presetApNote { display: block; }
-  .pre-del, .pre-ren {
+  .pre-del {
     position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
     display: grid; place-items: center; padding: 0; cursor: pointer;
     border: 1px solid rgba(255,255,255,.2); background: rgba(10,9,8,.8); color: var(--ink); font: 600 14px/1 var(--f-body);
     opacity: 0; transition: opacity .15s;
   }
-  .pre-ren { right: 32px; font-size: 12px; }
-  .pre:hover .pre-del, .pre-del:focus-visible, .pre:hover .pre-ren, .pre-ren:focus-visible { opacity: 1; }
-  @media (hover: none) { .pre-del, .pre-ren { opacity: 1; } }
-  .admin { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--line); }
-  .admin-tag { font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--amber); }
-  .admin .linkish { align-self: flex-start; font-size: 13px; font-weight: 500; }
-  #adminMsg.warn { color: #ffc98a; }
+  .pre:hover .pre-del, .pre-del:focus-visible { opacity: 1; }
+  @media (hover: none) { .pre-del { opacity: 1; } }
   .pre-confirm {
     position: absolute; inset: 0; border-radius: 7px; background: rgba(12,11,10,.94); border: 1px solid var(--tally);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px;
@@ -541,6 +536,39 @@
   .g-recipe .g-act { margin-top: auto; padding-top: 4px; }
   .g-recipe .g-act .hint { display: block; }
   .g-fix { max-width: 70ch; }
+
+  /* ---------- nature pictures ---------- */
+  .pic-credit { font-size: 12.5px; line-height: 1.4; color: var(--faint); overflow-wrap: anywhere; }
+  .pic-credit a { color: var(--dim); }
+  .nat-step { min-width: 40px; padding-inline: 8px; }
+  .nat-count { font: 18px/1 var(--f-osd); color: var(--faint); letter-spacing: .04em; }
+  .nat-inner { padding: 14px 16px calc(40px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 12px; }
+  .nat-bar { flex-wrap: wrap; row-gap: 10px; }
+  .nat-tabs { margin: 0; flex-basis: 100%; }
+  .nat-tabs .chip b { font: 16px/1 var(--f-osd); color: var(--faint); font-weight: 400; }
+  .nat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  @media (max-width: 520px) {
+    .nat-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+    .nat-count { display: none; }
+    .nat-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -20px; padding-inline: 20px; }
+    .nat-tabs::-webkit-scrollbar { display: none; }
+    .nat-tabs .chip { flex: none; }
+  }
+  .nat-tile {
+    position: relative; display: block; padding: 0; border-radius: 8px; overflow: hidden; cursor: pointer;
+    border: 1px solid var(--line); background: #0b0a09; aspect-ratio: 4 / 3; color: inherit; font: inherit;
+  }
+  .nat-tile img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease, filter .25s ease; }
+  .nat-tile span {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 7px 5px; text-align: left;
+    font-size: 12px; line-height: 1.25; color: #fff; text-shadow: 0 1px 2px #000;
+    background: linear-gradient(transparent, rgba(0,0,0,.75));
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nat-tile:hover img, .nat-tile:focus-visible img { transform: scale(1.06); filter: brightness(1.12); }
+  .nat-tile[aria-current="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 2px var(--loop-a), 0 0 14px var(--amber-glow); }
+  .nat-foot { margin-top: 8px; }
+  .nat-foot a { color: var(--dim); }
   .g-foot { display: flex; justify-content: center; }
 
   /* ---------- narrow screens ---------- */
@@ -670,11 +698,6 @@
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
         <div class="ctl">
-          <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
-          <div class="chips" id="apInputs" role="group" aria-labelledby="apInputsLbl"></div>
-          <span class="hint">Switch one off and Autopilot leaves it out from its next new look. A pinned input still stays. Video, Camera, Screen and Phone only come in while they’re running.</span>
-        </div>
-        <div class="ctl">
           <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
           <div class="seg seg-2" id="apTouch" role="group" aria-labelledby="apTouchLbl">
             <button data-touch="pin" aria-pressed="true">Pin it, keep going</button>
@@ -687,35 +710,6 @@
           <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
         </div>
         <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
-      </section>
-
-      <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
-        <h2 id="h-shared">Shared presets</h2>
-        <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
-        <div class="presets" id="sharedList"></div>
-        <div class="admin" id="adminBox" hidden>
-          <span class="admin-tag">ADMIN · ONLY YOU SEE THIS</span>
-          <form class="preset-form" id="sharedForm" hidden>
-            <label for="sharedName" class="lbl" id="sharedFormLbl">Name it for everyone</label>
-            <div class="preset-row">
-              <input type="text" id="sharedName" maxlength="40" autocomplete="off" spellcheck="false">
-              <button class="btn small" type="submit" id="sharedGo">Share</button>
-              <button class="btn small" type="button" id="sharedCancel">Cancel</button>
-            </div>
-          </form>
-          <button class="btn wide" id="sharedAdd">Share current look with everyone</button>
-          <p class="hint">Everyone sees a new or changed shared preset about a minute later. Share while Autopilot runs and it keeps Autopilot too. On a shared preset, ✎ renames it and × takes it away.</p>
-          <button class="linkish" id="adminOut" type="button">Stop being the admin on this device</button>
-        </div>
-        <form class="preset-form admin" id="adminLogin" hidden>
-          <span class="admin-tag">ADMIN</span>
-          <label for="adminKey" class="lbl">Admin key</label>
-          <div class="preset-row">
-            <input type="password" id="adminKey" autocomplete="off" spellcheck="false" placeholder="Paste your GitHub key">
-            <button class="btn small" type="submit" id="adminGo">Unlock</button>
-          </div>
-          <span class="hint" id="adminMsg">Paste the key you made on GitHub. It stays in this browser only.</span>
-        </form>
       </section>
 
       <section class="group" id="presetGroup" aria-labelledby="h-pre">
@@ -855,8 +849,15 @@
 
           <div class="dev" id="row-picture" hidden>
             <span class="dev-status">Picture: <b id="picName">the test card</b></span>
+            <span class="pic-credit" id="picCredit" hidden></span>
             <div class="dev-actions">
-              <button class="btn small" id="pickPic">Choose a picture…</button>
+              <button class="btn small" id="natOpen" title="Hundreds of photos of sea life, animals and plants to feed in">Nature pictures…</button>
+              <button class="btn small" id="natShuffle" title="Feed in a random nature picture">Shuffle</button>
+              <button class="btn small nat-step" id="natPrev" title="Previous nature picture" aria-label="Previous nature picture">◀</button>
+              <button class="btn small nat-step" id="natNext" title="Next nature picture" aria-label="Next nature picture">▶</button>
+            </div>
+            <div class="dev-actions">
+              <button class="btn small" id="pickPic">Your own picture…</button>
               <button class="btn small" id="useCard" hidden>Back to test card</button>
             </div>
           </div>
@@ -1040,6 +1041,10 @@
           <button class="btn wide" id="showBtn" aria-pressed="false"><span class="led"></span>Show mode</button>
           <span class="hint">For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake.</span>
           <span class="hint" id="offlineNote"></span>
+          <div class="dev" id="natSaveRow" hidden>
+            <span class="dev-status" id="natSaveNote">Nature pictures you’ve used are kept for offline. Save them all before a show without internet.</span>
+            <div class="dev-actions"><button class="btn small" id="natSave">Save all nature pictures</button></div>
+          </div>
         </div>
         <div class="ctl">
           <span class="lbl">MIDI controller</span>
@@ -1100,11 +1105,10 @@
             <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
-            <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Press it again to stop.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on both loops while Autopilot keeps changing the rest. Tap a lit pin to let it go. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
-            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Double-click a slider there to put it back.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Double-click a slider there to put it back.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
@@ -1114,7 +1118,8 @@
           <div class="g-card"><h3>What feeds the loop</h3><dl>
             <dt>Wave, Shape, Bars, Sparks, Ink, 3D world</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of ten 3D worlds to fly through, circle round or drift past. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
-            <dt>Picture and Video</dt><dd>Your own files. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
+            <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery (they work from a MIDI controller too). Your own picture… loads a file of yours.</dd>
+            <dt>Video</dt><dd>Your own file. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
@@ -1154,7 +1159,7 @@
           </dl></div>
           <div class="g-card"><h3>Show setup</h3><dl>
             <dt>Show mode</dt><dd>For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look and Autopilot, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake. Tap Fill my other screen in the output window to put the picture on the projector.</dd>
-            <dt>Without internet</dt><dd>After one visit from its web address, the browser keeps a copy, so Phosphor Loop opens offline. Only the phone link still needs internet.</dd>
+            <dt>Without internet</dt><dd>After one visit from its web address, the browser keeps a copy, so Phosphor Loop opens offline. Only the phone link still needs internet. Nature pictures you’ve used are kept too; press Save all nature pictures to keep every one.</dd>
             <dt>MIDI controller</dt><dd>Press Use a MIDI controller and allow it. Then press Learn, touch a slider or button, and move a fader, turn a knob or press a button on the controller. Repeat for each control. Mappings stay in this browser, like presets.</dd>
             <dt>Pickup</dt><dd>A fader only takes over once it reaches the slider’s current position, so loading a channel or preset never makes the picture jump. Endless knobs work straight away.</dd>
           </dl></div>
@@ -1207,6 +1212,22 @@
       </section>
 
       <p class="g-foot"><button class="btn" id="guideDone">Back to the screen</button></p>
+    </div>
+  </div>
+
+  <div class="guide nat" id="nat" role="dialog" aria-modal="true" aria-labelledby="natTitle" hidden>
+    <div class="guide-bar nat-bar">
+      <span class="wordmark" id="natTitle">Nature pictures</span>
+      <span class="nat-count" id="natCount"></span>
+      <span class="spacer"></span>
+      <button class="btn small" id="natShuffle2">Shuffle</button>
+      <button class="btn small" id="natClose">Close</button>
+      <div class="chips nat-tabs" id="natTabs" role="group" aria-label="Kinds of pictures"></div>
+    </div>
+    <div class="nat-inner">
+      <p class="hint" id="natHint">Tap a picture to feed it into loop A.</p>
+      <div class="nat-grid" id="natGrid"></div>
+      <p class="hint nat-foot">Photos from Wikimedia Commons’ Featured Pictures, free to use. Each one names its photographer when you pick it; the full list is in <a href="nature/CREDITS.txt" target="_blank" rel="noopener">nature/CREDITS.txt</a>.</p>
     </div>
   </div>
 </div>
@@ -4288,12 +4309,7 @@ const PINS = {
 };
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
-// Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['spectro', 'Spectrograph'],
-  ['world', '3D worlds'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
-const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
-const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin', off: [] };
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin' };
 const apSet = { ...AP_DEFAULTS };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
@@ -4301,12 +4317,9 @@ try {
     for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
-    apSet.off = cleanOff(s.off);
     if (Array.isArray(s.pins)) s.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
   }
 } catch (_) {}
-// Whether Autopilot may bring in this input (one switched off under Autopilot settings stays out)
-const apAllowed = (src) => !apSet.off.includes(is3D(src) ? 'world' : src);
 function saveAp() {
   try { localStorage.setItem(AP_KEY, JSON.stringify({ ...apSet, pins: [...ap.pins] })); } catch (_) {}
 }
@@ -4441,15 +4454,7 @@ function apPool() {
   if (vid.on) pool.push('video', 'video');
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
   if (snd.analyser) pool.push('spectro', 'spectro');
-  // Leave out the inputs switched off under Autopilot settings. If that leaves nothing it can use right now
-  // (say only Camera is on, and no camera is running), it uses them all rather than stall.
-  const ok = pool.filter(apAllowed);
-  return ok.length ? ok : pool;
-}
-// A real input (not the other loop's picture), for when both loops would only feed on each other
-function apRealInput() {
-  const p = apPool().filter((x) => x !== 'loop');
-  return p.length ? pick(p) : 'wave';
+  return pool;
 }
 // A new look. How wild (w) stretches how far it zooms, spins and tints, and how often it warps, flows and melts;
 // at the middle of the slider it behaves as Autopilot always has.
@@ -4463,7 +4468,7 @@ function apScene() {
     sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12) * j, -60, 80));
     sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15) * j, -70, 70));
     sc.color = Math.round(clamp((sc.color ?? 10) + rnd(-6, 10) * j, 0, 30 + 30 * w));
-    if (Math.random() < 0.35 || !apAllowed(sc.in1)) sc.in1 = pick(pool);
+    if (Math.random() < 0.35) sc.in1 = pick(pool);
     if (sc.in2 && !pool.includes(sc.in2)) sc.in2 = 'none';
   } else {
     const zoom = Math.round(Math.random() < 0.25 ? rnd(-(10 + 60 * w), -10) : Math.min(85, rnd(5, 15 + 90 * w)));
@@ -4512,8 +4517,8 @@ function freshLook(k, shown) {
   const sc = apScene();
   // Two loops that only feed on each other fade to black, so one of them keeps a real input
   if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) {
-    if (!ap.pins.has('in1')) sc.in1 = apRealInput();
-    else if (!ap.pins.has('in2')) { sc.in2 = apRealInput(); sc.blend = 50; }
+    if (!ap.pins.has('in1')) sc.in1 = 'wave';
+    else if (!ap.pins.has('in2')) { sc.in2 = pick(apPool().filter((x) => x !== 'loop')); sc.blend = 50; }
   }
   patchLoop(k, sc, true);
   const L = loops[k];
@@ -4525,14 +4530,10 @@ function freshLook(k, shown) {
 function glideLook(k) {
   const L = loops[k], sc = apScene();
   if (Math.random() < 0.7) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
-  // Keeping its inputs, unless one of them has been switched off under Autopilot settings
-  if (Math.random() < 0.65 && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
-    if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
-  }
+  if (Math.random() < 0.65) for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
   withPins(sc);
   const other = k === 'A' ? 'B' : 'A';
-  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = apRealInput();
+  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = 'wave';
   patchLoop(k, sc, true);
 }
 // Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat.
@@ -4605,7 +4606,6 @@ function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
-  $$('#apInputs button').forEach((b) => b.setAttribute('aria-pressed', String(!apSet.off.includes(b.dataset.apsrc))));
   syncPins();
   apStatus();
 }
@@ -4630,28 +4630,6 @@ $('#apBeat').addEventListener('click', () => {
   syncApUI();
   if (apSet.beat && !snd.analyser) toast('Change on the beat needs music: under React to sound, pick Computer sound or Microphone.');
 });
-// One toggle per kind of input. Lit means Autopilot may use it.
-for (const [k, label] of AP_INPUTS) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'chip';
-  b.dataset.apsrc = k;
-  b.innerHTML = `<span class="led"></span>${label}`;
-  // Inputs this device can't offer at all (Screen in the Android app, for one) get no toggle either
-  const inBtn = $(`#inputs [data-src="${k}"]`);
-  if (inBtn && inBtn.hidden) b.hidden = true;
-  b.addEventListener('click', () => {
-    const off = new Set(apSet.off);
-    if (off.has(k)) off.delete(k);
-    else if (off.size >= AP_INPUT_KEYS.length - 1) { toast('Leave at least one input on for Autopilot.'); return; }
-    else off.add(k);
-    apSet.off = [...off];
-    saveAp();
-    syncApUI();
-    toast(off.has(k) ? `Autopilot won’t use ${label} from its next new look.` : `Autopilot can use ${label} again.`);
-  });
-  $('#apInputs').appendChild(b);
-}
 $$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
   apSet.touch = b.dataset.touch;
   saveAp();
@@ -4666,7 +4644,6 @@ $('#apUnpin').addEventListener('click', () => {
 });
 $('#apReset').addEventListener('click', () => {
   for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'touch']) apSet[k] = AP_DEFAULTS[k];
-  apSet.off = [];
   saveAp();
   syncApUI();
   toast(ap.pins.size ? 'Autopilot settings are back to normal. Your pins are still pinned.' : 'Autopilot settings are back to normal.');
@@ -4733,6 +4710,7 @@ $('#useCard').addEventListener('click', () => {
   picAspect = 4 / 3;
   $('#picName').textContent = 'the test card';
   $('#useCard').hidden = true;
+  natNoCredit();
 });
 function downscale(img) {
   const max = 1024;
@@ -4771,6 +4749,7 @@ function loadFile(file) {
       URL.revokeObjectURL(url);
       $('#picName').textContent = file.name;
       $('#useCard').hidden = false;
+      natNoCredit();
       feedInto('picture');
       toast(`Feeding ${file.name} into loop ${edit}.`);
     };
@@ -4802,6 +4781,163 @@ function loadFile(file) {
   }
 }
 function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* ================= nature pictures ================= */
+// About 500 photos from Wikimedia Commons' Featured Pictures live in the nature folder, listed in
+// nature/pictures.json. The list loads the first time it's needed, the small thumbnails only when the
+// gallery opens, and a full picture only when it's picked.
+const nat = { pics: null, cats: [], cur: -1, cat: 'all', req: null, built: false, ask: 0 };
+const NAT_TAB_KEY = 'phosphor-nature-tab', NAT_LAST_KEY = 'phosphor-nature-last';
+try { nat.cat = localStorage.getItem(NAT_TAB_KEY) || 'all'; } catch (_) { /* fine, start on All */ }
+const natDlg = $('#nat'), natGrid = $('#natGrid'), natTabs = $('#natTabs');
+function natList() {
+  if (!nat.req) {
+    nat.req = fetch('nature/pictures.json')
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => {
+        nat.pics = d.pics || [];
+        nat.cats = d.cats || [];
+        if (nat.cat !== 'all' && !nat.cats.some((c) => c.id === nat.cat)) nat.cat = 'all';
+        return nat.pics;
+      })
+      .catch((e) => { nat.req = null; throw e; });
+  }
+  return nat.req;
+}
+function natNoList() { toast('The nature pictures couldn’t be loaded. They need internet the first time.'); }
+// The pictures in the chosen kind (or all of them), as positions in the full list
+function natShown() {
+  const all = nat.pics.map((_, i) => i);
+  return nat.cat === 'all' ? all : all.filter((i) => nat.pics[i].c === nat.cat);
+}
+function natNoCredit() {
+  nat.cur = -1;
+  try { localStorage.removeItem(NAT_LAST_KEY); } catch (_) { /* fine */ }
+  $('#picCredit').hidden = true;
+  natMark();
+}
+function natMark() {
+  for (const t of natGrid.children) t.setAttribute('aria-current', String(+t.dataset.i === nat.cur));
+}
+// quiet: put the picture in place without switching any loop to it (used when the page opens)
+function natPick(i, quiet) {
+  const p = nat.pics && nat.pics[i];
+  if (!p) return;
+  const ask = ++nat.ask;
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    if (ask !== nat.ask) return;   // a later pick overtook this one
+    uploadTo(picTex, downscale(img));
+    picAspect = img.naturalWidth / img.naturalHeight;
+    $('#picName').textContent = p.n;
+    $('#useCard').hidden = false;
+    nat.cur = i;
+    const credit = $('#picCredit');
+    credit.innerHTML = `Photo: ${escapeHTML(p.by)} · <a href="${escapeHTML(p.src)}" target="_blank" rel="noopener">${escapeHTML(p.lic)}</a>`;
+    credit.hidden = false;
+    natMark();
+    try { localStorage.setItem(NAT_LAST_KEY, p.f); } catch (_) { /* fine */ }
+    if (quiet) return;
+    const was = loops[edit].tgt.in1 === 'picture' || loops[edit].tgt.in2 === 'picture';
+    feedInto('picture');
+    if (was) showOSD('PICTURE', p.n.toUpperCase());
+  };
+  img.onerror = () => { if (ask === nat.ask && !quiet) toast('That picture couldn’t be loaded. It needs internet the first time.'); };
+  img.src = `nature/${p.f}.jpg`;
+}
+function natStep(dir) {
+  natList().then(() => {
+    const shown = natShown();
+    if (!shown.length) return;
+    const at = shown.indexOf(nat.cur);
+    const next = at < 0 ? (dir > 0 ? 0 : shown.length - 1) : (at + dir + shown.length) % shown.length;
+    natPick(shown[next]);
+  }).catch(natNoList);
+}
+function natShuffle() {
+  natList().then(() => {
+    const shown = natShown().filter((i) => i !== nat.cur);
+    if (shown.length) natPick(pick(shown));
+  }).catch(natNoList);
+}
+function natBuild() {
+  if (nat.built) return;
+  nat.built = true;
+  const count = (id) => (id === 'all' ? nat.pics.length : nat.pics.filter((p) => p.c === id).length);
+  for (const c of [{ id: 'all', n: 'All' }, ...nat.cats]) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.cat = c.id;
+    b.innerHTML = `${escapeHTML(c.n)} <b>${count(c.id)}</b>`;
+    b.addEventListener('click', () => {
+      nat.cat = c.id;
+      try { localStorage.setItem(NAT_TAB_KEY, c.id); } catch (_) { /* fine */ }
+      natFilter();
+      natDlg.scrollTop = 0;
+    });
+    natTabs.appendChild(b);
+  }
+  const frag = document.createDocumentFragment();
+  nat.pics.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.className = 'nat-tile';
+    b.dataset.i = i;
+    b.title = p.n;
+    b.innerHTML = `<img loading="lazy" decoding="async" alt="" src="nature/${escapeHTML(p.f)}-t.jpg"><span>${escapeHTML(p.n)}</span>`;
+    frag.appendChild(b);
+  });
+  natGrid.appendChild(frag);
+  natGrid.addEventListener('click', (e) => {
+    const t = e.target.closest('.nat-tile');
+    if (!t) return;
+    natPick(+t.dataset.i);
+    closeNat();
+  });
+}
+function natFilter() {
+  for (const b of natTabs.children) b.setAttribute('aria-pressed', String(b.dataset.cat === nat.cat));
+  for (const t of natGrid.children) t.hidden = nat.cat !== 'all' && nat.pics[+t.dataset.i].c !== nat.cat;
+  $('#natCount').textContent = `${natShown().length} PICTURES`;
+}
+let natReturn = null;
+function openNat() {
+  natList().then(() => {
+    if (!natDlg.hidden) return;
+    natBuild();
+    natFilter();
+    natMark();
+    $('#natHint').textContent = `Tap a picture to feed it into loop ${edit}. ◀ ▶ and Shuffle beside Picture flip through this kind without opening the gallery.`;
+    natReturn = document.activeElement;
+    natDlg.hidden = false;
+    document.documentElement.style.overflow = 'hidden';
+    const cur = natGrid.querySelector('[aria-current="true"]:not([hidden])');
+    if (cur) cur.scrollIntoView({ block: 'center' }); else natDlg.scrollTop = 0;
+    (cur || $('#natClose')).focus({ preventScroll: true });
+  }).catch(natNoList);
+}
+function closeNat() {
+  if (natDlg.hidden) return;
+  natDlg.hidden = true;
+  document.documentElement.style.overflow = '';
+  if (natReturn && natReturn.focus) natReturn.focus();
+}
+$('#natOpen').addEventListener('click', openNat);
+$('#natClose').addEventListener('click', closeNat);
+$('#natShuffle').addEventListener('click', natShuffle);
+$('#natShuffle2').addEventListener('click', () => { natShuffle(); closeNat(); });
+$('#natPrev').addEventListener('click', () => natStep(-1));
+$('#natNext').addEventListener('click', () => natStep(1));
+natDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeNat(); }
+  else e.stopPropagation(); // keep the keys from firing while browsing
+});
+// The nature picture in use last time comes back when the page opens, so a saved look picks up where it was
+(() => {
+  let last = null;
+  try { last = localStorage.getItem(NAT_LAST_KEY); } catch (_) { /* fine */ }
+  if (last) natList().then((pics) => { const i = pics.findIndex((p) => p.f === last); if (i >= 0 && nat.cur < 0) natPick(i, true); }).catch(() => {});
+})();
 
 const dropEl = $('#drop');
 let dragDepth = 0;
@@ -5472,8 +5608,7 @@ function snapshot() {
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
-  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch,
-    off: [...apSet.off], pins: [...ap.pins] };
+  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch, pins: [...ap.pins] };
 }
 function markPreset(id) {
   activePresetId = id;
@@ -5573,7 +5708,6 @@ function loadPreset(pr, quiet) {
     for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
     apSet.beat = a.beat === true;
     apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
-    apSet.off = cleanOff(a.off);
     ap.pins.clear();
     ap.pinVal = {};
     if (Array.isArray(a.pins)) a.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
@@ -5591,223 +5725,6 @@ function loadPreset(pr, quiet) {
   else if (ap.on && !quiet) toast(`Autopilot is on with this preset’s settings${ap.pins.size ? ' and pins' : ''}.`);
 }
 renderPresets();
-
-/* ================= shared presets ================= */
-// Looks the admin picks out for everyone. They live in presets.json next to this page, so every visitor gets them.
-// Only someone holding a GitHub key that can change this site's files can add, rename or remove them. The key is
-// pasted once (open the page with #admin on the end of the address), kept in this browser only, and used to save
-// presets.json straight to the repository. GitHub Pages then puts the new list on the site within a minute or so.
-const SHARED_REPO = 'nhillson/phosphor-loop', SHARED_FILE = 'presets.json', SHARED_MAX = 48, ADMIN_KEY = 'phosphor-admin-v1';
-const GH_API = `https://api.github.com/repos/${SHARED_REPO}`;
-let shared = [], adminKey = lsGet(ADMIN_KEY) || '', adminAsk = location.hash === '#admin', sharedBusy = false, sharedMode = null;
-const sharedGroup = $('#sharedGroup'), sharedList = $('#sharedList'), sharedForm = $('#sharedForm'), sharedName = $('#sharedName');
-const sharedAdd = $('#sharedAdd'), adminLogin = $('#adminLogin'), adminMsg = $('#adminMsg');
-
-function cleanShared(list) {
-  if (!Array.isArray(list)) return [];
-  return list.filter((p) => p && typeof p.id === 'string' && /^[a-z0-9]{1,40}$/i.test(p.id) && typeof p.name === 'string' && p.data && typeof p.data === 'object')
-    .map((p) => ({ id: p.id, name: p.name.slice(0, 40), thumb: typeof p.thumb === 'string' ? p.thumb : '', data: p.data, saved: p.saved || 0 }));
-}
-function renderShared() {
-  const admin = !!adminKey;
-  sharedGroup.hidden = !shared.length && !admin && !adminAsk;
-  $('#adminBox').hidden = !admin;
-  adminLogin.hidden = admin || !adminAsk;
-  const hint = $('#sharedHint');
-  hint.textContent = shared.length ? 'Looks picked out for everyone. Tap one to load it.'
-    : admin ? 'Nothing shared yet. Set up a look you like, then press Share current look with everyone.' : '';
-  hint.hidden = !hint.textContent;
-  sharedList.innerHTML = '';
-  shared.forEach((pr) => {
-    const t = document.createElement('div');
-    t.className = 'pre';
-    t.dataset.id = pr.id;
-    const name = escapeHTML(pr.name);
-    const auto = !!pr.data.ap;
-    const thumb = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(pr.thumb) ? `background-image:url(${pr.thumb})` : '';
-    t.innerHTML =
-      `<button class="pre-load" aria-pressed="${pr.id === activePresetId}" title="Load ${name}${auto ? ' and start Autopilot' : ''}"><span class="sw" style="${thumb}"></span>` +
-      `${auto ? '<span class="pre-auto">AUTO</span>' : ''}<span class="nm">${name}</span></button>` +
-      (admin ? `<button class="pre-ren" aria-label="Rename ${name}" title="Rename">✎</button>` +
-        `<button class="pre-del" aria-label="Take ${name} away from everyone" title="Take away from everyone">×</button>` +
-        `<div class="pre-confirm" hidden><span>Take “${name}” away from everyone?</span><div><button class="yes">Take away</button><button class="no">Keep</button></div></div>` : '');
-    t.querySelector('.pre-load').addEventListener('click', () => loadPreset(pr));
-    if (admin) {
-      const confirmBox = t.querySelector('.pre-confirm');
-      t.querySelector('.pre-ren').addEventListener('click', () => openSharedForm({ kind: 'rename', id: pr.id, old: pr.name }));
-      t.querySelector('.pre-del').addEventListener('click', () => { confirmBox.hidden = false; confirmBox.querySelector('.no').focus(); });
-      confirmBox.querySelector('.no').addEventListener('click', () => { confirmBox.hidden = true; });
-      confirmBox.querySelector('.yes').addEventListener('click', async () => {
-        confirmBox.hidden = true;
-        toast(`Taking “${pr.name}” away…`, 15000);
-        if (await changeShared((list) => list.filter((x) => x.id !== pr.id), `Remove shared preset "${pr.name}"`)) {
-          if (activePresetId === pr.id) activePresetId = null;
-          toast(`“${pr.name}” is gone for everyone in about a minute.`);
-        }
-      });
-    }
-    sharedList.appendChild(t);
-  });
-}
-
-// Talking to GitHub with the admin key
-function gh(path, opts = {}) {
-  return fetch(GH_API + path, { ...opts, cache: 'no-store', headers: {
-    Accept: 'application/vnd.github+json', Authorization: `Bearer ${adminKey}`, 'X-GitHub-Api-Version': '2022-11-28' } });
-}
-function b64enc(str) {
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-const b64dec = (b) => new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
-// The newest list, straight from GitHub (the site itself takes a minute to catch up after a change)
-async function readSharedGH() {
-  const r = await gh(`/contents/${SHARED_FILE}?ref=main`);
-  if (r.status === 404) return { sha: null, list: [] };
-  if (!r.ok) throw r;
-  const j = await r.json();
-  return { sha: j.sha, list: cleanShared(JSON.parse(b64dec(j.content || '')).presets) };
-}
-function adminTrouble(e) {
-  const st = e && e.status;
-  if (st === 401) return 'GitHub didn’t accept the admin key. It may have run out: make a new one and unlock again.';
-  if (st === 403 || st === 404) return 'The admin key can’t save to the site. On GitHub, give it phosphor-loop with Contents set to Read and write.';
-  if (st === 409 || st === 422) return 'Something else changed the shared presets at the same moment. Try again.';
-  return 'Couldn’t reach GitHub. Check the internet connection and try again.';
-}
-// Reads the newest list, makes one change and saves it, so nothing shared from elsewhere gets lost
-async function changeShared(change, message) {
-  if (sharedBusy) { toast('Still saving the last change. Try again in a moment.'); return false; }
-  sharedBusy = true;
-  sharedAdd.disabled = true;
-  try {
-    const { sha, list } = await readSharedGH();
-    const next = change(list).slice(-SHARED_MAX);
-    const body = { message, branch: 'main', content: b64enc(JSON.stringify({ v: 1, presets: next })) };
-    if (sha) body.sha = sha;
-    const w = await gh(`/contents/${SHARED_FILE}`, { method: 'PUT', body: JSON.stringify(body) });
-    if (!w.ok) throw w;
-    shared = next;
-    renderShared();
-    return true;
-  } catch (e) {
-    toast(adminTrouble(e), 9000);
-    return false;
-  } finally {
-    sharedBusy = false;
-    sharedAdd.disabled = false;
-  }
-}
-
-// Share current look, or rename one: the same little form, asking for a name
-function nextSharedName() {
-  let n = shared.length + 1;
-  while (shared.some((p) => p.name.toLowerCase() === `shared look ${n}`)) n++;
-  return `Shared look ${n}`;
-}
-function openSharedForm(mode) {
-  sharedMode = mode;
-  const active = [...presets, ...shared].find((p) => p.id === activePresetId);
-  $('#sharedFormLbl').textContent = mode.kind === 'rename' ? `New name for “${mode.old}”` : 'Name it for everyone';
-  $('#sharedGo').textContent = mode.kind === 'rename' ? 'Rename' : 'Share';
-  sharedName.value = mode.kind === 'rename' ? mode.old : (active ? active.name : nextSharedName());
-  sharedForm.hidden = false;
-  sharedAdd.hidden = true;
-  sharedName.focus();
-  sharedName.select();
-}
-function closeSharedForm() { sharedForm.hidden = true; sharedAdd.hidden = false; sharedMode = null; }
-sharedAdd.addEventListener('click', () => openSharedForm({ kind: 'add' }));
-$('#sharedCancel').addEventListener('click', closeSharedForm);
-sharedName.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closeSharedForm(); } });
-sharedForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const mode = sharedMode;
-  if (!mode) return;
-  const name = sharedName.value.trim().slice(0, 40) || (mode.kind === 'rename' ? mode.old : nextSharedName());
-  closeSharedForm();
-  if (mode.kind === 'rename') {
-    toast('Renaming…', 15000);
-    if (await changeShared((list) => list.map((p) => (p.id === mode.id ? { ...p, name } : p)), `Rename shared preset to "${name}"`)) {
-      toast(`Renamed to “${name}”. Everyone sees the new name in about a minute.`);
-    }
-    return;
-  }
-  const data = snapshot();
-  if (ap.on) data.ap = apSnapshot();
-  const thumb = await new Promise((res) => { thumbReq = res; });
-  toast('Sharing…', 15000);
-  let id = '';
-  const ok = await changeShared((list) => {
-    // The same name again replaces that shared preset
-    const same = list.find((p) => p.name.toLowerCase() === name.toLowerCase());
-    if (same) { id = same.id; return list.map((p) => (p === same ? { ...p, name, thumb, data, saved: Date.now() } : p)); }
-    id = 's' + Date.now().toString(36) + randId(4);
-    return [...list, { id, name, thumb, data, saved: Date.now() }];
-  }, `Share preset "${name}"`);
-  if (ok) {
-    markPreset(id);
-    toast(`Shared “${name}”${data.ap ? ' with Autopilot' : ''}. Everyone gets it in about a minute.`, 7000);
-  }
-});
-
-// Becoming the admin on this device: open the page with #admin, paste the key, press Unlock
-adminLogin.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const key = $('#adminKey').value.trim();
-  if (!key) return;
-  adminMsg.classList.remove('warn');
-  adminMsg.textContent = 'Checking the key with GitHub…';
-  $('#adminGo').disabled = true;
-  let r = null;
-  try {
-    r = await fetch(GH_API, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${key}` } });
-  } catch (_) {}
-  $('#adminGo').disabled = false;
-  if (!r || !r.ok) {
-    adminMsg.classList.add('warn');
-    adminMsg.textContent = !r ? 'Couldn’t reach GitHub. Check the internet connection and try again.'
-      : r.status === 401 ? 'GitHub didn’t accept that key. Copy it again and paste the whole thing.'
-      : 'That key can’t open phosphor-loop. On GitHub, make sure it has phosphor-loop with Contents set to Read and write.';
-    return;
-  }
-  adminKey = key;
-  lsSet(ADMIN_KEY, key);
-  $('#adminKey').value = '';
-  adminAsk = false;
-  if (location.hash === '#admin') history.replaceState(null, '', location.pathname + location.search);
-  adminMsg.textContent = 'Paste the key you made on GitHub. It stays in this browser only.';
-  renderShared();
-  toast('You’re the admin on this device. Under Shared presets, press Share current look with everyone.', 7000);
-  loadShared();
-});
-$('#adminOut').addEventListener('click', () => {
-  adminKey = '';
-  try { localStorage.removeItem(ADMIN_KEY); } catch (_) {}
-  closeSharedForm();
-  renderShared();
-  toast('This device isn’t the admin any more. Open the page with #admin on the end to unlock again.');
-});
-window.addEventListener('hashchange', () => {
-  if (location.hash !== '#admin') return;
-  adminAsk = true;
-  renderShared();
-  sharedGroup.scrollIntoView({ block: 'start', behavior: 'smooth' });
-});
-
-// Everyone gets the list from the site; the admin reads it straight from GitHub so a change shows at once
-async function loadShared() {
-  try {
-    const r = await fetch(SHARED_FILE, { cache: 'no-cache' });
-    if (r.ok) shared = cleanShared((await r.json()).presets);
-  } catch (_) {}
-  if (adminKey) { try { shared = (await readSharedGH()).list; } catch (_) {} }
-  renderShared();
-}
-renderShared();
-loadShared();
 
 /* ================= folding sections ================= */
 // Every section heading folds its section away. What's folded is remembered in this browser.
@@ -6438,7 +6355,71 @@ function showExtras() {
   document.addEventListener('contextmenu', (e) => { if (showMode) e.preventDefault(); });
 }
 
+// Show setup can save every nature picture ahead of time, for a show without internet (see sw.js)
+let natSaving = false;
+async function natSaveStatus() {
+  if (APP || !swOK || !window.caches) return;
+  $('#natSaveRow').hidden = false;
+  try {
+    const pics = await natList();
+    const cache = await caches.open('pl-nature');
+    const have = new Set((await cache.keys()).map((r) => r.url));
+    const want = natFiles(pics);
+    const missing = want.filter((u) => !have.has(u));
+    if (natSaving) return;
+    if (!missing.length) {
+      say($('#natSaveNote'), `All <b>${pics.length}</b> nature pictures are saved on this computer, so they work without internet.`);
+      $('#natSave').hidden = true;
+    } else {
+      $('#natSave').hidden = false;
+    }
+  } catch (_) { /* the list isn't reachable yet; the button tries again when pressed */ }
+}
+function natFiles(pics) {
+  return pics.flatMap((p) => [`nature/${p.f}.jpg`, `nature/${p.f}-t.jpg`]).map((u) => new URL(u, location.href).href);
+}
+$('#natSave').addEventListener('click', async () => {
+  if (natSaving) return;
+  natSaving = true;
+  const btn = $('#natSave'), note = $('#natSaveNote');
+  btn.disabled = true;
+  try {
+    const pics = await natList();
+    const cache = await caches.open('pl-nature');
+    const have = new Set((await cache.keys()).map((r) => r.url));
+    const todo = natFiles(pics).filter((u) => !have.has(u));
+    let done = 0, failed = 0;
+    const total = todo.length;
+    const step = async () => {
+      while (todo.length) {
+        const u = todo.shift();
+        try {
+          const r = await fetch(u);
+          if (r.ok) await cache.put(u, r); else failed++;
+        } catch (_) { failed++; }
+        done++;
+        if (done % 10 === 0 || done === total) say(note, `Saving the nature pictures… <b>${Math.round(done / total * 100)}%</b>`);
+      }
+    };
+    say(note, 'Saving the nature pictures… <b>0%</b>');
+    await Promise.all([step(), step(), step(), step(), step(), step()]);
+    natSaving = false;
+    if (failed) {
+      say(note, `${failed} files couldn’t be saved (the connection may have dropped). Press the button again to finish.`, true);
+      btn.disabled = false;
+    } else {
+      btn.disabled = false;
+      natSaveStatus();
+    }
+  } catch (_) {
+    natSaving = false;
+    btn.disabled = false;
+    say(note, 'The nature pictures couldn’t be reached. Connect to the internet and try again.', true);
+  }
+});
+
 function offlineStatus() {
+  natSaveStatus();
   if (APP) { offlineNote.textContent = 'The app keeps a copy on this phone, so it opens without internet. Only the phone link needs it.'; return; }
   if (!swOK) {
     offlineNote.textContent = location.protocol === 'file:'
@@ -6525,10 +6506,10 @@ function midiIn(e) {
 
 // What a slider or button stands for, stored so a mapping survives page reloads
 const LOOP_KEYS = LOOP_SLIDERS;
-const GROUP_NAMES = { inputs: 'Input', apInputs: 'Autopilot uses', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
+const GROUP_NAMES = { inputs: 'Input', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
                       specShape: 'Spectrograph', specListen: 'Spectrograph hears' };
-const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-ren, #adminBox *, #adminLogin *, .pre-confirm button, #presetForm button, #presetSave, ' +
-  '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn';
+const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-confirm button, #presetForm button, #presetSave, ' +
+  '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen';
 function labelFor(el) {
   const l = document.querySelector(`label[for="${el.id}"]`);
   return l ? l.textContent.replace(/\s+/g, ' ').trim() : el.id;
@@ -6548,7 +6529,7 @@ function btnAddress(b) {
 function btnLabel(b) {
   if (b.classList.contains('ch')) { const i = +b.dataset.ch; return `Channel ${i + 1}: ${CHANNELS[i].name}`; }
   const tile = b.closest('.pre');
-  if (tile) { const pr = [...presets, ...shared].find((p) => p.id === tile.dataset.id); return `Preset: ${pr ? pr.name : 'saved look'}`; }
+  if (tile) { const pr = presets.find((p) => p.id === tile.dataset.id); return `Preset: ${pr ? pr.name : 'saved look'}`; }
   const text = (b.getAttribute('aria-label') || b.textContent || '').replace(/­/g, '').replace(/\s+/g, ' ').trim();
   const g = b.parentElement && GROUP_NAMES[b.parentElement.id];
   return g ? `${g}: ${text}` : text;

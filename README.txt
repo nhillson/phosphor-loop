@@ -6,6 +6,8 @@ WHAT'S IN THIS FOLDER
   phone.html   The page your phone opens when you scan the QR code.
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
   sw.js        Keeps a copy in the browser so it opens without internet.
+  nature/      About 500 nature photos for the Picture input, with their credits
+               (CREDITS.txt) and the list the app reads (pictures.json).
   icon-180.png, icon-192.png   Icons for phone and tablet home screens.
   android/     The Android app (GitHub builds it by itself; see ANDROID APP below).
 
@@ -94,6 +96,7 @@ SHOW MODE (a computer that plays at gigs)
   1. Open your https:// address in Chrome once with internet. After a few
      seconds, Show setup says it's saved on this computer; from then on it
      opens without internet too (only the phone link still needs it).
+     Press "Save all nature pictures" there too, so every photo works offline.
   2. Click the icon left of the address, open Site settings, and set Camera,
      Microphone, MIDI devices, Pop-ups and redirects, and Window management
      to Allow, so nothing asks permission in the middle of a set.
@@ -114,23 +117,6 @@ MIDI CONTROLLER
   slider's current position, so loading a look never makes the picture jump.
   Endless knobs are recognized and work straight away.
 
-ADMIN: SHARED PRESETS FOR EVERYONE
-  Shared presets show up for everyone who opens the site. Only someone with
-  a GitHub key that can change this site's files can add them.
-  One-time setup, on your computer:
-  1. Signed in to GitHub, open github.com/settings/personal-access-tokens/new
-  2. Token name: Phosphor Loop presets. Expiration: the longest choice.
-  3. Repository access: Only select repositories, then pick phosphor-loop.
-  4. Permissions: find Contents and set it to Read and write.
-  5. Press Generate token, then Copy.
-  6. Open nhillson.github.io/phosphor-loop/#admin, paste the key into
-     Admin key under Shared presets, and press Unlock.
-  From then on, in that browser: set up a look, press "Share current look
-  with everyone" under Shared presets and name it. Everyone gets it about a
-  minute later. On a shared preset, the pencil renames it and x takes it
-  away. The key stays in that browser only; "Stop being the admin on this
-  device" forgets it. If the key runs out, make a new one the same way.
-
 TIPS
   - My presets: set up a look, press "Save current look" and name it. Presets
     stay in this browser on this device (another browser or computer won't
@@ -138,8 +124,6 @@ TIPS
   - Save a preset while Autopilot is running and it keeps Autopilot's
     settings and pins too. Loading it starts Autopilot again from that look.
     Those presets are marked AUTO.
-  - Shared presets: looks the admin picks out for everyone, at the top of
-    the presets. To add your own as the admin, see ADMIN below.
   - Crowded controls? Click any section heading to fold it away, or use
     "Collapse all" at the top of the controls.
   - Press the Guide button (top right) or G for a tour of every control and
@@ -165,8 +149,7 @@ TIPS
   - Autopilot settings (the section under Channels): how often a new look
     comes, how slowly it fades in, how wild it gets, and how often it mixes
     the two loops. "Change on the beat" makes each new look cut in on a beat
-    when music is playing. Under "Inputs Autopilot can use", switch off any
-    input (Camera, 3D worlds, Ink and so on) you don't want it to bring in.
+    when music is playing.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
@@ -216,6 +199,13 @@ TIPS
     It sets its own brightness, and its loud parts lie over the trails
     instead of adding to them, so it never washes out to white. Set Amount
     under React to sound to 0 to see it without the picture pumping.
+  - Nature pictures: press Picture under "What feeds the loop", then
+    "Nature pictures..." for a gallery of about 500 photos (sea life, birds,
+    bugs, frogs, flowers, mushrooms and more). Tap one to feed it in. The
+    arrow buttons and Shuffle flip through the kind chosen in the gallery
+    without opening it, and work from a MIDI controller too (Learn). Each
+    photo's credit shows under its name. "Your own picture..." still loads
+    a file of yours.
   - Split lines (under Mirror): every other line of the picture slides left
     and the lines between slide right, like a scrambled TV.
   - Camera: a phone's back camera shows the world the right way round; a

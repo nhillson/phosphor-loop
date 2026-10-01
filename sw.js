@@ -1,7 +1,8 @@
 // Phosphor Loop keeps a copy of itself in the browser, so after one visit it opens without internet.
 // Online, every file is fetched fresh and the copy updated; offline, or on a very slow network, the copy is used.
 const CACHE = 'pl-v1';
-const APP = ['./', 'index.html', 'phone.html', 'qrcode.js', 'icon-180.png', 'icon-192.png'];
+const NATURE = 'pl-nature';   // nature pictures seen so far, or all of them via Show setup; kept when the app updates
+const APP = ['./', 'index.html', 'phone.html', 'qrcode.js', 'icon-180.png', 'icon-192.png', 'nature/pictures.json'];
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Michroma&family=VT323&display=swap';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const SLOW_MS = 4000;
@@ -27,7 +28,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    for (const key of await caches.keys()) if (key !== CACHE) await caches.delete(key);
+    for (const key of await caches.keys()) if (key !== CACHE && key !== NATURE) await caches.delete(key);
     await self.clients.claim();
   })());
 });
@@ -38,8 +39,24 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (FONT_HOSTS.includes(url.hostname)) { event.respondWith(cacheFirst(req)); return; }
   if (url.origin !== self.location.origin) return;   // the phone link's servers and anything else go straight out
+  if (/\/nature\/[^/]+\.jpg$/.test(url.pathname)) { event.respondWith(natureFirst(req, url)); return; }
   event.respondWith(networkFirst(event, req, url));
 });
+
+// A nature picture never changes, so once seen it's kept (in its own store) and served from there
+async function natureFirst(req, url) {
+  const key = new URL(url.pathname, url.origin).href;
+  const cache = await caches.open(NATURE);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  try {
+    const res = await fetch(req);
+    if (res.ok && res.type === 'basic') cache.put(key, res.clone()).catch(() => {});
+    return res;
+  } catch (_) {
+    return Response.error();
+  }
+}
 
 async function cacheFirst(req) {
   const hit = await caches.match(req, { ignoreVary: true });
@@ -72,7 +89,7 @@ function networkFirst(event, req, url) {
     let res = null;
     try { res = await Promise.race([network, slow]); } catch (_) { res = null; }
     if (res && res.ok) return res;
-    const hit = await cache.match(key);
+    const hit = (await cache.match(key)) || (await caches.match(key));
     if (hit) return hit;
     return res || network;   // nothing saved yet, so wait for the network after all
   })();
