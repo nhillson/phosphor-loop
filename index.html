@@ -252,14 +252,19 @@
   }
   #presetApNote { display: none; color: var(--amber); }
   .ap-on #presetApNote { display: block; }
-  .pre-del {
+  .pre-del, .pre-ren {
     position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
     display: grid; place-items: center; padding: 0; cursor: pointer;
     border: 1px solid rgba(255,255,255,.2); background: rgba(10,9,8,.8); color: var(--ink); font: 600 14px/1 var(--f-body);
     opacity: 0; transition: opacity .15s;
   }
-  .pre:hover .pre-del, .pre-del:focus-visible { opacity: 1; }
-  @media (hover: none) { .pre-del { opacity: 1; } }
+  .pre-ren { right: 32px; font-size: 12px; }
+  .pre:hover .pre-del, .pre-del:focus-visible, .pre:hover .pre-ren, .pre-ren:focus-visible { opacity: 1; }
+  @media (hover: none) { .pre-del, .pre-ren { opacity: 1; } }
+  .admin { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .admin-tag { font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--amber); }
+  .admin .linkish { align-self: flex-start; font-size: 13px; font-weight: 500; }
+  #adminMsg.warn { color: #ffc98a; }
   .pre-confirm {
     position: absolute; inset: 0; border-radius: 7px; background: rgba(12,11,10,.94); border: 1px solid var(--tally);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px;
@@ -698,6 +703,11 @@
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
         <div class="ctl">
+          <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
+          <div class="chips" id="apInputs" role="group" aria-labelledby="apInputsLbl"></div>
+          <span class="hint">Switch one off and Autopilot leaves it out from its next new look. A pinned input still stays. Video, Camera, Screen and Phone only come in while they’re running.</span>
+        </div>
+        <div class="ctl">
           <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
           <div class="seg seg-2" id="apTouch" role="group" aria-labelledby="apTouchLbl">
             <button data-touch="pin" aria-pressed="true">Pin it, keep going</button>
@@ -710,6 +720,35 @@
           <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
         </div>
         <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
+      </section>
+
+      <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
+        <h2 id="h-shared">Shared presets</h2>
+        <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
+        <div class="presets" id="sharedList"></div>
+        <div class="admin" id="adminBox" hidden>
+          <span class="admin-tag">ADMIN · ONLY YOU SEE THIS</span>
+          <form class="preset-form" id="sharedForm" hidden>
+            <label for="sharedName" class="lbl" id="sharedFormLbl">Name it for everyone</label>
+            <div class="preset-row">
+              <input type="text" id="sharedName" maxlength="40" autocomplete="off" spellcheck="false">
+              <button class="btn small" type="submit" id="sharedGo">Share</button>
+              <button class="btn small" type="button" id="sharedCancel">Cancel</button>
+            </div>
+          </form>
+          <button class="btn wide" id="sharedAdd">Share current look with everyone</button>
+          <p class="hint">Everyone sees a new or changed shared preset about a minute later. Share while Autopilot runs and it keeps Autopilot too. On a shared preset, ✎ renames it and × takes it away.</p>
+          <button class="linkish" id="adminOut" type="button">Stop being the admin on this device</button>
+        </div>
+        <form class="preset-form admin" id="adminLogin" hidden>
+          <span class="admin-tag">ADMIN</span>
+          <label for="adminKey" class="lbl">Admin key</label>
+          <div class="preset-row">
+            <input type="password" id="adminKey" autocomplete="off" spellcheck="false" placeholder="Paste your GitHub key">
+            <button class="btn small" type="submit" id="adminGo">Unlock</button>
+          </div>
+          <span class="hint" id="adminMsg">Paste the key you made on GitHub. It stays in this browser only.</span>
+        </form>
       </section>
 
       <section class="group" id="presetGroup" aria-labelledby="h-pre">
@@ -1105,10 +1144,11 @@
             <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
+            <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Press it again to stop.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on both loops while Autopilot keeps changing the rest. Tap a lit pin to let it go. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
-            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Double-click a slider there to put it back.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Double-click a slider there to put it back.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
@@ -4309,7 +4349,12 @@ const PINS = {
 };
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin' };
+// Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one)
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['spectro', 'Spectrograph'],
+  ['world', '3D worlds'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
+const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
+const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin', off: [] };
 const apSet = { ...AP_DEFAULTS };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
@@ -4317,9 +4362,12 @@ try {
     for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
+    apSet.off = cleanOff(s.off);
     if (Array.isArray(s.pins)) s.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
   }
 } catch (_) {}
+// Whether Autopilot may bring in this input (one switched off under Autopilot settings stays out)
+const apAllowed = (src) => !apSet.off.includes(is3D(src) ? 'world' : src);
 function saveAp() {
   try { localStorage.setItem(AP_KEY, JSON.stringify({ ...apSet, pins: [...ap.pins] })); } catch (_) {}
 }
@@ -4454,7 +4502,15 @@ function apPool() {
   if (vid.on) pool.push('video', 'video');
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
   if (snd.analyser) pool.push('spectro', 'spectro');
-  return pool;
+  // Leave out the inputs switched off under Autopilot settings. If that leaves nothing it can use right now
+  // (say only Camera is on, and no camera is running), it uses them all rather than stall.
+  const ok = pool.filter(apAllowed);
+  return ok.length ? ok : pool;
+}
+// A real input (not the other loop's picture), for when both loops would only feed on each other
+function apRealInput() {
+  const p = apPool().filter((x) => x !== 'loop');
+  return p.length ? pick(p) : 'wave';
 }
 // A new look. How wild (w) stretches how far it zooms, spins and tints, and how often it warps, flows and melts;
 // at the middle of the slider it behaves as Autopilot always has.
@@ -4468,7 +4524,7 @@ function apScene() {
     sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12) * j, -60, 80));
     sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15) * j, -70, 70));
     sc.color = Math.round(clamp((sc.color ?? 10) + rnd(-6, 10) * j, 0, 30 + 30 * w));
-    if (Math.random() < 0.35) sc.in1 = pick(pool);
+    if (Math.random() < 0.35 || !apAllowed(sc.in1)) sc.in1 = pick(pool);
     if (sc.in2 && !pool.includes(sc.in2)) sc.in2 = 'none';
   } else {
     const zoom = Math.round(Math.random() < 0.25 ? rnd(-(10 + 60 * w), -10) : Math.min(85, rnd(5, 15 + 90 * w)));
@@ -4517,8 +4573,8 @@ function freshLook(k, shown) {
   const sc = apScene();
   // Two loops that only feed on each other fade to black, so one of them keeps a real input
   if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) {
-    if (!ap.pins.has('in1')) sc.in1 = 'wave';
-    else if (!ap.pins.has('in2')) { sc.in2 = pick(apPool().filter((x) => x !== 'loop')); sc.blend = 50; }
+    if (!ap.pins.has('in1')) sc.in1 = apRealInput();
+    else if (!ap.pins.has('in2')) { sc.in2 = apRealInput(); sc.blend = 50; }
   }
   patchLoop(k, sc, true);
   const L = loops[k];
@@ -4530,10 +4586,14 @@ function freshLook(k, shown) {
 function glideLook(k) {
   const L = loops[k], sc = apScene();
   if (Math.random() < 0.7) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
-  if (Math.random() < 0.65) for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
+  // Keeping its inputs, unless one of them has been switched off under Autopilot settings
+  if (Math.random() < 0.65 && apAllowed(L.tgt.in1)) {
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
+    if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
+  }
   withPins(sc);
   const other = k === 'A' ? 'B' : 'A';
-  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = 'wave';
+  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = apRealInput();
   patchLoop(k, sc, true);
 }
 // Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat.
@@ -4606,6 +4666,7 @@ function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
+  $$('#apInputs button').forEach((b) => b.setAttribute('aria-pressed', String(!apSet.off.includes(b.dataset.apsrc))));
   syncPins();
   apStatus();
 }
@@ -4630,6 +4691,28 @@ $('#apBeat').addEventListener('click', () => {
   syncApUI();
   if (apSet.beat && !snd.analyser) toast('Change on the beat needs music: under React to sound, pick Computer sound or Microphone.');
 });
+// One toggle per kind of input. Lit means Autopilot may use it.
+for (const [k, label] of AP_INPUTS) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'chip';
+  b.dataset.apsrc = k;
+  b.innerHTML = `<span class="led"></span>${label}`;
+  // Inputs this device can't offer at all (Screen in the Android app, for one) get no toggle either
+  const inBtn = $(`#inputs [data-src="${k}"]`);
+  if (inBtn && inBtn.hidden) b.hidden = true;
+  b.addEventListener('click', () => {
+    const off = new Set(apSet.off);
+    if (off.has(k)) off.delete(k);
+    else if (off.size >= AP_INPUT_KEYS.length - 1) { toast('Leave at least one input on for Autopilot.'); return; }
+    else off.add(k);
+    apSet.off = [...off];
+    saveAp();
+    syncApUI();
+    toast(off.has(k) ? `Autopilot won’t use ${label} from its next new look.` : `Autopilot can use ${label} again.`);
+  });
+  $('#apInputs').appendChild(b);
+}
 $$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
   apSet.touch = b.dataset.touch;
   saveAp();
@@ -4644,6 +4727,7 @@ $('#apUnpin').addEventListener('click', () => {
 });
 $('#apReset').addEventListener('click', () => {
   for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'touch']) apSet[k] = AP_DEFAULTS[k];
+  apSet.off = [];
   saveAp();
   syncApUI();
   toast(ap.pins.size ? 'Autopilot settings are back to normal. Your pins are still pinned.' : 'Autopilot settings are back to normal.');
@@ -5608,7 +5692,8 @@ function snapshot() {
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
-  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch, pins: [...ap.pins] };
+  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch,
+    off: [...apSet.off], pins: [...ap.pins] };
 }
 function markPreset(id) {
   activePresetId = id;
@@ -5708,6 +5793,7 @@ function loadPreset(pr, quiet) {
     for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
     apSet.beat = a.beat === true;
     apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
+    apSet.off = cleanOff(a.off);
     ap.pins.clear();
     ap.pinVal = {};
     if (Array.isArray(a.pins)) a.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
@@ -5725,6 +5811,223 @@ function loadPreset(pr, quiet) {
   else if (ap.on && !quiet) toast(`Autopilot is on with this preset’s settings${ap.pins.size ? ' and pins' : ''}.`);
 }
 renderPresets();
+
+/* ================= shared presets ================= */
+// Looks the admin picks out for everyone. They live in presets.json next to this page, so every visitor gets them.
+// Only someone holding a GitHub key that can change this site's files can add, rename or remove them. The key is
+// pasted once (open the page with #admin on the end of the address), kept in this browser only, and used to save
+// presets.json straight to the repository. GitHub Pages then puts the new list on the site within a minute or so.
+const SHARED_REPO = 'nhillson/phosphor-loop', SHARED_FILE = 'presets.json', SHARED_MAX = 48, ADMIN_KEY = 'phosphor-admin-v1';
+const GH_API = `https://api.github.com/repos/${SHARED_REPO}`;
+let shared = [], adminKey = lsGet(ADMIN_KEY) || '', adminAsk = location.hash === '#admin', sharedBusy = false, sharedMode = null;
+const sharedGroup = $('#sharedGroup'), sharedList = $('#sharedList'), sharedForm = $('#sharedForm'), sharedName = $('#sharedName');
+const sharedAdd = $('#sharedAdd'), adminLogin = $('#adminLogin'), adminMsg = $('#adminMsg');
+
+function cleanShared(list) {
+  if (!Array.isArray(list)) return [];
+  return list.filter((p) => p && typeof p.id === 'string' && /^[a-z0-9]{1,40}$/i.test(p.id) && typeof p.name === 'string' && p.data && typeof p.data === 'object')
+    .map((p) => ({ id: p.id, name: p.name.slice(0, 40), thumb: typeof p.thumb === 'string' ? p.thumb : '', data: p.data, saved: p.saved || 0 }));
+}
+function renderShared() {
+  const admin = !!adminKey;
+  sharedGroup.hidden = !shared.length && !admin && !adminAsk;
+  $('#adminBox').hidden = !admin;
+  adminLogin.hidden = admin || !adminAsk;
+  const hint = $('#sharedHint');
+  hint.textContent = shared.length ? 'Looks picked out for everyone. Tap one to load it.'
+    : admin ? 'Nothing shared yet. Set up a look you like, then press Share current look with everyone.' : '';
+  hint.hidden = !hint.textContent;
+  sharedList.innerHTML = '';
+  shared.forEach((pr) => {
+    const t = document.createElement('div');
+    t.className = 'pre';
+    t.dataset.id = pr.id;
+    const name = escapeHTML(pr.name);
+    const auto = !!pr.data.ap;
+    const thumb = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(pr.thumb) ? `background-image:url(${pr.thumb})` : '';
+    t.innerHTML =
+      `<button class="pre-load" aria-pressed="${pr.id === activePresetId}" title="Load ${name}${auto ? ' and start Autopilot' : ''}"><span class="sw" style="${thumb}"></span>` +
+      `${auto ? '<span class="pre-auto">AUTO</span>' : ''}<span class="nm">${name}</span></button>` +
+      (admin ? `<button class="pre-ren" aria-label="Rename ${name}" title="Rename">✎</button>` +
+        `<button class="pre-del" aria-label="Take ${name} away from everyone" title="Take away from everyone">×</button>` +
+        `<div class="pre-confirm" hidden><span>Take “${name}” away from everyone?</span><div><button class="yes">Take away</button><button class="no">Keep</button></div></div>` : '');
+    t.querySelector('.pre-load').addEventListener('click', () => loadPreset(pr));
+    if (admin) {
+      const confirmBox = t.querySelector('.pre-confirm');
+      t.querySelector('.pre-ren').addEventListener('click', () => openSharedForm({ kind: 'rename', id: pr.id, old: pr.name }));
+      t.querySelector('.pre-del').addEventListener('click', () => { confirmBox.hidden = false; confirmBox.querySelector('.no').focus(); });
+      confirmBox.querySelector('.no').addEventListener('click', () => { confirmBox.hidden = true; });
+      confirmBox.querySelector('.yes').addEventListener('click', async () => {
+        confirmBox.hidden = true;
+        toast(`Taking “${pr.name}” away…`, 15000);
+        if (await changeShared((list) => list.filter((x) => x.id !== pr.id), `Remove shared preset "${pr.name}"`)) {
+          if (activePresetId === pr.id) activePresetId = null;
+          toast(`“${pr.name}” is gone for everyone in about a minute.`);
+        }
+      });
+    }
+    sharedList.appendChild(t);
+  });
+}
+
+// Talking to GitHub with the admin key
+function gh(path, opts = {}) {
+  return fetch(GH_API + path, { ...opts, cache: 'no-store', headers: {
+    Accept: 'application/vnd.github+json', Authorization: `Bearer ${adminKey}`, 'X-GitHub-Api-Version': '2022-11-28' } });
+}
+function b64enc(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+const b64dec = (b) => new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+// The newest list, straight from GitHub (the site itself takes a minute to catch up after a change)
+async function readSharedGH() {
+  const r = await gh(`/contents/${SHARED_FILE}?ref=main`);
+  if (r.status === 404) return { sha: null, list: [] };
+  if (!r.ok) throw r;
+  const j = await r.json();
+  return { sha: j.sha, list: cleanShared(JSON.parse(b64dec(j.content || '')).presets) };
+}
+function adminTrouble(e) {
+  const st = e && e.status;
+  if (st === 401) return 'GitHub didn’t accept the admin key. It may have run out: make a new one and unlock again.';
+  if (st === 403 || st === 404) return 'The admin key can’t save to the site. On GitHub, give it phosphor-loop with Contents set to Read and write.';
+  if (st === 409 || st === 422) return 'Something else changed the shared presets at the same moment. Try again.';
+  return 'Couldn’t reach GitHub. Check the internet connection and try again.';
+}
+// Reads the newest list, makes one change and saves it, so nothing shared from elsewhere gets lost
+async function changeShared(change, message) {
+  if (sharedBusy) { toast('Still saving the last change. Try again in a moment.'); return false; }
+  sharedBusy = true;
+  sharedAdd.disabled = true;
+  try {
+    const { sha, list } = await readSharedGH();
+    const next = change(list).slice(-SHARED_MAX);
+    const body = { message, branch: 'main', content: b64enc(JSON.stringify({ v: 1, presets: next })) };
+    if (sha) body.sha = sha;
+    const w = await gh(`/contents/${SHARED_FILE}`, { method: 'PUT', body: JSON.stringify(body) });
+    if (!w.ok) throw w;
+    shared = next;
+    renderShared();
+    return true;
+  } catch (e) {
+    toast(adminTrouble(e), 9000);
+    return false;
+  } finally {
+    sharedBusy = false;
+    sharedAdd.disabled = false;
+  }
+}
+
+// Share current look, or rename one: the same little form, asking for a name
+function nextSharedName() {
+  let n = shared.length + 1;
+  while (shared.some((p) => p.name.toLowerCase() === `shared look ${n}`)) n++;
+  return `Shared look ${n}`;
+}
+function openSharedForm(mode) {
+  sharedMode = mode;
+  const active = [...presets, ...shared].find((p) => p.id === activePresetId);
+  $('#sharedFormLbl').textContent = mode.kind === 'rename' ? `New name for “${mode.old}”` : 'Name it for everyone';
+  $('#sharedGo').textContent = mode.kind === 'rename' ? 'Rename' : 'Share';
+  sharedName.value = mode.kind === 'rename' ? mode.old : (active ? active.name : nextSharedName());
+  sharedForm.hidden = false;
+  sharedAdd.hidden = true;
+  sharedName.focus();
+  sharedName.select();
+}
+function closeSharedForm() { sharedForm.hidden = true; sharedAdd.hidden = false; sharedMode = null; }
+sharedAdd.addEventListener('click', () => openSharedForm({ kind: 'add' }));
+$('#sharedCancel').addEventListener('click', closeSharedForm);
+sharedName.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closeSharedForm(); } });
+sharedForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const mode = sharedMode;
+  if (!mode) return;
+  const name = sharedName.value.trim().slice(0, 40) || (mode.kind === 'rename' ? mode.old : nextSharedName());
+  closeSharedForm();
+  if (mode.kind === 'rename') {
+    toast('Renaming…', 15000);
+    if (await changeShared((list) => list.map((p) => (p.id === mode.id ? { ...p, name } : p)), `Rename shared preset to "${name}"`)) {
+      toast(`Renamed to “${name}”. Everyone sees the new name in about a minute.`);
+    }
+    return;
+  }
+  const data = snapshot();
+  if (ap.on) data.ap = apSnapshot();
+  const thumb = await new Promise((res) => { thumbReq = res; });
+  toast('Sharing…', 15000);
+  let id = '';
+  const ok = await changeShared((list) => {
+    // The same name again replaces that shared preset
+    const same = list.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (same) { id = same.id; return list.map((p) => (p === same ? { ...p, name, thumb, data, saved: Date.now() } : p)); }
+    id = 's' + Date.now().toString(36) + randId(4);
+    return [...list, { id, name, thumb, data, saved: Date.now() }];
+  }, `Share preset "${name}"`);
+  if (ok) {
+    markPreset(id);
+    toast(`Shared “${name}”${data.ap ? ' with Autopilot' : ''}. Everyone gets it in about a minute.`, 7000);
+  }
+});
+
+// Becoming the admin on this device: open the page with #admin, paste the key, press Unlock
+adminLogin.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const key = $('#adminKey').value.trim();
+  if (!key) return;
+  adminMsg.classList.remove('warn');
+  adminMsg.textContent = 'Checking the key with GitHub…';
+  $('#adminGo').disabled = true;
+  let r = null;
+  try {
+    r = await fetch(GH_API, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${key}` } });
+  } catch (_) {}
+  $('#adminGo').disabled = false;
+  if (!r || !r.ok) {
+    adminMsg.classList.add('warn');
+    adminMsg.textContent = !r ? 'Couldn’t reach GitHub. Check the internet connection and try again.'
+      : r.status === 401 ? 'GitHub didn’t accept that key. Copy it again and paste the whole thing.'
+      : 'That key can’t open phosphor-loop. On GitHub, make sure it has phosphor-loop with Contents set to Read and write.';
+    return;
+  }
+  adminKey = key;
+  lsSet(ADMIN_KEY, key);
+  $('#adminKey').value = '';
+  adminAsk = false;
+  if (location.hash === '#admin') history.replaceState(null, '', location.pathname + location.search);
+  adminMsg.textContent = 'Paste the key you made on GitHub. It stays in this browser only.';
+  renderShared();
+  toast('You’re the admin on this device. Under Shared presets, press Share current look with everyone.', 7000);
+  loadShared();
+});
+$('#adminOut').addEventListener('click', () => {
+  adminKey = '';
+  try { localStorage.removeItem(ADMIN_KEY); } catch (_) {}
+  closeSharedForm();
+  renderShared();
+  toast('This device isn’t the admin any more. Open the page with #admin on the end to unlock again.');
+});
+window.addEventListener('hashchange', () => {
+  if (location.hash !== '#admin') return;
+  adminAsk = true;
+  renderShared();
+  sharedGroup.scrollIntoView({ block: 'start', behavior: 'smooth' });
+});
+
+// Everyone gets the list from the site; the admin reads it straight from GitHub so a change shows at once
+async function loadShared() {
+  try {
+    const r = await fetch(SHARED_FILE, { cache: 'no-cache' });
+    if (r.ok) shared = cleanShared((await r.json()).presets);
+  } catch (_) {}
+  if (adminKey) { try { shared = (await readSharedGH()).list; } catch (_) {} }
+  renderShared();
+}
+renderShared();
+loadShared();
 
 /* ================= folding sections ================= */
 // Every section heading folds its section away. What's folded is remembered in this browser.
@@ -6506,9 +6809,9 @@ function midiIn(e) {
 
 // What a slider or button stands for, stored so a mapping survives page reloads
 const LOOP_KEYS = LOOP_SLIDERS;
-const GROUP_NAMES = { inputs: 'Input', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
+const GROUP_NAMES = { inputs: 'Input', apInputs: 'Autopilot uses', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
                       specShape: 'Spectrograph', specListen: 'Spectrograph hears' };
-const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-confirm button, #presetForm button, #presetSave, ' +
+const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-ren, #adminBox *, #adminLogin *, .pre-confirm button, #presetForm button, #presetSave, ' +
   '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen';
 function labelFor(el) {
   const l = document.querySelector(`label[for="${el.id}"]`);
@@ -6529,7 +6832,7 @@ function btnAddress(b) {
 function btnLabel(b) {
   if (b.classList.contains('ch')) { const i = +b.dataset.ch; return `Channel ${i + 1}: ${CHANNELS[i].name}`; }
   const tile = b.closest('.pre');
-  if (tile) { const pr = presets.find((p) => p.id === tile.dataset.id); return `Preset: ${pr ? pr.name : 'saved look'}`; }
+  if (tile) { const pr = [...presets, ...shared].find((p) => p.id === tile.dataset.id); return `Preset: ${pr ? pr.name : 'saved look'}`; }
   const text = (b.getAttribute('aria-label') || b.textContent || '').replace(/­/g, '').replace(/\s+/g, ' ').trim();
   const g = b.parentElement && GROUP_NAMES[b.parentElement.id];
   return g ? `${g}: ${text}` : text;
