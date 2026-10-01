@@ -38,12 +38,13 @@ ANDROID APP
   - Snapshots and recordings go to the phone's Gallery, in a Phosphor Loop
     album.
   - Screen sharing and MIDI controllers need a computer.
-  - Updates to the website reach the app by themselves. A new copy of the
-    app itself is only needed when the android folder changes; install it
-    over the old one the same way (presets stay).
+  - Updates to the website reach the app by themselves whenever the phone
+    is online. The app is also rebuilt after every update, so its built-in
+    offline copy always matches the site. Installing a new copy is optional;
+    install it over the old one the same way (presets stay).
 
-  How it's built: each time the android folder changes, GitHub builds the
-  app (Actions tab, "Android app") and puts it on the Releases page.
+  How it's built: each time the site or the android folder changes, GitHub
+  builds the app (Actions tab, "Android app") and puts it on the Releases page.
   To build it again by hand: Actions > Android app > Run workflow.
 
 YOU CAN JUST DOUBLE-CLICK index.html

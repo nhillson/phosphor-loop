@@ -1,12 +1,19 @@
 name: Android app
 
 # Builds Phosphor Loop for Android and puts it on the repository's Releases page,
-# where a phone can download and install it. Runs whenever the android/ folder changes,
-# or by hand from the Actions tab ("Run workflow").
+# where a phone can download and install it. Runs whenever the site itself or the android/ folder
+# changes (so the app's built-in offline copy always matches the site), or by hand from the
+# Actions tab ("Run workflow").
 on:
   push:
     branches: [main]
     paths:
+      - 'index.html'
+      - 'phone.html'
+      - 'qrcode.js'
+      - 'sw.js'
+      - 'icon-180.png'
+      - 'icon-192.png'
       - 'android/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
