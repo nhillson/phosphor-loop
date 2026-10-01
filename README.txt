@@ -185,7 +185,10 @@ TIPS
     runs. Try the Ribbons channel, or the Guide's "Rubber time" recipe with a
     camera and wave your arms.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
-    or the P key) changes the settings slowly by itself.
+    or the P key) changes the settings slowly by itself. Every 1 to 3 new
+    looks (at random) it also puts in a different nature picture, from the
+    kind chosen in the gallery. A picture of your own stays put, and
+    switching off Picture under "Inputs Autopilot can use" stops it too.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
     it, or just move that slider, and the setting stays put on the loop
     you're changing (the A or B tab) while Autopilot keeps changing
