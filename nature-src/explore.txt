@@ -1,0 +1,5 @@
+# category | how deep to open
+Category:Featured pictures on Wikimedia Commons|1
+Category:Featured pictures of animals|3
+Category:Featured pictures of plants|2
+Category:Featured pictures of fungi|2

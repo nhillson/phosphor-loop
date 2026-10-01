@@ -1,0 +1,43 @@
+name: Nature pictures
+
+# Gathers the built-in nature pictures from Wikimedia Commons (the job is chosen in nature-src/job.txt)
+# and saves the results back to this branch. Runs when nature-src/job.txt changes, or by hand.
+on:
+  push:
+    branches: [nature-work]
+    paths:
+      - 'nature-src/job.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nature-pictures
+  cancel-in-progress: true
+
+jobs:
+  gather:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the picture tools
+        run: pip install --quiet pillow
+
+      - name: Run the job
+        run: |
+          set -o pipefail
+          python3 -u .github/scripts/nature.py 2>&1 | tee nature-src/log.txt
+
+      - name: Save the results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A nature-src
+          if [ -d nature ]; then git add -A nature; fi
+          git diff --cached --quiet && exit 0
+          git commit -m "Nature pictures: $(head -1 nature-src/job.txt) results"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
