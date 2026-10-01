@@ -1080,12 +1080,6 @@
           </div>
           <span class="hint" id="shapeNote" hidden>While the output window is open, its size sets the shape.</span>
         </div>
-        <div class="ctl">
-          <div class="ctl-head"><label for="tv">Old TV look</label><output id="tvOut" for="tv"></output></div>
-          <input type="range" id="tv" min="0" max="100" step="1" value="60">
-          <div class="ends"><span>Clean</span><span>Worn</span></div>
-        </div>
-        <p class="hint">Double-click a slider to put it back where the channel had it.</p>
       </section>
 
       <section class="group" id="showGroup" aria-labelledby="h-show">
@@ -1136,7 +1130,7 @@
           <div class="g-arrow">→</div>
           <div class="g-node"><b>LOOP</b><span>Zoom, spin, warp, fade and tint the last frame</span></div>
           <div class="g-arrow">→</div>
-          <div class="g-node"><b>SCREEN</b><span>What you see, with an optional old-TV glass</span></div>
+          <div class="g-node"><b>SCREEN</b><span>What you see</span></div>
           <div class="g-return">↻ the screen is fed back into the loop sixty times a second</div>
         </div>
       </header>
@@ -1202,7 +1196,6 @@
             <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on. With Include mic lit, the microphone goes in too, mixed with the music.</dd>
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
-            <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
@@ -1259,7 +1252,7 @@
           <dt>The output window didn’t open</dt><dd>The browser blocked it. Click the blocked pop-up icon at the right of the address bar, choose to always allow pop-ups for this page, then press Output window again.</dd>
           <dt>The picture doesn’t react to music</dt><dd>Check that the Low, Mid and High bars move. With Computer sound, share again and make sure Also share system audio is switched on under the screen you pick (or Also share tab audio for a browser tab). If that switch never appears, use Microphone with Stereo Mix instead. Then raise Amount.</dd>
           <dt>The Spectrograph is black</dt><dd>It only draws what it hears. Press Computer sound or Microphone under it, allow it when the browser asks, and play something. If the Low, Mid and High bars under React to sound don’t move, it isn’t hearing anything yet; the tip above helps.</dd>
-          <dt>It’s choppy</dt><dd>Turn the Old TV look down, close other tabs, or choose 4:3 TV as the screen shape.</dd>
+          <dt>It’s choppy</dt><dd>Close other tabs, or choose 4:3 TV as the screen shape.</dd>
           <dt>A fader on the MIDI controller does nothing</dt><dd>It’s waiting to pick up: move it past the slider’s current position (a note under the screen says where). If nothing reacts at all, check the controller is listed under Show setup.</dd>
           <dt>It won’t open without internet</dt><dd>It needs one visit from its web address with internet first. Open it once online, wait until Show setup says it’s saved, and from then on it opens offline.</dd>
         </dl>
@@ -1331,7 +1324,7 @@ function loopDefaults() {
 }
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'split', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
 const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'split'];
-const MIX_SLIDERS = ['view', 'xab', 'xba', 'tv'];
+const MIX_SLIDERS = ['view', 'xab', 'xba'];
 // What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
 
@@ -1383,7 +1376,7 @@ const CHANNELS = [
 /* ================= state ================= */
 function mkLoop() { const d = loopDefaults(); return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0 }; }
 const loops = { A: mkLoop(), B: mkLoop() };
-const mixDefaults = { view: 0, xab: 0, xba: 0, tv: 60 };
+const mixDefaults = { view: 0, xab: 0, xba: 0 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
 let edit = 'A';
 let channel = -1;
@@ -1783,11 +1776,10 @@ const FS_DISPLAY = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
 uniform vec2 uRes;
-uniform float uTV, uTime, uStatic, uLines, uFlash, uPunch, uHueKick;
+uniform float uTime, uStatic, uLines, uFlash, uPunch, uHueKick;
 uniform vec2 uShake;   // the music's jolt: its direction, times how hard
 out vec4 o;
 ${COMMON}
-vec2 barrel(vec2 uv, float k) { vec2 c = uv * 2.0 - 1.0; c *= 1.0 + k * dot(c, c); return c * 0.5 + 0.5; }
 vec3 hueTurn(vec3 c, float a) {
   const vec3 k = vec3(0.57735027);
   float ca = cos(a);
@@ -1795,38 +1787,21 @@ vec3 hueTurn(vec3 c, float a) {
 }
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 cuv = barrel(uv, 0.11 * uTV);
+  vec2 cuv = uv;
   // Music hits land straight on the screen: a punch in on the kick and a jolt on the beat,
   // zoomed in just enough that the jolt never shows the edge
   float jolt = length(uShake);
   cuv = (cuv - 0.5) / (1.0 + uPunch + jolt * 0.022) + 0.5 + uShake * 0.008;
   float line = floor(uv.y * uLines);
   cuv.x += (hash(vec2(line, floor(uTime * 60.0))) - 0.5) * 0.03 * uStatic;
-  vec2 c = cuv * 2.0 - 1.0;
-  vec2 ca = c * 0.0035 * uTV + uShake * 0.01;
+  vec2 ca = uShake * 0.01;
   vec3 col;
   col.r = texture(uTex, cuv + ca).r;
   col.g = texture(uTex, cuv).g;
   col.b = texture(uTex, cuv - ca).b;
-
-  vec3 g = vec3(0.0);
-  vec2 r1 = vec2(0.004, 0.0053), r2 = vec2(0.009, 0.012);
-  g += texture(uTex, cuv + vec2( r1.x,  r1.y)).rgb + texture(uTex, cuv + vec2(-r1.x,  r1.y)).rgb;
-  g += texture(uTex, cuv + vec2( r1.x, -r1.y)).rgb + texture(uTex, cuv + vec2(-r1.x, -r1.y)).rgb;
-  g += texture(uTex, cuv + vec2( r2.x, 0.0)).rgb + texture(uTex, cuv + vec2(-r2.x, 0.0)).rgb;
-  g += texture(uTex, cuv + vec2(0.0,  r2.y)).rgb + texture(uTex, cuv + vec2(0.0, -r2.y)).rgb;
-  col += g * 0.125 * 0.35 * uTV;
   if (uHueKick != 0.0) col = max(hueTurn(col, uHueKick), 0.0);
 
-  float scan = 0.5 + 0.5 * cos(cuv.y * uLines * TAU);
-  col *= 1.0 - uTV * 0.42 * (1.0 - scan);
-  float m = mod(floor(gl_FragCoord.x), 3.0);
-  vec3 mask = vec3(m == 0.0 ? 1.0 : 0.7, m == 1.0 ? 1.0 : 0.7, m == 2.0 ? 1.0 : 0.7);
-  col *= mix(vec3(1.0), mask, 0.5 * uTV);
-  col *= 1.0 + 0.45 * uTV + uFlash;
-  col *= 1.0 - 0.28 * uTV * dot(c * 0.75, c * 0.75);
-  col *= 1.0 - 0.035 * uTV * (0.5 + 0.5 * sin((uv.y + uTime * 0.07) * TAU));
-  col += (hash(gl_FragCoord.xy + fract(uTime * 7.13) * 391.0) - 0.5) * 0.045 * uTV;
+  col *= 1.0 + uFlash;
   col = mix(col, vec3(hash(gl_FragCoord.xy * 0.5 + fract(uTime) * 113.0)), uStatic * 0.9);
   vec2 e = smoothstep(vec2(0.0), vec2(0.006), cuv) * smoothstep(vec2(1.0), vec2(0.994), cuv);
   col *= e.x * e.y;
@@ -3430,14 +3405,14 @@ const sliderEls = {}, outputs = {};
   outputs[k] = $('#' + k + 'Out');
   const isMix = MIX_SLIDERS.includes(k);
   el.addEventListener('input', () => {
-    if (k !== 'tv') takeOver(k);
+    takeOver(k);
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     showSlider(k);
     if ((k === 'xab' || k === 'xba') && +el.value > 0) showFedLoop(k);
     if (k === 'view' || k === 'xab' || k === 'xba' || k === 'trails') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
-    if (k !== 'tv') takeOver(k);
+    takeOver(k);
     const v = (isMix ? mix.base : loops[edit].base)[k];
     (isMix ? mix.tgt : loops[edit].tgt)[k] = v;
     el.value = v;
@@ -3455,7 +3430,7 @@ function sliderText(k, v) {
       return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
     }
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
-    case 'color': case 'warp': case 'flow': case 'melt': case 'split': case 'tv': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
+    case 'color': case 'warp': case 'flow': case 'melt': case 'split': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
     default: return String(v);
   }
 }
@@ -5509,13 +5484,8 @@ phoOff.addEventListener('click', () => {
 let drawing = false, pCur = null, pPrev = null;
 function pointerToP(e, el = canvas) {
   const r = el.getBoundingClientRect();
-  let u = (e.clientX - r.left) / r.width;
-  let v = 1 - (e.clientY - r.top) / r.height;
-  const k = 0.11 * mix.cur.tv / 100;
-  let cx = u * 2 - 1, cy = v * 2 - 1;
-  const f = 1 + k * (cx * cx + cy * cy);
-  cx *= f; cy *= f;
-  u = cx * 0.5 + 0.5; v = cy * 0.5 + 0.5;
+  const u = (e.clientX - r.left) / r.width;
+  const v = 1 - (e.clientY - r.top) / r.height;
   return [(u - 0.5) * simAspect, v - 0.5];
 }
 function startDraw(e, el) {
@@ -5539,7 +5509,7 @@ const RECIPES = [
     text: 'Share this tab and the screen films itself, like a camera pointed at a TV. Tiny changes to Zoom and Spin make big differences.',
     how: 'SCREEN · ZOOM IN 12 · SPIN 4 · TRAILS 72',
     sw: 'repeating-radial-gradient(circle at 50% 50%,#0d0c0b 0 6px,#ffae3b 6px 8px,#0d0c0b 8px 12px)',
-    patch: { A: { in1: 'screen', size: 100, zoom: 12, spin: 4, trails: 72, color: 6 }, tv: 70 } },
+    patch: { A: { in1: 'screen', size: 100, zoom: 12, spin: 4, trails: 72, color: 6 } } },
   { name: 'Kaleidoscope drawing', after: 'Now drag on the screen.',
     text: 'A blank loop with an eight-way mirror. Every stroke you draw is copied eight times and slowly drifts outward.',
     how: 'NOTHING · MIRROR 8 · TRAILS 97 · ZOOM IN 10',
@@ -5566,7 +5536,7 @@ const RECIPES = [
     how: 'VIDEO · TRACKING 70 · WARP 45 · TRAILS 94',
     sw: 'linear-gradient(180deg,#c0c0c0 0 20%,#c0c000 20% 35%,#fff 35% 38%,#00c0c0 38% 55%,#00a000 55% 72%,#a000a0 72%)',
     patch: { A: { in1: 'video', size: 85, warp: 45, trails: 94, zoom: 3, shift: [0, -0.003], blur: 0.25, color: 4 },
-             adj: { video: { tracking: 70 }, picture: { tracking: 70 } }, tv: 85 } },
+             adj: { video: { tracking: 70 }, picture: { tracking: 70 } } } },
   { name: 'Hyperspace',
     text: 'Sparks rushing past at full zoom. Push Spin either way for a wormhole.',
     how: 'SPARKS · ZOOM IN 85 · TRAILS 80',
@@ -5574,9 +5544,9 @@ const RECIPES = [
     patch: { A: { in1: 'sparks', zoom: 85, spin: 0, trails: 80, color: 6, blur: 0.1 } } },
   { name: 'Phone at the monitor', needs: 'phone', after: 'Scan the code, then aim your phone at this screen.',
     text: 'Aim your phone at this screen for real camera-and-TV feedback. Tilt the phone to twist the spiral.',
-    how: 'PHONE · SIZE FULL · TRAILS 70 · OLD TV 80',
+    how: 'PHONE · SIZE FULL · TRAILS 70',
     sw: 'repeating-conic-gradient(from 0deg at 50% 50%,#1b0f3d 0 10deg,#ff7ac6 10deg 14deg)',
-    patch: { A: { in1: 'phone', size: 100, trails: 70, color: 4 }, tv: 80 } },
+    patch: { A: { in1: 'phone', size: 100, trails: 70, color: 4 } } },
   { name: 'Slow drift',
     text: 'Calm and slow. Good for leaving on a second screen or a projector while music plays.',
     how: 'A WAVE · B SHAPE · BOTH FEEDS 30 · AUTO-DRIFT',
@@ -5586,9 +5556,9 @@ const RECIPES = [
     drift: true },
   { name: 'Hands-free show', autopilot: true, after: 'Autopilot is on. Leave it running, or move a slider to pin it where you want it.',
     text: 'Autopilot gives each loop a new look every half minute or so and fades slowly between them. Leave it on a TV or projector.',
-    how: 'AUTOPILOT · AUTO-DRIFT · OLD TV 65',
+    how: 'AUTOPILOT · AUTO-DRIFT',
     sw: 'linear-gradient(90deg,#ffae3b,#ff4fa3 35%,#6a2bd9 65%,#4fd1c5)',
-    patch: { A: { in1: 'wave', form: 3, zoom: 14, spin: 6, trails: 92, color: 14, mirror: 4, blur: 0.2 }, tv: 65 } },
+    patch: { A: { in1: 'wave', form: 3, zoom: 14, spin: 6, trails: 92, color: 14, mirror: 4, blur: 0.2 } } },
   { name: 'Music visualizer', needs: 'sound', sound: 'system', soundAmount: 70,
     soundMap: { kick: true, size: true, spin: false, color: true, warp: false, flash: true },
     after: 'Pick a screen, switch on “Also share system audio”, press Share, then play some music.',
@@ -5642,7 +5612,6 @@ function applyRecipe(r) {
   mix.tgt.view = p.view ?? 0;
   mix.tgt.xab = p.xab ?? 0;
   mix.tgt.xba = p.xba ?? 0;
-  if (p.tv != null) mix.tgt.tv = p.tv;
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((p.adj && p.adj[src]) || {}) }; });
   syncAdjUI();
@@ -5721,7 +5690,7 @@ function snapshot() {
   return {
     v: 1,
     A: clone(loops.A.tgt), B: clone(loops.B.tgt),
-    mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba, tv: mix.tgt.tv },
+    mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba },
     adj: clone(adj),
     snd: { amount: snd.amount, map: clone(snd.map) },
     drift,
@@ -5810,7 +5779,6 @@ function loadPreset(pr, quiet) {
   patchLoop('B', d.B || B_PARTNER, true);
   const m = d.mix || {};
   mix.tgt.view = m.view ?? 0; mix.tgt.xab = m.xab ?? 0; mix.tgt.xba = m.xba ?? 0;
-  if (m.tv != null) mix.tgt.tv = m.tv;
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((d.adj && d.adj[src]) || {}) }; });
   syncAdjUI();
@@ -6803,8 +6771,10 @@ let midiSaved = { enabled: false, maps: [] };
 try {
   const v = JSON.parse(lsGet(MIDI_KEY) || 'null');
   if (v && Array.isArray(v.maps)) midiSaved = { enabled: !!v.enabled, maps: v.maps.filter((m) => m && m.t && m.key) };
-  // An input, channel or button that has been taken out of Phosphor Loop loses its mappings
-  const kept = midiSaved.maps.filter((m) => !(m.t.sel && /data-(src|look|when)=/.test(m.t.sel) && !document.querySelector(m.t.sel)));
+  // An input, channel, button or slider that has been taken out of Phosphor Loop loses its mappings
+  const gone = (t) => (t.sel && /data-(src|look|when)=/.test(t.sel) && !document.querySelector(t.sel)) ||
+    (t.kind === 'mix' && !MIX_SLIDERS.includes(t.key));
+  const kept = midiSaved.maps.filter((m) => !gone(m.t));
   if (kept.length !== midiSaved.maps.length) { midiSaved.maps = kept; lsSet(MIDI_KEY, JSON.stringify(midiSaved)); }
 } catch (_) {}
 const midi = { access: null, learning: false, target: null, pending: null, pendTimer: null, st: new Map(), lastHint: 0 };
@@ -6937,11 +6907,11 @@ function setTarget(t, v) {
     if (t.loop === edit) { sliderEls[t.key].value = v; showSlider(t.key); }
     if (t.key === 'trails') syncVisibility();
   } else if (t.kind === 'mix') {
-    if (t.key !== 'tv') takeOver(t.key);
+    takeOver(t.key);
     mix.tgt[t.key] = v;
     sliderEls[t.key].value = v;
     showSlider(t.key);
-    if (t.key !== 'tv') syncVisibility();
+    syncVisibility();
   } else if (t.kind === 'snd') {
     snd.amount = v;
     syncSoundUI();
@@ -7407,7 +7377,7 @@ function frame() {
     const L = loops[key];
     for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p) ? k : kLoop);
   }
-  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (p === 'tv' || pinned(p) ? k : kMix);
+  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (pinned(p) ? k : kMix);
   if (ap.on && !frozen && now >= ap.next) apTick(now);
   if (!frozen) simT += dt;
   if (drift && !frozen) driftT += dt;
@@ -7464,7 +7434,6 @@ function frame() {
   gl.useProgram(dispProg.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, comp.tex);
   set2f(dispProg, 'uRes', canvas.width, canvas.height);
-  set1f(dispProg, 'uTV', clamp(mix.cur.tv, 0, 100) / 100);
   set1f(dispProg, 'uTime', (now - t0) / 1000);
   set1f(dispProg, 'uStatic', staticAmt);
   // Hits from the music that show at once, on top of what they do inside the loops
