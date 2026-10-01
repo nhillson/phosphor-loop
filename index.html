@@ -1046,6 +1046,18 @@
             <span class="hint">The picture pushes itself around: its own bright and dark parts decide where it moves next.</span>
           </div>
           <div class="ctl">
+            <div class="ctl-head"><label for="push">Pushed by <span class="mini b" id="pushFrom">B</span></label><output id="pushOut" for="push"></output></div>
+            <input type="range" id="push" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Swept along</span></div>
+            <span class="hint" id="pushHint">Loop B’s picture shoves this one around: its bright parts and outlines decide where this loop slides. Works even while loop B is hidden.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="dye">Dyed by <span class="mini b" id="dyeFrom">B</span></label><output id="dyeOut" for="dye"></output></div>
+            <input type="range" id="dye" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Soaked</span></div>
+            <span class="hint" id="dyeHint">Loop B’s picture soaks color into this one: wherever loop B is bright, this loop’s colors keep turning, so loop B’s shapes show up as rainbow bands.</span>
+          </div>
+          <div class="ctl">
             <div class="ctl-head"><span class="lbl" id="mirrorLbl">Mirror</span><output id="mirrorOut"></output></div>
             <div class="seg seg-5" id="mirror" role="group" aria-labelledby="mirrorLbl">
               <button data-mirror="0" aria-pressed="false">Off</button>
@@ -1178,6 +1190,8 @@
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Flow</dt><dd>Slow currents curl the echoes into threads and swirls, like ink in water. Works best with Trails high.</dd>
             <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>
+            <dt>Pushed by the other loop</dt><dd>Like Melt, but the other loop does the pushing. Its bright parts decide which way this loop slides and its outlines drag this loop’s trails along them, so the other loop’s shapes show up as currents and swirls. It works even while the other loop is hidden. Works best with Trails high.</dd>
+            <dt>Dyed by the other loop</dt><dd>The other loop soaks color into this one. Wherever it’s bright, this loop’s colors keep turning round the rainbow, so its shapes show up here as shifting rainbow bands. Grey and white parts pick up color too.</dd>
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
           </dl></div>
@@ -1315,10 +1329,10 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1 };
+           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1 };
 }
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'split', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'split'];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split'];
 const MIX_SLIDERS = ['view', 'xab', 'xba'];
 // What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
@@ -1425,6 +1439,8 @@ uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, u
 uniform float uBlend, uScale, uMotion, uXfeed;
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
+uniform float uPush, uPushTurn;   // Pushed by the other loop: the same idea, but the other loop's picture does the pushing
+uniform float uDye, uDyeTurn;     // Dyed by the other loop: how far its bright parts turn this loop's colors this frame
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
@@ -1576,6 +1592,47 @@ vec2 meltAt(vec2 q, float asp) {
   vec2 curl = vec2(g.y, -g.x) / (length(g) + 4.0);
   return uMelt * (slide + 0.5 * curl);
 }
+// Pushed by the other loop: like Melt, but it's the other loop's latest picture that decides where this one
+// moves. Its brightness picks which way each spot slides, its outlines drag this loop's trails along them, and
+// its bright parts swell outward a little, so its shapes carve currents and swirls through this loop.
+vec2 pushAt(vec2 q, float asp) {
+  vec2 st = q / vec2(asp, 1.0) + 0.5;
+  vec2 r = vec2(0.016 / asp, 0.016), d = r * 0.7071;
+  float lE = luma(texture(uOther, st + vec2(r.x, 0.0)).rgb), lW = luma(texture(uOther, st - vec2(r.x, 0.0)).rgb);
+  float lN = luma(texture(uOther, st + vec2(0.0, r.y)).rgb), lS = luma(texture(uOther, st - vec2(0.0, r.y)).rgb);
+  float lNE = luma(texture(uOther, st + d).rgb), lSW = luma(texture(uOther, st - d).rgb);
+  float lNW = luma(texture(uOther, st + vec2(-d.x, d.y)).rgb), lSE = luma(texture(uOther, st + vec2(d.x, -d.y)).rgb);
+  float L = 0.125 * (lE + lW + lN + lS + lNE + lSW + lNW + lSE);
+  vec2 g = (vec2(lE - lW, lN - lS) + 0.7071 * vec2(lNE - lSW + lSE - lNW, lNE - lSW + lNW - lSE)) / 0.064;
+  float a = L * 7.0 + uPushTurn;
+  vec2 slide = vec2(cos(a), sin(a)) * smoothstep(0.03, 0.3, L);
+  float gn = length(g) + 3.0;
+  vec2 curl = vec2(g.y, -g.x) / gn;
+  vec2 swell = g / gn;
+  return uPush * (0.6 * slide + 0.9 * curl + 0.35 * swell);
+}
+// Dyed by the other loop: the other loop's picture soaks color into this one. How bright the other loop is at
+// each spot picks a color there, and this loop's trails are steadily stained towards it while their colors keep
+// turning. The stains ride along with the trails and get stained again wherever they land, so the other loop's
+// shapes show up here as rainbow bands that keep shifting. Only the color changes, never how bright it is.
+vec3 dyeBy(vec3 c, vec2 p, float asp) {
+  vec2 st = p / vec2(asp, 1.0) + 0.5;
+  vec2 r = vec2(0.014 / asp, 0.014), d = r * 0.7071;
+  float lo = 0.2 * luma(texture(uOther, st).rgb) +
+             0.1 * (luma(texture(uOther, st + vec2(r.x, 0.0)).rgb) + luma(texture(uOther, st - vec2(r.x, 0.0)).rgb) +
+                    luma(texture(uOther, st + vec2(0.0, r.y)).rgb) + luma(texture(uOther, st - vec2(0.0, r.y)).rgb) +
+                    luma(texture(uOther, st + d).rgb) + luma(texture(uOther, st - d).rgb) +
+                    luma(texture(uOther, st + vec2(-d.x, d.y)).rgb) + luma(texture(uOther, st + vec2(d.x, -d.y)).rgb));
+  float k = uDye * smoothstep(0.02, 0.5, lo);
+  if (k <= 0.0) return c;
+  c = max(hueRot(c, k * 0.9), 0.0);
+  float l = luma(c);
+  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));
+  float grey = 1.0 - (mx - mn) / max(mx, 1e-3);
+  vec3 tint = hsv(fract(lo * 1.4 + uDyeTurn), 0.8, 1.0);
+  tint = clamp(tint * (l / max(luma(tint), 0.05)), 0.0, 1.0);
+  return mix(c, tint, clamp(k * (0.7 + grey), 0.0, 1.0));
+}
 // The spectrograph (see writeSpec): a picture of the sound. Each row of uSpec is one moment and runs from
 // the lowest pitch on the left to the highest on the right; new rows are written over the oldest, like a ring.
 uniform sampler2D uSpec;
@@ -1709,6 +1766,7 @@ void main() {
   q += uWarp * vec2(sin(q.y * 7.0 + uTime * 1.1 + sin(q.x * 3.0 + uTime * 0.5)),
                     cos(q.x * 7.0 - uTime * 0.9 + sin(q.y * 2.0 - uTime * 0.3)));
   if (uMelt > 0.0) q += meltAt(q, asp);
+  if (uPush > 0.0) q += pushAt(q, asp);
   // Split lines: every other line of pixels slides left, the lines between slide right
   float side = mod(floor(gl_FragCoord.y), 2.0) < 0.5 ? 1.0 : -1.0;
   q.x += uSplit * side;
@@ -1728,6 +1786,7 @@ void main() {
   vec3 fb = c0 + (cb - c0) * uBlur;
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
+  if (uDye > 0.0) fb = dyeBy(fb, pf, asp);
   fb = max(hueRot(fb, uHue), 0.0);
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
@@ -3425,7 +3484,7 @@ function sliderText(k, v) {
       return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
     }
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
-    case 'color': case 'warp': case 'flow': case 'melt': case 'split': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
+    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
     default: return String(v);
   }
 }
@@ -3562,6 +3621,12 @@ $('#showLoop').addEventListener('click', () => {
   syncUI();
 });
 function weights(v) { return [Math.min(1, 2 * (1 - v / 100)), Math.min(1, 2 * v / 100)]; }
+// Whether loop k looks at the other loop's picture: as an input, or to be pushed or dyed by it.
+// The other loop then keeps running even when it isn't on screen.
+function readsOther(k) {
+  const L = loops[k];
+  return [L.tgt.in1, L.tgt.in2].includes('loop') || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
+}
 // A feed pours into the other loop, so if that loop isn't on screen, raising the slider slides
 // What you see to Both. (Only for the slider itself: a MIDI fader leaves the view alone and the note explains.)
 function showFedLoop(k) {
@@ -3611,7 +3676,7 @@ function syncVisibility() {
   const hidden = (edit === 'A' ? wA : wB) === 0;
   $('#hiddenHint').hidden = !hidden;
   const other = edit === 'A' ? 'B' : 'A';
-  const feedsOther = (edit === 'A' ? mix.tgt.xab : mix.tgt.xba) > 0 || [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop');
+  const feedsOther = (edit === 'A' ? mix.tgt.xab : mix.tgt.xba) > 0 || readsOther(other);
   $('#hiddenText').textContent = feedsOther
     ? `Loop ${edit} isn’t on screen, but it still feeds loop ${other}.`
     : `Loop ${edit} isn’t on screen right now.`;
@@ -3639,6 +3704,9 @@ function syncUI() {
   $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
   $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
   in2Sel.querySelector('option[value="loop"]').textContent = `Loop ${otherK}’s picture`;
+  for (const id of ['#pushFrom', '#dyeFrom']) { const el = $(id); el.textContent = otherK; el.className = `mini ${otherK.toLowerCase()}`; }
+  $('#pushHint').textContent = `Loop ${otherK}’s picture shoves this one around: its bright parts and outlines decide where this loop slides. Works even while loop ${otherK} is hidden.`;
+  $('#dyeHint').textContent = `Loop ${otherK}’s picture soaks color into this one: wherever loop ${otherK} is bright, this loop’s colors keep turning, so loop ${otherK}’s shapes show up as rainbow bands.`;
   $('#motionCtl').hidden = !LIVE.some(usesHere);
   $('#motion').setAttribute('aria-pressed', String(!!t.motion));
   syncVisibility();
@@ -3699,6 +3767,8 @@ function randomLoop() {
     warp: Math.round(Math.random() < 0.5 ? rnd(0, 15) : rnd(15, 60)),
     flow: in1 === 'ink' || Math.random() < 0.25 ? Math.round(rnd(30, 85)) : 0,
     melt: Math.random() < 0.25 ? Math.round(rnd(25, 75)) : 0,
+    push: Math.random() < 0.2 ? Math.round(rnd(30, 75)) : 0,
+    dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
     edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
@@ -4325,6 +4395,8 @@ const PINS = {
   warp: { name: 'Warp', fields: ['warp'] },
   flow: { name: 'Flow', fields: ['flow'] },
   melt: { name: 'Melt', fields: ['melt'] },
+  push: { name: 'Pushed by the other loop', fields: ['push'] },
+  dye: { name: 'Dyed by the other loop', fields: ['dye'] },
   mirror: { name: 'Mirror', fields: ['mirror'] },
   split: { name: 'Split lines', fields: ['split'] },
   view: { name: 'What you see', fields: ['view'], mix: true },
@@ -4518,6 +4590,8 @@ function apScene() {
       warp: Math.round(Math.random() < 0.9 - 0.6 * w ? rnd(0, 5 + 20 * w) : rnd(15, 15 + 60 * w)),
       flow: Math.random() < 0.5 * w ? Math.round(rnd(30, 80)) : 0,
       melt: Math.random() < 0.4 * w ? Math.round(rnd(20, 20 + 80 * w)) : 0,
+      push: Math.random() < 0.3 * w ? Math.round(rnd(25, 25 + 60 * w)) : 0,
+      dye: Math.random() < 0.3 * w ? Math.round(rnd(20, 20 + 70 * w)) : 0,
       split: Math.random() < 0.2 * w ? Math.round(rnd(10, 10 + 60 * w)) : 0,
       mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
       edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
@@ -5515,6 +5589,18 @@ const RECIPES = [
     how: 'SHAPE · ZOOM IN 45 · MELT 80 · TRAILS 86',
     sw: 'repeating-radial-gradient(ellipse at 35% 45%,#1b0f3d 0 5px,#c77dff 5px 8px,#ffe6ff 8px 9px,#1b0f3d 9px 14px)',
     patch: { A: { in1: 'shape', form: 3, zoom: 45, spin: 14, trails: 86, color: 22, blur: -0.12, melt: 80 } } },
+  { name: 'Currents', after: 'Slide What you see to Both to see loop B, the one doing the pushing.',
+    text: 'Loop B stays hidden, but its spinning shape sweeps loop A’s trails into currents and swirls around itself.',
+    how: 'A WAVE · PUSHED BY B 75 · B SHAPE, HIDDEN',
+    sw: 'radial-gradient(ellipse at 30% 40%,transparent 0 18%,#4fd1c5 19% 21%,transparent 22% 30%,#ffae3b 31% 33%,transparent 34%),repeating-linear-gradient(115deg,#0b1d28 0 7px,#1f5f7a 7px 9px)',
+    patch: { A: { in1: 'wave', form: 3, zoom: 18, spin: 6, trails: 93, color: 14, blur: 0.05, push: 75 },
+             B: { in1: 'shape', form: 4, zoom: -20, spin: -25, trails: 88, color: 20, mirror: 4, edge: 1, blur: 0.1 } } },
+  { name: 'Rainbow ghost', after: 'Slide Dyed by B up and down to see how hard loop B soaks in. Drop in your own picture to dye that instead.',
+    text: 'Loop B never shows itself. Instead its spinning star stains the picture in loop A, so B’s shape turns up as shifting rainbow colors.',
+    how: 'A PICTURE · DYED BY B 75 · B WAVE, HIDDEN',
+    sw: 'repeating-radial-gradient(circle at 50% 50%,#ff4fa3 0 4px,#ffcf6b 4px 8px,#3bff9a 8px 12px,#3b8bff 12px 16px,#c43bff 16px 20px)',
+    patch: { A: { in1: 'picture', zoom: 30, spin: 8, trails: 88, color: 0, blur: -0.05, dye: 75 },
+             B: { in1: 'wave', form: 3, mirror: 6, zoom: -20, spin: -12, trails: 92, color: 10, edge: 1, blur: 0.1 } } },
   { name: 'Ghost trails', needs: 'camera', after: 'Wave your hands in front of the camera.',
     text: 'Only moving things get in, so waving your hands leaves glowing smears while the still room disappears.',
     how: 'CAMERA · ONLY MOVEMENT · SIZE FULL · TRAILS 95',
@@ -7147,6 +7233,8 @@ function computeWave(t, form) {
 }
 const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
 const MELT_K = 0.02;     // how far Melt at 100 lets the picture push itself in one frame
+const PUSH_K = 0.02;     // how far Pushed by the other loop at 100 moves this loop in one frame
+const DYE_K = 0.16;      // how far Dyed by the other loop at 100 turns colors in one frame, where the other loop is brightest
 
 /* ================= ink drops ================= */
 // Six droppers, each on its own uneven rhythm, land a drop of ink somewhere on screen about twice a second.
@@ -7304,6 +7392,10 @@ function runLoop(k, xf, brush, f) {
   // Gentle low on the slider, wild at the top
   set1f(fbProg, 'uMelt', Math.pow(clamp(c.melt, 0, 100) / 100, 1.3) * MELT_K * f);
   set1f(fbProg, 'uMeltTurn', simT * 0.07 + (k === 'B' ? 2.0 : 0));
+  set1f(fbProg, 'uPush', Math.pow(clamp(c.push, 0, 100) / 100, 1.3) * PUSH_K * f);
+  set1f(fbProg, 'uPushTurn', simT * 0.05 + (k === 'B' ? 3.0 : 0));
+  set1f(fbProg, 'uDye', Math.min(0.6, Math.pow(clamp(c.dye, 0, 100) / 100, 1.2) * DYE_K * f));
+  set1f(fbProg, 'uDyeTurn', simT * 0.03 + (k === 'B' ? 0.5 : 0));
   set1f(fbProg, 'uMirror', t.mirror);
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
@@ -7406,9 +7498,8 @@ function frame() {
   if (!frozen) {
     let brush = null;
     if (drawing && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
-    const feedsFromOther = (k) => [loops[k].tgt.in1, loops[k].tgt.in2].includes('loop');
-    const needA = wA > 0.001 || xab > 0.001 || feedsFromOther('B');
-    const needB = wB > 0.001 || xba > 0.001 || feedsFromOther('A');
+    const needA = wA > 0.001 || xab > 0.001 || readsOther('B');
+    const needB = wB > 0.001 || xba > 0.001 || readsOther('A');
     if (needA) runLoop('A', xba, wA > 0.01 ? brush : null, f);
     if (needB) runLoop('B', xab, wB > 0.01 ? brush : null, f);
   }

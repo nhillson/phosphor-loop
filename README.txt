@@ -146,7 +146,7 @@ TIPS
   - Crowded controls? Click any section heading to fold it away, or use
     "Collapse all" at the top of the controls.
   - Press the Guide button (top right) or G for a tour of every control and
-    eight one-click recipes.
+    a set of one-click recipes.
   - Share this tab (Screen input) or aim the phone at the monitor for
     classic "camera pointed at the TV" feedback.
   - Loop B: slide "What you see" to Both, then raise "Feed A into B" and/or
@@ -160,6 +160,14 @@ TIPS
     how bright each spot is decides which way it slides, so the echoes fold
     into each other like marbling. Low is a gentle drip, high is wild.
     Keep Trails high. The Guide's "Marbled" recipe sets it up in one click.
+  - Pushed by B and Dyed by B (right under Melt; they say "by A" when you're
+    shaping loop B) let the other loop's picture reshape this one without
+    ever showing it. Pushed by: the other loop's bright parts and outlines
+    sweep this loop's trails into currents and swirls, like Melt driven by
+    the other loop. Dyed by: wherever the other loop is bright, this loop's
+    colors get stained and keep turning, so its shapes show up as shifting
+    rainbow bands. Both keep the other loop running even when it's hidden.
+    The Guide's "Currents" and "Rainbow ghost" recipes show them off.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
