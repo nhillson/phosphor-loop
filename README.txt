@@ -187,8 +187,12 @@ TIPS
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
-    it, or just move that slider, and the setting stays put while Autopilot
-    keeps changing everything else. Tap a lit pin to let it go again.
+    it, or just move that slider, and the setting stays put on the loop
+    you're changing (the A or B tab) while Autopilot keeps changing
+    everything else. Tap a lit pin to let it go again.
+  - Pin on both loops: right-click a pin (or press and hold it on a
+    touchscreen) and the setting stays put on both loops, the same on each.
+    The pin then says AB. Right-click it again to let it go on both.
   - Autopilot settings (the section under Channels): how often a new look
     comes, how slowly it fades in, how wild it gets, and how often it mixes
     the two loops. "Change on the beat" makes each new look cut in on a beat

@@ -426,6 +426,10 @@
   .pin[aria-pressed="true"] { color: var(--amber); border-color: var(--amber); background: rgba(255,174,59,.12); }
   .editor[data-loop="B"] .pin[aria-pressed="true"] { background: rgba(79,209,197,.12); }
   .ap-on .pin, .pin[aria-pressed="true"] { display: inline-grid; }
+  /* A pin holding the setting on both loops (right-click) is wider and says AB */
+  .pin .pin-ab { display: none; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; line-height: 1; }
+  .pin.both { width: auto; padding: 0 7px; grid-auto-flow: column; gap: 4px; }
+  .pin.both .pin-ab { display: block; }
   .ctl-head:has(.pin) { align-items: center; }
   .ap-state { margin: 0; font-size: 14px; color: var(--dim); }
   .ap-state b { color: var(--ink); font-weight: 600; }
@@ -1183,7 +1187,7 @@
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Press it again to stop.</dd>
-            <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on both loops while Autopilot keeps changing the rest. Tap a lit pin to let it go. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
+            <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Double-click a slider there to put it back.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
@@ -3854,6 +3858,7 @@ function setEdit(k) {
   $('#h-in').textContent = `What feeds loop ${k}`;
   $('#h-shape').textContent = `Shape loop ${k}`;
   syncUI();
+  syncPins();
 }
 $('#showLoop').addEventListener('click', () => {
   takeOver('view');
@@ -4625,7 +4630,8 @@ $('#neutral').addEventListener('click', neutral);
 /* ================= autopilot ================= */
 // Every half minute or so (New look every, under Autopilot settings) the hidden loop gets a new look, then the
 // view glides over to it, sometimes resting on both loops at once. The loop on screen keeps drifting in between.
-// Pinned settings stay where they are on both loops; Autopilot changes everything else.
+// Pinned settings stay where they are while Autopilot changes everything else. A pin holds its setting on the
+// loop being edited only; right-click it (or press and hold it on a touchscreen) to hold it on both loops at once.
 const ap = { on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {} };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
@@ -4666,7 +4672,7 @@ try {
     apSet.beat = s.beat === true;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(s.off);
-    if (Array.isArray(s.pins)) s.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
+    if (Array.isArray(s.pins)) s.pins.forEach(addSavedPin);
   }
 } catch (_) {}
 // Whether Autopilot may bring in this input (one switched off under Autopilot settings stays out)
@@ -4676,7 +4682,31 @@ function saveAp() {
 }
 const apEverySec = () => 10 * Math.pow(12, apSet.every / 100);   // 10 seconds to 2 minutes; 30 by default
 const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100);    // 1.5 to 30 seconds; 10 by default
-const pinned = (k) => ap.on && ap.pins.has(k);
+// Each pin has a name: a setting under Mix the two loops is just its own ("view"); a loop's setting also says
+// which loop it holds: "zoom@A", "zoom@B", or "zoom@both" for one pinned on both loops with a right-click.
+function pinParse(id) {
+  const [key, where] = String(id).split('@');
+  return { key, where: where || null };
+}
+// Whether a setting is pinned on loop L, on its own or on both loops (the Mix settings belong to both anyway)
+function isPinned(key, L) {
+  const P = PINS[key];
+  if (!P) return false;
+  if (P.mix) return ap.pins.has(key);
+  return ap.pins.has(`${key}@${L}`) || ap.pins.has(`${key}@both`);
+}
+function pinnedBoth(key) { return !!PINS[key] && !PINS[key].mix && ap.pins.has(`${key}@both`); }
+// Pins saved before pins were per loop held their setting on both loops, so they still do
+function addSavedPin(id) {
+  const { key, where } = pinParse(id);
+  const P = PINS[key];
+  if (!P) return;
+  if (P.mix) { if (!where) ap.pins.add(key); return; }
+  if (!where || where === 'both') ap.pins.add(`${key}@both`);
+  else if (where === 'A' || where === 'B') ap.pins.add(`${key}@${where}`);
+}
+function unpinKey(key, where) { const id = `${key}@${where}`; ap.pins.delete(id); delete ap.pinVal[id]; }
+const pinned = (k, L) => ap.on && isPinned(k, L);
 
 // Two Autopilot buttons: one under Channels, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
@@ -4691,8 +4721,8 @@ function setAutopilot(on, quiet) {
     setDrift(true);
     channel = -1;
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
-    // Pinned settings start from what the sliders show now, on both loops
-    for (const k of ap.pins) holdPin(k, edit);
+    // Pinned settings start from what the sliders show now (a pin on both loops from the loop being edited)
+    for (const id of ap.pins) holdPin(id, edit);
     settleDevices();
     syncUI();
     if (!quiet) {
@@ -4713,15 +4743,18 @@ function setAutopilot(on, quiet) {
 function takeOver(key, from) {
   if (!ap.on) return;
   if (key && PINS[key] && apSet.touch === 'pin') {
-    const fresh = !ap.pins.has(key);
-    ap.pins.add(key);
-    const loopKey = from || edit;
-    queueMicrotask(() => holdPin(key, loopKey));
+    const P = PINS[key], loopKey = from || edit;
+    const fresh = !isPinned(key, loopKey);
+    // Only the loop being changed gets pinned, unless this setting is already pinned on both loops
+    const id = P.mix ? key : pinnedBoth(key) ? `${key}@both` : `${key}@${loopKey}`;
+    ap.pins.add(id);
+    queueMicrotask(() => holdPin(id, loopKey));
     if (fresh) {
       syncPins();
       saveAp();
       apStatus();
-      toast(`Pinned ${PINS[key].name}. Autopilot keeps changing the rest. Tap its pin to let it go.`);
+      toast(P.mix ? `Pinned ${P.name}. Autopilot keeps changing the rest. Tap its pin to let it go.`
+        : `Pinned ${P.name} on loop ${loopKey}. Tap its pin to let it go, or right-click the pin to hold it on both loops.`);
     }
     return;
   }
@@ -4730,42 +4763,85 @@ function takeOver(key, from) {
 }
 apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
 
-// Holds a pinned setting at the value it has on loop `from`, and while Autopilot runs puts it on both loops,
-// so it stays put whichever loop is on screen
-function holdPin(key, from) {
+// Holds a pinned setting where it is. A pin on one loop holds that loop's setting. A pin on both loops takes the
+// setting from loop `from` and, while Autopilot runs, puts it on the other loop too, so it stays put whichever
+// loop is on screen.
+function holdPin(id, from) {
+  if (!ap.pins.has(id)) return;
+  const { key, where } = pinParse(id);
   const P = PINS[key];
-  if (!P || !ap.pins.has(key)) return;
-  const src = P.mix ? mix.tgt : loops[from].tgt;
+  if (!P) return;
+  const L = where === 'A' || where === 'B' ? where : from;
+  const src = P.mix ? mix.tgt : loops[L].tgt;
   const v = {};
   for (const f of P.fields) v[f] = src[f];
-  ap.pinVal[key] = v;
-  if (P.mix || !ap.on) return;
+  ap.pinVal[id] = v;
+  if (where !== 'both' || !ap.on) return;
   // "The other loop's picture" means something different on each loop, so that input stays on its own loop
   if (key === 'in1' && v.in1 === 'loop') return;
-  Object.assign(loops[from === 'A' ? 'B' : 'A'].tgt, v);
+  Object.assign(loops[L === 'A' ? 'B' : 'A'].tgt, v);
   if (key === 'in1' || key === 'in2') settleDevices();
 }
-// Puts the pinned values into a new look
-function withPins(sc, only) {
-  for (const k of ap.pins) {
-    if (PINS[k].mix || (only && !only.includes(k)) || !ap.pinVal[k]) continue;
-    Object.assign(sc, ap.pinVal[k]);
+// Puts the values pinned on loop k (or on both loops) into a new look for loop k
+function withPins(sc, k, only) {
+  for (const id of ap.pins) {
+    const { key, where } = pinParse(id);
+    const P = PINS[key];
+    if (!P || P.mix || (where !== k && where !== 'both') || (only && !only.includes(key)) || !ap.pinVal[id]) continue;
+    Object.assign(sc, ap.pinVal[id]);
   }
   return sc;
 }
+function pinsChanged() { syncPins(); saveAp(); apStatus(); }
+// Tapping a pin: pins or frees the setting on the loop being edited only
 function togglePin(key) {
-  if (ap.pins.has(key)) {
-    ap.pins.delete(key);
-    delete ap.pinVal[key];
-    toast(ap.on ? `${PINS[key].name} is free again. Autopilot changes it from its next look.` : `${PINS[key].name} is no longer pinned.`);
-  } else {
-    ap.pins.add(key);
-    holdPin(key, edit);
-    toast(ap.on ? `Pinned ${PINS[key].name}. Autopilot keeps changing the rest.` : `Pinned ${PINS[key].name}. Autopilot will leave it where it is.`);
+  const P = PINS[key], name = P.name;
+  if (P.mix) {
+    if (ap.pins.has(key)) {
+      ap.pins.delete(key);
+      delete ap.pinVal[key];
+      toast(ap.on ? `${name} is free again. Autopilot changes it from its next look.` : `${name} is no longer pinned.`);
+    } else {
+      ap.pins.add(key);
+      holdPin(key, edit);
+      toast(ap.on ? `Pinned ${name}. Autopilot keeps changing the rest.` : `Pinned ${name}. Autopilot will leave it where it is.`);
+    }
+    pinsChanged();
+    return;
   }
-  syncPins();
-  saveAp();
-  apStatus();
+  const L = edit, other = L === 'A' ? 'B' : 'A';
+  if (isPinned(key, L)) {
+    // Freed on this loop only: a pin on both loops stays on the other one
+    if (pinnedBoth(key)) {
+      const v = ap.pinVal[`${key}@both`];
+      unpinKey(key, 'both');
+      ap.pins.add(`${key}@${other}`);
+      if (v) ap.pinVal[`${key}@${other}`] = v; else holdPin(`${key}@${other}`, other);
+    }
+    unpinKey(key, L);
+    toast(ap.on ? `${name} is free again on loop ${L}. Autopilot changes it there from its next look.` : `${name} is no longer pinned on loop ${L}.`);
+  } else {
+    ap.pins.add(`${key}@${L}`);
+    holdPin(`${key}@${L}`, L);
+    toast(`Pinned ${name} on loop ${L}. Right-click the pin to hold it on both loops.`);
+  }
+  pinsChanged();
+}
+// Right-clicking a pin (or pressing and holding it on a touchscreen): pins the setting on both loops, the same on
+// each (taken from the loop being edited), or frees it on both if it's pinned on both already
+function togglePinBoth(key) {
+  const P = PINS[key], name = P.name;
+  if (P.mix) { togglePin(key); return; }
+  const wasBoth = pinnedBoth(key) || (isPinned(key, 'A') && isPinned(key, 'B'));
+  for (const w of ['A', 'B', 'both']) unpinKey(key, w);
+  if (wasBoth) {
+    toast(ap.on ? `${name} is free again on both loops.` : `${name} is no longer pinned on either loop.`);
+  } else {
+    ap.pins.add(`${key}@both`);
+    holdPin(`${key}@both`, edit);
+    toast(`Pinned ${name} on both loops, where loop ${edit} has it. Right-click the pin again to free both.`);
+  }
+  pinsChanged();
 }
 // A small pin beside each setting Autopilot can change. They show while Autopilot runs, and whenever one is pinned.
 const PIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h6v1.2L10 3v3.5L12.5 9v1.2H8.6V15H7.4v-4.8H3.5V9L6 6.5V3L5 2.2z" fill="currentColor"/></svg>';
@@ -4779,20 +4855,35 @@ for (const key of Object.keys(PINS)) {
   b.dataset.pin = key;
   b.setAttribute('aria-pressed', 'false');
   b.setAttribute('aria-label', `Pin ${PINS[key].name}`);
-  b.innerHTML = PIN_ICON;
+  b.innerHTML = PIN_ICON + '<span class="pin-ab" aria-hidden="true">AB</span>';
   b.addEventListener('click', () => togglePin(key));
+  // Right-click, or press and hold on a touchscreen: both loops
+  b.addEventListener('contextmenu', (e) => { e.preventDefault(); togglePinBoth(key); });
   head.insertBefore(b, head.querySelector('output'));
 }
+// The pins show the loop being edited: lit when the setting is pinned on it, and marked AB when it's pinned on both
 function syncPins() {
   $$('.pin').forEach((b) => {
-    const on = ap.pins.has(b.dataset.pin), name = PINS[b.dataset.pin].name;
+    const key = b.dataset.pin, P = PINS[key], name = P.name;
+    const on = isPinned(key, edit), both = !P.mix && isPinned(key, 'A') && isPinned(key, 'B');
     b.setAttribute('aria-pressed', String(on));
-    b.title = on ? `${name} is pinned: Autopilot leaves it alone. Tap to let Autopilot change it again.`
-                 : `Pin ${name}: Autopilot leaves it where it is`;
+    b.classList.toggle('both', both);
+    b.setAttribute('aria-label', both ? `${name} is pinned on both loops` : `Pin ${name}${P.mix ? '' : ` on loop ${edit}`}`);
+    b.title = P.mix
+      ? (on ? `${name} is pinned: Autopilot leaves it alone. Tap to let Autopilot change it again.` : `Pin ${name}: Autopilot leaves it where it is`)
+      : both ? `${name} is pinned on both loops. Tap to free it on loop ${edit} only; right-click to free it on both.`
+      : on ? `${name} is pinned on loop ${edit}. Tap to let Autopilot change it again; right-click to pin it on both loops.`
+      : `Pin ${name} on loop ${edit}: Autopilot leaves it where it is. Right-click to pin it on both loops.`;
   });
-  const names = [...ap.pins].map((k) => PINS[k].name);
+  const names = [];
+  for (const [key, P] of Object.entries(PINS)) {
+    if (P.mix) { if (ap.pins.has(key)) names.push(P.name); continue; }
+    const a = isPinned(key, 'A'), b = isPinned(key, 'B');
+    if (a && b) names.push(`${P.name} (both loops)`);
+    else if (a || b) names.push(`${P.name} (loop ${a ? 'A' : 'B'})`);
+  }
   $('#apPinList').textContent = names.length ? names.join(' · ')
-    : 'Nothing pinned. While Autopilot runs, a pin shows beside each setting. Tap it, or just move that slider, to keep the setting where it is.';
+    : 'Nothing pinned. While Autopilot runs, a pin shows beside each setting. Tap it, or just move that slider, to keep the setting where it is on the loop you’re changing. Right-click a pin to keep it on both loops.';
   $('#apUnpin').hidden = !names.length;
 }
 
@@ -4817,7 +4908,8 @@ function apRealInput() {
 }
 // A new look. How wild (w) stretches how far it zooms, spins and tints, and how often it warps, flows and melts;
 // at the middle of the slider it behaves as Autopilot always has.
-function apScene() {
+// (k: the loop it's for, whose own pins it keeps)
+function apScene(k) {
   const pool = apPool(), w = apSet.wild / 100;
   let sc;
   if (Math.random() < 0.45) {
@@ -4848,20 +4940,20 @@ function apScene() {
     if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
   }
   // Pinned inputs go in first, so the size below suits the input really used
-  withPins(sc, ['in1', 'in2']);
-  if (sc.in2 && sc.in2 === sc.in1 && !ap.pins.has('in2')) sc.in2 = 'none';
+  withPins(sc, k, ['in1', 'in2']);
+  if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
   if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
   if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
   if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
   if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
     sc.size = Math.round(rnd(60, 100));
-    if (!ap.pins.has('in1')) sc.motion = Math.random() < 0.35;
+    if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
   }
   if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
-    if (!ap.pins.has('in1')) sc.specRound = Math.random() < 0.5;
+    if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
     if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
   }
-  withPins(sc);
+  withPins(sc, k);
   return sc;
 }
 function clearLoop(k) {
@@ -4871,7 +4963,7 @@ function clearLoop(k) {
 }
 function nudge(k) {
   const t = loops[k].tgt, j = 0.2 + 1.6 * apSet.wild / 100;
-  const move = (key, by, lo, hi) => { if (!ap.pins.has(key)) t[key] = Math.round(clamp(t[key] + rnd(-by, by) * j, lo, hi)); };
+  const move = (key, by, lo, hi) => { if (!isPinned(key, k)) t[key] = Math.round(clamp(t[key] + rnd(-by, by) * j, lo, hi)); };
   move('zoom', 15, -60, 80);
   move('spin', 15, -70, 70);
   move('color', 8, 0, 45);
@@ -4881,16 +4973,16 @@ function nudge(k) {
 // already above 75, a new look from Autopilot keeps this loop's Trails at 75 or below (unless Trails is pinned).
 const AP_TRAILS_MAX = 75;
 function capTrails(sc, other) {
-  if (ap.pins.has('trails')) return;
+  if (isPinned('trails', other === 'A' ? 'B' : 'A')) return;
   if (loops[other].tgt.trails > AP_TRAILS_MAX && (sc.trails ?? loopDefaults().trails) > AP_TRAILS_MAX) sc.trails = Math.round(rnd(62, AP_TRAILS_MAX));
 }
 // A hidden loop gets a whole new look at once, from a clean slate
 function freshLook(k, shown) {
-  const sc = apScene();
+  const sc = apScene(k);
   // Two loops that only feed on each other fade to black, so one of them keeps a real input
   if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) {
-    if (!ap.pins.has('in1')) sc.in1 = apRealInput();
-    else if (!ap.pins.has('in2')) { sc.in2 = apRealInput(); sc.blend = 50; }
+    if (!isPinned('in1', k)) sc.in1 = apRealInput();
+    else if (!isPinned('in2', k)) { sc.in2 = apRealInput(); sc.blend = 50; }
   }
   capTrails(sc, shown);
   patchLoop(k, sc, true);
@@ -4901,16 +4993,16 @@ function freshLook(k, shown) {
 // With What you see pinned, a loop on screen changes in place instead, gliding into its new look.
 // Most of the time it keeps its input and mirror, so the picture changes shape rather than jumping.
 function glideLook(k) {
-  const L = loops[k], sc = apScene();
+  const L = loops[k], sc = apScene(k);
   if (Math.random() < 0.7) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs, unless one of them has been switched off under Autopilot settings
   if (Math.random() < 0.65 && apAllowed(L.tgt.in1)) {
     for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
-  withPins(sc);
+  withPins(sc, k);
   const other = k === 'A' ? 'B' : 'A';
-  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = apRealInput();
+  if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !isPinned('in1', k)) sc.in1 = apRealInput();
   capTrails(sc, other);
   patchLoop(k, sc, true);
 }
@@ -6165,7 +6257,7 @@ function loadPreset(pr, quiet) {
     apSet.off = cleanOff(a.off);
     ap.pins.clear();
     ap.pinVal = {};
-    if (Array.isArray(a.pins)) a.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
+    if (Array.isArray(a.pins)) a.pins.forEach(addSavedPin);
     saveAp();
     syncApUI();
     setAutopilot(true, true);
@@ -7697,7 +7789,7 @@ function runLoop(k, xf, brush, f) {
     const calm = still * Math.max(0, 1 - 1.2 * clamp(c.flow, 0, 100) / 100);
     // Under Autopilot, How wild sets how far it drifts, and a pinned setting doesn't drift at all
     const amt = ap.on ? 0.4 + 1.2 * apSet.wild / 100 : 1;
-    const free = (key) => (pinned(key) ? 0 : amt);
+    const free = (key) => (pinned(key, k) ? 0 : amt);
     z += 22 * calm * free('zoom') * Math.sin(d * 0.13);
     s += 26 * calm * free('spin') * Math.sin(d * 0.071 + 1.3);
     col += 12 * free('color') * (0.5 + 0.5 * Math.sin(d * 0.05));
@@ -7836,7 +7928,7 @@ function frame() {
   const kMix = ap.on ? 1 - Math.exp(-dt * glide * 0.73) : k;
   for (const key of ['A', 'B']) {
     const L = loops[key];
-    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p) ? k : kLoop);
+    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p, key) ? k : kLoop);
   }
   for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (pinned(p) ? k : kMix);
   if (ap.on && !frozen && now >= ap.next) apTick(now);
