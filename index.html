@@ -318,6 +318,8 @@
   .seg-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ctl .seg + .hint, .ctl .ends + .seg { margin-top: 4px; }
   .seg-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .seg button {
     min-height: 36px; padding: 6px 2px; border-radius: 6px;
@@ -839,6 +841,7 @@
             <button data-src="bars" aria-pressed="false">Bars</button>
             <button data-src="sparks" aria-pressed="false">Sparks</button>
             <button data-src="ink" aria-pressed="false">Ink</button>
+            <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
             <button data-src="none" aria-pressed="false">Nothing</button>
@@ -869,6 +872,21 @@
               </div>
             </div>
             <span class="hint" id="specHint">Low sounds at the bottom, high at the top; the louder, the brighter. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</span>
+          </div>
+
+          <div class="dev" id="row-text" hidden>
+            <label for="textIn" class="lbl">Your text</label>
+            <div class="preset-row"><input type="text" id="textIn" maxlength="60" autocomplete="off" spellcheck="false" placeholder="Type anything"></div>
+            <div class="ctl">
+              <span class="lbl" id="textStyleLbl">Style</span>
+              <div class="seg seg-4" id="textStyle" role="group" aria-labelledby="textStyleLbl">
+                <button data-tstyle="bold" aria-pressed="true">Bold</button>
+                <button data-tstyle="outline" aria-pressed="false">Outline</button>
+                <button data-tstyle="serif" aria-pressed="false">Classic</button>
+                <button data-tstyle="mono" aria-pressed="false">Typewriter</button>
+              </div>
+            </div>
+            <span class="hint">Type a name, a word or the venue and it echoes through the loop. The picture changes as you type, and presets keep what you typed. Long text wraps onto more lines by itself.</span>
           </div>
 
           <div class="dev" id="row-loop" hidden>
@@ -1039,6 +1057,17 @@
             <span class="hint" id="dyeHint">Loop B’s picture soaks color into this one: wherever loop B is bright, this loop’s colors keep turning, so loop B’s shapes show up as rainbow bands.</span>
           </div>
           <div class="ctl">
+            <div class="ctl-head"><label for="grow">Grow</label><output id="growOut" for="grow"></output></div>
+            <input type="range" id="grow" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Spreading</span></div>
+            <div class="seg seg-3" id="growSize" role="group" aria-label="How big the patterns are">
+              <button data-gsize="0" aria-pressed="false">Fine</button>
+              <button data-gsize="1" aria-pressed="true">Medium</button>
+              <button data-gsize="2" aria-pressed="false">Big</button>
+            </div>
+            <span class="hint">The picture grows patterns out of itself, like coral, zebra stripes or fingerprints. They start at its outlines and spread through everything lit. Keep Trails high.</span>
+          </div>
+          <div class="ctl">
             <div class="ctl-head"><span class="lbl" id="mirrorLbl">Mirror</span><output id="mirrorOut"></output></div>
             <div class="seg seg-5" id="mirror" role="group" aria-labelledby="mirrorLbl">
               <button data-mirror="0" aria-pressed="false">Off</button>
@@ -1053,6 +1082,17 @@
             <input type="range" id="split" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Far apart</span></div>
             <span class="hint">Every other line of the picture slides left and the lines between slide right.</span>
+          </div>
+          <div class="ctl" id="timeCtl">
+            <div class="ctl-head"><label for="time">Time warp</label><output id="timeOut" for="time"></output></div>
+            <input type="range" id="time" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Further back</span></div>
+            <div class="seg seg-3" id="timeShape" role="group" aria-label="Which way time runs across the picture">
+              <button data-tshape="0" aria-pressed="true">Top to bottom</button>
+              <button data-tshape="1" aria-pressed="false">Side to side</button>
+              <button data-tshape="2" aria-pressed="false">From the middle</button>
+            </div>
+            <span class="hint">Each part of the picture shows a different moment. One edge (or the middle) is right now, and the further from it, the longer ago, so anything moving stretches into ribbons and waves.</span>
           </div>
         </div>
       </section>
@@ -1137,7 +1177,7 @@
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
           <div class="g-card"><h3>Channels</h3><dl>
-            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways.</dd>
+            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways. Coral grows zebra stripes and mazes out of a mandala, and Ribbons stretches a spinning pattern through time.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
@@ -1152,8 +1192,9 @@
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
-            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of ten 3D worlds to fly through, circle round or drift past. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
+            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of nine 3D worlds to fly through, circle round or drift past. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
+            <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery (they work from a MIDI controller too). Your own picture… loads a file of yours.</dd>
             <dt>Video</dt><dd>Your own file. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
@@ -1173,8 +1214,10 @@
             <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>
             <dt>Pushed by the other loop</dt><dd>Like Melt, but the other loop does the pushing. Its bright parts decide which way this loop slides and its outlines drag this loop’s trails along them, so the other loop’s shapes show up as currents and swirls. It works even while the other loop is hidden. Works best with Trails high.</dd>
             <dt>Dyed by the other loop</dt><dd>The other loop soaks color into this one. Wherever it’s bright, this loop’s colors keep turning round the rainbow, so its shapes show up here as shifting rainbow bands. Grey and white parts pick up color too.</dd>
+            <dt>Grow</dt><dd>The picture grows patterns out of itself, the way stripes and spots form on animals: coral, zebra stripes, fingerprints, mazes. They start at outlines and spread through anything lit, and keep re-forming as the loop zooms and spins. Fine, Medium and Big set how far apart the stripes sit. Low is a fine texture, high takes over the whole picture. Keep Trails high.</dd>
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
+            <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
           </dl></div>
           <div class="g-card"><h3>React to sound</h3><dl>
             <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: on the Entire Screen tab pick any screen (with two monitors, Screen 1 or Screen 2 both give the whole computer’s sound) and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
@@ -1301,18 +1344,19 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, cubes: 13, horizon: 14, cavern: 15,
-                 blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
+                 blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1 };
+           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           grow: 0, growSize: 1, time: 0, timeShape: 0 };
 }
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split'];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time'];
 const MIX_SLIDERS = ['view', 'xab', 'xba'];
 // What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
@@ -1359,11 +1403,15 @@ const CHANNELS = [
   { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
     sw: 'radial-gradient(circle at 56% 40%,#fff 0 3%,transparent 7%),radial-gradient(ellipse at 34% 46%,rgba(255,80,170,.85) 0,transparent 48%),radial-gradient(ellipse at 66% 56%,rgba(90,110,255,.85) 0,transparent 52%),#0a0514' },
   { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 76% 22%,#fff4dc 0 5%,transparent 6%),linear-gradient(#ffb04a,#ffb04a) 14% 64%/3px 3px no-repeat,linear-gradient(#ff6fb5,#ff6fb5) 38% 50%/3px 3px no-repeat,linear-gradient(#ffe6a0,#ffe6a0) 60% 72%/3px 3px no-repeat,linear-gradient(#ff6fb5,#ff6fb5) 88% 62%/3px 3px no-repeat,linear-gradient(#2c34f0,#2c34f0) 6% 100%/22% 54% no-repeat,linear-gradient(#5a3cd0,#5a3cd0) 36% 100%/18% 74% no-repeat,linear-gradient(#7474ff,#7474ff) 62% 100%/22% 46% no-repeat,linear-gradient(#1c1f9a,#1c1f9a) 92% 100%/20% 62% no-repeat,linear-gradient(180deg,#0b0a40,#2330f0 62%,#a24cf0)' }
+    sw: 'radial-gradient(circle at 76% 22%,#fff4dc 0 5%,transparent 6%),linear-gradient(#ffb04a,#ffb04a) 14% 64%/3px 3px no-repeat,linear-gradient(#ff6fb5,#ff6fb5) 38% 50%/3px 3px no-repeat,linear-gradient(#ffe6a0,#ffe6a0) 60% 72%/3px 3px no-repeat,linear-gradient(#ff6fb5,#ff6fb5) 88% 62%/3px 3px no-repeat,linear-gradient(#2c34f0,#2c34f0) 6% 100%/22% 54% no-repeat,linear-gradient(#5a3cd0,#5a3cd0) 36% 100%/18% 74% no-repeat,linear-gradient(#7474ff,#7474ff) 62% 100%/22% 46% no-repeat,linear-gradient(#1c1f9a,#1c1f9a) 92% 100%/20% 62% no-repeat,linear-gradient(180deg,#0b0a40,#2330f0 62%,#a24cf0)' },
+  { name: 'Coral', A: { in1: 'wave', form: 3, zoom: 14, trails: 92, color: 24, warp: 6, mirror: 6, blur: 0.1, grow: 60, growSize: 1 },
+    sw: 'repeating-radial-gradient(circle at 50% 55%,#06120f 0 3px,#3bffb0 3px 5px,#eafff6 5px 6px,#06120f 6px 9px)' },
+  { name: 'Ribbons', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1, time: 85, timeShape: 2 },
+    sw: 'repeating-linear-gradient(100deg,#1a0b2e 0 5px,#ff4fa3 5px 8px,#ffcf6b 8px 10px,#3b8bff 10px 13px)' }
 ];
 
 /* ================= state ================= */
-function mkLoop() { const d = loopDefaults(); return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0 }; }
+function mkLoop() { const d = loopDefaults(); return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0, tw: null }; }
 const loops = { A: mkLoop(), B: mkLoop() };
 const mixDefaults = { view: 0, xab: 0, xba: 0 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
@@ -1413,7 +1461,7 @@ vec3 hsv(float h, float s, float v) {
 
 const FS_FEEDBACK = `#version 300 es
 precision highp float;
-uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev, uScene1, uScene2;
+uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev, uScene1, uScene2, uText;
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
@@ -1421,6 +1469,8 @@ uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
 uniform float uPush, uPushTurn;   // Pushed by the other loop: the same idea, but the other loop's picture does the pushing
 uniform float uDye, uDyeTurn;     // Dyed by the other loop: how far its bright parts turn this loop's colors this frame
+uniform float uGrow, uGrowR, uGrowTurn;   // Grow: how fast patterns grow this frame, how far apart their stripes sit (pixels), and a turn that changes every frame
+uniform float uAspText;   // the Text input's picture: how wide it is for its height
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
@@ -1613,6 +1663,37 @@ vec3 dyeBy(vec3 c, vec2 p, float asp) {
   tint = clamp(tint * (l / max(luma(tint), 0.05)), 0.0, 1.0);
   return mix(c, tint, clamp(k * (0.7 + grey), 0.0, 1.0));
 }
+// Grow: the picture grows patterns out of itself, the way stripes and spots form on animals. Each spot compares
+// how bright it is up close with how bright a ring around it is. Brighter than its ring, it gets brighter, in its own
+// color; darker than its ring, it gets darker. Bright places shade their surroundings, so the light settles into
+// stripes, spots and coral-like mazes about two ring-widths apart. They start at outlines and spread through
+// anything lit, while zoom, spin and the rest keep moving them, so they keep growing and re-forming.
+vec3 growAt(vec3 c, vec3 near, vec2 st) {
+  vec2 px = 1.0 / uSim;
+  float lc = luma(c);
+  float la = luma(mix(c, near, 0.8));
+  // The ring: two circles of samples, turned a different way every frame so no direction is favoured
+  float li = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float a = uGrowTurn + float(i) * 0.7853982;
+    li += luma(texture(uPrev, st + vec2(cos(a), sin(a)) * uGrowR * px).rgb);
+  }
+  for (int i = 0; i < 6; i++) {
+    float a = 0.5 - uGrowTurn * 1.3 + float(i) * 1.0471976;
+    li += 0.75 * luma(texture(uPrev, st + vec2(cos(a), sin(a)) * (uGrowR * 0.6) * px).rgb);
+  }
+  li /= 12.5;
+  float x = la - li;
+  // A whisper of noise where there is already some light, so patterns can start up in smooth, even patches
+  x += (hash(gl_FragCoord.xy * 0.731 + fract(uGrowTurn * 0.159) * 97.0) - 0.5) * 0.02 * smoothstep(0.02, 0.25, la);
+  float lt = clamp(lc + uGrow * tanh(x * 12.0), 0.0, 1.0);
+  // Only the brightness changes, never the color: a spot keeps its own color, and a dark spot that lights up
+  // takes the color of what's around it (white only where there is no color at all)
+  float ln = luma(near);
+  vec3 hue = mix(near / max(ln, 1e-4), c / max(lc, 1e-4), smoothstep(0.02, 0.08, lc));
+  hue = mix(vec3(1.0), hue, smoothstep(0.0, 0.015, max(lc, ln)));
+  return clamp(hue * lt, 0.0, 1.0);
+}
 // The spectrograph (see writeSpec): a picture of the sound. Each row of uSpec is one moment and runs from
 // the lowest pitch on the left to the highest on the right; new rows are written over the oldest, like a ring.
 uniform sampler2D uSpec;
@@ -1713,6 +1794,15 @@ vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, f
   }
   return c * e.x * e.y;
 }
+// Text: the words typed under Text, drawn white (with a soft glow) into their own picture and tinted here with
+// slowly turning colors. At Input size 100 they reach nearly across the screen, at 50 a bit over half way.
+vec3 seedText(vec2 p, float t) {
+  float w = 0.95 * (uSim.x / uSim.y) * pow(uScale / 2.5, 0.6);
+  vec2 q = p / vec2(w, w / uAspText) + 0.5;
+  if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) return vec3(0.0);
+  float l = texture(uText, q).r;
+  return hsv(fract(t * 0.05 + q.x * 0.3), 0.55, 1.0) * l;
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -1721,6 +1811,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 3) return seedSparks(g, uTime);
   if (id == 11) return seedInk(p);
   if (id == 22) return seedSpec(p);
+  if (id == 24) return seedText(p, uTime);
   // The 3D worlds (Cubes to Nebula, and City), each drawn just before this pass (see draw3D) filling the screen
   if ((id >= 13 && id <= 21) || id == 23) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);
@@ -1764,6 +1855,7 @@ void main() {
   vec3 cb = 0.25 * (texture(uPrev, st + vec2(px.x, 0.0)).rgb + texture(uPrev, st - vec2(px.x, 0.0)).rgb +
                     texture(uPrev, st + vec2(0.0, px.y)).rgb + texture(uPrev, st - vec2(0.0, px.y)).rgb);
   vec3 fb = c0 + (cb - c0) * uBlur;
+  if (uGrow > 0.0) fb = growAt(fb, cb, st);
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   if (uDye > 0.0) fb = dyeBy(fb, pf, asp);
@@ -1804,6 +1896,40 @@ void main() {
   vec3 a = texture(uA, uv).rgb * uWA;
   vec3 b = texture(uB, uv).rgb * uWB;
   o = vec4(1.0 - (1.0 - a) * (1.0 - b), 1.0);
+}`;
+
+// Time warp: each part of a loop's picture comes from a different moment. The loop's recent frames are kept
+// (see twStep) in a stack, newest on top; how far each pixel is from the "now" edge (or the middle) picks how
+// far down the stack it reads, blending between neighbouring frames so the picture never steps.
+const FS_TIMEWARP = `#version 300 es
+precision highp float;
+precision highp sampler2DArray;
+uniform sampler2D uNow;
+uniform sampler2DArray uHist;
+uniform vec2 uSim;
+uniform float uHead, uFilled, uLayers, uSince, uRate, uSpan, uShape;
+out vec4 o;
+vec3 kept(float j, vec2 uv) { return texture(uHist, vec3(uv, mod(uHead - j + uLayers, uLayers))).rgb; }
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  float asp = uSim.x / uSim.y;
+  float d;
+  if (uShape < 0.5) d = 1.0 - uv.y;            // the top is now, the bottom is longest ago
+  else if (uShape < 1.5) d = uv.x;             // the left is now, the right is longest ago
+  else d = min(1.0, length((uv - 0.5) * vec2(asp, 1.0)) / (0.5 * length(vec2(asp, 1.0))));   // the middle is now
+  float age = d * uSpan;                       // seconds ago
+  vec3 now = texture(uNow, uv).rgb;
+  if (uFilled < 1.0) { o = vec4(now, 1.0); return; }
+  // The newest kept frame is uSince old; between it and now, blend the two
+  float j = (age - uSince) * uRate;
+  if (j <= 0.0) {
+    float a = uSince > 0.0 ? clamp(age / uSince, 0.0, 1.0) : 1.0;
+    o = vec4(mix(now, kept(0.0, uv), a), 1.0);
+    return;
+  }
+  j = min(j, uFilled - 1.0);
+  float j0 = floor(j);
+  o = vec4(mix(kept(j0, uv), kept(min(j0 + 1.0, uFilled - 1.0), uv), j - j0), 1.0);
 }`;
 
 const FS_DISPLAY = `#version 300 es
@@ -3205,13 +3331,27 @@ function set4f(prog, name, a, b, c, d) { const l = U(prog, name); if (l) gl.unif
 function set1i(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1i(l, v); }
 
 // Texture units for the feedback pass never change, so set them once
-const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev', 'uScene1', 'uScene2', 'uSpec'];
+const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev', 'uScene1', 'uScene2', 'uSpec', 'uText'];
 gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
 gl.useProgram(compProg.p);
 set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
+// Time warp gets its own program, so a graphics card that can't draw it only loses Time warp
+let twProg = null;
+try {
+  twProg = program(FS_TIMEWARP);
+  gl.useProgram(twProg.p);
+  set1i(twProg, 'uNow', 0); set1i(twProg, 'uHist', 1);
+} catch (_) { twProg = null; }
+// Time warp keeps TW_RATE frames a second. Phones and small computers keep fewer, smaller ones.
+const TW_RATE = 30;
+const twLowMem = !!APP || (navigator.deviceMemory > 0 && navigator.deviceMemory <= 4);
+const TW_LAYERS = twLowMem ? 36 : 48;
+const TW_SCALE = twLowMem ? 0.5 : 0.75;
+const TW_MAX_SEC = (TW_LAYERS - 1) / TW_RATE;   // how far back the slider's top reaches: 1.6 seconds (1.2 on phones)
+const twSpan = (v) => TW_MAX_SEC * Math.pow(clamp(v, 0, 100) / 100, 1.3);
 
 let useFloat = !!gl.getExtension('EXT_color_buffer_float');
 function makeTarget(w = simW, h = simH) {
@@ -3245,6 +3385,7 @@ function clearTargets() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
+  twForget(loops.A); twForget(loops.B);
 }
 clearTargets();
 
@@ -3349,6 +3490,88 @@ function makeTestCard() {
 }
 const testCard = makeTestCard();
 uploadTo(picTex, testCard);
+
+/* text */
+// The Text input: the words typed under Text, drawn white with a soft glow into a picture of their own, which
+// the feedback pass tints with slowly turning colors (seedText). The words stay in this browser, and presets
+// that use Text keep them too.
+const TEXT_KEY = 'phosphor-text-v1';
+const TEXT_DEFAULT = 'PHOSPHOR LOOP';
+const TEXT_FONTS = {
+  bold: (px) => `900 ${px}px "Arial Black", "Helvetica Neue", Arial, sans-serif`,
+  outline: (px) => `900 ${px}px "Arial Black", "Helvetica Neue", Arial, sans-serif`,
+  serif: (px) => `italic 700 ${px}px Georgia, "Times New Roman", serif`,
+  mono: (px) => `700 ${px}px "Courier New", Courier, monospace`,
+};
+const TEXT_STYLE_NAME = { bold: 'BOLD', outline: 'OUTLINE', serif: 'CLASSIC', mono: 'TYPEWRITER' };
+const txt = { str: TEXT_DEFAULT, style: 'bold' };
+try {
+  const t = JSON.parse(localStorage.getItem(TEXT_KEY) || 'null');
+  if (t && typeof t.str === 'string') txt.str = t.str.slice(0, 60);
+  if (t && t.style in TEXT_FONTS) txt.style = t.style;
+} catch (_) {}
+function saveText() { try { localStorage.setItem(TEXT_KEY, JSON.stringify(txt)); } catch (_) {} }
+const textTex = makeSourceTex();
+const textCanvas = document.createElement('canvas');
+textCanvas.width = 1536; textCanvas.height = 768;
+const textAspect = textCanvas.width / textCanvas.height;
+// The words split over one to three lines, whichever lets them be biggest. Each way of splitting is
+// tried and the widest line of each decides how big the letters can be.
+function textLayout(g, words) {
+  const W = textCanvas.width * 0.9, H = textCanvas.height * 0.8, LINE = 1.12;
+  const width = (ws) => g.measureText(ws.join(' ')).width;
+  let best = null;
+  const consider = (lines) => {
+    const wMax = Math.max(1, ...lines.map(width));
+    const px = Math.min(100 * W / wMax, H / (lines.length * LINE));
+    // More lines only when that makes the letters clearly bigger
+    if (!best || px > best.px * 1.2) best = { px, lines: lines.map((l) => l.join(' ')) };
+  };
+  const n = words.length;
+  consider([words]);
+  for (let i = 1; i < n; i++) consider([words.slice(0, i), words.slice(i)]);
+  if (n <= 24) for (let i = 1; i < n; i++) for (let j = i + 1; j < n; j++) consider([words.slice(0, i), words.slice(i, j), words.slice(j)]);
+  return best;
+}
+function drawText() {
+  const W = textCanvas.width, H = textCanvas.height, g = textCanvas.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.shadowBlur = 0;
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, W, H);
+  const words = txt.str.trim().split(/\s+/).filter(Boolean);
+  if (words.length) {
+    const font = TEXT_FONTS[txt.style] || TEXT_FONTS.bold;
+    g.font = font(100);
+    const { px, lines } = textLayout(g, words);
+    const size = Math.max(8, Math.floor(px));
+    g.font = font(size);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const lineH = size * 1.12, top = H / 2 - (lines.length - 1) * lineH / 2;
+    const outline = txt.style === 'outline';
+    g.lineWidth = Math.max(2, size * 0.045);
+    g.lineJoin = 'round';
+    g.fillStyle = '#fff';
+    g.strokeStyle = '#fff';
+    // A soft glow first, then the crisp letters on top
+    for (const glow of [true, false]) {
+      g.shadowColor = 'rgba(255,255,255,.85)';
+      g.shadowBlur = glow ? size * 0.22 : 0;
+      lines.forEach((line, i) => {
+        if (outline) g.strokeText(line, W / 2, top + i * lineH);
+        else g.fillText(line, W / 2, top + i * lineH);
+      });
+    }
+    g.shadowBlur = 0;
+  }
+  uploadTo(textTex, textCanvas);
+  // Smaller copies too, so small words stay smooth instead of sparkling
+  gl.bindTexture(gl.TEXTURE_2D, textTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.generateMipmap(gl.TEXTURE_2D);
+}
+drawText();
 
 /* ================= helpers ================= */
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -3464,7 +3687,9 @@ function sliderText(k, v) {
       return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
     }
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
-    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
+    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
+    // How far back the far edge reaches
+    case 'time': return v === 0 ? 'OFF' : `${twSpan(v).toFixed(1)} SEC`;
     default: return String(v);
   }
 }
@@ -3489,7 +3714,7 @@ function showSlider(k) {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (3D world)`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (3D world)`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -3541,6 +3766,51 @@ $$('#specShape button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD('SPECTROGRAPH', b.dataset.round === '1' ? 'ROUND' : 'SCROLLING');
 }));
+// Text: what you type shows straight away. The words aren't part of a loop's settings (both loops share them),
+// so typing never pins anything or stops Autopilot.
+const textIn = $('#textIn');
+textIn.value = txt.str;
+let textSaveT = null;
+textIn.addEventListener('input', () => {
+  txt.str = textIn.value.slice(0, 60);
+  drawText();
+  clearTimeout(textSaveT);
+  textSaveT = setTimeout(saveText, 400);
+});
+textIn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') textIn.blur(); });
+function setTextStyle(style) {
+  if (!(style in TEXT_FONTS)) return;
+  txt.style = style;
+  drawText();
+  saveText();
+  syncTextUI();
+  showOSD('TEXT', TEXT_STYLE_NAME[style]);
+}
+$$('#textStyle button').forEach((b) => b.addEventListener('click', () => setTextStyle(b.dataset.tstyle)));
+function syncTextUI() {
+  if (document.activeElement !== textIn && textIn.value !== txt.str) textIn.value = txt.str;
+  $$('#textStyle button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tstyle === txt.style)));
+}
+const GROW_SIZE_NAME = ['FINE', 'MEDIUM', 'BIG'];
+$$('#growSize button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('grow');
+  const t = loops[edit].tgt;
+  t.growSize = +b.dataset.gsize;
+  // Picking a size with Grow off turns it on, so the button always shows something
+  if (!(t.grow > 0)) t.grow = 60;
+  syncUI();
+  showOSD(`GROW ${edit}`, GROW_SIZE_NAME[t.growSize]);
+}));
+const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE'];
+$$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('time');
+  const t = loops[edit].tgt;
+  t.timeShape = +b.dataset.tshape;
+  if (!(t.time > 0)) t.time = 60;
+  syncUI();
+  showOSD(`TIME WARP ${edit}`, TIME_SHAPE_NAME[t.timeShape]);
+}));
+if (!twProg) $('#timeCtl').hidden = true;
 
 function uses(src) { return ['A', 'B'].some((k) => loops[k].tgt.in1 === src || loops[k].tgt.in2 === src); }
 
@@ -3555,6 +3825,7 @@ function chooseSource(slot, src) {
   if (src === 'phone') startPhoneLink();
   if (src === 'video' && !vid.on) $('#vidFile').click();
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
+  if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
@@ -3663,7 +3934,10 @@ function syncUI() {
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
   $$('.ch').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ch === channel)));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text']) $('#row-' + s).hidden = !usesHere(s);
+  syncTextUI();
+  $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
+  $$('#timeShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.tshape === (t.timeShape ?? 0))));
   $$('#specShape button').forEach((b) => b.setAttribute('aria-pressed', String((+b.dataset.round === 1) === !!t.specRound)));
   const fly = [t.in1, t.in2].find(is3D);
   $('#row-3d').hidden = !fly;
@@ -3724,10 +3998,10 @@ function loadChannel(i) {
 }
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', ...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : 100, specRound: Math.random() < 0.5,
+    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5,
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -3738,6 +4012,8 @@ function randomLoop() {
     melt: Math.random() < 0.25 ? Math.round(rnd(25, 75)) : 0,
     push: Math.random() < 0.2 ? Math.round(rnd(30, 75)) : 0,
     dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
+    grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, growSize: Math.floor(Math.random() * 3),
+    time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * 3),
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
     edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
@@ -4324,7 +4600,7 @@ function neutral() {
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   channel = -1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -4368,6 +4644,8 @@ const PINS = {
   dye: { name: 'Dyed by the other loop', fields: ['dye'] },
   mirror: { name: 'Mirror', fields: ['mirror'] },
   split: { name: 'Split lines', fields: ['split'] },
+  grow: { name: 'Grow', fields: ['grow', 'growSize'] },
+  time: { name: 'Time warp', fields: ['time', 'timeShape'] },
   view: { name: 'What you see', fields: ['view'], mix: true },
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
   xba: { name: 'Feed B into A', fields: ['xba'], mix: true },
@@ -4375,7 +4653,7 @@ const PINS = {
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -4519,7 +4797,7 @@ function syncPins() {
 }
 
 function apPool() {
-  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'picture'];
+  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text'];
   // Using the other loop as an input is one more way of mixing the loops
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -4562,6 +4840,8 @@ function apScene() {
       push: Math.random() < 0.3 * w ? Math.round(rnd(25, 25 + 60 * w)) : 0,
       dye: Math.random() < 0.3 * w ? Math.round(rnd(20, 20 + 70 * w)) : 0,
       split: Math.random() < 0.2 * w ? Math.round(rnd(10, 10 + 60 * w)) : 0,
+      grow: Math.random() < 0.3 * w ? Math.round(rnd(35, 35 + 55 * w)) : 0, growSize: Math.floor(Math.random() * 3),
+      time: Math.random() < 0.3 * w ? Math.round(rnd(30, 30 + 70 * w)) : 0, timeShape: Math.floor(Math.random() * 3),
       mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
       edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
     };
@@ -4572,6 +4852,7 @@ function apScene() {
   if (sc.in2 && sc.in2 === sc.in1 && !ap.pins.has('in2')) sc.in2 = 'none';
   if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
   if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
+  if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
   if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
     sc.size = Math.round(rnd(60, 100));
     if (!ap.pins.has('in1')) sc.motion = Math.random() < 0.35;
@@ -4586,6 +4867,7 @@ function apScene() {
 function clearLoop(k) {
   gl.clearColor(0, 0, 0, 1);
   for (const t of loops[k].rt) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.clear(gl.COLOR_BUFFER_BIT); }
+  twForget(loops[k]);
 }
 function nudge(k) {
   const t = loops[k].tgt, j = 0.2 + 1.6 * apSet.wild / 100;
@@ -5579,6 +5861,21 @@ const RECIPES = [
     sw: 'repeating-radial-gradient(circle at 50% 50%,#ff4fa3 0 4px,#ffcf6b 4px 8px,#3bff9a 8px 12px,#3b8bff 12px 16px,#c43bff 16px 20px)',
     patch: { A: { in1: 'picture', zoom: 30, spin: 8, trails: 88, color: 0, blur: -0.05, dye: 75 },
              B: { in1: 'wave', form: 3, mirror: 6, zoom: -20, spin: -12, trails: 92, color: 10, edge: 1, blur: 0.1 } } },
+  { name: 'Name in lights', after: 'Type your own words in the Your text box under What feeds loop A.',
+    text: 'Your band’s name, a title or the venue, flying down a tunnel of its own echoes. Type your own words and they change straight away.',
+    how: 'TEXT · ZOOM IN 32 · TRAILS 88 · COLOR 16',
+    sw: 'radial-gradient(ellipse 46% 20% at 50% 50%,#fff3b0 0 30%,transparent 32%),repeating-radial-gradient(ellipse at 50% 50%,#140a2a 0 6px,#ff7ac6 6px 8px,#6a2bd9 8px 10px)',
+    patch: { A: { in1: 'text', size: 80, zoom: 32, spin: 0, trails: 88, color: 16, blur: 0.05 } } },
+  { name: 'Living picture', after: 'Try a few nature pictures with ◀ ▶ under Picture, or slide Grow up and down.',
+    text: 'Patterns grow over the picture like the markings on a shell or a fish, starting from its outlines and slowly spreading.',
+    how: 'PICTURE · GROW 45 FINE · TRAILS 93',
+    sw: 'repeating-linear-gradient(60deg,#06120f 0 3px,#ffcf6b 3px 5px,#06120f 5px 7px),radial-gradient(circle,#3bffb0,#06120f)',
+    patch: { A: { in1: 'picture', size: 78, zoom: 3, spin: 0, trails: 93, color: 6, blur: 0.02, grow: 45, growSize: 0 } } },
+  { name: 'Rubber time', needs: 'camera', after: 'Stand in front of the camera and wave your arms, or turn your head slowly.',
+    text: 'The top of the picture is now and the bottom is a second and a half ago, so when you move, your body bends and stretches like rubber.',
+    how: 'CAMERA · TIME WARP TOP TO BOTTOM · NO TRAILS',
+    sw: 'repeating-linear-gradient(180deg,#0b1d28 0 4px,#4fd1c5 4px 6px,#ffae3b 6px 7px),linear-gradient(90deg,#0b1d28,#1f5f7a)',
+    patch: { A: { in1: 'camera', size: 100, trails: 0, zoom: 0, color: 0, time: 100, timeShape: 0 } }, drift: false },
   { name: 'Ghost trails', needs: 'camera', after: 'Wave your hands in front of the camera.',
     text: 'Only moving things get in, so waving your hands leaves glowing smears while the still room disappears.',
     how: 'CAMERA · ONLY MOVEMENT · SIZE FULL · TRAILS 95',
@@ -5753,6 +6050,7 @@ function snapshot() {
     adj: clone(adj),
     snd: { amount: snd.amount, map: clone(snd.map) },
     drift,
+    text: { str: txt.str, style: txt.style },
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
@@ -5845,6 +6143,13 @@ function loadPreset(pr, quiet) {
   if (typeof d.drift === 'boolean') setDrift(d.drift);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = [loops.A.tgt.in1, loops.A.tgt.in2, loops.B.tgt.in1, loops.B.tgt.in2];
+  // A preset that shows Text brings back the words it was saved with (others leave your words alone)
+  if (used.includes('text') && d.text && typeof d.text.str === 'string') {
+    txt.str = d.text.str.slice(0, 60);
+    if (d.text.style in TEXT_FONTS) txt.style = d.text.style;
+    drawText();
+    saveText();
+  }
   if (used.includes('camera') && !cam.on) startCamera();
   if (used.includes('screen') && !scr.on) startScreen(true);
   if (used.includes('phone')) startPhoneLink();
@@ -6883,7 +7188,7 @@ function midiIn(e) {
 // What a slider or button stands for, stored so a mapping survives page reloads
 const LOOP_KEYS = LOOP_SLIDERS;
 const GROUP_NAMES = { inputs: 'Input', apInputs: 'Autopilot uses', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
-                      specShape: 'Spectrograph', specListen: 'Spectrograph hears' };
+                      specShape: 'Spectrograph', specListen: 'Spectrograph hears', textStyle: 'Text style', growSize: 'Grow size', timeShape: 'Time warp' };
 const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-ren, #adminBox *, #adminLogin *, .pre-confirm button, #presetForm button, #presetSave, ' +
   '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen';
 function labelFor(el) {
@@ -7201,6 +7506,103 @@ const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
 const MELT_K = 0.02;     // how far Melt at 100 lets the picture push itself in one frame
 const PUSH_K = 0.02;     // how far Pushed by the other loop at 100 moves this loop in one frame
 const DYE_K = 0.16;      // how far Dyed by the other loop at 100 turns colors in one frame, where the other loop is brightest
+const GROW_K = 0.06;     // how much brighter or darker Grow at 100 can make a spot in one frame
+const GROW_R = [2.6, 5, 9];   // Grow's ring for Fine, Medium and Big patterns, in pixels of the 576-line picture
+
+/* ================= time warp ================= */
+// While a loop uses Time warp, its recent frames are kept on the graphics card in a stack (TW_RATE a second,
+// at TW_SCALE of full size), and its picture is redrawn from them so each part shows a different moment
+// (FS_TIMEWARP). What you see, the other loop, recordings and the output window all get the warped picture;
+// the loop itself keeps feeding back its own plain frames, so its trails behave as always. On a phone the stack
+// is let go a minute after Time warp is turned off, to save memory; a computer keeps it, so turning Time warp
+// on again (or Autopilot bringing it in) never makes the picture hitch while the memory is found.
+function twMake() {
+  const w = Math.max(16, Math.round(simW * TW_SCALE)), h = Math.max(16, Math.round(simH * TW_SCALE));
+  for (let i = 0; i < 8 && gl.getError() !== gl.NO_ERROR; i++) {}
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, w, h, TW_LAYERS);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  if (gl.getError() === gl.OUT_OF_MEMORY) { gl.deleteTexture(tex); return null; }
+  const warp = [makeTarget(), makeTarget()];
+  gl.clearColor(0, 0, 0, 1);
+  for (const t of warp) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.clear(gl.COLOR_BUFFER_BIT); }
+  return { tex, fbo: gl.createFramebuffer(), w, h, sw: simW, sh: simH, head: -1, filled: 0, ago: 0, acc: 0, idle: 0, warp, wf: 0, live: false };
+}
+function twDrop(L) {
+  const tw = L.tw;
+  if (!tw) return;
+  gl.deleteTexture(tw.tex);
+  gl.deleteFramebuffer(tw.fbo);
+  tw.warp.forEach(dropTarget);
+  L.tw = null;
+}
+// Clear and fresh looks start the stack over, so nothing from before shows up in the warped parts
+function twForget(L) { if (L.tw) { L.tw.filled = 0; L.tw.head = -1; } }
+let twWarned = false;
+function twStep(k, dt) {
+  const L = loops[k];
+  const on = !!twProg && (L.tgt.time > 0 || L.cur.time > 0.3);
+  if (L.tw && (L.tw.sw !== simW || L.tw.sh !== simH)) twDrop(L);
+  if (!on) {
+    if (L.tw) { L.tw.live = false; L.tw.idle += dt; if (twLowMem && L.tw.idle > 60) twDrop(L); }
+    return;
+  }
+  if (!L.tw) {
+    L.tw = twMake();
+    if (!L.tw) {
+      if (!twWarned) { twWarned = true; toast('Time warp needs more graphics memory than this device has free right now.'); }
+      return;
+    }
+  }
+  const tw = L.tw, front = L.rt[L.front].tex;
+  tw.idle = 0;
+  tw.ago += dt;
+  tw.acc += dt;
+  // Keep this frame each time a thirtieth of a second has gone by. A computer drawing fewer than 30 frames a
+  // second keeps some frames twice, so the far edge still reaches as far back as the slider says.
+  let keep = tw.filled === 0 ? 1 : Math.min(4, Math.floor(tw.acc * TW_RATE));
+  if (keep > 0) {
+    tw.acc = tw.filled === 0 ? 0 : Math.min(tw.acc - keep / TW_RATE, 1 / TW_RATE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, tw.fbo);
+    gl.viewport(0, 0, tw.w, tw.h);
+    gl.useProgram(copyProg.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, front);
+    set2f(copyProg, 'uSim', tw.w, tw.h);
+    for (; keep > 0; keep--) {
+      tw.head = (tw.head + 1) % TW_LAYERS;
+      gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, tw.tex, 0, tw.head);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      tw.filled = Math.min(TW_LAYERS, tw.filled + 1);
+    }
+    tw.ago = 0;
+  }
+  const dst = tw.warp[1 - tw.wf];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(twProg.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, front);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tw.tex);
+  set2f(twProg, 'uSim', simW, simH);
+  set1f(twProg, 'uHead', tw.head);
+  set1f(twProg, 'uFilled', tw.filled);
+  set1f(twProg, 'uLayers', TW_LAYERS);
+  set1f(twProg, 'uSince', tw.ago);
+  set1f(twProg, 'uRate', TW_RATE);
+  set1f(twProg, 'uSpan', twSpan(L.cur.time));
+  set1f(twProg, 'uShape', L.tgt.timeShape || 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+  tw.wf = 1 - tw.wf;
+  tw.live = true;
+}
+// What a loop shows (and what the other loop sees of it): its time-warped picture while Time warp is on
+function shownTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[L.tw.wf].tex : L.rt[L.front].tex; }
+function shownPrev(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[1 - L.tw.wf].tex : L.rt[1 - L.front].tex; }
 
 /* ================= ink drops ================= */
 // Six droppers, each on its own uneven rhythm, land a drop of ink somewhere on screen about twice a second.
@@ -7284,8 +7686,8 @@ function draw3D(k, name, slot, scale) {
 }
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
-  const O = loops[k === 'A' ? 'B' : 'A'];
-  const otherTex = O.rt[O.front].tex, otherPrev = O.rt[1 - O.front].tex;
+  const otherK = k === 'A' ? 'B' : 'A';
+  const otherTex = shownTex(otherK), otherPrev = shownPrev(otherK);
   let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
   if (drift) {
     const d = driftT + (k === 'B' ? 37.0 : 0);
@@ -7331,7 +7733,7 @@ function runLoop(k, xf, brush, f) {
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(fbProg.p);
   const texs = [src.tex, otherTex, picTex, vid.cur, vid.prev, cam.cur, cam.prev, scr.cur, scr.prev, pho.cur, pho.prev, otherPrev,
-                flyTex1 || src.tex, flyTex2 || src.tex, specTex];
+                flyTex1 || src.tex, flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
   if (t.in1 === 'spectro' || t.in2 === 'spectro') {
     set2f(fbProg, 'uSpecSize', SPEC_W, SPEC_H);
@@ -7362,6 +7764,11 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uPushTurn', simT * 0.05 + (k === 'B' ? 3.0 : 0));
   set1f(fbProg, 'uDye', Math.min(0.6, Math.pow(clamp(c.dye, 0, 100) / 100, 1.2) * DYE_K * f));
   set1f(fbProg, 'uDyeTurn', simT * 0.03 + (k === 'B' ? 0.5 : 0));
+  // Grow: faster towards the top of the slider. Its ring turns at random every frame (see growAt).
+  set1f(fbProg, 'uGrow', Math.min(0.2, Math.pow(clamp(c.grow, 0, 100) / 100, 1.2) * GROW_K * f));
+  set1f(fbProg, 'uGrowR', GROW_R[t.growSize] ?? GROW_R[1]);
+  set1f(fbProg, 'uGrowTurn', Math.random() * 6.2831853);
+  set1f(fbProg, 'uAspText', textAspect);
   set1f(fbProg, 'uMirror', t.mirror);
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
@@ -7414,6 +7821,7 @@ function runLoop(k, xf, brush, f) {
   set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   L.front = 1 - L.front;
+  twStep(k, f / 60);
 }
 
 function frame() {
@@ -7473,8 +7881,8 @@ function frame() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, loops.A.rt[loops.A.front].tex);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loops.B.rt[loops.B.front].tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shownTex('A'));
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, shownTex('B'));
   set2f(compProg, 'uSim', simW, simH);
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);

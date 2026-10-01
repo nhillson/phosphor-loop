@@ -168,6 +168,22 @@ TIPS
     colors get stained and keep turning, so its shapes show up as shifting
     rainbow bands. Both keep the other loop running even when it's hidden.
     The Guide's "Currents" and "Rainbow ghost" recipes show them off.
+  - Text: press Text under "What feeds the loop" and type your own words in
+    the Your text box (a band name, a title, the venue). They change as you
+    type. Bold, Outline, Classic and Typewriter change the lettering, and long
+    text wraps onto more lines by itself. Presets keep the words. The Guide's
+    "Name in lights" recipe flies them down a tunnel.
+  - Grow (in "Shape loop", under Dyed by) makes the picture grow patterns out
+    of itself, like coral, zebra stripes or fingerprints. They start at
+    outlines and spread through anything lit. Fine, Medium and Big set how far
+    apart the stripes sit. Keep Trails high. Try the Coral channel, or the
+    Guide's "Living picture" recipe.
+  - Time warp (in "Shape loop", at the bottom) shows each part of the picture
+    from a different moment: one edge (or the middle) is now, the other up to
+    about a second and a half ago. Anything moving stretches into ribbons and
+    waves. Top to bottom, Side to side and From the middle pick which way time
+    runs. Try the Ribbons channel, or the Guide's "Rubber time" recipe with a
+    camera and wave your arms.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
@@ -177,7 +193,7 @@ TIPS
     comes, how slowly it fades in, how wild it gets, and how often it mixes
     the two loops. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
-    input (Camera, 3D worlds, Ink and so on) you don't want it to bring in.
+    input (Camera, 3D worlds, Ink, Text and so on) you don't want it to bring in.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
