@@ -243,4 +243,4 @@ TIPS
     screen" button shows at the top right (it fades again when you stop).
     Esc works too. The output window has the same button.
   - Keys: Space freeze, N neutral, R surprise,
-    P autopilot, C clear, F full screen, H hide controls, G guide.
+    P autopilot, C clear, F full screen, G guide.

@@ -102,10 +102,6 @@
   @media (hover: none) { .fs-exit kbd { display: none; } }
   .fs-exit.away { opacity: 0; pointer-events: none; }
   .stage.idle canvas { cursor: none; }
-  /* Hide controls: the monitor takes the whole window */
-  .app.bare .deck { grid-template-columns: minmax(0, 1fr); }
-  .app.bare .panel { display: none; }
-  .app.bare .monitor { padding: 12px; }
   .bezel {
     padding: 8px;
     border-radius: 14px;
@@ -190,18 +186,6 @@
   .btn.rec[aria-pressed="true"] { color: #ffd9d5; }
   .btn.wide { width: 100%; }
   .btn.small { min-height: 32px; padding: 5px 11px; font-size: 14px; }
-  .btn.special {
-    border-color: var(--loop-a);
-    background: linear-gradient(var(--press-1), var(--press-2));
-    color: var(--press-ink);
-    font-weight: 600;
-    animation: special-pulse 2.4s ease-in-out infinite;
-  }
-  .btn.special:hover { filter: brightness(1.12); }
-  @keyframes special-pulse {
-    0%, 100% { box-shadow: 0 0 0 1px var(--loop-a), 0 0 8px var(--amber-glow), inset 0 1px 0 rgba(255,255,255,.08); }
-    50% { box-shadow: 0 0 0 1px var(--loop-a), 0 0 20px var(--amber-glow), inset 0 1px 0 rgba(255,255,255,.08); }
-  }
   .linkish {
     background: none; border: 0; padding: 0; cursor: pointer;
     color: var(--amber); text-decoration: underline; text-underline-offset: 2px; font-weight: 600;
@@ -613,7 +597,6 @@
   @media (prefers-reduced-motion: reduce) {
     .osd, .tip { transition: none; }
     .rec-ind .dot { animation: none; }
-    .btn.special { animation: none; }
   }
 </style>
 </head>
@@ -656,15 +639,13 @@
         <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
-        <button class="btn special" id="phoneMotion" title="Sets this loop's input to your phone, showing only what moves">Phone: movement only</button>
-        <button class="btn" id="hideCtl" aria-pressed="false">Hide controls</button>
         <span class="spacer" aria-hidden="true"></span>
         <button class="btn" id="snap" hidden>Save picture</button>
         <button class="btn" id="recMic" aria-pressed="true" hidden title="When lit, videos you record include the microphone"><span class="led"></span>Include mic</button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>H</kbd> hide controls · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -1208,7 +1189,7 @@
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
-            <dt>Full screen and Hide controls</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
+            <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
             <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. Videos are large, up to about 75 MB a minute.</dd>
             <dt>Include mic</dt><dd>When its light is on, videos you record include the microphone, so you can talk over the picture or catch the room. The first time, the browser asks to use the microphone: choose Allow. Press it again to turn the mic off.</dd>
@@ -1238,7 +1219,6 @@
           <div><kbd>P</kbd>Autopilot</div>
           <div><kbd>C</kbd>Clear</div>
           <div><kbd>F</kbd>Full screen</div>
-          <div><kbd>H</kbd>Hide controls</div>
           <div><kbd>G</kbd>This guide</div>
           <div><kbd>Esc</kbd>Close the guide</div>
         </div>
@@ -3591,17 +3571,6 @@ function settleDevices() {
   }
 }
 
-// One-click button: sets this loop's input to the phone and turns on "Only movement".
-// Nothing else about the current look changes.
-const phoneMotionBtn = $('#phoneMotion');
-if (inArtifact) phoneMotionBtn.hidden = true;
-phoneMotionBtn.addEventListener('click', () => {
-  chooseSource('in1', 'phone');
-  loops[edit].tgt.motion = true;
-  syncUI();
-  toast('This loop’s input is now your phone, with Only movement on. Scan the QR code to connect it.');
-});
-
 /* ================= UI: loop tabs ================= */
 const editor = $('#editor');
 $('#tabA').addEventListener('click', () => setEdit('A'));
@@ -4626,6 +4595,13 @@ function nudge(k) {
   move('color', 8, 0, 45);
   move('warp', 10, 0, 50);
 }
+// Two loops with long Trails at the same time pile up into white. So whenever the other loop's Trails are
+// already above 75, a new look from Autopilot keeps this loop's Trails at 75 or below (unless Trails is pinned).
+const AP_TRAILS_MAX = 75;
+function capTrails(sc, other) {
+  if (ap.pins.has('trails')) return;
+  if (loops[other].tgt.trails > AP_TRAILS_MAX && (sc.trails ?? loopDefaults().trails) > AP_TRAILS_MAX) sc.trails = Math.round(rnd(62, AP_TRAILS_MAX));
+}
 // A hidden loop gets a whole new look at once, from a clean slate
 function freshLook(k, shown) {
   const sc = apScene();
@@ -4634,6 +4610,7 @@ function freshLook(k, shown) {
     if (!ap.pins.has('in1')) sc.in1 = apRealInput();
     else if (!ap.pins.has('in2')) { sc.in2 = apRealInput(); sc.blend = 50; }
   }
+  capTrails(sc, shown);
   patchLoop(k, sc, true);
   const L = loops[k];
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
@@ -4652,6 +4629,7 @@ function glideLook(k) {
   withPins(sc);
   const other = k === 'A' ? 'B' : 'A';
   if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !ap.pins.has('in1')) sc.in1 = apRealInput();
+  capTrails(sc, other);
   patchLoop(k, sc, true);
 }
 // Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat.
@@ -6167,7 +6145,6 @@ function onKey(e) {
   else if (e.key === 'n' || e.key === 'N') neutral();
   else if (e.key === 'c' || e.key === 'C') clearScreen();
   else if (e.key === 'f' || e.key === 'F') toggleFS();
-  else if (e.key === 'h' || e.key === 'H') toggleBare();
   else if (e.key === 'g' || e.key === 'G' || e.key === '?') openGuide();
 }
 window.addEventListener('keydown', onKey);
@@ -6536,17 +6513,6 @@ $$('#shape button').forEach((b) => b.addEventListener('click', () => {
 }));
 function syncShapeUI() { $$('#shape button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.shape === shape))); }
 syncShapeUI();
-
-const appEl = $('.app');
-const hideBtn = $('#hideCtl');
-function toggleBare(force) {
-  const bare = typeof force === 'boolean' ? force : !appEl.classList.contains('bare');
-  appEl.classList.toggle('bare', bare);
-  hideBtn.textContent = bare ? 'Show controls' : 'Hide controls';
-  hideBtn.setAttribute('aria-pressed', String(bare));
-  fit();
-}
-hideBtn.addEventListener('click', () => toggleBare());
 
 /* ================= output window ================= */
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
