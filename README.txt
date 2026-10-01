@@ -144,11 +144,6 @@ TIPS
     comes, how slowly it fades in, how wild it gets, and how often it mixes
     the two loops. "Change on the beat" makes each new look cut in on a beat
     when music is playing.
-  - Keep it from going white (under Screen) watches the brightness and
-    quietly eases off the trails before the picture washes out; your sliders
-    stay where you put them. "Always" works while you steer too; "Only with
-    Autopilot" leaves you free to push it into white. It never makes the
-    graphics chip wait, so it doesn't cause stutter.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),

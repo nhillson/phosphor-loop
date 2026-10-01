@@ -425,8 +425,6 @@
   .ap-state b { color: var(--ink); font-weight: 600; }
   .ap-state .live { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
   .ap-reset { align-self: flex-start; font-size: 13px; font-weight: 500; }
-  #whiteWhen { margin: 8px 0 4px; }
-  .white-state.busy { color: #ffc98a; }
 
   /* fader */
   input[type="range"] {
@@ -671,7 +669,6 @@
           <p class="hint" id="apPinList">Nothing pinned.</p>
           <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
         </div>
-        <p class="hint">Keep it from going white is under Screen, so it can work while you steer too.</p>
         <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
       </section>
 
@@ -987,16 +984,6 @@
           <input type="range" id="tv" min="0" max="100" step="1" value="60">
           <div class="ends"><span>Clean</span><span>Worn</span></div>
         </div>
-        <div class="ctl">
-          <div class="ctl-head"><label for="apWhite">Keep it from going white</label><output id="apWhiteOut" for="apWhite"></output></div>
-          <input type="range" id="apWhite" min="0" max="100" step="1" value="50">
-          <div class="ends"><span>Off</span><span>Keep it darker</span></div>
-          <div class="seg seg-2" id="whiteWhen" role="group" aria-label="When to keep it from going white">
-            <button data-when="always" aria-pressed="true">Always</button>
-            <button data-when="autopilot" aria-pressed="false">Only with Autopilot</button>
-          </div>
-          <span class="hint white-state" id="whiteState">Watches how bright the picture is and eases off the trails before it turns white. Your sliders stay where you put them.</span>
-        </div>
         <p class="hint">Double-click a slider to put it back where the channel had it.</p>
       </section>
 
@@ -1109,7 +1096,6 @@
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Old TV look</dt><dd>Scanlines, glow and curved glass. Turn it off for a clean picture.</dd>
-            <dt>Keep it from going white</dt><dd>Watches how bright the picture is and quietly eases off the trails before it washes out to white. Your sliders stay where you put them. Always works whether you or Autopilot are steering; Only with Autopilot leaves you free to push it into white. Slide it right to keep things darker, or all the way left to turn it off.</dd>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
@@ -1159,7 +1145,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Under Screen, check that Keep it from going white isn’t Off and is set to Always, or slide it further right. Otherwise lower Trails, Input size or Color shift a little, or press Clear.</dd>
+          <dt>The screen went white</dt><dd>Lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
@@ -1326,7 +1312,6 @@ uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1,
 uniform vec2 uSim;
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
-uniform float uKnee;     // Autopilot's white-out watch: how hard to squeeze the brightest trails (0 = not at all)
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
@@ -1633,7 +1618,6 @@ void main() {
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   fb = max(hueRot(fb, uHue), 0.0);
-  if (uKnee > 0.0) fb = fb / (1.0 + uKnee * fb);   // the brightest parts are squeezed most
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec2 ps = pf + vec2(uSplitOff * side, 0.0);
@@ -3591,7 +3575,6 @@ function patchLoop(k, p, force) {
   L.base = { ...L.tgt };
 }
 function applyPatch(c) {
-  guardReset();
   patchLoop('A', c.A);
   patchLoop('B', c.B || B_PARTNER);
   mix.tgt.view = c.view ?? 0;
@@ -4202,7 +4185,6 @@ function writeSpec(dt) {
 const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (ap.on) setAutopilot(false, true);
-  guardReset();
   markPreset(null);
   setDrift(false);
   if (frozen) toggleFreeze(false);
@@ -4258,15 +4240,14 @@ const PINS = {
 };
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, white: 50, whiteWhen: 'always', beat: false, touch: 'pin' };
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin' };
 const apSet = { ...AP_DEFAULTS };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
   if (s && typeof s === 'object') {
-    for (const k of ['every', 'fade', 'wild', 'mix', 'white']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
+    for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
-    apSet.whiteWhen = s.whiteWhen === 'autopilot' ? 'autopilot' : 'always';
     if (Array.isArray(s.pins)) s.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
   }
 } catch (_) {}
@@ -4276,16 +4257,6 @@ function saveAp() {
 const apEverySec = () => 10 * Math.pow(12, apSet.every / 100);   // 10 seconds to 2 minutes; 30 by default
 const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100);    // 1.5 to 30 seconds; 10 by default
 const pinned = (k) => ap.on && ap.pins.has(k);
-// Keep it from going white works while Autopilot runs, and also while you steer if it's set to Always
-const watching = () => apSet.white > 0 && (ap.on || apSet.whiteWhen === 'always');
-// How hard the white-out watch is leaning on each loop right now (0 to 1); see watchBrightness
-const guard = { A: 0, B: 0, stuckA: 0, stuckB: 0, hotA: 0, hotB: 0 };
-const lum = { A: { mean: 0, white: 0 }, B: { mean: 0, white: 0 }, comp: { mean: 0, white: 0 } };
-// A whole new look (a channel, preset, recipe, Neutral, Clear) starts with nothing held back
-function guardReset() {
-  for (const k of Object.keys(guard)) guard[k] = 0;
-  for (const k of ['A', 'B', 'comp']) { lum[k].mean = 0; lum[k].white = 0; }
-}
 
 // Two Autopilot buttons: one under Channels, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
@@ -4296,8 +4267,6 @@ function setAutopilot(on, quiet) {
   ap.beatWait = null;
   document.documentElement.classList.toggle('ap-on', on);
   apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
-  for (const k of ['A', 'B', 'comp']) { lum[k].mean = 0; lum[k].white = 0; }
-  for (const k of ['stuckA', 'stuckB', 'hotA', 'hotB']) guard[k] = 0;
   if (on) {
     setDrift(true);
     channel = -1;
@@ -4460,18 +4429,7 @@ function apScene() {
     if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
   }
   withPins(sc);
-  whiteSafe(sc);
   return sc;
-}
-// Big bright inputs (a camera, a video, a picture filling the screen) pile up into white fastest,
-// so with Keep it from going white on they come in with shorter trails and a little less light
-function whiteSafe(sc) {
-  if (!apSet.white) return;
-  const s = apSet.white / 100;
-  const big = ['camera', 'screen', 'phone', 'video', 'picture'].includes(sc.in1) && (sc.size ?? 100) >= 70 && !sc.motion;
-  const two = !!sc.in2 && sc.in2 !== 'none';
-  if ((big || two) && !ap.pins.has('trails')) sc.trails = Math.min(sc.trails ?? 88, Math.round(rnd(88, 94) - 16 * s));
-  if (big) sc.gain = 1 - 0.3 * s;
 }
 function clearLoop(k) {
   gl.clearColor(0, 0, 0, 1);
@@ -4497,8 +4455,6 @@ function freshLook(k, shown) {
   const L = loops[k];
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
   clearLoop(k);
-  guard[k] = 0; guard['stuck' + k] = 0; guard['hot' + k] = 0;
-  lum[k].mean = 0; lum[k].white = 0;
 }
 // With What you see pinned, a loop on screen changes in place instead, gliding into its new look.
 // Most of the time it keeps its input and mirror, so the picture changes shape rather than jumping.
@@ -4553,71 +4509,9 @@ function apStep(now, onBeat) {
   const feed = () => (Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0);
   if (!ap.pins.has('xab')) mix.tgt.xab = feed();
   if (!ap.pins.has('xba')) mix.tgt.xba = feed();
-  // Two strong feeds pour so much light back and forth that the picture turns white
-  if (apSet.white) {
-    let over = mix.tgt.xab + mix.tgt.xba - 90;
-    for (const f of ['xab', 'xba']) {
-      if (over <= 0 || ap.pins.has(f)) continue;
-      const cut = Math.min(over, mix.tgt[f]);
-      mix.tgt[f] -= cut; over -= cut;
-    }
-  }
   if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
   syncUI();
   apStatus();
-}
-
-/* ================= autopilot's white-out watch ================= */
-// Feedback piles brightness on brightness, so long trails, big inputs and strong feeds can drift to solid white.
-// When too much of a loop (or the mixed picture) is near white, that loop's trails, brightness and feed ease off
-// and its brightest parts are squeezed, then let go slowly so the picture doesn't pump. (How it measures is
-// further down, in measAsk and measCollect.)
-// How far past its limit a picture is: above 0 it's too bright, below 0 it has room to spare
-function pressure(b) {
-  const s = apSet.white / 100;
-  const meanLim = 0.78 - 0.4 * s, whiteLim = 0.40 - 0.36 * s;   // at 50: a mean of 0.58, or 22% of it near white
-  return Math.max((b.white - whiteLim) / 0.35, (b.mean - meanLim) / 0.3);
-}
-function updateGuard(dt, wA, wB, now) {
-  for (const k of ['A', 'B']) {
-    const own = lum[k];
-    let p = pressure(own);
-    // The mixed picture can wash out even when neither loop does on its own
-    if ((k === 'A' ? wA : wB) > 0 && own.mean > 0.3) p = Math.max(p, pressure(lum.comp));
-    // Too bright: lean in, gently when it's only just over and fast for a real white wall. Just under the limit:
-    // hold steady, so the picture settles there instead of swinging bright and dark. Well under: let go,
-    // slowly at first and faster the darker it is.
-    if (p > 0) guard[k] = Math.min(1, guard[k] + dt * (0.06 + 1.0 * Math.min(1, p)));
-    else if (p < -0.35) guard[k] = Math.max(0, guard[k] - dt * (0.03 + 0.1 * Math.min(1, (-p - 0.35) / 0.5)));
-    // The rest is only for Autopilot. When a person is steering, the watch never moves their sliders,
-    // clears the screen or changes the look; the easing above is all it does.
-    if (!ap.on) continue;
-    // Still leaning hard after five seconds: turn that loop's own settings down a notch (unless they're pinned),
-    // so the look can settle without the watch holding it back
-    const hot = 'hot' + k;
-    guard[hot] = guard[k] > 0.5 ? guard[hot] + dt : 0;
-    if (guard[hot] > 5) { guard[hot] = 0; coolLoop(k); }
-    // Solid white even with the watch all the way on: wipe that loop and move on to a new look
-    const stuck = 'stuck' + k;
-    if (guard[k] > 0.95 && own.mean > 0.9 && own.white > 0.8) {
-      guard[stuck] += dt;
-      if (guard[stuck] > 2.5) {
-        guard[stuck] = 0;
-        clearLoop(k);
-        own.mean = 0; own.white = 0;
-        burst();
-        ap.next = Math.min(ap.next, now + 1500);
-      }
-    } else guard[stuck] = 0;
-  }
-}
-function coolLoop(k) {
-  const t = loops[k].tgt;
-  if (!ap.pins.has('trails')) t.trails = Math.max(55, Math.round(t.trails - 6));
-  if (!ap.pins.has('size') && IMAGE_INPUTS.includes(t.in1)) t.size = Math.max(40, Math.round(t.size - 8));
-  const feedIn = k === 'A' ? 'xba' : 'xab';
-  if (!ap.pins.has(feedIn)) mix.tgt[feedIn] = Math.round(mix.tgt[feedIn] * 0.7);
-  if (k === edit) syncUI();
 }
 
 /* ================= autopilot settings ================= */
@@ -4632,7 +4526,6 @@ const apCtl = {
   fade: { text: () => fmtDur(apFadeSec()) },
   wild: { text: (v) => (v === 50 ? 'USUAL' : String(v)) },
   mix: { text: (v) => (v === 0 ? 'NEVER' : v === 50 ? 'USUAL' : String(v)) },
-  white: { text: (v) => (v === 0 ? 'OFF' : String(v)) },
 };
 function showAp(k) {
   const c = apCtl[k];
@@ -4644,7 +4537,6 @@ function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
-  $$('#whiteWhen button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.when === apSet.whiteWhen)));
   syncPins();
   apStatus();
 }
@@ -4669,12 +4561,6 @@ $('#apBeat').addEventListener('click', () => {
   syncApUI();
   if (apSet.beat && !snd.analyser) toast('Change on the beat needs music: under React to sound, pick Computer sound or Microphone.');
 });
-$$('#whiteWhen button').forEach((b) => b.addEventListener('click', () => {
-  apSet.whiteWhen = b.dataset.when;
-  saveAp();
-  syncApUI();
-  if (apSet.white === 0) toast('Keep it from going white is at Off. Slide it up to turn it on.');
-}));
 $$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
   apSet.touch = b.dataset.touch;
   saveAp();
@@ -4693,8 +4579,7 @@ $('#apReset').addEventListener('click', () => {
   syncApUI();
   toast(ap.pins.size ? 'Autopilot settings are back to normal. Your pins are still pinned.' : 'Autopilot settings are back to normal.');
 });
-// The line at the top of Autopilot settings: on or off, when the next look comes, what's pinned,
-// and whether the white-out watch is easing off right now
+// The line at the top of Autopilot settings: on or off, when the next look comes, and what's pinned
 function apStatus() {
   let html;
   if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (under Channels, under the picture, or the P key) to start it.';
@@ -4703,19 +4588,9 @@ function apStatus() {
     html = '<span class="live"></span><b>Autopilot is on.</b> ' +
       (ap.beatWait ? 'New look on the next beat.' : s <= 1 ? 'New look coming now.' : `Next new look in about ${s < 60 ? s + ' seconds' : fmtDur(s).toLowerCase()}.`);
     if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
-    const easing = ['A', 'B'].filter((k) => guard[k] > 0.15);
-    if (easing.length) html += ` Easing off loop ${easing.join(' and ')} so it doesn’t turn white.`;
   }
   if (html !== apStatus.shown) { apStatus.shown = html; $('#apState').innerHTML = html; }
-  const easing = ['A', 'B'].filter((k) => guard[k] > 0.15);
-  let note, busy = false;
-  if (!apSet.white) note = 'Off: the picture is free to wash out to white.';
-  else if (!watching()) note = 'Resting: it only works while Autopilot is on. Choose Always to have it work while you steer too.';
-  else if (easing.length) { busy = true; note = `Easing off loop ${easing.join(' and ')} right now so it doesn’t turn white. Your sliders stay where you put them.`; }
-  else note = 'Watches how bright the picture is and eases off the trails before it turns white. Your sliders stay where you put them.';
-  if (note !== apStatus.note) { apStatus.note = note; whiteStateEl.textContent = note; whiteStateEl.classList.toggle('busy', busy); }
 }
-const whiteStateEl = $('#whiteState');
 setInterval(apStatus, 500);
 syncApUI();
 
@@ -4727,7 +4602,7 @@ function toggleFreeze(force) {
   if (frozen) showOSD('II', 'FROZEN');
 }
 freezeBtn.addEventListener('click', () => toggleFreeze());
-function clearScreen() { clearTargets(); guardReset(); burst(); }
+function clearScreen() { clearTargets(); burst(); }
 $('#clear').addEventListener('click', clearScreen);
 const driftBtn = $('#drift');
 function setDrift(on) { drift = on; driftBtn.setAttribute('aria-pressed', String(on)); }
@@ -5409,7 +5284,6 @@ RECIPES.forEach((r) => {
 });
 function applyRecipe(r) {
   if (ap.on) setAutopilot(false, true);
-  guardReset();
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
   if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
@@ -5570,7 +5444,6 @@ presetForm.addEventListener('submit', async (e) => {
 
 function loadPreset(pr, quiet) {
   if (ap.on) setAutopilot(false, true);
-  guardReset();
   const d = pr.data || {};
   channel = -1;
   patchLoop('A', d.A || {}, true);
@@ -6255,8 +6128,8 @@ let midiSaved = { enabled: false, maps: [] };
 try {
   const v = JSON.parse(lsGet(MIDI_KEY) || 'null');
   if (v && Array.isArray(v.maps)) midiSaved = { enabled: !!v.enabled, maps: v.maps.filter((m) => m && m.t && m.key) };
-  // An input or channel that has been taken out of Phosphor Loop loses its mappings
-  const kept = midiSaved.maps.filter((m) => !(m.t.sel && /data-(src|look)=/.test(m.t.sel) && !document.querySelector(m.t.sel)));
+  // An input, channel or button that has been taken out of Phosphor Loop loses its mappings
+  const kept = midiSaved.maps.filter((m) => !(m.t.sel && /data-(src|look|when)=/.test(m.t.sel) && !document.querySelector(m.t.sel)));
   if (kept.length !== midiSaved.maps.length) { midiSaved.maps = kept; lsSet(MIDI_KEY, JSON.stringify(midiSaved)); }
 } catch (_) {}
 const midi = { access: null, learning: false, target: null, pending: null, pendTimer: null, st: new Map(), lastHint: 0 };
@@ -6715,88 +6588,6 @@ function draw3D(k, name, slot, scale) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return rt.tex;
 }
-/* ================= autopilot's white-out watch: measuring ================= */
-// While Autopilot runs, a tiny 32 x 18 copy of loop A, loop B or the mixed picture is taken every few frames and
-// its brightness added up. The graphics chip hands the copy over once it's ready, a frame or two later, and until
-// then the page just carries on: nothing ever stops to wait for it. (The first white-out guard did wait, and that
-// wait could make the picture hitch.) What to do about a bright picture is decided in updateGuard.
-const MEAS_W = 32, MEAS_H = 18, MEAS_ORDER = ['A', 'comp', 'B', 'comp'];
-const meas = { tgt: null, pbo: null, sync: null, key: '', age: 0, gap: 0, turn: 0, buf: new Uint8Array(MEAS_W * MEAS_H * 4) };
-function measSetup() {
-  const tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, MEAS_W, MEAS_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  const fbo = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-  meas.tgt = { tex, fbo };
-  meas.pbo = gl.createBuffer();
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, meas.pbo);
-  gl.bufferData(gl.PIXEL_PACK_BUFFER, meas.buf.byteLength, gl.STREAM_READ);
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-}
-// Asks for a small copy of one picture, and returns straight away
-function measAsk(key, tex) {
-  if (!meas.tgt) measSetup();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, meas.tgt.fbo);
-  gl.viewport(0, 0, MEAS_W, MEAS_H);
-  gl.useProgram(copyProg.p);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  set2f(copyProg, 'uSim', MEAS_W, MEAS_H);
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
-  // Into a buffer the graphics chip fills in its own time, with a marker that says when it's done
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, meas.pbo);
-  gl.readPixels(0, 0, MEAS_W, MEAS_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-  meas.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-  meas.key = key;
-  meas.age = 0;
-}
-// If the copy has arrived, reads it (instant, since it's already here) and notes how bright that picture is
-function measCollect() {
-  if (!meas.sync) return;
-  const st = gl.clientWaitSync(meas.sync, 0, 0);   // a timeout of 0: only asks, never waits
-  if (st === gl.TIMEOUT_EXPIRED && ++meas.age < 60) return;
-  gl.deleteSync(meas.sync);
-  meas.sync = null;
-  if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return;
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, meas.pbo);
-  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, meas.buf);
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-  const b = meas.buf;
-  let sum = 0, white = 0;
-  for (let i = 0; i < b.length; i += 4) {
-    const l = (0.299 * b[i] + 0.587 * b[i + 1] + 0.114 * b[i + 2]) / 255;
-    sum += l;
-    if (l > 0.88) white++;
-  }
-  const n = MEAS_W * MEAS_H;
-  lum[meas.key].mean = sum / n;
-  lum[meas.key].white = white / n;
-}
-function watchBrightness(dt, now, wA, wB) {
-  if (!watching()) {
-    // Off: let go of whatever it was holding back, over a couple of seconds
-    guard.A = Math.max(0, guard.A - dt * 0.4);
-    guard.B = Math.max(0, guard.B - dt * 0.4);
-    return;
-  }
-  measCollect();
-  if (!meas.sync && !frozen && ++meas.gap >= 3) {
-    meas.gap = 0;
-    // Take turns: loop A, the mixed picture, loop B, the mixed picture; skip a loop that isn't in use
-    for (let i = 0; i < MEAS_ORDER.length; i++) {
-      const key = MEAS_ORDER[meas.turn++ % MEAS_ORDER.length];
-      const busy = key === 'comp' || (key === 'A' ? (wA > 0.001 || mix.cur.xab > 0.1) : (wB > 0.001 || mix.cur.xba > 0.1));
-      if (busy) { measAsk(key, key === 'comp' ? comp.tex : loops[key].rt[loops[key].front].tex); break; }
-    }
-  }
-  if (!frozen) updateGuard(dt, wA, wB, now);
-}
-
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const O = loops[k === 'A' ? 'B' : 'A'];
@@ -6832,9 +6623,7 @@ function runLoop(k, xf, brush, f) {
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
   const ramp = tr >= 0.1 ? 1 : (tr / 0.1) * (tr / 0.1) * (3 - 2 * tr / 0.1);
-  // G: how hard Autopilot's white-out watch is leaning on this loop (0 = not at all)
-  const G = guard[k];
-  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp * (1 - 0.14 * G);
+  const decay60 = (1 - (0.2 - 0.194 * Math.pow(tr, 0.7))) * ramp;
 
   // The music can swell the input past the slider's top, so it still pulses when Size is already at 100
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
@@ -6879,8 +6668,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
-  set1f(fbProg, 'uGain', c.gain * gainBoost * (1 - 0.5 * G));
-  set1f(fbProg, 'uKnee', 0.35 * G);
+  set1f(fbProg, 'uGain', c.gain * gainBoost);
   set1f(fbProg, 'uForm', t.form);
   if (t.in1 === 'wave' || t.in2 === 'wave') {
     computeWave(simT + (k === 'B' ? 11.0 : 0), t.form);
@@ -6889,7 +6677,7 @@ function runLoop(k, xf, brush, f) {
     if (lb) gl.uniform4fv(lb, waveBoxes);
   }
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
-  set1f(fbProg, 'uXfeed', xf * (1 - 0.6 * G));
+  set1f(fbProg, 'uXfeed', xf);
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
   set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
   set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
@@ -6994,7 +6782,6 @@ function frame() {
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
-  watchBrightness(dt, now, wA, wB);
 
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
