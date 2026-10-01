@@ -1,1 +1,77 @@
-706 categories listed
+ocean: 577 files in 21 categories
+  536 pass license/size/shape
+/home/runner/work/phosphor-loop/phosphor-loop/.github/scripts/nature.py:165: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
+  px = list(small.getdata())
+  scored 100
+  scored 200
+  scored 300
+  scored 400
+  scored 500
+  kept 175 (score cut 86.6)
+birds: 1436 files in 319 categories
+  1284 pass license/size/shape
+  scored 100
+  scored 200
+  scored 300
+  scored 400
+  scored 500
+  scored 600
+  scored 700
+  scored 800
+  scored 900
+  scored 1000
+  scored 1100
+  scored 1200
+  kept 130 (score cut 81.7)
+bugs: 1315 files in 77 categories
+  1117 pass license/size/shape
+  scored 100
+  scored 200
+  scored 300
+  scored 400
+  scored 500
+  scored 600
+  scored 700
+  scored 800
+  scored 900
+  scored 1000
+  scored 1100
+  kept 120 (score cut 100.2)
+reptiles: 324 files in 30 categories
+  296 pass license/size/shape
+  scored 100
+  scored 200
+  kept 85 (score cut 74.7)
+mammals: 795 files in 93 categories
+  685 pass license/size/shape
+  scored 100
+  scored 200
+  scored 300
+  scored 400
+  scored 500
+  scored 600
+  kept 85 (score cut 78.2)
+flowers: 766 files in 23 categories
+  560 pass license/size/shape
+  scored 100
+  scored 200
+  scored 300
+  scored 400
+  scored 500
+  kept 150 (score cut 100.9)
+trees: 352 files in 9 categories
+  302 pass license/size/shape
+  scored 100
+  scored 200
+  scored 300
+  kept 60 (score cut 92.5)
+fungi: 150 files in 5 categories
+  137 pass license/size/shape
+  scored 100
+  kept 45 (score cut 85.7)
+sky: 347 files in 15 categories
+  280 pass license/size/shape
+  scored 100
+  scored 200
+  kept 30 (score cut 101.3)
+880 candidates, 19 sheets
