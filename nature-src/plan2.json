@@ -1,0 +1,17 @@
+{
+ "buckets": [
+  {"id": "sky", "label": "Sky & earth", "pool": 110, "depth": 1, "skip": ["by country", "people", "building", "architecture", "city", "cities"],
+   "find": "aurora|polar light|sunset|sunrise|clouds?\\b|lightning|rainbow|waterfall|volcan|astronom|nebula|galax|milky way|night sky|glacier|iceberg|\\bice\\b|caves?\\b|geyser|dunes?\\b|deserts?\\b|natural phenomena|weather|mountains?\\b|canyon|lakes?\\b|coast|sea\\b|oceans?\\b",
+   "cats": []},
+  {"id": "birds", "label": "Birds", "pool": 60, "depth": 3, "skip": ["by country", "Wiki Loves"],
+   "cats": ["Category:Featured pictures of birds"]},
+  {"id": "mammals", "label": "Mammals", "pool": 55, "depth": 3, "skip": ["by country", "bones and fossils", "Cetacea"],
+   "cats": ["Category:Featured pictures of mammals"]},
+  {"id": "bugs", "label": "Butterflies & bugs", "pool": 35, "depth": 3, "skip": ["by country"],
+   "cats": ["Category:Featured pictures of Insecta", "Category:Featured pictures of Chelicerata"]},
+  {"id": "trees", "label": "Trees & leaves", "pool": 30, "depth": 2, "skip": ["by country"],
+   "cats": ["Category:Featured pictures of forests", "Category:Featured pictures of trees", "Category:Featured pictures of Polypodiales"]},
+  {"id": "fungi", "label": "Mushrooms", "pool": 15, "depth": 2, "skip": [],
+   "cats": ["Category:Featured pictures of fungi"]}
+ ]
+}

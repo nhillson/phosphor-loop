@@ -162,7 +162,7 @@ def score_image(im):
     """Colorfulness (Hasler & Suesstrunk) plus contrast, plus a little for dark surroundings that glow in feedback."""
     from PIL import ImageStat
     small = im.convert('RGB').resize((96, 72))
-    px = list(small.getdata())
+    px = list(small.get_flattened_data()) if hasattr(small, 'get_flattened_data') else list(small.getdata())
     rg = [r - g for r, g, b in px]
     yb = [0.5 * (r + g) - b for r, g, b in px]
 
@@ -220,13 +220,39 @@ def depicts(items):
 
 
 # ---------------------------------------------------------------- candidates
+def find_cats(pattern, root='Category:Featured pictures by subject', depth=3):
+    """Featured-picture categories anywhere under root whose names match pattern."""
+    found, seen = [], set()
+    rx = re.compile(pattern, re.I)
+
+    def walk(cat, d):
+        if cat in seen or d > depth:
+            return
+        seen.add(cat)
+        for k in subcats(cat):
+            if re.search(r' by country| in [A-Z]| in the |by Ermell', k):
+                continue
+            if rx.search(k):
+                found.append(k)
+            walk(k, d + 1)
+    walk(root, 0)
+    print(f'  found categories: {found}', flush=True)
+    return found
+
+
 def candidates(args):
     from PIL import Image, ImageDraw, ImageFont
-    plan = json.load(open(os.path.join(SRC, 'plan.json'), encoding='utf-8'))
+    second = bool(args and args[0] == 'more')
+    plan = json.load(open(os.path.join(SRC, 'plan2.json' if second else 'plan.json'), encoding='utf-8'))
+    old = json.load(open(os.path.join(SRC, 'candidates.json'), encoding='utf-8')) if second else []
+    seen_titles = {d['title'] for d in old}
+    start_id = max([d['id'] for d in old] or [0])
     pool = {}
     for bucket in plan['buckets']:
         files = []
         seen_cats = set()
+        if bucket.get('find'):
+            bucket['cats'] = bucket.get('cats', []) + find_cats(bucket['find'])
 
         def walk(cat, depth):
             if cat in seen_cats or depth > bucket.get('depth', 2):
@@ -244,7 +270,7 @@ def candidates(args):
         info = imageinfo(files, 330)
         keep = []
         for t, d in info.items():
-            if t in pool:
+            if t in pool or t in seen_titles:
                 continue
             if not d['mime'].startswith('image/jpeg') and d['mime'] != 'image/png':
                 continue
@@ -258,20 +284,25 @@ def candidates(args):
             keep.append(d)
         print(f"  {len(keep)} pass license/size/shape", flush=True)
         scored = []
-        for n, d in enumerate(keep):
+
+        def fetch(d):
             try:
                 im = Image.open(io.BytesIO(http(d['thumb'])))
                 im.load()
             except Exception as e:
                 print('  thumb failed', d['title'], e, flush=True)
-                continue
+                return None
             d['score'], d['color'], d['contrast'], d['dark'] = score_image(im)
             d['bucket'] = bucket['id']
-            d['_im'] = im
-            scored.append(d)
-            if n % 100 == 99:
-                print(f'  scored {n + 1}', flush=True)
-            time.sleep(0.05)
+            d['_im'] = im.convert('RGB')
+            return d
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(4) as ex:
+            for n, d in enumerate(ex.map(fetch, keep)):
+                if d:
+                    scored.append(d)
+                if n % 200 == 199:
+                    print(f'  scored {n + 1}', flush=True)
         scored.sort(key=lambda d: -d['score'])
         take = scored[:bucket['pool']]
         for d in take:
@@ -286,8 +317,10 @@ def candidates(args):
     # contact sheets: numbered tiles, 8 across, 6 down
     sheets = os.path.join(SRC, 'sheets')
     os.makedirs(sheets, exist_ok=True)
+    prefix = 'more' if second else 'sheet'
     for f in os.listdir(sheets):
-        os.remove(os.path.join(sheets, f))
+        if f.startswith(prefix):
+            os.remove(os.path.join(sheets, f))
     items = list(pool.values())
     tw, th, cols, rows = 200, 150, 8, 6
     try:
@@ -296,7 +329,7 @@ def candidates(args):
         font = ImageFont.load_default()
     cand = []
     for i, d in enumerate(items):
-        d['id'] = i + 1
+        d['id'] = start_id + i + 1
         cand.append({k: v for k, v in d.items() if k != '_im'})
     per = cols * rows
     for s in range(0, len(items), per):
@@ -309,7 +342,8 @@ def candidates(args):
             sheet.paste(im, (x + (tw - im.width) // 2, y + (th - im.height) // 2))
             dr.rectangle([x + 2, y + 2, x + 52, y + 24], fill=(0, 0, 0))
             dr.text((x + 5, y + 3), str(d['id']), fill=(255, 255, 0), font=font)
-        sheet.save(os.path.join(sheets, f'sheet-{s // per + 1:02d}.jpg'), quality=80)
+        sheet.save(os.path.join(sheets, f'{prefix}-{s // per + 1:02d}.jpg'), quality=80)
+    cand = old + cand
     with open(os.path.join(SRC, 'candidates.json'), 'w', encoding='utf-8') as f:
         json.dump(cand, f, indent=0, ensure_ascii=False)
     print(f'{len(cand)} candidates, {math.ceil(len(cand) / per)} sheets')
@@ -396,5 +430,5 @@ def final(args):
 
 
 if __name__ == '__main__':
-    job = sys.argv[1] if len(sys.argv) > 1 else open(os.path.join(SRC, 'job.txt')).read().split()[0]
-    {'explore': explore, 'candidates': candidates, 'final': final}[job](sys.argv[2:])
+    words = sys.argv[1:] or open(os.path.join(SRC, 'job.txt')).read().split()
+    {'explore': explore, 'candidates': candidates, 'final': final}[words[0]](words[1:])
