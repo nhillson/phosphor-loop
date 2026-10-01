@@ -118,6 +118,9 @@ TIPS
   - My presets: set up a look, press "Save current look" and name it. Presets
     stay in this browser on this device (another browser or computer won't
     see them). Save under the same name to update one.
+  - Save a preset while Autopilot is running and it keeps Autopilot's
+    settings and pins too. Loading it starts Autopilot again from that look.
+    Those presets are marked AUTO.
   - Crowded controls? Click any section heading to fold it away, or use
     "Collapse all" at the top of the controls.
   - Press the Guide button (top right) or G for a tour of every control and

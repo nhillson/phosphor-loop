@@ -245,6 +245,13 @@
   .pre-load .sw { display: block; height: 44px; border-radius: 4px; background: #0b0a09 center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
   .pre-load .nm { font-size: 13px; line-height: 1.15; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pre-load[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a); }
+  .pre-auto {
+    position: absolute; top: 8px; left: 8px; padding: 3px 5px; border-radius: 4px; pointer-events: none;
+    border: 1px solid rgba(255,174,59,.55); background: rgba(10,9,8,.82); color: var(--amber);
+    font: 600 10px/1 var(--f-body); letter-spacing: .08em;
+  }
+  #presetApNote { display: none; color: var(--amber); }
+  .ap-on #presetApNote { display: block; }
   .pre-del {
     position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%;
     display: grid; place-items: center; padding: 0; cursor: pointer;
@@ -685,6 +692,7 @@
           </div>
         </form>
         <button class="btn wide" id="presetSave">Save current look</button>
+        <p class="hint" id="presetApNote">Autopilot is on, so this preset will keep Autopilot’s settings and pins too, and start Autopilot again when you load it.</p>
         <p class="hint" id="presetNote">Presets stay in this browser on this device. Save under the same name to update one. Pictures and videos aren’t saved, only the settings.</p>
       </section>
 
@@ -743,9 +751,9 @@
             <div class="chips" id="sndMap">
               <button class="chip" data-map="kick" aria-pressed="true" title="The picture punches in on every kick and pumps with the bass"><span class="led"></span>Zoom kick</button>
               <button class="chip" data-map="size" aria-pressed="true" title="The input swells on the bass"><span class="led"></span>Input size</button>
-              <button class="chip" data-map="spin" aria-pressed="false" title="Spin follows the mids"><span class="led"></span>Spin</button>
+              <button class="chip" data-map="spin" aria-pressed="true" title="Spin follows the mids"><span class="led"></span>Spin</button>
               <button class="chip" data-map="color" aria-pressed="true" title="Colors jump with the highs and the beat"><span class="led"></span>Color</button>
-              <button class="chip" data-map="warp" aria-pressed="false" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
+              <button class="chip" data-map="warp" aria-pressed="true" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
               <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
             </div>
           </div>
@@ -1053,7 +1061,7 @@
             <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways.</dd>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
-            <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Presets stay in this browser on this device. Save with the same name to update one.</dd>
+            <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Press it again to stop.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on both loops while Autopilot keeps changing the rest. Tap a lit pin to let it go. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Double-click a slider there to put it back.</dd>
@@ -3634,7 +3642,7 @@ const snd = {
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
   flux: 0, lastBeat: 0, beats: 0, shakeDir: [1, 0], amount: 60,
-  map: { kick: true, size: true, spin: false, color: true, warp: false, flash: true },
+  map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true },
 };
 // How hard the picture reacts. The old full strength now sits near 50, and Wild goes well past it.
 const sndPower = () => Math.pow(clamp(snd.amount, 0, 100) / 100, 0.85) * 2.4;
@@ -5378,6 +5386,10 @@ function snapshot() {
     drift,
   };
 }
+// While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
+function apSnapshot() {
+  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch, pins: [...ap.pins] };
+}
 function markPreset(id) {
   activePresetId = id;
   $$('.pre-load').forEach((b) => b.setAttribute('aria-pressed', String(b.parentElement.dataset.id === id)));
@@ -5390,9 +5402,11 @@ function renderPresets() {
     t.className = 'pre';
     t.dataset.id = pr.id;
     const name = escapeHTML(pr.name);
+    const auto = !!(pr.data && pr.data.ap);
     const thumb = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(pr.thumb || '') ? `background-image:url(${pr.thumb})` : '';
     t.innerHTML =
-      `<button class="pre-load" aria-pressed="${pr.id === activePresetId}" title="Load ${name}"><span class="sw" style="${thumb}"></span><span class="nm">${name}</span></button>` +
+      `<button class="pre-load" aria-pressed="${pr.id === activePresetId}" title="Load ${name}${auto ? ' and start Autopilot' : ''}"><span class="sw" style="${thumb}"></span>` +
+      `${auto ? '<span class="pre-auto">AUTO</span>' : ''}<span class="nm">${name}</span></button>` +
       `<button class="pre-del" aria-label="Delete ${name}" title="Delete">×</button>` +
       `<div class="pre-confirm" hidden><span>Delete “${name}”?</span><div><button class="yes">Delete</button><button class="no">Keep</button></div></div>`;
     const confirmBox = t.querySelector('.pre-confirm');
@@ -5428,6 +5442,7 @@ presetForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = presetName.value.trim().slice(0, 40) || nextPresetName();
   const data = snapshot();
+  if (ap.on) data.ap = apSnapshot();
   const thumb = await new Promise((res) => { thumbReq = res; });
   const existing = presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
   if (existing) { existing.data = data; existing.thumb = thumb; existing.saved = Date.now(); }
@@ -5439,7 +5454,10 @@ presetForm.addEventListener('submit', async (e) => {
   activePresetId = id;
   renderPresets();
   if (!ok && storageOK) toast('Couldn’t save: this browser’s storage for the page is full. Delete a few presets and try again.');
-  else toast(existing ? `Updated “${name}”.` : `Saved “${name}” in this browser.`);
+  else {
+    const withAp = data.ap ? ' with Autopilot' : '';
+    toast(existing ? `Updated “${name}”${withAp}.` : `Saved “${name}”${withAp} in this browser.`);
+  }
 });
 
 function loadPreset(pr, quiet) {
@@ -5464,6 +5482,19 @@ function loadPreset(pr, quiet) {
   settleDevices();
   setEdit('A');
   syncUI();
+  // Saved while Autopilot was running: its settings and pins come back, and it carries on from this look
+  const a = d.ap;
+  if (a && typeof a === 'object') {
+    for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
+    apSet.beat = a.beat === true;
+    apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
+    ap.pins.clear();
+    ap.pinVal = {};
+    if (Array.isArray(a.pins)) a.pins.forEach((k) => { if (k in PINS) ap.pins.add(k); });
+    saveAp();
+    syncApUI();
+    setAutopilot(true, true);
+  }
   markPreset(pr.id);
   if (!quiet) {
     burst();
@@ -5471,6 +5502,7 @@ function loadPreset(pr, quiet) {
   }
   if (used.includes('video') && !vid.on) toast('This preset uses a video. Choose one under Video.');
   else if (used.includes('spectro') && !snd.analyser && snd.src === 'off' && !quiet) toast('This look uses the Spectrograph. Under the inputs, pick Computer sound or Microphone.');
+  else if (ap.on && !quiet) toast(`Autopilot is on with this preset’s settings${ap.pins.size ? ' and pins' : ''}.`);
 }
 renderPresets();
 
