@@ -145,7 +145,7 @@ def imageinfo(titles, thumbw):
             md = ii.get('extmetadata', {})
             g = lambda k: (md.get(k) or {}).get('value', '')
             res[p['title']] = {
-                'title': p['title'], 'w': ii['width'], 'h': ii['height'], 'mime': ii.get('mime', ''),
+                'title': p['title'], 'pageid': p.get('pageid'), 'w': ii['width'], 'h': ii['height'], 'mime': ii.get('mime', ''),
                 'thumb': ii.get('thumburl', ''), 'page': ii.get('descriptionurl', ''),
                 'license': strip_html(g('LicenseShortName')), 'licenseUrl': strip_html(g('LicenseUrl')),
                 'artist': strip_html(g('Artist')) or strip_html(g('Credit')),
@@ -178,6 +178,45 @@ def score_image(im):
     edge = [lum.getpixel((x, y)) for x in range(w) for y in range(h) if x < 8 or y < 6 or x >= w - 8 or y >= h - 6]
     dark = sum(1 for v in edge if v < 50) / len(edge)
     return round(color + 0.5 * contrast + 25 * dark, 1), round(color, 1), round(contrast, 1), round(dark, 2)
+
+
+GENERIC = {'flower', 'flowers', 'tree', 'trees', 'bird', 'plant', 'nature', 'forest', 'animal', 'fish', 'insect',
+           'mushroom', 'fungus', 'leaf', 'leaves', 'water', 'sky', 'landscape', 'macro photography', 'close-up',
+           'bokeh', 'wildlife', 'blossom', 'inflorescence', 'flower bud', 'petal', 'fruit', 'male', 'female',
+           'juvenile', 'adult', 'feather', 'spider web', 'dew', 'snow', 'winter', 'autumn', 'spring', 'summer'}
+
+
+def depicts(items):
+    """Common names from each file's 'depicts' statement on Commons (and the label on Wikidata)."""
+    ids = {}
+    good = [d for d in items if d.get('pageid')]
+    for i in range(0, len(good), 50):
+        chunk = good[i:i + 50]
+        out = api(action='wbgetentities', ids='|'.join(f"M{d['pageid']}" for d in chunk), props='claims')
+        for d in chunk:
+            ent = out.get('entities', {}).get(f"M{d['pageid']}", {})
+            claims = ent.get('statements') or ent.get('claims') or {}
+            qs = []
+            for c in claims.get('P180', []):
+                v = ((c.get('mainsnak') or {}).get('datavalue') or {}).get('value') or {}
+                if v.get('id'):
+                    qs.append(v['id'])
+            ids[d['title']] = qs
+    allq = sorted({q for qs in ids.values() for q in qs})
+    labels = {}
+    for i in range(0, len(allq), 50):
+        url = 'https://www.wikidata.org/w/api.php?' + urllib.parse.urlencode({
+            'action': 'wbgetentities', 'ids': '|'.join(allq[i:i + 50]), 'props': 'labels', 'languages': 'en',
+            'languagefallback': '1', 'format': 'json', 'formatversion': '2'})
+        out = json.loads(http(url))
+        for q, ent in out.get('entities', {}).items():
+            lab = (ent.get('labels', {}).get('en') or {}).get('value')
+            if lab:
+                labels[q] = lab
+    for d in items:
+        names = [labels[q] for q in ids.get(d['title'], []) if q in labels]
+        names = [n for n in names if n.lower() not in GENERIC] or names
+        d['depicts'] = names[:3]
 
 
 # ---------------------------------------------------------------- candidates
@@ -238,6 +277,11 @@ def candidates(args):
         for d in take:
             pool[d['title']] = d
         print(f"  kept {len(take)} (score cut {take[-1]['score'] if take else '-'})", flush=True)
+
+    try:
+        depicts(list(pool.values()))
+    except Exception as e:
+        print('depicts lookup failed:', e, flush=True)
 
     # contact sheets: numbered tiles, 8 across, 6 down
     sheets = os.path.join(SRC, 'sheets')
