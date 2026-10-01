@@ -401,7 +401,7 @@ def final(args):
                 continue
             im = im.convert('RGB')
             im.thumbnail((1024, 1024), Image.LANCZOS)
-            im.save(os.path.join(OUT, big), quality=84, optimize=True, progressive=True)
+            im.save(os.path.join(OUT, big), quality=80, optimize=True, progressive=True)
             t = im.copy()
             tw, th = 240, 180
             sc = max(tw / t.width, th / t.height)

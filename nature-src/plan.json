@@ -1,47 +1,149 @@
 {
  "buckets": [
-  {"id": "ocean", "label": "Ocean", "pool": 175, "depth": 2,
-   "skip": ["by country", "bones and fossils"],
-   "cats": ["Category:Featured pictures of fish", "Category:Featured pictures of Cnidaria",
-            "Category:Featured pictures of Echinodermata", "Category:Featured pictures of Cephalopoda",
-            "Category:Featured pictures of Gastropoda", "Category:Featured pictures of Tunicata",
-            "Category:Featured pictures of Platyhelminthes", "Category:Featured pictures of Annelida",
-            "Category:Featured pictures of Crustacea", "Category:Featured pictures of Cetacea"]},
-  {"id": "birds", "label": "Birds", "pool": 130, "depth": 3,
-   "skip": ["by country", "Wiki Loves"],
-   "cats": ["Category:Featured pictures of birds"]},
-  {"id": "bugs", "label": "Butterflies & bugs", "pool": 120, "depth": 3,
-   "skip": ["by country"],
-   "cats": ["Category:Featured pictures of Insecta", "Category:Featured pictures of Chelicerata",
-            "Category:Featured pictures of Diplopoda"]},
-  {"id": "reptiles", "label": "Frogs & reptiles", "pool": 85, "depth": 3,
-   "skip": ["by country"],
-   "cats": ["Category:Featured pictures of amphibians", "Category:Featured pictures of reptiles"]},
-  {"id": "mammals", "label": "Mammals", "pool": 85, "depth": 3,
-   "skip": ["by country", "bones and fossils", "Cetacea"],
-   "cats": ["Category:Featured pictures of mammals"]},
-  {"id": "flowers", "label": "Flowers", "pool": 150, "depth": 2,
-   "skip": ["by country"],
-   "cats": ["Category:Featured pictures of flowers", "Category:Featured pictures of plants by Ermell",
-            "Category:Featured pictures of Orchidaceae", "Category:Featured pictures of Amaryllidaceae",
-            "Category:Featured pictures of Iridaceae", "Category:Featured pictures of Nymphaeales",
-            "Category:Featured pictures of Liliales", "Category:Featured pictures of Ranunculales",
-            "Category:Featured pictures of Asteraceae", "Category:Featured pictures of Ericales",
-            "Category:Featured pictures of Caryophyllales", "Category:Featured pictures of Lamiales",
-            "Category:Featured pictures of Rosales", "Category:Featured pictures of Malvales",
-            "Category:Featured pictures of Myrtales", "Category:Featured pictures of Asparagaceae"]},
-  {"id": "trees", "label": "Trees & leaves", "pool": 60, "depth": 2,
-   "skip": ["by country"],
-   "cats": ["Category:Featured pictures of forests", "Category:Featured pictures of trees",
-            "Category:Featured pictures of Pinales", "Category:Featured pictures of Polypodiales",
-            "Category:Featured pictures of Ginkgoales", "Category:Featured pictures of Bryales",
-            "Category:Featured pictures of Sapindales"]},
-  {"id": "fungi", "label": "Mushrooms", "pool": 45, "depth": 2,
+  {
+   "id": "ocean",
+   "label": "Ocean",
+   "pool": 175,
+   "depth": 2,
+   "skip": [
+    "by country",
+    "bones and fossils"
+   ],
+   "cats": [
+    "Category:Featured pictures of fish",
+    "Category:Featured pictures of Cnidaria",
+    "Category:Featured pictures of Echinodermata",
+    "Category:Featured pictures of Cephalopoda",
+    "Category:Featured pictures of Gastropoda",
+    "Category:Featured pictures of Tunicata",
+    "Category:Featured pictures of Platyhelminthes",
+    "Category:Featured pictures of Annelida",
+    "Category:Featured pictures of Crustacea",
+    "Category:Featured pictures of Cetacea"
+   ]
+  },
+  {
+   "id": "birds",
+   "label": "Birds",
+   "pool": 130,
+   "depth": 3,
+   "skip": [
+    "by country",
+    "Wiki Loves"
+   ],
+   "cats": [
+    "Category:Featured pictures of birds"
+   ]
+  },
+  {
+   "id": "bugs",
+   "label": "Butterflies & bugs",
+   "pool": 120,
+   "depth": 3,
+   "skip": [
+    "by country"
+   ],
+   "cats": [
+    "Category:Featured pictures of Insecta",
+    "Category:Featured pictures of Chelicerata",
+    "Category:Featured pictures of Diplopoda"
+   ]
+  },
+  {
+   "id": "reptiles",
+   "label": "Frogs & reptiles",
+   "pool": 85,
+   "depth": 3,
+   "skip": [
+    "by country"
+   ],
+   "cats": [
+    "Category:Featured pictures of amphibians",
+    "Category:Featured pictures of reptiles"
+   ]
+  },
+  {
+   "id": "mammals",
+   "label": "Mammals",
+   "pool": 85,
+   "depth": 3,
+   "skip": [
+    "by country",
+    "bones and fossils",
+    "Cetacea"
+   ],
+   "cats": [
+    "Category:Featured pictures of mammals"
+   ]
+  },
+  {
+   "id": "flowers",
+   "label": "Flowers",
+   "pool": 150,
+   "depth": 2,
+   "skip": [
+    "by country"
+   ],
+   "cats": [
+    "Category:Featured pictures of flowers",
+    "Category:Featured pictures of plants by Ermell",
+    "Category:Featured pictures of Orchidaceae",
+    "Category:Featured pictures of Amaryllidaceae",
+    "Category:Featured pictures of Iridaceae",
+    "Category:Featured pictures of Nymphaeales",
+    "Category:Featured pictures of Liliales",
+    "Category:Featured pictures of Ranunculales",
+    "Category:Featured pictures of Asteraceae",
+    "Category:Featured pictures of Ericales",
+    "Category:Featured pictures of Caryophyllales",
+    "Category:Featured pictures of Lamiales",
+    "Category:Featured pictures of Rosales",
+    "Category:Featured pictures of Malvales",
+    "Category:Featured pictures of Myrtales",
+    "Category:Featured pictures of Asparagaceae"
+   ]
+  },
+  {
+   "id": "trees",
+   "label": "Trees & leaves",
+   "pool": 60,
+   "depth": 2,
+   "skip": [
+    "by country"
+   ],
+   "cats": [
+    "Category:Featured pictures of forests",
+    "Category:Featured pictures of trees",
+    "Category:Featured pictures of Pinales",
+    "Category:Featured pictures of Polypodiales",
+    "Category:Featured pictures of Ginkgoales",
+    "Category:Featured pictures of Bryales",
+    "Category:Featured pictures of Sapindales"
+   ]
+  },
+  {
+   "id": "fungi",
+   "label": "Mushrooms",
+   "pool": 45,
+   "depth": 2,
    "skip": [],
-   "cats": ["Category:Featured pictures of fungi"]},
-  {"id": "sky", "label": "Sky & earth", "pool": 30, "depth": 1,
-   "skip": ["by country"],
-   "cats": ["Category:Featured pictures of natural phenomena", "Category:Featured pictures of auroras",
-            "Category:Featured pictures of lightning"]}
+   "cats": [
+    "Category:Featured pictures of fungi"
+   ]
+  },
+  {
+   "id": "sky",
+   "label": "Earth & sky",
+   "pool": 30,
+   "depth": 1,
+   "skip": [
+    "by country"
+   ],
+   "cats": [
+    "Category:Featured pictures of natural phenomena",
+    "Category:Featured pictures of auroras",
+    "Category:Featured pictures of lightning"
+   ]
+  }
  ]
 }
