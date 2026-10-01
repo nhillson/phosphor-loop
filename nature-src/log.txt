@@ -1,77 +1,37 @@
-ocean: 577 files in 21 categories
-  536 pass license/size/shape
-/home/runner/work/phosphor-loop/phosphor-loop/.github/scripts/nature.py:165: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.
-  px = list(small.getdata())
-  scored 100
+  found categories: ['Category:Featured pictures of astronomy', 'Category:Featured pictures of aurora', 'Category:Featured pictures of galaxies', 'Category:Featured pictures of the Milky Way', 'Category:Featured pictures of sunrises', 'Category:Featured pictures of sunsets', 'Category:Featured pictures of caves', 'Category:Featured pictures of mountains', 'Category:Featured pictures of volcanoes', 'Category:Featured pictures of coasts', 'Category:Featured pictures of geysers', 'Category:Featured pictures of lakes', 'Category:Featured pictures of oceans', 'Category:Featured pictures of the Atlantic Ocean', 'Category:Featured pictures of the Indian Ocean', 'Category:Featured pictures of the Pacific Ocean', 'Category:Featured pictures of the Adriatic Sea', 'Category:Featured pictures of the North Sea', 'Category:Featured pictures of waterfalls', 'Category:Featured pictures of caves', 'Category:Featured pictures of coasts', 'Category:Featured pictures of mountains', 'Category:Featured pictures of volcanoes', 'Category:Featured pictures of natural phenomena', 'Category:Featured pictures of aurora', 'Category:Featured pictures of caves', 'Category:Featured pictures of clouds', 'Category:Featured pictures of ice', 'Category:Featured pictures of lightning', 'Category:Featured pictures of volcanism', 'Category:Featured pictures of volcanoes', 'Category:Featured pictures of Crater Lake National Park', 'Category:Featured pictures of geysers', 'Category:Featured pictures of Hawaii Volcanoes National Park', 'Category:Featured pictures of Grand Canyon National Park', 'Category:Featured pictures of Hawaii Volcanoes National Park', 'Category:Featured pictures of aurora']
+sky: 1369 files in 44 categories
+  1034 pass license/size/shape
   scored 200
-  scored 300
   scored 400
-  scored 500
-  kept 175 (score cut 86.6)
+  scored 600
+  scored 800
+  scored 1000
+  kept 110 (score cut 96.4)
 birds: 1436 files in 319 categories
-  1284 pass license/size/shape
-  scored 100
+  1154 pass license/size/shape
   scored 200
-  scored 300
   scored 400
-  scored 500
   scored 600
-  scored 700
   scored 800
-  scored 900
   scored 1000
-  scored 1100
-  scored 1200
-  kept 130 (score cut 81.7)
-bugs: 1315 files in 77 categories
-  1117 pass license/size/shape
-  scored 100
-  scored 200
-  scored 300
-  scored 400
-  scored 500
-  scored 600
-  scored 700
-  scored 800
-  scored 900
-  scored 1000
-  scored 1100
-  kept 120 (score cut 100.2)
-reptiles: 324 files in 30 categories
-  296 pass license/size/shape
-  scored 100
-  scored 200
-  kept 85 (score cut 74.7)
+  kept 60 (score cut 76.8)
 mammals: 795 files in 93 categories
-  685 pass license/size/shape
-  scored 100
+  599 pass license/size/shape
   scored 200
-  scored 300
   scored 400
-  scored 500
+  kept 55 (score cut 72.4)
+bugs: 1314 files in 76 categories
+  996 pass license/size/shape
+  scored 200
+  scored 400
   scored 600
-  kept 85 (score cut 78.2)
-flowers: 766 files in 23 categories
-  560 pass license/size/shape
-  scored 100
+  scored 800
+  kept 35 (score cut 96.4)
+trees: 306 files in 5 categories
+  217 pass license/size/shape
   scored 200
-  scored 300
-  scored 400
-  scored 500
-  kept 150 (score cut 100.9)
-trees: 352 files in 9 categories
-  302 pass license/size/shape
-  scored 100
-  scored 200
-  scored 300
-  kept 60 (score cut 92.5)
+  kept 30 (score cut 83.2)
 fungi: 150 files in 5 categories
-  137 pass license/size/shape
-  scored 100
-  kept 45 (score cut 85.7)
-sky: 347 files in 15 categories
-  280 pass license/size/shape
-  scored 100
-  scored 200
-  kept 30 (score cut 101.3)
-880 candidates, 19 sheets
+  92 pass license/size/shape
+  kept 15 (score cut 79.9)
+1185 candidates, 25 sheets
