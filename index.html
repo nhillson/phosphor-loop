@@ -1170,6 +1170,53 @@
             <span class="hint">Each part of the picture shows a different moment. One edge (or the middle) is right now, and the further from it, the longer ago, so anything moving stretches into ribbons and waves.</span>
           </div>
         </div>
+
+        <div class="group">
+          <h2 id="h-self">Loop A feeds on itself</h2>
+          <p class="hint">Each of these lets the picture decide what happens to it next.</p>
+          <div class="ctl">
+            <div class="ctl-head"><label for="lookup">Look-up</label><output id="lookupOut" for="lookup"></output></div>
+            <input type="range" id="lookup" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Tangled</span></div>
+            <span class="hint">Each spot copies from a spot its own color points to: its red, green and blue say which way and how far. So the picture keeps rearranging itself by its own colors into folds and liquid-metal swirls.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="chase">Chase</label><output id="chaseOut" for="chase"></output></div>
+            <input type="range" id="chase" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Hunting</span></div>
+            <span class="hint">Zoom and Spin turn around the brightest part of the picture instead of the middle, so the tunnel wanders off after the light. Needs some Zoom or Spin.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="breathe">Breathe</label><output id="breatheOut" for="breathe"></output></div>
+            <input type="range" id="breathe" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Deep</span></div>
+            <span class="hint">Zoom and Spin follow the picture itself: as it brightens it pulls back, as it darkens it pushes in, and lots of movement spins it faster. It finds its own rhythm, even with no music.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="chroma">Color chase</label><output id="chromaOut" for="chroma"></output></div>
+            <input type="range" id="chroma" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Wild</span></div>
+            <span class="hint">Red is pushed around by the green parts, green by the blue and blue by the red, so the three colors keep chasing each other into rainbow fringes and braids.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="restless">Restless</label><output id="restlessOut" for="restless"></output></div>
+            <input type="range" id="restless" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Only what moves</span></div>
+            <span class="hint">Only the parts of the picture that are changing get to stay. Anything that holds still fades, so you see a shimmer of moving outlines.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="julia">Fractal fold</label><output id="juliaOut" for="julia"></output></div>
+            <input type="range" id="julia" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>All fractal</span></div>
+            <span class="hint">Instead of a plain zoom, each frame folds the picture through the formula behind the Mandelbrot set, so whatever comes in grows into fractal flowers and spirals. Zoom and Spin reshape the fractal.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="crystal">Crystal</label><output id="crystalOut" for="crystal"></output></div>
+            <input type="range" id="crystal" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Shattered</span></div>
+            <span class="hint">The picture cracks into pieces around its brightest spots, and each piece turns and zooms its own way, like a broken mirror. The cracks re-form as the light moves.</span>
+          </div>
+        </div>
       </section>
 
       <section class="group" aria-labelledby="h-screen">
@@ -1296,6 +1343,15 @@
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
             <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
+          </dl></div>
+          <div class="g-card"><h3>Feeds on itself</h3><dl>
+            <dt>Look-up</dt><dd>Each spot copies from a spot its own color points to: how red it is says how far to the side, how green how far up or down, and how blue turns that direction round. The picture keeps rearranging itself by its own colors into folds and liquid-metal swirls. Dark parts stay put. More Color shift gives it more to work with.</dd>
+            <dt>Chase</dt><dd>Zoom and Spin normally turn around the middle. With Chase they turn around the brightest part of the picture, and as the tunnel pulls that light away, it heads for the next bright spot, so the middle of the tunnel keeps wandering. Needs some Zoom or Spin.</dd>
+            <dt>Breathe</dt><dd>Like React to sound, but the loop listens to itself. As the picture gets brighter it zooms out, as it gets darker it zooms in, and the more it moves the faster it spins. It settles into its own slow rhythm, and pulls back before it turns white.</dd>
+            <dt>Color chase</dt><dd>Red is pushed around by the green parts of the picture, green by the blue and blue by the red. Each color slides along the outlines of the one pushing it, so the three chase each other round and split into rainbow fringes and braids.</dd>
+            <dt>Restless</dt><dd>Only what's changing gets to stay. Each frame the picture is compared with the one before: still parts fade away and the changes themselves glow, leaving a shimmer of moving outlines. Lovely with the camera.</dd>
+            <dt>Fractal fold</dt><dd>Instead of a plain zoom, every frame folds the picture through the formula behind the Mandelbrot set, so anything that comes in grows into fractal flowers, spirals and lace. The fractal slowly changes shape by itself; Zoom and Spin reshape it too. Low mixes a little of it into the usual tunnel.</dd>
+            <dt>Crystal</dt><dd>The picture cracks into ten pieces centred on its brightest spots. Each piece turns and zooms in its own way, like a broken mirror, and the cracks move as the light does.</dd>
           </dl></div>
           <div class="g-card"><h3>React to sound</h3><dl>
             <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: on the Entire Screen tab pick any screen (with two monitors, Screen 1 or Screen 2 both give the whole computer’s sound) and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
@@ -1453,10 +1509,13 @@ const DEVICE = ['camera', 'screen', 'phone'];
 function loopDefaults() {
   return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
            zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
-           grow: 0, growSize: 1, time: 0, timeShape: 0 };
+           grow: 0, growSize: 1, time: 0, timeShape: 0,
+           lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size'];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time'];
+// The sliders under "Loop A feeds on itself"
+const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 const MIX_SLIDERS = ['view', 'xab', 'xba'];
 // What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
@@ -1511,7 +1570,17 @@ const CHANNELS = [
 ];
 
 /* ================= state ================= */
-function mkLoop() { const d = loopDefaults(); return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0, tw: null }; }
+// Crystal's ten pieces start spread over the screen
+function crystalStart() {
+  const a = new Float32Array(20);
+  for (let i = 0; i < 10; i++) { a[i * 2] = ((i % 5) / 4 - 0.5) * 1.1; a[i * 2 + 1] = i < 5 ? 0.2 : -0.2; }
+  return a;
+}
+function mkLoop() {
+  const d = loopDefaults();
+  return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0, tw: null,
+           probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], cells: crystalStart(), breath: { z: 0, s: 1 } };
+}
 const loops = { A: mkLoop(), B: mkLoop() };
 const mixDefaults = { view: 0, xab: 0, xba: 0 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
@@ -1569,6 +1638,14 @@ uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
 uniform float uPush, uPushTurn;   // Pushed by the other loop: the same idea, but the other loop's picture does the pushing
 uniform float uDye, uDyeTurn;     // Dyed by the other loop: how far its bright parts turn this loop's colors this frame
+uniform float uLook;              // Look-up: how far each spot moves towards the place its own color points at, this frame
+uniform vec2 uCenter;             // Chase: the point Zoom and Spin turn around (the middle unless Chase moves it)
+uniform float uChroma, uChromaTurn;   // Color chase: how far each color is pushed by another this frame, and a slow turn
+uniform float uRestless;          // Restless: how much of what holds still fades this frame
+uniform float uJulia;             // Fractal fold: how much of the fold (0 none, 1 all of it)
+uniform vec2 uJuliaC;             // Fractal fold: the fractal's constant, which drifts slowly
+uniform float uCrystal;           // Crystal: how far each piece turns and zooms this frame
+uniform vec4 uCells[5];           // Crystal: the centres of its ten pieces, two to a slot
 uniform float uGrow, uGrowR, uGrowTurn;   // Grow: how fast patterns grow this frame, how far apart their stripes sit (pixels), and a turn that changes every frame
 uniform float uAspText;   // the Text input's picture: how wide it is for its height
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
@@ -1794,6 +1871,58 @@ vec3 growAt(vec3 c, vec3 near, vec2 st) {
   hue = mix(vec3(1.0), hue, smoothstep(0.0, 0.015, max(lc, ln)));
   return clamp(hue * lt, 0.0, 1.0);
 }
+// Look-up: each spot copies from a spot its own color points at. How red it is says how far to the side, how green
+// how far up or down, and how blue turns that direction round, so every color reads from its own place and
+// neighbouring colors pull apart. The picture keeps rearranging itself by its own colors, folding into liquid-metal
+// swirls that never quite repeat. Dark spots point nowhere and stay put.
+vec2 lookAt(vec2 q, float asp) {
+  vec2 st = q / vec2(asp, 1.0) + 0.5;
+  vec2 r = vec2(0.008 / asp, 0.008);
+  vec3 c = 0.25 * (texture(uPrev, st + r).rgb + texture(uPrev, st - r).rgb +
+                   texture(uPrev, st + vec2(r.x, -r.y)).rgb + texture(uPrev, st + vec2(-r.x, r.y)).rgb);
+  vec2 way = rot(c.b * TAU) * (c.rg - 0.5);
+  return q + way * uLook * smoothstep(0.02, 0.2, luma(c));
+}
+// Color chase: red is pushed around by the green parts of the picture, green by the blue and blue by the red.
+// Each color slides along the outlines of the one pushing it, and its brightness picks which way, so the three
+// keep chasing each other round in a circle, splitting into rainbow fringes and braids.
+vec3 chromaAt(vec2 st, float asp) {
+  vec2 r = vec2(0.012 / asp, 0.012);
+  vec3 E = texture(uPrev, st + vec2(r.x, 0.0)).rgb, W = texture(uPrev, st - vec2(r.x, 0.0)).rgb;
+  vec3 N = texture(uPrev, st + vec2(0.0, r.y)).rgb, S = texture(uPrev, st - vec2(0.0, r.y)).rgb;
+  vec3 C = 0.25 * (E + W + N + S);
+  vec3 gx = ((E - W) / 0.024).gbr, gy = ((N - S) / 0.024).gbr, by = C.gbr;   // the slope of the color doing the pushing
+  vec3 n = sqrt(gx * gx + gy * gy) + 3.0;
+  vec3 a = by * 7.0 + uChromaTurn + vec3(0.0, 2.1, 4.2);
+  vec3 slide = smoothstep(0.03, 0.3, by);
+  vec3 dx = (gy / n * 0.9 + cos(a) * slide * 0.5) * uChroma;
+  vec3 dy = (-gx / n * 0.9 + sin(a) * slide * 0.5) * uChroma;
+  return vec3(texture(uPrev, st + vec2(dx.r / asp, dy.r)).r,
+              texture(uPrev, st + vec2(dx.g / asp, dy.g)).g,
+              texture(uPrev, st + vec2(dx.b / asp, dy.b)).b);
+}
+// Fractal fold: instead of a plain zoom, the picture is folded through the formula behind the Mandelbrot set
+// (z becomes z times z plus a constant), so whatever comes in grows into fractal flowers and spirals
+vec2 juliaAt(vec2 q) {
+  vec2 z = q * 2.2;
+  return (vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + uJuliaC) / 2.2;
+}
+// Crystal: the picture is split into ten pieces around its brightest spots (found by the loop's probe, see
+// probeTick), and each piece turns and zooms around its own centre in its own way, like a broken mirror
+vec2 crystalAt(vec2 q) {
+  float best = 1e9, id = 0.0;
+  vec2 cc = vec2(0.0);
+  for (int i = 0; i < 5; i++) {
+    vec4 c = uCells[i];
+    vec2 d1 = q - c.xy, d2 = q - c.zw;
+    float e1 = dot(d1, d1), e2 = dot(d2, d2);
+    if (e1 < best) { best = e1; cc = c.xy; id = float(i * 2); }
+    if (e2 < best) { best = e2; cc = c.zw; id = float(i * 2 + 1); }
+  }
+  float a = sin(id * 12.9898 + 0.7) * 0.05 * uCrystal;
+  float z = (cos(id * 4.1414) * 0.6 + 0.25) * 0.017 * uCrystal;
+  return cc + rot(a) * (q - cc) * exp(-z);
+}
 // The spectrograph (see writeSpec): a picture of the sound. Each row of uSpec is one moment and runs from
 // the lowest pitch on the left to the highest on the right; new rows are written over the oldest, like a ring.
 uniform sampler2D uSpec;
@@ -1930,7 +2059,9 @@ void main() {
   vec2 pf = fold(p, uMirror);
 
   // Where this pixel was one frame ago
-  vec2 q = rot(uSpin) * pf * exp(-uZoom);
+  vec2 q = rot(uSpin) * (pf - uCenter) * exp(-uZoom) + uCenter;
+  if (uJulia > 0.0) q = mix(q, juliaAt(q), uJulia);
+  if (uCrystal > 0.0) q = crystalAt(q);
   q -= uShift;
   if (uFlow > 0.0) q -= uFlow * flowAt(q, uTime * 0.6);
   if (uInkDt > 0.0) q -= uInkDt * inkPush(pf);
@@ -1938,6 +2069,7 @@ void main() {
                     cos(q.x * 7.0 - uTime * 0.9 + sin(q.y * 2.0 - uTime * 0.3)));
   if (uMelt > 0.0) q += meltAt(q, asp);
   if (uPush > 0.0) q += pushAt(q, asp);
+  if (uLook > 0.0) q = lookAt(q, asp);
   // Split lines: every other line of pixels slides left, the lines between slide right
   float side = mod(floor(gl_FragCoord.y), 2.0) < 0.5 ? 1.0 : -1.0;
   q.x += uSplit * side;
@@ -1951,10 +2083,16 @@ void main() {
     inside = b.x * b.y;
   }
   vec2 px = 1.0 / uSim;
-  vec3 c0 = texture(uPrev, st).rgb;
+  vec3 c0 = uChroma > 0.0 ? chromaAt(st, asp) : texture(uPrev, st).rgb;
   vec3 cb = 0.25 * (texture(uPrev, st + vec2(px.x, 0.0)).rgb + texture(uPrev, st - vec2(px.x, 0.0)).rgb +
                     texture(uPrev, st + vec2(0.0, px.y)).rgb + texture(uPrev, st - vec2(0.0, px.y)).rgb);
   vec3 fb = c0 + (cb - c0) * uBlur;
+  // Restless: only what is changing gets to stay. The picture that lands here is compared with what was here
+  // a frame ago; where they match, it fades, and where they differ, the difference itself glows.
+  if (uRestless > 0.0) {
+    vec3 d = abs(c0 - texture(uPrev, uv).rgb);
+    fb = fb * (1.0 - uRestless + uRestless * smoothstep(0.03, 0.2, luma(d))) + d * 0.35 * uRestless;
+  }
   if (uGrow > 0.0) fb = growAt(fb, cb, st);
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
@@ -3787,7 +3925,8 @@ function sliderText(k, v) {
       return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
     }
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
-    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'trails': return v === 0 ? 'OFF' : String(v);
+    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'trails':
+    case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal': return v === 0 ? 'OFF' : String(v);
     // How far back the far edge reaches
     case 'time': return v === 0 ? 'OFF' : `${twSpan(v).toFixed(1)} SEC`;
     default: return String(v);
@@ -3953,6 +4092,7 @@ function setEdit(k) {
   $('#tabB').setAttribute('aria-selected', String(k === 'B'));
   $('#h-in').textContent = `What feeds loop ${k}`;
   $('#h-shape').textContent = `Shape loop ${k}`;
+  $('#h-self').textContent = `Loop ${k} feeds on itself`;
   syncUI();
   syncPins();
 }
@@ -4097,6 +4237,11 @@ function loadChannel(i) {
   burst();
   showOSD(`CH ${String(i + 1).padStart(2, '0')}`, CHANNELS[i].name.toUpperCase());
 }
+function surpriseSelf() {
+  const sc = {};
+  apSelf(sc, 0.5);
+  return sc;
+}
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...worldsOK().sort(() => Math.random() - 0.5).slice(0, 2),
@@ -4115,6 +4260,7 @@ function randomLoop() {
     dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
     grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, growSize: Math.floor(Math.random() * 3),
     time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * 3),
+    ...surpriseSelf(),
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
     edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
@@ -4750,6 +4896,13 @@ const PINS = {
   split: { name: 'Split lines', fields: ['split'] },
   grow: { name: 'Grow', fields: ['grow', 'growSize'] },
   time: { name: 'Time warp', fields: ['time', 'timeShape'] },
+  lookup: { name: 'Look-up', fields: ['lookup'] },
+  chase: { name: 'Chase', fields: ['chase'] },
+  breathe: { name: 'Breathe', fields: ['breathe'] },
+  chroma: { name: 'Color chase', fields: ['chroma'] },
+  restless: { name: 'Restless', fields: ['restless'] },
+  julia: { name: 'Fractal fold', fields: ['julia'] },
+  crystal: { name: 'Crystal', fields: ['crystal'] },
   view: { name: 'What you see', fields: ['view'], mix: true },
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
   xba: { name: 'Feed B into A', fields: ['xba'], mix: true },
@@ -4759,7 +4912,7 @@ const PINS = {
 // on one: a value it picks inside the range stays as it is, and one outside gets a fresh value from somewhere
 // inside it. Sliders moved by hand, and pinned ones, aren't limited. Kept as { trails: [40, 90], ... }, listing
 // only the sliders whose range is narrowed.
-const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'split', 'time'];
+const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'split', 'time', ...SELF];
 const LIM_MIX = ['view', 'xab', 'xba'];
 const limScale = (k) => (k === 'zoom' || k === 'spin' ? [-100, 100] : [0, 100]);
 function cleanLim(v) {
@@ -5406,6 +5559,17 @@ function apRealInput() {
 // A new look. How wild (w) stretches how far it zooms, spins and tints, and how often it warps, flows and melts;
 // at the middle of the slider it behaves as Autopilot always has.
 // (k: the loop it's for, whose own pins it keeps)
+// Feeds on itself, for a new look: about half the time one of them, and in wilder looks sometimes two, each
+// somewhere in its own useful range
+const SELF_RANGE = { lookup: [25, 80], chase: [35, 90], breathe: [35, 90], chroma: [25, 80], restless: [30, 85], julia: [35, 100], crystal: [30, 85] };
+function apSelf(sc, w) {
+  for (const key of SELF) sc[key] = 0;
+  let n = Math.random() < 0.35 + 0.35 * w ? (Math.random() < 0.3 * w ? 2 : 1) : 0;
+  while (n-- > 0) {
+    const key = pick(SELF), [lo, hi] = SELF_RANGE[key];
+    sc[key] = Math.round(rnd(lo, lo + (hi - lo) * (0.4 + 0.6 * w)));
+  }
+}
 function apScene(k) {
   const pool = apPool(), w = apSet.wild / 100;
   let sc;
@@ -5436,6 +5600,7 @@ function apScene(k) {
     };
     if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
   }
+  apSelf(sc, w);
   // Pinned inputs go in first, so the size below suits the input really used
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
@@ -6660,6 +6825,21 @@ const RECIPES = [
     sw: 'repeating-radial-gradient(circle at 50% 50%,#ff4fa3 0 4px,#ffcf6b 4px 8px,#3bff9a 8px 12px,#3b8bff 12px 16px,#c43bff 16px 20px)',
     patch: { A: { in1: 'picture', zoom: 30, spin: 8, trails: 88, color: 0, blur: -0.05, dye: 75 },
              B: { in1: 'wave', form: 3, mirror: 6, zoom: -20, spin: -12, trails: 92, color: 10, edge: 1, blur: 0.1 } } },
+  { name: 'Fractal garden', after: 'Slide Fractal fold down to mix the fractal back into an ordinary tunnel.',
+    text: 'The loop folds its picture through the Mandelbrot formula every frame, so a plain glowing square grows into fractal flowers and lace that slowly change shape.',
+    how: 'SHAPE · FRACTAL FOLD 100 · TRAILS 90',
+    sw: 'radial-gradient(circle at 30% 50%,#ffcf6b 0 6%,transparent 7%),radial-gradient(circle at 70% 50%,#ffcf6b 0 6%,transparent 7%),radial-gradient(ellipse 48% 22% at 50% 50%,#ff7ac6 0 40%,#6a2bd9 60%,transparent 72%),#0b0614',
+    patch: { A: { in1: 'shape', form: 3, zoom: 8, spin: 6, trails: 90, color: 25, julia: 100 } } },
+  { name: 'Shattered mirror', after: 'Raise Crystal for sharper turns, or add Spin.',
+    text: 'The picture cracks into pieces around its brightest spots, and every piece turns and zooms its own way, like looking into a broken mirror.',
+    how: 'SHAPE · CRYSTAL 80 · ZOOM IN 15 · TRAILS 90',
+    sw: 'conic-gradient(from 30deg at 40% 55%,#1b0f3d 0 60deg,#c77dff 60deg 64deg,#2a1450 64deg 150deg,#ffcf6b 150deg 153deg,#1b0f3d 153deg 250deg,#4fd1c5 250deg 254deg,#1b0f3d 254deg)',
+    patch: { A: { in1: 'shape', form: 3, zoom: 15, spin: 0, trails: 90, color: 15, crystal: 80 } } },
+  { name: 'Prism', after: 'Try Color chase on your own picture or the camera.',
+    text: 'Red, green and blue push each other around in a circle, so a white outline splits into rainbow fringes that braid and chase each other.',
+    how: 'SHAPE · COLOR CHASE 80 · ZOOM IN 18 · TRAILS 92',
+    sw: 'linear-gradient(100deg,#0b0614 0 30%,#ff3b3b 34%,#ffd23b 40%,#3bff9a 46%,#3b8bff 52%,#c43bff 58%,#0b0614 64%)',
+    patch: { A: { in1: 'shape', form: 3, zoom: 18, spin: 8, trails: 92, color: 10, chroma: 80 } } },
   { name: 'Name in lights', after: 'Type your own words in the Your text box under What feeds loop A.',
     text: 'Your band’s name, a title or the venue, flying down a tunnel of its own echoes. Type your own words and they change straight away.',
     how: 'TEXT · ZOOM IN 32 · TRAILS 88 · COLOR 16',
@@ -8307,6 +8487,8 @@ function computeWave(t, form) {
   }
 }
 const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
+const LOOK_K = 0.03;     // how far Look-up at 100 lets each spot read from where its color points, in one frame
+const CHROMA_K = 0.005;  // how far Color chase at 100 pushes each color in one frame
 const MELT_K = 0.02;     // how far Melt at 100 lets the picture push itself in one frame
 const PUSH_K = 0.02;     // how far Pushed by the other loop at 100 moves this loop in one frame
 const DYE_K = 0.16;      // how far Dyed by the other loop at 100 turns colors in one frame, where the other loop is brightest
@@ -8488,6 +8670,170 @@ function draw3D(k, name, slot, scale) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return rt.tex;
 }
+/* ================= the loops' probes (Chase, Breathe, Crystal) ================= */
+// Chase, Breathe and Crystal need to know what a loop's picture looks like: where it's brightest, how bright it
+// is overall and how fast it's changing. So while one of them is on, a tiny 32 x 18 map of the loop's brightness is
+// drawn every few hundredths of a second and handed over by the graphics chip a frame or two later, the same way
+// Autopilot's eye works: nothing ever stops to wait for it, so it can't make the picture stutter.
+const PROBE_W = 32, PROBE_H = 18;
+let probeProg = null, probeFailed = false;
+function probeMake() {
+  if (!probeProg) {
+    probeProg = program(`#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uOut;
+out vec4 o;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uOut, d = 0.33 / uOut;
+  float l = 0.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++)
+    l += dot(texture(uSrc, uv + vec2(float(x), float(y)) * d).rgb, vec3(0.299, 0.587, 0.114));
+  o = vec4(clamp(l / 9.0, 0.0, 1.0), 0.0, 0.0, 1.0);
+}`);
+    gl.useProgram(probeProg.p);
+    set1i(probeProg, 'uSrc', 0);
+  }
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PROBE_W, PROBE_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('probe target');
+  const buf = new Uint8Array(PROBE_W * PROBE_H * 4);
+  const pbo = gl.createBuffer();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, buf.byteLength, gl.STREAM_READ);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  return { tex, fbo, pbo, buf, sync: null, askT: 0, age: 0, lum: null, t: 0, mean: 0, motion: 0 };
+}
+// Once a frame for a loop using Chase, Breathe or Crystal: collects the last map if it has arrived, and asks for
+// the next one. Row 0 of the map is the bottom of the picture.
+function probeTick(k, now) {
+  if (probeFailed) return;
+  const L = loops[k];
+  try {
+    if (!L.probe) L.probe = probeMake();
+    const P = L.probe;
+    if (P.sync) {
+      const st = gl.clientWaitSync(P.sync, 0, 0);   // a timeout of 0: only asks, never waits
+      if (st === gl.TIMEOUT_EXPIRED && ++P.age < 60) return;
+      gl.deleteSync(P.sync);
+      P.sync = null;
+      if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) {
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, P.pbo);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, P.buf);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        const n = PROBE_W * PROBE_H, lum = new Float32Array(n);
+        let sum = 0, diff = 0;
+        for (let i = 0; i < n; i++) { lum[i] = P.buf[i * 4] / 255; sum += lum[i]; if (P.lum) diff += Math.abs(lum[i] - P.lum[i]); }
+        const dt = (P.askT - P.t) / 1000;
+        P.motion = P.lum && dt > 0.005 && dt < 1 ? diff / n / dt : P.motion;
+        P.mean = sum / n;
+        P.lum = lum;
+        P.t = P.askT;
+        probeUse(k);
+      }
+      return;
+    }
+    if (now - P.askT < 33) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, P.fbo);
+    gl.viewport(0, 0, PROBE_W, PROBE_H);
+    gl.useProgram(probeProg.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, L.rt[L.front].tex);
+    set2f(probeProg, 'uOut', PROBE_W, PROBE_H);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, P.pbo);
+    gl.readPixels(0, 0, PROBE_W, PROBE_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    P.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    P.askT = now;
+    P.age = 0;
+  } catch (err) {
+    probeFailed = true;   // Chase, Breathe and Crystal then just stay still; nothing else is affected
+    console.warn('Probe unavailable:', err);
+  }
+}
+// The map, softened a little (each spot an average of it and its eight neighbours), and where each spot is on screen
+function probeSoft(lum) {
+  const W = PROBE_W, H = PROBE_H, out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let s = 0, n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      s += lum[yy * W + xx]; n++;
+    }
+    out[y * W + x] = s / n;
+  }
+  return out;
+}
+const probeX = (x) => ((x + 0.5) / PROBE_W - 0.5) * simAspect, probeY = (y) => (y + 0.5) / PROBE_H - 0.5;
+// What each effect takes from a new map
+function probeUse(k) {
+  const L = loops[k], c = L.cur, P = L.probe, soft = probeSoft(P.lum);
+  // Chase heads for the brightest part of the picture that isn't where it already is
+  if (c.chase > 0.5) {
+    const [cx, cy] = L.chaseAt;
+    let best = 0.06, tx = null, ty = null;
+    for (let y = 0; y < PROBE_H; y++) for (let x = 0; x < PROBE_W; x++) {
+      const v = soft[y * PROBE_W + x], X = probeX(x), Y = probeY(y);
+      if (v > best && Math.hypot(X - cx, Y - cy) > 0.14) { best = v; tx = X; ty = Y; }
+    }
+    if (tx !== null) L.chaseGoal = [clamp(tx, -0.3 * simAspect, 0.3 * simAspect), clamp(ty, -0.3, 0.3)];
+  }
+  // Crystal's pieces centre on the brightest spots, each piece easing towards the nearest one
+  if (c.crystal > 0.5) {
+    const peaks = [];
+    for (let y = 0; y < PROBE_H; y++) for (let x = 0; x < PROBE_W; x++) {
+      const v = soft[y * PROBE_W + x];
+      if (v < 0.05) continue;
+      let top = true;
+      for (let dy = -1; dy <= 1 && top; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if ((dx || dy) && xx >= 0 && yy >= 0 && xx < PROBE_W && yy < PROBE_H && soft[yy * PROBE_W + xx] > v) { top = false; break; }
+      }
+      if (top) peaks.push([v, probeX(x), probeY(y)]);
+    }
+    peaks.sort((a, b) => b[0] - a[0]);
+    const goals = [];
+    for (const [, X, Y] of peaks) {
+      if (goals.length >= 10) break;
+      if (goals.every(([gx, gy]) => Math.hypot(gx - X, gy - Y) > 0.12)) goals.push([X, Y]);
+    }
+    // Not enough bright spots: the rest sit at steady places spread over the screen
+    for (let i = 0; goals.length < 10; i++) goals.push([(fract(Math.sin(i * 7.31 + 1) * 4375.85) - 0.5) * simAspect * 0.9,
+                                                        fract(Math.sin(i * 3.17 + 2) * 2791.13) - 0.55]);
+    const cells = L.cells, used = new Set();
+    for (const [gx, gy] of goals) {
+      let bi = -1, bd = 1e9;
+      for (let i = 0; i < 10; i++) {
+        if (used.has(i)) continue;
+        const d = Math.hypot(cells[i * 2] - gx, cells[i * 2 + 1] - gy);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      used.add(bi);
+      cells[bi * 2] += (gx - cells[bi * 2]) * 0.35;
+      cells[bi * 2 + 1] += (gy - cells[bi * 2 + 1]) * 0.35;
+    }
+  }
+}
+// Breathe: Zoom and Spin follow the picture itself. Brighter than about a fifth pulls back, darker pushes in, and
+// lots of movement turns the spin up. Each loop finds its own rhythm, and backs off before it turns white.
+function breathe(k, amt, dt) {
+  const L = loops[k], P = L.probe, B = L.breath;
+  if (!P || !P.lum) return B;
+  const goalZ = clamp((0.2 - P.mean) * 1500, -90, 70) * amt;
+  const goalS = 1 + amt * Math.min(P.motion * 3, 2);
+  const e = 1 - Math.exp(-dt * 1.6);
+  B.z += (goalZ - B.z) * e;
+  B.s += (goalS - B.s) * e;
+  return B;
+}
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const otherK = k === 'A' ? 'B' : 'A';
@@ -8526,6 +8872,9 @@ function runLoop(k, xf, brush, f) {
     if (m.size) sizeBoost = a * (E.low * 30 + E.beat * 22);
     if (m.flash) gainBoost = 1 + a * E.beat * 0.8;
   }
+  const br = clamp(c.breathe, 0, 100) / 100;
+  if (br > 0.005) { const B = breathe(k, br, f / 60); z += B.z; s *= B.s; }
+  else { L.breath.z *= 0.95; L.breath.s += (1 - L.breath.s) * 0.05; }
   z = clamp(z, -100, 100); s = clamp(s, -100, 100); col = clamp(col, 0, 100); w = clamp(w, 0, 100);
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
@@ -8575,6 +8924,23 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uPushTurn', simT * 0.05 + (k === 'B' ? 3.0 : 0));
   set1f(fbProg, 'uDye', Math.min(0.6, Math.pow(clamp(c.dye, 0, 100) / 100, 1.2) * DYE_K * f));
   set1f(fbProg, 'uDyeTurn', simT * 0.03 + (k === 'B' ? 0.5 : 0));
+  // Feeds on itself
+  set1f(fbProg, 'uLook', Math.min(0.15, Math.pow(clamp(c.lookup, 0, 100) / 100, 1.2) * LOOK_K * f));
+  const ch = clamp(c.chase, 0, 100) / 100;
+  // Chase: the turning point glides towards its goal (home to the middle when Chase is off)
+  const goal = ch > 0.005 ? L.chaseGoal : [0, 0], ce = 1 - Math.exp(-(f / 60) * (ch > 0.005 ? 0.25 + 1.6 * ch : 1.5));
+  L.chaseAt[0] += (goal[0] - L.chaseAt[0]) * ce;
+  L.chaseAt[1] += (goal[1] - L.chaseAt[1]) * ce;
+  set2f(fbProg, 'uCenter', L.chaseAt[0], L.chaseAt[1]);
+  set1f(fbProg, 'uChroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
+  set1f(fbProg, 'uChromaTurn', simT * 0.4 + (k === 'B' ? 1.0 : 0));
+  set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.5 * clamp(c.restless, 0, 100) / 100, f));
+  set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
+  const ja = 2.2 + 0.9 * Math.sin(simT * 0.021 + (k === 'B' ? 2.0 : 0));
+  set2f(fbProg, 'uJuliaC', 0.7885 * Math.cos(ja), 0.7885 * Math.sin(ja));
+  set1f(fbProg, 'uCrystal', Math.pow(clamp(c.crystal, 0, 100) / 100, 1.2) * f);
+  const lc = U(fbProg, 'uCells[0]');
+  if (lc) gl.uniform4fv(lc, L.cells);
   // Grow: faster towards the top of the slider. Its ring turns at random every frame (see growAt).
   set1f(fbProg, 'uGrow', Math.min(0.2, Math.pow(clamp(c.grow, 0, 100) / 100, 1.2) * GROW_K * f));
   set1f(fbProg, 'uGrowR', GROW_R[t.growSize] ?? GROW_R[1]);
@@ -8633,6 +8999,7 @@ function runLoop(k, xf, brush, f) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   L.front = 1 - L.front;
   twStep(k, f / 60);
+  if (c.chase > 0.5 || c.breathe > 0.5 || c.crystal > 0.5) probeTick(k, performance.now());
 }
 
 /* ================= autopilot's eye: the copies ================= */

@@ -169,6 +169,20 @@ TIPS
     colors get stained and keep turning, so its shapes show up as shifting
     rainbow bands. Both keep the other loop running even when it's hidden.
     The Guide's "Currents" and "Rainbow ghost" recipes show them off.
+  - "Loop A feeds on itself" (the section under Shape loop) has seven
+    effects where the picture decides what happens to it next:
+      Look-up       each spot copies from a spot its own color points to
+      Chase         Zoom and Spin turn around the brightest part, so the
+                    tunnel wanders off after the light (needs Zoom or Spin)
+      Breathe       brighter pulls back, darker pushes in, movement spins
+                    faster: the loop finds its own rhythm
+      Color chase   red is pushed by green, green by blue, blue by red
+      Restless      only what's changing stays; still parts fade
+      Fractal fold  each frame is folded through the Mandelbrot formula
+      Crystal       the picture cracks into pieces that turn on their own
+    Autopilot and Surprise me use them now and then, and the Fader limits
+    menu lists them. Guide recipes: "Fractal garden", "Shattered mirror"
+    and "Prism".
   - Text: press Text under "What feeds the loop" and type your own words in
     the Your text box (a band name, a title, the venue). They change as you
     type. Bold, Outline, Classic and Typewriter change the lettering, and long
