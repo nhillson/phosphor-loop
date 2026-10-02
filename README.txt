@@ -202,6 +202,13 @@ TIPS
     the two loops. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
     input (Camera, 3D worlds, Ink, Text and so on) you don't want it to bring in.
+  - Fader limits (the button under Autopilot settings): one slider with two
+    handles for every slider Autopilot moves, both loops at once. Drag the
+    left handle to the lowest and the right handle to the highest you want
+    (Trails between 40 and 90, say). Autopilot only picks values between
+    them. It never moves the handles and doesn't sit on them. Sliders you
+    move yourself and pinned ones aren't limited. Double-click a slider in
+    the menu to open it back up. Presets saved with Autopilot keep them.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),

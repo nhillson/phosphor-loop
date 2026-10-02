@@ -436,6 +436,61 @@
   .ap-state .live { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
   .ap-reset { align-self: flex-start; font-size: 13px; font-weight: 500; }
 
+  /* Fader limits: the button under Autopilot settings, and the menu it opens over the controls */
+  .lim-btn svg { width: 24px; height: 12px; flex: none; color: var(--amber); }
+  .lim-btn[aria-expanded="true"] { border-color: var(--amber); color: var(--press-ink); }
+  .lim-count {
+    display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+    background: var(--amber); color: #1b1206; font: 700 12px/1 var(--f-body);
+  }
+  .lim-count[hidden] { display: none; }
+  .lim {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 40; width: 420px; max-width: 100vw;
+    display: flex; flex-direction: column;
+    background: var(--panel); border-left: 1px solid var(--line); box-shadow: -18px 0 40px rgba(0,0,0,.5);
+  }
+  .lim[hidden] { display: none; }
+  .lim-bar { position: static; flex: none; }
+  .lim-bar .wordmark { color: var(--loop-a); }
+  .lim-inner {
+    flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding: 18px 20px calc(28px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .lim-lede { margin: 0; color: var(--dim); }
+  .lim-lede b { color: var(--ink); font-weight: 600; }
+  .lim-list { display: flex; flex-direction: column; gap: 14px; }
+  .lim-row .ctl-head output.any { color: var(--faint); }
+  .lim-row.set .ctl-head .lbl::after {
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border-radius: 50%; vertical-align: 2px;
+    background: var(--amber); box-shadow: 0 0 8px var(--amber-glow);
+  }
+  /* A fader with two handles: two sliders stacked on one track, each grabbed only by its handle */
+  .dual { position: relative; height: 30px; --fa: 0; --fb: 1; touch-action: none; cursor: pointer; }
+  .dual-track {
+    position: absolute; left: 0; right: 0; top: 11px; height: 8px; border-radius: 4px; pointer-events: none;
+    background: linear-gradient(90deg,
+      var(--well) 0 calc(8px + (100% - 16px) * var(--fa)),
+      var(--amber) calc(8px + (100% - 16px) * var(--fa)) calc(8px + (100% - 16px) * var(--fb)),
+      var(--well) calc(8px + (100% - 16px) * var(--fb)) 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.04);
+  }
+  .dual.bipolar .dual-track::after {
+    content: ""; position: absolute; left: calc(50% - 1px); top: -3px; width: 2px; height: 14px; border-radius: 1px; background: var(--dim); opacity: .6;
+  }
+  .dual input[type="range"] { position: absolute; inset: 0; pointer-events: none; }
+  .dual input[type="range"]::-webkit-slider-runnable-track { background: transparent; box-shadow: none; }
+  .dual input[type="range"]::-moz-range-track { background: transparent; box-shadow: none; }
+  .dual input[type="range"]::-webkit-slider-thumb { pointer-events: auto; cursor: grab; }
+  .dual input[type="range"]::-moz-range-thumb { pointer-events: auto; cursor: grab; }
+  @media (max-width: 900px) {
+    .lim { width: 100vw; border-left: 0; box-shadow: none; }
+  }
+  @media (max-width: 520px) {
+    .lim-inner { padding-inline: 16px; }
+    .lim-bar { padding-inline: 16px; }
+  }
+
   /* fader */
   input[type="range"] {
     -webkit-appearance: none; appearance: none; width: 100%; height: 30px; margin: 0;
@@ -693,6 +748,13 @@
           <input type="range" id="apMix" min="0" max="100" step="1" value="50">
           <div class="ends"><span>Never</span><span>Often</span></div>
           <span class="hint">How often it shows both loops at once and pours one into the other.</span>
+        </div>
+        <div class="ctl">
+          <button class="btn wide lim-btn" id="limOpen" aria-controls="lim" aria-expanded="false" title="Set the lowest and highest Autopilot may put each slider at">
+            <svg viewBox="0 0 24 12" aria-hidden="true"><rect x="1" y="5" width="22" height="2" rx="1" fill="currentColor" opacity=".35"/><rect x="7" y="5" width="10" height="2" fill="currentColor"/><rect x="5.5" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="15.5" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg>
+            Fader limits…<span class="lim-count" id="limCount" hidden></span>
+          </button>
+          <span class="hint" id="limSum">No limits yet: Autopilot can use the whole of every slider.</span>
         </div>
         <div class="ctl">
           <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
@@ -1189,6 +1251,7 @@
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). Press it again to stop.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
+            <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
@@ -1311,6 +1374,27 @@
       <p class="hint" id="natHint">Tap a picture to feed it into loop A.</p>
       <div class="nat-grid" id="natGrid"></div>
       <p class="hint nat-foot">Photos from Wikimedia Commons’ Featured Pictures, free to use. Each one names its photographer when you pick it; the full list is in <a href="nature/CREDITS.txt" target="_blank" rel="noopener">nature/CREDITS.txt</a>.</p>
+    </div>
+  </div>
+
+  <div class="lim" id="lim" role="dialog" aria-labelledby="limTitle" hidden>
+    <div class="guide-bar lim-bar">
+      <span class="wordmark" id="limTitle">Fader limits</span>
+      <span class="spacer"></span>
+      <button class="btn small" id="limClose">Done</button>
+    </div>
+    <div class="lim-inner" id="limBody">
+      <p class="lim-lede">Drag the two handles on each slider. <b>Autopilot only picks values between them</b>, on both loops. It never moves the handles, and never sits on them.</p>
+      <section class="group" aria-labelledby="h-limLoops">
+        <h2 id="h-limLoops">Both loops</h2>
+        <div class="lim-list" id="limLoops"></div>
+      </section>
+      <section class="group" aria-labelledby="h-limMix">
+        <h2 id="h-limMix">Mix the two loops</h2>
+        <div class="lim-list" id="limMix"></div>
+      </section>
+      <p class="hint">Sliders you move yourself, and pinned ones, can still go anywhere. Music under React to sound can push past a limit for a moment. Double-click a slider here to open it back up.</p>
+      <button class="btn wide" id="limReset">Whole range for every slider</button>
     </div>
   </div>
 </div>
@@ -4656,6 +4740,71 @@ const PINS = {
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
   xba: { name: 'Feed B into A', fields: ['xba'], mix: true },
 };
+// Fader limits (the Fader limits button under Autopilot settings): the lowest and highest Autopilot may put each
+// slider at, the same on both loops. They are limits only. Autopilot never changes them, and never parks a slider
+// on one: a value it picks inside the range stays as it is, and one outside gets a fresh value from somewhere
+// inside it. Sliders moved by hand, and pinned ones, aren't limited. Kept as { trails: [40, 90], ... }, listing
+// only the sliders whose range is narrowed.
+const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'split', 'time'];
+const LIM_MIX = ['view', 'xab', 'xba'];
+const limScale = (k) => (k === 'zoom' || k === 'spin' ? [-100, 100] : [0, 100]);
+function cleanLim(v) {
+  const out = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const k of [...LIM_LOOP, ...LIM_MIX]) {
+    const r = v[k];
+    if (!Array.isArray(r) || r.length !== 2 || !r.every(Number.isFinite)) continue;
+    const [a, b] = limScale(k);
+    let lo = clamp(Math.round(r[0]), a, b), hi = clamp(Math.round(r[1]), a, b);
+    if (lo > hi) [lo, hi] = [hi, lo];
+    if (lo > a || hi < b) out[k] = [lo, hi];
+  }
+  return out;
+}
+// The part of slider k's range Autopilot may actually use. A handle you've moved is a limit, so Autopilot stays
+// just inside it rather than on it; a handle left at the slider's end (Off, say) can still be used.
+function limSpan(k) {
+  const r = apSet.lim[k];
+  if (!r) return null;
+  const [a, b] = limScale(k);
+  let [lo, hi] = r;
+  if (hi - lo >= 2) { if (lo > a) lo++; if (hi < b) hi--; }
+  return [lo, hi];
+}
+// A value Autopilot wants for slider k, kept inside its limits: as it is when it fits, otherwise a fresh value
+// from anywhere inside the range (so it doesn't pile up on the edge)
+function inLim(k, v) {
+  const r = limSpan(k);
+  if (!r || (v >= r[0] && v <= r[1])) return v;
+  return Math.round(rnd(r[0], r[1]));
+}
+// The gentle version, for when a range is narrowed (or Autopilot starts) with the picture already running:
+// a value outside moves just inside the nearer edge, instead of jumping across the range
+function nearLim(k, v) {
+  const r = limSpan(k);
+  if (!r || (v >= r[0] && v <= r[1])) return v;
+  const step = rnd(0, 0.15) * (r[1] - r[0]);
+  return Math.round(v < r[0] ? r[0] + step : r[1] - step);
+}
+// A small move that stays inside both the move's own bounds and the limits, bouncing off an edge rather than
+// sticking to it. When the two don't overlap, the limits win.
+function limStep(k, v, a, b) {
+  const r = limSpan(k);
+  if (!r) return Math.round(clamp(v, a, b));
+  let lo = Math.max(a, r[0]), hi = Math.min(b, r[1]);
+  if (lo > hi) [lo, hi] = r;
+  if (v > hi) v = hi - (v - hi);
+  if (v < lo) v = lo + (lo - v);
+  return Math.round(clamp(v, lo, hi));
+}
+// Auto-drift's sway, folded back inside the limits (a reflection, so it turns at an edge instead of resting on it)
+function limFold(k, v) {
+  const r = limSpan(k);
+  if (!r) return v;
+  if (v > r[1]) v = r[1] - (v - r[1]);
+  if (v < r[0]) v = r[0] + (r[0] - v);
+  return clamp(v, r[0], r[1]);
+}
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one)
@@ -4664,7 +4813,7 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
 const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin', off: [] };
-const apSet = { ...AP_DEFAULTS };
+const apSet = { ...AP_DEFAULTS, lim: {} };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
   if (s && typeof s === 'object') {
@@ -4672,6 +4821,7 @@ try {
     apSet.beat = s.beat === true;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(s.off);
+    apSet.lim = cleanLim(s.lim);
     if (Array.isArray(s.pins)) s.pins.forEach(addSavedPin);
   }
 } catch (_) {}
@@ -4724,6 +4874,8 @@ function setAutopilot(on, quiet) {
     ap.picIn = apPicGap();
     // Pinned settings start from what the sliders show now (a pin on both loops from the loop being edited)
     for (const id of ap.pins) holdPin(id, edit);
+    // and anything outside the fader limits eases just inside them
+    apIntoLimits();
     settleDevices();
     syncUI();
     if (!quiet) {
@@ -4763,6 +4915,25 @@ function takeOver(key, from) {
   toast('Autopilot off. You’re steering now.');
 }
 apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
+// Brings every slider Autopilot is in charge of (not pinned) inside its fader limits, gliding there
+function apIntoLimits() {
+  for (const k of ['A', 'B']) {
+    const t = loops[k].tgt;
+    for (const key of LIM_LOOP) if (!isPinned(key, k)) t[key] = nearLim(key, t[key]);
+  }
+  for (const key of LIM_MIX) if (!ap.pins.has(key)) mix.tgt[key] = nearLim(key, mix.tgt[key]);
+}
+// Puts a new look for loop k inside the fader limits (pinned settings stay as they are)
+function apLimit(sc, k) {
+  const def = loopDefaults();
+  for (const key of LIM_LOOP) {
+    if (!apSet.lim[key] || isPinned(key, k)) continue;
+    const v = sc[key] ?? def[key];
+    const w = inLim(key, v);
+    if (w !== v) sc[key] = w;
+  }
+  return sc;
+}
 
 // Holds a pinned setting where it is. A pin on one loop holds that loop's setting. A pin on both loops takes the
 // setting from loop `from` and, while Autopilot runs, puts it on the other loop too, so it stays put whichever
@@ -4964,18 +5135,22 @@ function clearLoop(k) {
 }
 function nudge(k) {
   const t = loops[k].tgt, j = 0.2 + 1.6 * apSet.wild / 100;
-  const move = (key, by, lo, hi) => { if (!isPinned(key, k)) t[key] = Math.round(clamp(t[key] + rnd(-by, by) * j, lo, hi)); };
+  // Each nudge stays inside the fader limits, bouncing off an edge rather than resting on it
+  const move = (key, by, lo, hi) => { if (!isPinned(key, k)) t[key] = limStep(key, t[key] + rnd(-by, by) * j, lo, hi); };
   move('zoom', 15, -60, 80);
   move('spin', 15, -70, 70);
   move('color', 8, 0, 45);
   move('warp', 10, 0, 50);
 }
 // Two loops with long Trails at the same time pile up into white. So whenever the other loop's Trails are
-// already above 75, a new look from Autopilot keeps this loop's Trails at 75 or below (unless Trails is pinned).
+// already above 75, a new look from Autopilot keeps this loop's Trails at 75 or below (unless Trails is pinned),
+// still inside the Trails limits. A lowest Trails limit above 75 wins over this.
 const AP_TRAILS_MAX = 75;
 function capTrails(sc, other) {
   if (isPinned('trails', other === 'A' ? 'B' : 'A')) return;
-  if (loops[other].tgt.trails > AP_TRAILS_MAX && (sc.trails ?? loopDefaults().trails) > AP_TRAILS_MAX) sc.trails = Math.round(rnd(62, AP_TRAILS_MAX));
+  const lo = limSpan('trails') ? limSpan('trails')[0] : 0;
+  if (lo > AP_TRAILS_MAX) return;
+  if (loops[other].tgt.trails > AP_TRAILS_MAX && (sc.trails ?? loopDefaults().trails) > AP_TRAILS_MAX) sc.trails = Math.round(rnd(Math.max(lo, 62), AP_TRAILS_MAX));
 }
 // A hidden loop gets a whole new look at once, from a clean slate
 function freshLook(k, shown) {
@@ -4985,6 +5160,7 @@ function freshLook(k, shown) {
     if (!isPinned('in1', k)) sc.in1 = apRealInput();
     else if (!isPinned('in2', k)) { sc.in2 = apRealInput(); sc.blend = 50; }
   }
+  apLimit(sc, k);
   capTrails(sc, shown);
   patchLoop(k, sc, true);
   const L = loops[k];
@@ -5004,6 +5180,7 @@ function glideLook(k) {
   withPins(sc, k);
   const other = k === 'A' ? 'B' : 'A';
   if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !isPinned('in1', k)) sc.in1 = apRealInput();
+  apLimit(sc, k);
   capTrails(sc, other);
   patchLoop(k, sc, true);
 }
@@ -5025,7 +5202,10 @@ function apStep(now, onBeat) {
   ap.quick = onBeat ? now + 1500 : 0;   // on a beat the new look cuts in fast
   const m = apSet.mix / 100;
   const v = mix.tgt.view;
-  if (!ap.pins.has('view')) {
+  // A narrowed What you see limit means Autopilot can't hide a loop to swap it out, so it moves What you see
+  // somewhere inside the limit and changes the loops in place, the same as when What you see is pinned
+  const viewLim = limSpan('view');
+  if (!ap.pins.has('view') && !viewLim) {
     if (v <= 1 || v >= 99) {
       const hidden = v <= 1 ? 'B' : 'A', shown = hidden === 'A' ? 'B' : 'A';
       // Still fading away from the last change (a long Fade time): look again in a moment,
@@ -5040,15 +5220,16 @@ function apStep(now, onBeat) {
       nudge('A'); nudge('B');
     }
   } else {
-    const [wA, wB] = weights(v);
+    if (!ap.pins.has('view')) mix.tgt.view = Math.round(rnd(viewLim[0], viewLim[1]));
+    const [wA, wB] = weights(mix.tgt.view);
     const onScreen = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0);
     const k = pick(onScreen.length ? onScreen : ['A']);
     glideLook(k);
     nudge(k === 'A' ? 'B' : 'A');
   }
   const feed = () => (Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0);
-  if (!ap.pins.has('xab')) mix.tgt.xab = feed();
-  if (!ap.pins.has('xba')) mix.tgt.xba = feed();
+  if (!ap.pins.has('xab')) mix.tgt.xab = inLim('xab', feed());
+  if (!ap.pins.has('xba')) mix.tgt.xba = inLim('xba', feed());
   if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
   apPicture();
   syncUI();
@@ -5092,6 +5273,7 @@ function syncApUI() {
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
   $$('#apInputs button').forEach((b) => b.setAttribute('aria-pressed', String(!apSet.off.includes(b.dataset.apsrc))));
+  syncLimUI();
   syncPins();
   apStatus();
 }
@@ -5153,9 +5335,10 @@ $('#apUnpin').addEventListener('click', () => {
 $('#apReset').addEventListener('click', () => {
   for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'touch']) apSet[k] = AP_DEFAULTS[k];
   apSet.off = [];
+  apSet.lim = {};
   saveAp();
   syncApUI();
-  toast(ap.pins.size ? 'Autopilot settings are back to normal. Your pins are still pinned.' : 'Autopilot settings are back to normal.');
+  toast(ap.pins.size ? 'Autopilot settings and fader limits are back to normal. Your pins are still pinned.' : 'Autopilot settings and fader limits are back to normal.');
 });
 // The line at the top of Autopilot settings: on or off, when the next look comes, and what's pinned
 function apStatus() {
@@ -5169,6 +5352,135 @@ function apStatus() {
   }
   if (html !== apStatus.shown) { apStatus.shown = html; $('#apState').innerHTML = html; }
 }
+
+/* ================= fader limits ================= */
+// The Fader limits menu: one slider with two handles for each slider Autopilot moves, lowest on the left and
+// highest on the right. It slides in over the controls, so the picture stays in view while you set them.
+const limDlg = $('#lim'), limRows = {};
+const limFull = (k) => !apSet.lim[k];
+function limText(k, v) {
+  if (k === 'view') return String(v);
+  return sliderText(k, v);
+}
+function limReadout(k) {
+  const r = apSet.lim[k];
+  if (!r) return 'ANY';
+  return r[0] === r[1] ? `ALWAYS ${limText(k, r[0])}` : `${limText(k, r[0])} – ${limText(k, r[1])}`;
+}
+function showLim(k) {
+  const R = limRows[k];
+  if (!R) return;
+  const [a, b] = limScale(k);
+  const [lo, hi] = apSet.lim[k] || [a, b];
+  R.lo.value = lo;
+  R.hi.value = hi;
+  R.dual.style.setProperty('--fa', (lo - a) / (b - a));
+  R.dual.style.setProperty('--fb', (hi - a) / (b - a));
+  // When the two handles meet, the one that can still move goes on top
+  const loTop = lo > (a + b) / 2;
+  R.lo.style.zIndex = loTop ? 3 : 2;
+  R.hi.style.zIndex = loTop ? 2 : 3;
+  R.out.textContent = limReadout(k);
+  R.out.classList.toggle('any', limFull(k));
+  R.row.classList.toggle('set', !limFull(k));
+}
+// The line under the Fader limits button says which sliders have limits
+function limSummary() {
+  const set = [...LIM_LOOP, ...LIM_MIX].filter((k) => !limFull(k));
+  $('#limSum').textContent = set.length
+    ? `Limits on ${set.map((k) => PINS[k].name).join(', ')}.`
+    : 'No limits yet: Autopilot can use the whole of every slider.';
+  $('#limCount').textContent = set.length ? String(set.length) : '';
+  $('#limCount').hidden = !set.length;
+  $('#limReset').disabled = !set.length;
+}
+function syncLimUI() {
+  Object.keys(limRows).forEach(showLim);
+  limSummary();
+}
+function setLim(k, lo, hi) {
+  const [a, b] = limScale(k);
+  if (lo <= a && hi >= b) delete apSet.lim[k];
+  else apSet.lim[k] = [lo, hi];
+  showLim(k);
+  limSummary();
+  saveAp();
+  // While Autopilot runs, anything now outside the limits eases just inside them straight away
+  if (ap.on) { apIntoLimits(); syncUI(); }
+}
+function limRow(k, holder) {
+  const main = $('#' + k);
+  const [a, b] = limScale(k);
+  const name = PINS[k].name;
+  const row = document.createElement('div');
+  row.className = 'ctl lim-row';
+  row.innerHTML =
+    `<div class="ctl-head"><span class="lbl">${name}</span><output></output></div>` +
+    `<div class="dual${a < 0 ? ' bipolar' : ''}"><i class="dual-track"></i>` +
+    `<input type="range" class="lo" min="${a}" max="${b}" step="1" aria-label="${name}: lowest Autopilot may set">` +
+    `<input type="range" class="hi" min="${a}" max="${b}" step="1" aria-label="${name}: highest Autopilot may set"></div>`;
+  const ends = main && main.closest('.ctl') && main.closest('.ctl').querySelector('.ends');
+  if (ends) row.appendChild(ends.cloneNode(true));
+  if (k === 'trails') {
+    const h = document.createElement('span');
+    h.className = 'hint';
+    h.textContent = 'Autopilot still keeps the two loops from both going over 75 at once, unless your lowest is 75 or higher.';
+    row.appendChild(h);
+  }
+  holder.appendChild(row);
+  const R = limRows[k] = { row, dual: row.querySelector('.dual'), lo: row.querySelector('.lo'), hi: row.querySelector('.hi'), out: row.querySelector('output') };
+  // The handles can meet but never cross
+  R.lo.addEventListener('input', () => { const hi = +R.hi.value, lo = Math.min(+R.lo.value, hi); setLim(k, lo, hi); });
+  R.hi.addEventListener('input', () => { const lo = +R.lo.value, hi = Math.max(+R.hi.value, lo); setLim(k, lo, hi); });
+  // Double-click opens it back up to the whole slider
+  R.dual.addEventListener('dblclick', () => setLim(k, a, b));
+  // Tapping the track moves the nearer handle there
+  R.dual.addEventListener('pointerdown', (e) => {
+    if (e.target !== R.dual && !e.target.classList.contains('dual-track')) return;
+    const box = R.dual.getBoundingClientRect();
+    const v = Math.round(a + clamp((e.clientX - box.left - 8) / Math.max(1, box.width - 16), 0, 1) * (b - a));
+    const lo = +R.lo.value, hi = +R.hi.value;
+    const useLo = v < lo || (v <= hi && v - lo <= hi - v);
+    if (useLo) setLim(k, v, hi); else setLim(k, lo, v);
+    (useLo ? R.lo : R.hi).focus();
+  });
+}
+LIM_LOOP.forEach((k) => limRow(k, $('#limLoops')));
+LIM_MIX.forEach((k) => limRow(k, $('#limMix')));
+$('#limReset').addEventListener('click', () => {
+  apSet.lim = {};
+  saveAp();
+  syncLimUI();
+  toast('Every slider is back to its whole range for Autopilot.');
+});
+
+let limReturn = null;
+const limWide = () => !matchMedia('(max-width: 900px)').matches;
+function openLim() {
+  if (!limDlg.hidden) return;
+  limReturn = document.activeElement;
+  syncLimUI();
+  limDlg.hidden = false;
+  $('#limBody').scrollTop = 0;
+  $('#limOpen').setAttribute('aria-expanded', 'true');
+  // Over the controls on a wide screen, so the picture stays in sight; the whole page on a narrow one
+  if (!limWide()) document.documentElement.style.overflow = 'hidden';
+  $('#limClose').focus();
+}
+function closeLim() {
+  if (limDlg.hidden) return;
+  limDlg.hidden = true;
+  $('#limOpen').setAttribute('aria-expanded', 'false');
+  document.documentElement.style.overflow = '';
+  if (limReturn && limReturn.focus) limReturn.focus();
+}
+$('#limOpen').addEventListener('click', () => (limDlg.hidden ? openLim() : closeLim()));
+$('#limClose').addEventListener('click', closeLim);
+limDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeLim(); }
+  else e.stopPropagation(); // keep the keys from firing while setting limits
+});
+
 setInterval(apStatus, 500);
 syncApUI();
 
@@ -6168,7 +6480,7 @@ function snapshot() {
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
   return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch,
-    off: [...apSet.off], pins: [...ap.pins] };
+    off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim) };
 }
 function markPreset(id) {
   activePresetId = id;
@@ -6275,6 +6587,8 @@ function loadPreset(pr, quiet) {
     apSet.beat = a.beat === true;
     apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(a.off);
+    // Presets saved before fader limits existed leave the limits as they are
+    if (a.lim && typeof a.lim === 'object') apSet.lim = cleanLim(a.lim);
     ap.pins.clear();
     ap.pinVal = {};
     if (Array.isArray(a.pins)) a.pins.forEach(addSavedPin);
@@ -7816,6 +8130,13 @@ function runLoop(k, xf, brush, f) {
     w += 16 * still * free('warp') * (0.5 + 0.5 * Math.sin(d * 0.09 + 2.0));
     sx += 0.0012 * still * amt * Math.sin(d * 0.11);
     sy += 0.0012 * still * amt * Math.cos(d * 0.083);
+    // Under Autopilot the sway turns back at the fader limits instead of going past them
+    if (ap.on) {
+      if (!pinned('zoom', k)) z = limFold('zoom', z);
+      if (!pinned('spin', k)) s = limFold('spin', s);
+      if (!pinned('color', k)) col = limFold('color', col);
+      if (!pinned('warp', k)) w = limFold('warp', w);
+    }
   }
   let sizeBoost = 0, gainBoost = 1;
   if (snd.analyser) {
