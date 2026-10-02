@@ -436,6 +436,9 @@
   .ap-state .live { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
   .ap-reset { align-self: flex-start; font-size: 13px; font-weight: 500; }
 
+  /* Next look: Autopilot's next new look straight away */
+  .next-look .skip { width: 15px; height: 11px; flex: none; color: var(--loop-a); }
+
   /* Fader limits: the button under Autopilot settings, and the menu it opens over the controls */
   .lim-btn svg { width: 24px; height: 12px; flex: none; color: var(--amber); }
   .lim-btn[aria-expanded="true"] { border-color: var(--amber); color: var(--press-ink); }
@@ -698,6 +701,7 @@
         <button class="btn" id="clear">Clear</button>
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
+        <button class="btn next-look" id="nextLookBar" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <span class="spacer" aria-hidden="true"></span>
@@ -706,7 +710,7 @@
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>L</kbd> next look · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -728,6 +732,7 @@
       <section class="group" id="apGroup" aria-labelledby="h-ap">
         <h2 id="h-ap">Autopilot settings</h2>
         <p class="ap-state" id="apState" role="status">Autopilot is off.</p>
+        <button class="btn wide next-look" id="nextLook" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look now</button>
         <div class="ctl">
           <div class="ctl-head"><label for="apEvery">New look every</label><output id="apEveryOut" for="apEvery"></output></div>
           <input type="range" id="apEvery" min="0" max="100" step="1" value="44">
@@ -1249,6 +1254,7 @@
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). Press it again to stop.</dd>
+            <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. The wait for the look after starts over.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Sliders you move by hand and pinned ones can still go anywhere.</dd>
@@ -1327,6 +1333,7 @@
           <div><kbd>N</kbd>Neutral</div>
           <div><kbd>R</kbd>Surprise me</div>
           <div><kbd>P</kbd>Autopilot</div>
+          <div><kbd>L</kbd>Next look</div>
           <div><kbd>C</kbd>Clear</div>
           <div><kbd>F</kbd>Full screen</div>
           <div><kbd>G</kbd>This guide</div>
@@ -5248,6 +5255,25 @@ function apPicture() {
     if (shown.length) natPick(pick(shown), true);
   }).catch(() => { /* offline before the list was ever saved: keep the picture there is */ });
 }
+// Next look (beside the Autopilot buttons, or the L key): Autopilot's next new look straight away, cutting in
+// fast the way a look does on a beat, and the countdown to the one after starts again. If Autopilot is off it
+// starts with a new look. Any fade still going is finished first, and when both loops are showing, one of
+// them cuts away so the hidden one can take the new look (unless What you see is pinned or limited, when the
+// loops change in place as usual).
+function nextLook() {
+  const was = ap.on;
+  if (frozen) toggleFreeze(false);
+  if (!was) setAutopilot(true, true);
+  ap.beatWait = null;
+  if (!ap.pins.has('view') && !limSpan('view')) {
+    if (mix.tgt.view > 1 && mix.tgt.view < 99) mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
+    mix.cur.view = mix.tgt.view;
+  }
+  apStep(performance.now(), true);
+  showOSD('AUTOPILOT', 'NEXT LOOK');
+  if (!was) toast('Autopilot is on, starting with a new look. Press Next look any time to skip ahead.');
+}
+$$('.next-look').forEach((b) => b.addEventListener('click', nextLook));
 
 /* ================= autopilot settings ================= */
 function fmtDur(s) {
@@ -6873,6 +6899,7 @@ function onKey(e) {
   if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
+  else if (e.key === 'l' || e.key === 'L') nextLook();
   else if (e.key === 'n' || e.key === 'N') neutral();
   else if (e.key === 'c' || e.key === 'C') clearScreen();
   else if (e.key === 'f' || e.key === 'F') toggleFS();

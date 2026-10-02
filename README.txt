@@ -190,6 +190,10 @@ TIPS
     looks (at random) it also puts in a different nature picture, from the
     kind chosen in the gallery. A picture of your own stays put, and
     switching off Picture under "Inputs Autopilot can use" stops it too.
+  - Next look (beside Autopilot under the picture, under Autopilot
+    settings, or the L key): skips straight to Autopilot's next new look,
+    cutting in quickly, and starts Autopilot if it's off. The wait for the
+    look after that starts over. It can be learned onto a MIDI button too.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
     it, or just move that slider, and the setting stays put on the loop
     you're changing (the A or B tab) while Autopilot keeps changing
@@ -274,4 +278,4 @@ TIPS
     screen" button shows at the top right (it fades again when you stop).
     Esc works too. The output window has the same button.
   - Keys: Space freeze, N neutral, R surprise,
-    P autopilot, C clear, F full screen, G guide.
+    P autopilot, L next look, C clear, F full screen, G guide.
