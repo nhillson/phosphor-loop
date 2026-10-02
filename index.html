@@ -1349,7 +1349,7 @@
             <dt>Chase</dt><dd>Zoom and Spin normally turn around the middle. With Chase they turn around the brightest part of the picture, and as the tunnel pulls that light away, it heads for the next bright spot, so the middle of the tunnel keeps wandering. Needs some Zoom or Spin.</dd>
             <dt>Breathe</dt><dd>Like React to sound, but the loop listens to itself. As the picture gets brighter it zooms out, as it gets darker it zooms in, and the more it moves the faster it spins. It settles into its own slow rhythm, and pulls back before it turns white.</dd>
             <dt>Color chase</dt><dd>Red is pushed around by the green parts of the picture, green by the blue and blue by the red. Each color slides along the outlines of the one pushing it, so the three chase each other round and split into rainbow fringes and braids.</dd>
-            <dt>Restless</dt><dd>Only what's changing gets to stay. Each frame the picture is compared with the one before: still parts fade away and the changes themselves glow, leaving a shimmer of moving outlines. Lovely with the camera.</dd>
+            <dt>Restless</dt><dd>Only what's changing gets to stay. Each frame the picture is compared with the one before, and the parts that held still fade away, leaving a shimmer of moving outlines. Lovely with the camera.</dd>
             <dt>Fractal fold</dt><dd>Instead of a plain zoom, every frame folds the picture through the formula behind the Mandelbrot set, so anything that comes in grows into fractal flowers, spirals and lace. The fractal slowly changes shape by itself; Zoom and Spin reshape it too. Low mixes a little of it into the usual tunnel.</dd>
             <dt>Crystal</dt><dd>The picture cracks into ten pieces centred on its brightest spots. Each piece turns and zooms in its own way, like a broken mirror, and the cracks move as the light does.</dd>
           </dl></div>
@@ -2088,13 +2088,13 @@ void main() {
                     texture(uPrev, st + vec2(0.0, px.y)).rgb + texture(uPrev, st - vec2(0.0, px.y)).rgb);
   vec3 fb = c0 + (cb - c0) * uBlur;
   // Restless: only what is changing gets to stay. The picture that lands here is compared with what was here
-  // a frame ago; where they match, it fades, and where they differ, the difference itself glows.
+  // a frame ago; where they match, it fades away.
   // Both are softened first, so it follows real movement rather than feeding on its own grain.
   if (uRestless > 0.0) {
     vec3 here = 0.25 * (texture(uPrev, uv + vec2(px.x, 0.0)).rgb + texture(uPrev, uv - vec2(px.x, 0.0)).rgb +
                         texture(uPrev, uv + vec2(0.0, px.y)).rgb + texture(uPrev, uv - vec2(0.0, px.y)).rgb);
     vec3 d = abs(cb - here);
-    fb = fb * (1.0 - uRestless + uRestless * smoothstep(0.015, 0.1, luma(d))) + d * 0.2 * uRestless;
+    fb *= 1.0 - uRestless + uRestless * smoothstep(0.004, 0.06, luma(d));
   }
   if (uGrow > 0.0) fb = growAt(fb, cb, st);
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
@@ -8937,7 +8937,7 @@ function runLoop(k, xf, brush, f) {
   set2f(fbProg, 'uCenter', L.chaseAt[0], L.chaseAt[1]);
   set1f(fbProg, 'uChroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
   set1f(fbProg, 'uChromaTurn', simT * 0.4 + (k === 'B' ? 1.0 : 0));
-  set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.5 * clamp(c.restless, 0, 100) / 100, f));
+  set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.3 * clamp(c.restless, 0, 100) / 100, f));
   set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
   const ja = 2.2 + 0.9 * Math.sin(simT * 0.021 + (k === 'B' ? 2.0 : 0));
   set2f(fbProg, 'uJuliaC', 0.7885 * Math.cos(ja), 0.7885 * Math.sin(ja));
