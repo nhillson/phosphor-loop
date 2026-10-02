@@ -190,6 +190,18 @@ TIPS
     looks (at random) it also puts in a different nature picture, from the
     kind chosen in the gallery. A picture of your own stays put, and
     switching off Picture under "Inputs Autopilot can use" stops it too.
+  - Autopilot never lets the picture turn white. It keeps an eye on the
+    screen, and if too much of it gets close to white it turns its own
+    Trails, feeds and Grow down a notch on the loop that's doing it, shows
+    one loop instead of two, or moves on to the next look. Nothing is dimmed,
+    and pinned settings and fader limits are always respected. When you
+    steer by hand (Autopilot off) it leaves the picture alone.
+  - Check each look (under Autopilot settings, on unless switched off):
+    Autopilot tries each new look out of sight on the hidden loop first and
+    looks at it for a few seconds. One that's turning white, nearly black,
+    plain or frozen is thrown away and another tried, up to six in all,
+    and it keeps the richest. Switch it off to see every look it makes.
+    Watching the picture uses tiny copies that never make it stutter.
   - Next look (beside Autopilot under the picture, under Autopilot
     settings, or the L key): skips straight to Autopilot's next new look,
     cutting in quickly, and starts Autopilot if it's off. The wait for the

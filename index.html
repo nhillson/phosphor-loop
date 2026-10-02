@@ -762,6 +762,10 @@
           <span class="hint" id="limSum">No limits yet: Autopilot can use the whole of every slider.</span>
         </div>
         <div class="ctl">
+          <div class="chips"><button class="chip" id="apCheck" aria-pressed="true"><span class="led"></span>Check each look</button></div>
+          <span class="hint">Tries each new look out of sight first, skips ones that are dull, nearly black or turning white, and keeps the richest. Switch it off to see every look Autopilot makes.</span>
+        </div>
+        <div class="ctl">
           <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
@@ -1253,10 +1257,11 @@
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
-            <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). Press it again to stop.</dd>
-            <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. The wait for the look after starts over.</dd>
+            <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
+            <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
+            <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. With Check each look on, a look that’s ready goes on at once; otherwise it takes two or three seconds to find one that passes. The wait for the look after starts over.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
-            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
@@ -1351,7 +1356,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
+          <dt>The screen went white</dt><dd>Autopilot keeps it from turning white by itself. When you’re steering, lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
@@ -4723,7 +4728,9 @@ $('#neutral').addEventListener('click', neutral);
 // view glides over to it, sometimes resting on both loops at once. The loop on screen keeps drifting in between.
 // Pinned settings stay where they are while Autopilot changes everything else. A pin holds its setting on the
 // loop being edited only; right-click it (or press and hold it on a touchscreen) to hold it on both loops at once.
-const ap = { on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0 };
+// prep: the next look being tried out of sight (Check each look); glide: a look changed in place, waiting to be
+// looked at; rush: bring the next look as soon as one is ready (Next look, or the white-out watch)
+const ap = { on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
   in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'motion'] },
@@ -4819,13 +4826,14 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, touch: 'pin', off: [] };
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, check: true, touch: 'pin', off: [] };
 const apSet = { ...AP_DEFAULTS, lim: {} };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
   if (s && typeof s === 'object') {
     for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
+    apSet.check = s.check !== false;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(s.off);
     apSet.lim = cleanLim(s.lim);
@@ -4865,6 +4873,310 @@ function addSavedPin(id) {
 function unpinKey(key, where) { const id = `${key}@${where}`; ap.pins.delete(id); delete ap.pinVal[id]; }
 const pinned = (k, L) => ap.on && isPinned(k, L);
 
+/* ================= autopilot's eye ================= */
+// While Autopilot runs it keeps an eye on the picture. Every few hundredths of a second a tiny 64 x 36 copy is
+// made of the picture on screen, or of loop A or B on its own, and the graphics chip hands it over a frame or two
+// later. Nothing ever stops to wait for it, so it can't make the picture stutter. (Making and collecting the
+// copies is in eyeTick, next to frame.) Each copy is boiled down to a few numbers: how much of it is near white,
+// how much is lit at all, how much detail it has, how colorful it is and how fast it's changing.
+// Check each look and the white-out watch, below, decide what to do with them.
+const EYE_W = 64, EYE_H = 36;
+const eye = { tgt: null, prog: null, pbo: null, sync: null, failed: false, key: '', gen: { A: 0, B: 0, comp: 0 }, askGen: 0,
+  askT: 0, age: 0, turn: 0, buf: new Uint8Array(EYE_W * EYE_H * 4), last: {}, hist: { A: [], B: [], comp: [] } };
+// A picture that has just been wiped or given a whole new look starts with a clean slate (a copy already on its
+// way of what was there before is thrown away when it arrives)
+function eyeForget(key) { delete eye.last[key]; eye.hist[key] = []; eye.gen[key]++; }
+function eyeReset() { for (const key of ['A', 'B', 'comp']) eyeForget(key); }
+const eyeAvg = (S, f) => S.reduce((a, s) => a + s[f], 0) / S.length;
+const eyeRecent = (key, ms, now) => eye.hist[key].filter((s) => now - s.t <= ms);
+function eyeStats(key, b, t) {
+  const W = EYE_W, H = EYE_H, n = W * H;
+  const lum = new Float32Array(n), hue = new Float32Array(12);
+  let sum = 0, white = 0, lit = 0, colorful = 0;
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    const r = b[i] / 255, g = b[i + 1] / 255, bl = b[i + 2] / 255;
+    const l = 0.299 * r + 0.587 * g + 0.114 * bl;
+    lum[p] = l;
+    sum += l;
+    const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl);
+    if (mn > 0.8) white++;          // near white: every color turned right up
+    if (mx > 0.08) lit++;
+    if (mx > 0.15 && mx - mn > 0.3 * mx) {
+      const d = mx - mn;
+      const h = mx === r ? (g - bl) / d : mx === g ? 2 + (bl - r) / d : 4 + (r - g) / d;
+      hue[Math.floor(((h / 6 + 1) % 1) * 12) % 12]++;
+      colorful++;
+    }
+  }
+  // Detail: how much neighbouring spots differ, side by side and a few spots apart; and how much of the picture
+  // is busy with edges (a single thin outline on black has sharp edges, but only a few of them)
+  let fine = 0, coarse = 0, nf = 0, nc = 0, busy = 0;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const p = y * W + x;
+      let g = 0;
+      if (x + 1 < W) { const d = Math.abs(lum[p] - lum[p + 1]); fine += d; nf++; g += d; }
+      if (y + 1 < H) { const d = Math.abs(lum[p] - lum[p + W]); fine += d; nf++; g += d; }
+      if (x + 4 < W) { coarse += Math.abs(lum[p] - lum[p + 4]); nc++; }
+      if (y + 4 < H) { coarse += Math.abs(lum[p] - lum[p + 4 * W]); nc++; }
+      if (g > 0.06) busy++;
+    }
+  }
+  // Shades: how evenly the picture spreads over sixteen steps from black to white (0 for one flat shade)
+  const steps = new Float32Array(16);
+  for (let p = 0; p < n; p++) steps[Math.min(15, Math.floor(lum[p] * 16))]++;
+  let shades = 0;
+  for (const c of steps) if (c > 0) { const q = c / n; shades -= q * Math.log(q); }
+  shades /= Math.log(16);
+  // Color: how much of it is colorful, and how evenly that spreads over twelve hues (1 for all of them alike)
+  let ent = 0;
+  for (const c of hue) if (c > 0) { const q = c / colorful; ent -= q * Math.log(q); }
+  const variety = colorful ? ent / Math.log(12) : 0;
+  // Movement: how much it has changed since the last copy of the same picture, per second
+  const prev = eye.last[key];
+  let motion = null;
+  if (prev && t - prev.t > 15 && t - prev.t < 1500) {
+    let d = 0;
+    for (let p = 0; p < n; p++) d += Math.abs(lum[p] - prev.lum[p]);
+    motion = d / n / ((t - prev.t) / 1000);
+  }
+  eye.last[key] = { lum, rgb: b.slice(0), t };
+  const s = { t, mean: sum / n, white: white / n, lit: lit / n, detail: (fine / nf + coarse / nc) / 2, busy: busy / n, shades,
+    colorful: colorful / n, variety, motion };
+  const h = eye.hist[key];
+  h.push(s);
+  while (h.length > 1 && t - h[0].t > 8000) h.shift();
+  return s;
+}
+
+// What Check each look makes of a picture, from its copies over a few seconds. A picture fails if it's going
+// white, nearly black all over, plain (a lone outline or a glow on black: few edges and few shades) or frozen.
+// One that passes gets a score for how rich it is: edges all over, a full range of shades, fine detail,
+// movement and plenty of color. (Tuned by trying hundreds of Autopilot's looks and picking out the dull ones.)
+const LOOK = { white: 0.12, mean: 0.62, rise: 0.035, lit: 0.15, busy: 0.25, shades: 0.45, flat: 0.02, still: 0.01,
+  busyRich: 0.6, shadesRich: 0.8, rich: 0.1, lively: 0.12 };
+function lookVerdict(S) {
+  const last = S[S.length - 1], first = S[0];
+  const span = (last.t - first.t) / 1000;
+  const rise = span > 0.6 ? (last.white - first.white) / span : 0;
+  const white = Math.max(eyeAvg(S, 'white'), last.white), mean = Math.max(eyeAvg(S, 'mean'), last.mean);
+  const moving = S.filter((s) => s.motion != null);
+  const motion = moving.length ? eyeAvg(moving, 'motion') : null;
+  const detail = eyeAvg(S, 'detail'), lit = eyeAvg(S, 'lit'), busy = eyeAvg(S, 'busy'), shades = eyeAvg(S, 'shades');
+  const color = Math.min(1, eyeAvg(S, 'colorful') * 2.5) * (0.35 + 0.65 * eyeAvg(S, 'variety'));
+  let why = '';
+  if (white > LOOK.white || mean > LOOK.mean || (last.white > 0.03 && rise > LOOK.rise)) why = 'white';
+  else if (lit < LOOK.lit) why = 'dark';
+  else if (busy < LOOK.busy || shades < LOOK.shades || detail < LOOK.flat) why = 'plain';
+  else if (motion != null && motion < LOOK.still) why = 'still';
+  const score = 0.3 * Math.min(1, busy / LOOK.busyRich) + 0.2 * Math.min(1, shades / LOOK.shadesRich) +
+    0.15 * Math.min(1, detail / LOOK.rich) + 0.15 * Math.min(1, (motion ?? LOOK.lively) / LOOK.lively) + 0.2 * color;
+  return { pass: !why, why, score, white, mean, lit, detail, busy, shades, motion, color };
+}
+// Which of two tried looks to keep: one that passed beats one that didn't, anything beats going white,
+// and otherwise the richer one
+function betterLook(a, b) {
+  if (!b) return true;
+  if (!a) return false;
+  if (a.pass !== b.pass) return a.pass;
+  if (!a.pass && (a.why === 'white') !== (b.why === 'white')) return b.why === 'white';
+  return a.score > b.score;
+}
+
+/* ================= check each look ================= */
+// With Check each look on (under Autopilot settings), the next look is tried out on the hidden loop, out of
+// sight, starting about 14 seconds before it's due. After about 3 seconds Autopilot looks at it. One that's
+// going white, nearly black, plain or frozen is thrown away and another tried, up to six in all; one that passes
+// but is a bit plain gets another try or two while there's time; and the richest one seen is kept. The view
+// only fades over once a look has passed (or, if none of the six did, to the best of them). Next look rushes
+// it: quicker tries, and the first look that passes goes on.
+// It works whenever Autopilot swaps a hidden loop in. With What you see pinned or limited, the loops change in
+// place instead, so each look is looked at once it's on screen and a poor one is followed by another soon after.
+const CHECK = { tries: 6, settle: 1.5, judge: 3.5, rushSettle: 0.7, rushJudge: 2, lead: 14, hold: 8, great: 0.75 };
+const checking = () => apSet.check && !eye.failed;
+const otherLoop = (k) => (k === 'A' ? 'B' : 'A');
+const canTryOut = () => !ap.pins.has('view') && !limSpan('view');
+function prepBegin(k, now, rush) {
+  ap.prep = { k, since: now, tries: 0, rush: !!rush, ok: false, best: null, look: null, v: null, hold: 0 };
+  prepTry(now);
+}
+function prepTry(now) {
+  const P = ap.prep;
+  freshLook(P.k, otherLoop(P.k));
+  P.look = JSON.parse(JSON.stringify(loops[P.k].tgt));
+  P.since = now;
+  P.tries++;
+  P.v = null;
+  if (edit === P.k) syncUI();
+  apStatus();
+}
+// Puts back a look tried earlier (the best one), from a clean slate
+function prepRestore(look, now) {
+  const P = ap.prep, L = loops[P.k];
+  patchLoop(P.k, look, true);
+  for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+  clearLoop(P.k);
+  eyeForget(P.k);
+  P.look = look;
+  P.since = now;
+  if (edit === P.k) syncUI();
+}
+// A new copy of the look being tried out has arrived
+function prepJudge(now) {
+  const P = ap.prep;
+  if (P.ok) {
+    // Passed and waiting its turn. If it starts going white after all, it's thrown away and another tried.
+    const S = eyeRecent(P.k, 1500, now);
+    if (S.length < 3 || P.tries >= CHECK.tries) return;
+    const v = lookVerdict(S);
+    if (v.why !== 'white') return;
+    if (P.best && P.best.look === P.look) P.best = { v, look: P.look };
+    P.ok = false;
+    prepTry(now);
+    return;
+  }
+  const age = (now - P.since) / 1000;
+  if (age < (P.rush ? CHECK.rushJudge : CHECK.judge)) return;
+  const from = P.since + 1000 * (P.rush ? CHECK.rushSettle : CHECK.settle);
+  const S = eye.hist[P.k].filter((s) => s.t >= from);
+  if (S.length < 3 && age < 8) return;   // a few copies are needed to judge it
+  if (!S.length) { P.ok = true; return; }   // nothing to go on (very slow graphics): don't hold Autopilot up
+  const v = lookVerdict(S);
+  P.v = v;
+  if (betterLook(v, P.best && P.best.v)) P.best = { v, look: P.look };
+  const left = (ap.next - now) / 1000;
+  const great = v.pass && v.score >= CHECK.great;
+  const more = !great && P.tries < CHECK.tries && (P.best.v.pass ? !P.rush && left > CHECK.judge + 0.5 : true);
+  if (more) { prepTry(now); return; }
+  if (P.best.look !== P.look) prepRestore(P.best.look, now);
+  P.v = P.best.v;
+  P.ok = true;
+  apStatus();
+}
+// Autopilot wants to bring the hidden loop k in. Returns true once its look has been checked; until then the
+// hidden loop keeps trying (starting now if it hadn't begun), for up to 8 seconds past when it was due (about 5
+// when rushed), after which the best look seen so far goes on.
+function prepReady(k, now, rush) {
+  let P = ap.prep;
+  if (!P || P.k !== k) { prepBegin(k, now, rush); P = ap.prep; }
+  if (rush) P.rush = true;
+  if (!P.hold) P.hold = now;
+  if (!P.ok && now - P.hold > CHECK.hold * 1000 * (P.rush ? 0.6 : 1)) {
+    if (P.best && P.best.look !== P.look && betterLook(P.best.v, P.v)) prepRestore(P.best.look, now);
+    P.ok = true;
+  }
+  if (!P.ok) return false;
+  ap.prep = null;
+  return true;
+}
+// With What you see pinned or limited, a look changed in place is looked at once it has faded in; a poor one
+// (going white, nearly black, plain or frozen) brings the next look in a second or so, up to three times running
+function glideJudge(now) {
+  const k = ap.glide.k;
+  ap.glide = null;
+  const S = eyeRecent(k, 2500, now);
+  if (S.length < 2) return;
+  const v = lookVerdict(S);
+  if (!v.pass && ap.glideRedo < 3) { ap.glideRedo++; ap.next = Math.min(ap.next, now + 1200); }
+  else ap.glideRedo = 0;
+}
+// How much of the screen would be near white with both loops showing at once (on screen they add up, like two
+// projectors on one wall), from the latest copies of each. 0 when there's no copy of one of them yet.
+function overlayWhite(a, b) {
+  const A = eye.last[a], B = eye.last[b];
+  if (!A || !B) return 0;
+  const x = A.rgb, y = B.rgb;
+  let w = 0;
+  for (let i = 0; i < x.length; i += 4) {
+    let mn = 1;
+    for (let c = 0; c < 3; c++) mn = Math.min(mn, 1 - (1 - x[i + c] / 255) * (1 - y[i + c] / 255));
+    if (mn > 0.8) w++;
+  }
+  return w / (x.length / 4);
+}
+
+/* ================= white-out watch ================= */
+// While Autopilot runs, the picture on screen is kept from washing out to white, whether or not Check each look
+// is on. Nothing is dimmed or held back. When too much of the screen is near white (or it's heading there fast),
+// Autopilot turns its own sliders down a notch on the loop that's doing it, the way a person would: Trails first,
+// then the other loop pouring in, Grow, and a big picture's size; a notch at a time until it's clear. If both loops
+// together are what's white, it shows just one of them. Still white after 4 seconds: on to the next look. Solid
+// white after 8: that loop is wiped clean. Pinned sliders stay where they are, and nothing goes past its fader
+// limits. When you steer by hand (Autopilot off) it does nothing at all.
+const WATCH = { white: 0.16, mean: 0.68, rise: 0.08, step: 1.2, next: 4, wipe: 8 };
+const watch = { hot: 0, cool: 0, stepT: 0, easing: '', easeT: 0, skipped: false };
+// Turns loop k's own settings down a notch. Says whether there was anything left to turn down.
+function coolLoop(k) {
+  const t = loops[k].tgt;
+  let did = false;
+  // Lowered, but never below a fader limit
+  const lower = (obj, key, v, pin) => {
+    if (pin) return;
+    const r = limSpan(key);
+    v = Math.round(r ? Math.max(v, r[0]) : v);
+    if (v < obj[key]) { obj[key] = v; did = true; }
+  };
+  if (t.trails > 45) lower(t, 'trails', Math.max(45, t.trails - 6), isPinned('trails', k));
+  const feed = k === 'A' ? 'xba' : 'xab';
+  if (mix.tgt[feed] > 4) lower(mix.tgt, feed, mix.tgt[feed] * 0.6, ap.pins.has(feed));
+  if (t.grow > 30) lower(t, 'grow', t.grow - 12, isPinned('grow', k));
+  if (IMAGE_INPUTS.includes(t.in1) && t.size > 40) lower(t, 'size', Math.max(40, t.size - 8), isPinned('size', k));
+  return did;
+}
+function whiteWatch(now, dt, wA, wB) {
+  // The last second or so (or the last copy, on a slow computer)
+  let S = eyeRecent('comp', 1000, now);
+  if (!S.length) S = eyeRecent('comp', 3000, now).slice(-1);
+  if (!S.length) return;
+  const white = eyeAvg(S, 'white'), mean = eyeAvg(S, 'mean');
+  const first = S[0], last = S[S.length - 1], span = (last.t - first.t) / 1000;
+  const rise = span > 0.3 ? (last.white - first.white) / span : 0;
+  const darker = span > 0.3 && rise < -0.005 && last.mean < first.mean;
+  const hot = white > WATCH.white || mean > WATCH.mean || (last.white > 0.06 && rise > WATCH.rise);
+  if (watch.easing && now - watch.easeT > 2500) watch.easing = '';
+  if (!hot) {
+    watch.cool += dt;
+    if (watch.cool > 1.5) { watch.hot = 0; watch.skipped = false; }
+    return;
+  }
+  watch.cool = 0;
+  watch.hot += dt;
+  const shown = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0.05);
+  const own = (k) => { const R = eyeRecent(k, 3000, now); return R.length ? Math.max(eyeAvg(R, 'white'), R[R.length - 1].white) : null; };
+  // A notch at a time, and none while it's already getting darker (sliders glide, so a change takes a moment to show)
+  if (now - watch.stepT >= WATCH.step * 1000 && !darker) {
+    watch.stepT = now;
+    // The loops that are white on their own; if neither is, it's the two of them added together
+    const culprits = shown.filter((k) => { const w = own(k); return w == null || w > WATCH.white * 0.6; });
+    let did = false;
+    if (shown.length === 2 && !culprits.length && !ap.pins.has('view')) {
+      const keep = (own('A') ?? 0) <= (own('B') ?? 0) ? 'A' : 'B';
+      const to = limSpan('view') ? nearLim('view', keep === 'A' ? 0 : 100) : (keep === 'A' ? 0 : 100);
+      if (to !== mix.tgt.view) { mix.tgt.view = to; did = true; }
+    }
+    for (const k of culprits.length ? culprits : shown) did = coolLoop(k) || did;
+    if (did) {
+      watch.easing = (culprits.length ? culprits : shown).join(' and ');
+      watch.easeT = now;
+      syncUI();
+      apStatus();
+    }
+  }
+  // Still white: on to the next look, as soon as one is ready
+  if (watch.hot > WATCH.next && !watch.skipped) {
+    watch.skipped = true;
+    ap.rush = true;
+    ap.next = Math.min(ap.next, now);
+  }
+  // Solid white even so: wipe the loops that are white and let them build up again
+  if (watch.hot > WATCH.wipe && last.mean > 0.85 && last.white > 0.6) {
+    for (const k of shown) if ((own(k) ?? 1) > 0.5) { clearLoop(k); eyeForget(k); }
+    eyeForget('comp');
+    burst();
+    watch.hot = 0;
+  }
+}
+
 // Two Autopilot buttons: one under Channels, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
 const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
@@ -4872,6 +5184,12 @@ function setAutopilot(on, quiet) {
   ap.on = on;
   ap.quick = 0;
   ap.beatWait = null;
+  ap.prep = null;
+  ap.glide = null;
+  ap.glideRedo = 0;
+  ap.rush = false;
+  eyeReset();
+  Object.assign(watch, { hot: 0, cool: 0, easing: '', skipped: false });
   document.documentElement.classList.toggle('ap-on', on);
   apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
   if (on) {
@@ -5173,6 +5491,7 @@ function freshLook(k, shown) {
   const L = loops[k];
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
   clearLoop(k);
+  eyeForget(k);
 }
 // With What you see pinned, a loop on screen changes in place instead, gliding into its new look.
 // Most of the time it keeps its input and mirror, so the picture changes shape rather than jumping.
@@ -5191,9 +5510,10 @@ function glideLook(k) {
   capTrails(sc, other);
   patchLoop(k, sc, true);
 }
-// Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat.
+// Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat,
+// unless Next look or the white-out watch asked for it straight away.
 function apTick(now) {
-  if (apSet.beat && snd.analyser && snd.amount > 0) {
+  if (apSet.beat && snd.analyser && snd.amount > 0 && !ap.rush) {
     if (!ap.beatWait) ap.beatWait = { beats: snd.beats, until: now + 4000 };
     if (snd.beats === ap.beatWait.beats && now < ap.beatWait.until) return;
     const onBeat = snd.beats !== ap.beatWait.beats;
@@ -5205,8 +5525,9 @@ function apTick(now) {
   }
 }
 function apStep(now, onBeat) {
+  const rush = ap.rush;
   ap.next = now + apEverySec() * 1000 * rnd(0.75, 1.25);
-  ap.quick = onBeat ? now + 1500 : 0;   // on a beat the new look cuts in fast
+  ap.quick = onBeat || rush ? now + 1500 : 0;   // on a beat (or when rushed) the new look cuts in fast
   const m = apSet.mix / 100;
   const v = mix.tgt.view;
   // A narrowed What you see limit means Autopilot can't hide a loop to swap it out, so it moves What you see
@@ -5219,9 +5540,15 @@ function apStep(now, onBeat) {
       // rather than swap out a loop that's still on screen
       const [cA, cB] = weights(mix.cur.view);
       if ((hidden === 'A' ? cA : cB) > 0.02) { ap.next = now + 1000; ap.quick = 0; return; }
-      freshLook(hidden, shown);
+      // Check each look: the hidden loop only comes in once its look has been tried out and passed
+      if (checking()) {
+        if (!prepReady(hidden, now, rush)) { ap.next = now + 250; ap.quick = 0; apStatus(); return; }
+      } else freshLook(hidden, shown);
       nudge(shown);
-      mix.tgt.view = Math.random() < 0.8 * m ? 50 : (hidden === 'B' ? 100 : 0);
+      // Two loops that would add up to white on screen are shown one at a time
+      let both = Math.random() < 0.8 * m;
+      if (both && overlayWhite(hidden, shown) > WATCH.white * 0.7) both = false;
+      mix.tgt.view = both ? 50 : (hidden === 'B' ? 100 : 0);
     } else {
       mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
       nudge('A'); nudge('B');
@@ -5233,7 +5560,10 @@ function apStep(now, onBeat) {
     const k = pick(onScreen.length ? onScreen : ['A']);
     glideLook(k);
     nudge(k === 'A' ? 'B' : 'A');
+    // Check each look: once it has faded in, Autopilot looks at it (see glideJudge)
+    ap.glide = checking() ? { k, at: now + (apFadeSec() + 2.5) * 1000 } : null;
   }
+  ap.rush = false;
   const feed = () => (Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0);
   if (!ap.pins.has('xab')) mix.tgt.xab = inLim('xab', feed());
   if (!ap.pins.has('xba')) mix.tgt.xba = inLim('xba', feed());
@@ -5259,7 +5589,8 @@ function apPicture() {
 // fast the way a look does on a beat, and the countdown to the one after starts again. If Autopilot is off it
 // starts with a new look. Any fade still going is finished first, and when both loops are showing, one of
 // them cuts away so the hidden one can take the new look (unless What you see is pinned or limited, when the
-// loops change in place as usual).
+// loops change in place as usual). With Check each look on, a look that's ready and checked goes on at once;
+// otherwise the quickest look that passes does, usually within two or three seconds.
 function nextLook() {
   const was = ap.on;
   if (frozen) toggleFreeze(false);
@@ -5269,6 +5600,7 @@ function nextLook() {
     if (mix.tgt.view > 1 && mix.tgt.view < 99) mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
     mix.cur.view = mix.tgt.view;
   }
+  ap.rush = true;
   apStep(performance.now(), true);
   showOSD('AUTOPILOT', 'NEXT LOOK');
   if (!was) toast('Autopilot is on, starting with a new look. Press Next look any time to skip ahead.');
@@ -5297,6 +5629,7 @@ function showAp(k) {
 function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
+  $('#apCheck').setAttribute('aria-pressed', String(apSet.check));
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
   $$('#apInputs button').forEach((b) => b.setAttribute('aria-pressed', String(!apSet.off.includes(b.dataset.apsrc))));
   syncLimUI();
@@ -5323,6 +5656,16 @@ $('#apBeat').addEventListener('click', () => {
   saveAp();
   syncApUI();
   if (apSet.beat && !snd.analyser) toast('Change on the beat needs music: under React to sound, pick Computer sound or Microphone.');
+});
+$('#apCheck').addEventListener('click', () => {
+  apSet.check = !apSet.check;
+  // Switched off part way through trying looks: the hidden loop keeps the one it has, and changes as before
+  if (!apSet.check) ap.prep = null;
+  ap.glide = null;
+  saveAp();
+  syncApUI();
+  toast(apSet.check ? 'Check each look is on. Autopilot tries each new look out of sight first and skips the poor ones.'
+    : 'Check each look is off. You’ll see every look Autopilot makes. It still keeps the picture from turning white.');
 });
 // One toggle per kind of input. Lit means Autopilot may use it.
 for (const [k, label] of AP_INPUTS) {
@@ -5359,21 +5702,27 @@ $('#apUnpin').addEventListener('click', () => {
   toast(ap.on ? 'Nothing is pinned now. Autopilot changes everything from its next look.' : 'Nothing is pinned now.');
 });
 $('#apReset').addEventListener('click', () => {
-  for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'touch']) apSet[k] = AP_DEFAULTS[k];
+  for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'check', 'touch']) apSet[k] = AP_DEFAULTS[k];
   apSet.off = [];
   apSet.lim = {};
   saveAp();
   syncApUI();
   toast(ap.pins.size ? 'Autopilot settings and fader limits are back to normal. Your pins are still pinned.' : 'Autopilot settings and fader limits are back to normal.');
 });
-// The line at the top of Autopilot settings: on or off, when the next look comes, and what's pinned
+// The line at the top of Autopilot settings: on or off, when the next look comes, what's pinned, and what
+// Check each look and the white-out watch are doing
 function apStatus() {
   let html;
   if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (under Channels, under the picture, or the P key) to start it.';
   else {
     const s = Math.max(0, Math.round((ap.next - performance.now()) / 1000));
+    const P = ap.prep, holding = P && P.hold && !P.ok;
     html = '<span class="live"></span><b>Autopilot is on.</b> ' +
-      (ap.beatWait ? 'New look on the next beat.' : s <= 1 ? 'New look coming now.' : `Next new look in about ${s < 60 ? s + ' seconds' : fmtDur(s).toLowerCase()}.`);
+      (holding ? 'New look as soon as one passes its check.'
+        : ap.beatWait ? 'New look on the next beat.' : s <= 1 ? 'New look coming now.' : `Next new look in about ${s < 60 ? s + ' seconds' : fmtDur(s).toLowerCase()}.`);
+    if (watch.easing) html += ` Easing off loop ${watch.easing} so it doesn’t turn white.`;
+    else if (P && !P.ok) html += ` Trying out looks out of sight (${P.tries} of up to ${CHECK.tries}).`;
+    else if (P && P.ok) html += ' The next one is checked and ready.';
     if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
   }
   if (html !== apStatus.shown) { apStatus.shown = html; $('#apState').innerHTML = html; }
@@ -6505,7 +6854,7 @@ function snapshot() {
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
-  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, touch: apSet.touch,
+  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, check: apSet.check, touch: apSet.touch,
     off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim) };
 }
 function markPreset(id) {
@@ -6611,6 +6960,8 @@ function loadPreset(pr, quiet) {
   if (a && typeof a === 'object') {
     for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
     apSet.beat = a.beat === true;
+    // Presets saved before Check each look existed have it on
+    apSet.check = a.check !== false;
     apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(a.off);
     // Presets saved before fader limits existed leave the limits as they are
@@ -8284,6 +8635,104 @@ function runLoop(k, xf, brush, f) {
   twStep(k, f / 60);
 }
 
+/* ================= autopilot's eye: the copies ================= */
+// A tiny copy of one picture is drawn (each spot an average of four, so fine patterns aren't missed) and read
+// into a buffer the graphics chip fills in its own time, with a marker that says when it's done. Each frame the
+// marker is asked about, never waited on; the copy is read once it's there. (See eyeStats for what's noted.)
+function eyeSetup() {
+  try {
+    eye.prog = program(`#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uOut;
+out vec4 o;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uOut, d = 0.25 / uOut;
+  vec3 c = texture(uSrc, uv - d).rgb + texture(uSrc, uv + d).rgb +
+           texture(uSrc, uv + vec2(d.x, -d.y)).rgb + texture(uSrc, uv + vec2(-d.x, d.y)).rgb;
+  o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
+}`);
+    gl.useProgram(eye.prog.p);
+    set1i(eye.prog, 'uSrc', 0);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, EYE_W, EYE_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('eye target');
+    eye.tgt = { tex, fbo };
+    eye.pbo = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, eye.pbo);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, eye.buf.byteLength, gl.STREAM_READ);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  } catch (e) {
+    // Without it Autopilot carries on as it always did
+    eye.failed = true;
+    ap.prep = null;
+  }
+}
+function eyeAsk(key, tex, now) {
+  if (!eye.tgt) { eyeSetup(); if (eye.failed) return; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, eye.tgt.fbo);
+  gl.viewport(0, 0, EYE_W, EYE_H);
+  gl.useProgram(eye.prog.p);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  set2f(eye.prog, 'uOut', EYE_W, EYE_H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, eye.pbo);
+  gl.readPixels(0, 0, EYE_W, EYE_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  eye.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  eye.key = key;
+  eye.askGen = eye.gen[key];
+  eye.askT = now;
+  eye.age = 0;
+}
+// The copy, if it has arrived: noted down, and which picture it was returned. A copy of a picture that has
+// since been wiped or given a new look is thrown away.
+function eyeCollect() {
+  if (!eye.sync) return null;
+  const st = gl.clientWaitSync(eye.sync, 0, 0);   // a timeout of 0: only asks, never waits
+  if (st === gl.TIMEOUT_EXPIRED && ++eye.age < 60) return null;
+  gl.deleteSync(eye.sync);
+  eye.sync = null;
+  if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return null;
+  if (eye.askGen !== eye.gen[eye.key]) return null;
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, eye.pbo);
+  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, eye.buf);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  eyeStats(eye.key, eye.buf, eye.askT);
+  return eye.key;
+}
+// Once a frame while Autopilot runs: collects the last copy, starts trying out the next look when it's nearly
+// due (Check each look), keeps the white-out watch going, and asks for the next copy. The look being tried out
+// gets every other copy; the rest go round the picture on screen and the loops showing in it.
+function eyeTick(now, dt, wA, wB) {
+  if (!ap.on || eye.failed) return;
+  const got = eyeCollect();
+  if (frozen) return;
+  if (got && ap.prep && got === ap.prep.k) prepJudge(now);
+  if (checking() && canTryOut()) {
+    const v = mix.tgt.view, P = ap.prep;
+    const hidden = v <= 1 ? 'B' : v >= 99 ? 'A' : null;
+    // The view moved (or a person moved it) while a look was being tried: try again for the next one
+    if (P && P.k !== hidden) ap.prep = null;
+    else if (!P && hidden && (hidden === 'A' ? wA : wB) <= 0.02 && now > ap.next - CHECK.lead * 1000) prepBegin(hidden, now, false);
+  } else if (ap.prep) ap.prep = null;
+  if (ap.glide && now >= ap.glide.at) glideJudge(now);
+  whiteWatch(now, dt, wA, wB);
+  if (!eye.sync && now - eye.askT > 55) {
+    const P = ap.prep, keys = P ? [P.k, 'comp', P.k] : ['comp'];
+    for (const k of ['A', 'B']) if ((k === 'A' ? wA : wB) > 0.02 && !(P && P.k === k)) keys.push(k);
+    const key = keys[eye.turn++ % keys.length];
+    eyeAsk(key, key === 'comp' ? comp.tex : shownTex(key), now);
+  }
+}
+
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
@@ -8332,8 +8781,10 @@ function frame() {
   if (!frozen) {
     let brush = null;
     if (drawing && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
-    const needA = wA > 0.001 || xab > 0.001 || readsOther('B');
-    const needB = wB > 0.001 || xba > 0.001 || readsOther('A');
+    // A hidden loop also runs while Check each look is trying a look out on it
+    const trying = ap.prep ? ap.prep.k : null;
+    const needA = wA > 0.001 || xab > 0.001 || readsOther('B') || trying === 'A';
+    const needB = wB > 0.001 || xba > 0.001 || readsOther('A') || trying === 'B';
     if (needA) runLoop('A', xba, wA > 0.01 ? brush : null, f);
     if (needB) runLoop('B', xab, wB > 0.01 ? brush : null, f);
   }
@@ -8347,6 +8798,7 @@ function frame() {
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  eyeTick(now, dt, wA, wB);
 
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -8404,6 +8856,8 @@ for (const key of ['A', 'B']) Object.assign(loops[key].cur, loops[key].tgt);
 Object.assign(mix.cur, mix.tgt);
 setEdit('A');
 showOSD(`CH ${String(startCh + 1).padStart(2, '0')}`, CHANNELS[startCh].name.toUpperCase());
+// Autopilot's eye is made now, with everything else, so starting Autopilot never waits for it
+eyeSetup();
 requestAnimationFrame(frame);
 showStart();
 })();
