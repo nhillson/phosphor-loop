@@ -237,6 +237,23 @@ TIPS
     clear). "Open a taste file…" (or dropping the file on the page) adds a
     profile someone sent. Rating while a SHARED profile is lit makes your
     own copy of it.
+  - Train again: with one of your profiles lit, "Train … again" starts
+    another session for it. Autopilot follows the profile as it would live,
+    you rate what it brings, and "Finish and add them" adds the new ratings.
+    Made for one profile per song, trained as often as you like.
+  - What taste learns: every setting of both loops (inputs, effects and how
+    strong, mirror, zoom, spin, trails, color, warp, Input size, Blend,
+    softness, Wave/Shape patterns, Grow size, Time warp direction, Only
+    movement, edges, drift, brightness, Spectrograph style), which nature
+    picture shows (and its kind), and how the screen looks. With a taste to
+    follow, Autopilot picks nature pictures you've liked, and a picture it
+    brings back comes with its nature picture.
+  - Not just loops and settings but which go together.
+    Each loop's settings tied to its input ("Shape with Melt, zoomed in"),
+    effects that come together, whole looks, and whole pairs of looks with
+    how they're shown and fed into each other. At "Stick to what I like",
+    Autopilot mostly brings back pictures you rated up, barely changed, so
+    you know roughly what will be on screen (How wild sets how much).
   - Follow my taste (under Taste profiles) goes from "Surprise me"
     (ignores your taste) to "Stick to what I like". Autopilot then makes
     several looks and keeps one you'd probably like, starts some looks from
