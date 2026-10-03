@@ -6135,7 +6135,8 @@ function rate(dir) {
   else if (ap.on) {
     toast(added ? `Noted${loopsSaid}: fewer looks like this. Skipping to the next one.${off}` : 'Already noted. Skipping to the next one.');
     nextLook('rated');
-  } else toast(`Noted${loopsSaid}: Autopilot will steer away from looks like this. Press Next look for a new one.${off}`);
+  } else toast(added ? `Noted${loopsSaid}: Autopilot will steer away from looks like this. Press Next look for a new one.${off}`
+    : 'Already noted: you don’t like this look. Press Next look for a new one.');
 }
 rateBtns[1].addEventListener('click', () => rate(1));
 rateBtns[-1].addEventListener('click', () => rate(-1));
