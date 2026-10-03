@@ -462,6 +462,40 @@
   }
   @media (prefers-reduced-motion: reduce) { .rate.flash { animation: none; } }
   .taste-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+  /* Taste profiles: tiles like presets, two to a row so their buttons fit */
+  .tp-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tp-load {
+    width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 6px;
+    border-radius: 7px; border: 1px solid var(--line); border-bottom-color: #0c0b0a;
+    background: linear-gradient(var(--raise-2), var(--raise)); cursor: pointer; text-align: left;
+  }
+  .tp-load:hover { border-color: #564f47; }
+  .tp-load[aria-pressed="true"] { border-color: var(--gun-g); box-shadow: 0 0 0 1px var(--gun-g); }
+  .tp-load .sw { display: block; height: 44px; border-radius: 4px; background: #0b0a09 center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+  .tp-load .sw.blank { background: radial-gradient(circle at 30% 40%, rgba(61,220,132,.55) 0 18%, transparent 40%), radial-gradient(circle at 72% 60%, rgba(255,174,59,.5) 0 16%, transparent 38%), #0b0a09; }
+  .tp-load .nm { font-size: 13px; line-height: 1.15; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tp-load .ct { font-size: 11.5px; line-height: 1.1; padding-inline: 2px; color: var(--faint); }
+  .tp-load[aria-pressed="true"] .ct { color: var(--gun-g); }
+  .tp-ics { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
+  .tp-ic {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.2); background: rgba(10,9,8,.82); color: var(--ink); font: 600 13px/1 var(--f-body);
+  }
+  .tp-ic:hover { border-color: var(--loop-a); }
+  .tp-ic.share { color: var(--loop-a); }
+  #tasteAdminNote .admin-tag { margin-right: 4px; }
+  /* The taste session bar, under the buttons under the picture */
+  .session-bar {
+    display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; border-radius: 8px;
+    border: 1px solid rgba(61,220,132,.45); background: rgba(61,220,132,.07);
+  }
+  .session-bar[hidden] { display: none; }
+  .session-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; }
+  .session-row .live { background: var(--gun-g); box-shadow: 0 0 8px rgba(61,220,132,.7); }
+  .session-row #sessionText { color: var(--ink); }
+  .session-form { max-width: 460px; width: 100%; align-self: center; }
+  #tasteState .live { background: var(--gun-g); box-shadow: 0 0 8px rgba(61,220,132,.7); }
+  .session-btn[aria-pressed="true"] .led { background: var(--gun-g); box-shadow: 0 0 8px rgba(61,220,132,.7); }
   .btn.armed { border-color: var(--tally); color: #ffd9d5; }
 
   /* Fader limits: the button under Autopilot settings, and the menu it opens over the controls */
@@ -749,6 +783,18 @@
         <button class="btn" id="recMic" aria-pressed="true" hidden title="Which sound goes into videos you record. Click to change it: Off, Mic, Computer or Both."><span class="led"></span><span id="recSoundLabel">Video sound: Both</span></button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden title="Record a video; press again to stop and save it (key V, works in full screen too)"><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
+      <div class="session-bar" id="sessionBar" hidden>
+        <div class="session-row">
+          <span class="live" aria-hidden="true"></span><span id="sessionText"><b>Taste session</b> · nothing rated yet</span>
+          <button class="btn small" id="sessionFinish">Finish and name it</button>
+          <button class="btn small" id="sessionCancel">Cancel</button>
+        </div>
+        <form class="preset-row session-form" id="sessionForm" hidden>
+          <input type="text" id="sessionName" maxlength="40" autocomplete="off" spellcheck="false" aria-label="Name this taste profile">
+          <button class="btn small" type="submit">Save</button>
+          <button class="btn small" type="button" id="sessionBack">Keep rating</button>
+        </form>
+      </div>
       <div class="foot">
         <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>L</kbd> next look · <kbd>Y</kbd> more like this · <kbd>X</kbd> not this · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>V</kbd> record · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
@@ -806,15 +852,6 @@
           <span class="hint">Tries each new look out of sight first, skips ones that are dull, nearly black or turning white, and keeps the richest. Switch it off to see every look Autopilot makes.</span>
         </div>
         <div class="ctl">
-          <div class="ctl-head"><label for="apTaste">Follow my taste</label><output id="apTasteOut" for="apTaste"></output></div>
-          <input type="range" id="apTaste" min="0" max="100" step="1" value="50">
-          <div class="ends"><span>Surprise me</span><span>Stick to what I like</span></div>
-          <span class="hint" id="tasteSum">Nothing learned yet. Press More like this or Not this under the picture.</span>
-          <div class="chips"><button class="chip" id="apHints" aria-pressed="true"><span class="led"></span>Learn from hints</button></div>
-          <span class="hint">Also learns without you pressing anything: saving a preset counts as a like, skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that setting.</span>
-          <div class="taste-actions"><button class="btn small" id="tasteForget">Forget my taste</button></div>
-        </div>
-        <div class="ctl">
           <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
@@ -838,6 +875,38 @@
         <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
       </section>
 
+      <section class="group" id="tasteGroup" aria-labelledby="h-taste">
+        <h2 id="h-taste">Taste profiles</h2>
+        <p class="ap-state" id="tasteState" role="status">Autopilot follows My taste.</p>
+        <button class="btn wide session-btn" id="sessionStart"><span class="led"></span>Start taste session</button>
+        <p class="hint">Makes a new taste profile from scratch. Autopilot runs, you rate its looks with More like this and Not this under the picture, and when you finish you give the profile a name.</p>
+        <div class="presets tp-list" id="tasteList"></div>
+        <form class="preset-form" id="tasteRenForm" hidden>
+          <label for="tasteRenName" class="lbl" id="tasteRenLbl">New name</label>
+          <div class="preset-row">
+            <input type="text" id="tasteRenName" maxlength="40" autocomplete="off" spellcheck="false">
+            <button class="btn small" type="submit">Rename</button>
+            <button class="btn small" type="button" id="tasteRenCancel">Cancel</button>
+          </div>
+        </form>
+        <p class="hint">Tap a profile and Autopilot follows it. Ratings you make outside a session go into the lit one. On your own profiles, ✎ renames, ⤓ saves a file to send to someone, and × deletes.</p>
+        <p class="hint" id="tasteSum">Nothing learned yet. Press More like this or Not this under the picture.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apTaste">Follow my taste</label><output id="apTasteOut" for="apTaste"></output></div>
+          <input type="range" id="apTaste" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Surprise me</span><span>Stick to what I like</span></div>
+        </div>
+        <div class="ctl">
+          <div class="chips"><button class="chip" id="apHints" aria-pressed="true"><span class="led"></span>Learn from hints</button></div>
+          <span class="hint">Also learns without you pressing anything: skipping a new look in its first few seconds counts a little against it, pinning a setting counts for that setting, and in My taste, your saved presets count as likes.</span>
+        </div>
+        <div class="taste-actions">
+          <button class="btn small" id="tasteOpen">Open a taste file…</button>
+          <input type="file" id="tasteFile" accept=".json,application/json" hidden>
+        </div>
+        <p class="hint" id="tasteAdminNote" hidden><b class="admin-tag">ADMIN</b> ⇪ on one of your profiles shares it with everyone (the same name replaces it). On a shared one, ✎ renames it and × takes it away.</p>
+      </section>
+
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
         <h2 id="h-shared">Shared presets</h2>
         <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
@@ -854,9 +923,6 @@
           </form>
           <button class="btn wide" id="sharedAdd">Share current look with everyone</button>
           <p class="hint">Everyone sees a new or changed shared preset about a minute later. Share while Autopilot runs and it keeps Autopilot too. On a shared preset, ✎ renames it and × takes it away.</p>
-          <button class="btn wide" id="tasteShare">Share my taste with everyone</button>
-          <p class="hint" id="tasteShareHint">Everyone’s Autopilot starts out leaning towards what you like. Their own ratings take over as they rate.</p>
-          <button class="linkish" id="tasteUnshare" type="button" hidden>Take my taste away from everyone</button>
           <button class="linkish" id="adminOut" type="button">Stop being the admin on this device</button>
         </div>
         <form class="preset-form admin" id="adminLogin" hidden>
@@ -1358,8 +1424,10 @@
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
-            <dt>More like this and Not this</dt><dd>Right under the picture, or the Y and X keys (they can go on MIDI pads too). They teach Autopilot your taste: it remembers what the look on screen is made of and how it looks, then brings more like the ones you like and fewer like the ones you don’t. While Autopilot runs, Not this also skips to the next look. With both loops showing, a rating counts for both. Rate the same look the other way and the new rating replaces the old one. Ratings stay in this browser.</dd>
-            <dt>Follow my taste</dt><dd>Under Autopilot settings. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Your presets count as likes too. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting). Forget my taste, pressed twice, wipes every rating.</dd>
+            <dt>More like this and Not this</dt><dd>Right under the picture, or the Y and X keys (they can go on MIDI pads too). They teach Autopilot your taste: it remembers what the look on screen is made of and how it looks, then brings more like the ones you like and fewer like the ones you don’t. While Autopilot runs, Not this also skips to the next look. With both loops showing, a rating counts for both. Rate the same look the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
+            <dt>Taste profiles</dt><dd>Your ratings are kept in named taste profiles, and Autopilot follows the lit one (tap another to switch). My taste is always there, and in it your saved presets count as likes too. Ratings you make outside a session go into the lit profile. On your own profiles, ✎ renames, ⤓ saves the profile as a small file you can send to someone, and × deletes it (on My taste it clears the ratings). Open a taste file… (or dropping the file on the page) adds a profile someone sent you. Profiles marked SHARED come from the admin; rating while one is lit starts your own copy of it.</dd>
+            <dt>Taste session</dt><dd>Start taste session, under Taste profiles, makes a new profile from scratch. Autopilot brings looks, you rate them with More like this and Not this, and Autopilot learns from them as you go. A green bar under the picture counts your ratings; press Finish and name it to keep the profile, or Cancel (twice, once you’ve rated) to throw it away.</dd>
+            <dt>Follow my taste</dt><dd>Under Taste profiles. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting).</dd>
             <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. With Check each look on, a look that’s ready goes on at once; otherwise it takes two or three seconds to find one that passes. The wait for the look after starts over.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
@@ -5833,11 +5901,12 @@ function apPicture() {
 // them cuts away so the hidden one can take the new look (unless What you see is pinned or limited, when the
 // loops change in place as usual). With Check each look on, a look that's ready and checked goes on at once;
 // otherwise the quickest look that passes does, usually within two or three seconds.
-// how: 'rated' when Not this asked for it (that rating already counts, so a quick skip isn't counted again)
+// how: who asked, when it wasn't Next look itself ('rated' for Not this, whose rating already counts; 'session'
+// for a taste session starting). Only Next look itself counts as a quick skip.
 function nextLook(how) {
   const was = ap.on;
   // Learn from hints: skipping a look that came in only a few seconds ago counts a little against it
-  if (was && how !== 'rated') tasteHintSkip(performance.now());
+  if (was && !how) tasteHintSkip(performance.now());
   if (frozen) toggleFreeze(false);
   if (!was) setAutopilot(true, true);
   ap.beatWait = null;
@@ -5858,38 +5927,99 @@ $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
 // eye has seen it, how it looks: how much is lit, how busy it is, how many shades and how much detail it has, how
 // much it moves and how colorful it is. With Learn from hints on, some smaller ratings come by themselves:
 // skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that
-// setting. Saved presets count as strong likes and shared presets as mild ones, so it doesn't start from nothing.
-// The admin can also share their ratings as everyone's starting point; a person's own ratings take over as they
-// rate. Ratings stay in this browser, the newest 400.
-// Autopilot uses what it learned in three ways, as far as Follow my taste says (not at all at Off):
+// setting.
+// Ratings are kept in named taste profiles (under Taste profiles), and Autopilot follows the lit one. My taste is
+// always there; in it, saved presets count as likes too, so it doesn't start from nothing. A taste session makes
+// a new profile from scratch: its ratings go into the session, Autopilot learns from them as you go, and Finish
+// names it and keeps it. Profiles can be saved as a file to send to someone, and opened from one; the admin can
+// share them with everyone (they live in presets.json beside the shared presets). Rating while a shared profile
+// is lit starts your own copy of it. Everything stays in this browser, the newest 400 ratings per profile.
+// Autopilot uses the lit profile in three ways, as far as Follow my taste says (not at all at Off):
 //   1. it makes several looks and keeps one whose inputs, effects, mirror and slider ranges you've liked most
 //   2. some new looks start from a look you liked (or a preset) and vary it
 //   3. Check each look leans towards tries that look like the ones you liked
 // It also learns whether you like seeing both loops at once, and shows both more or less often.
-const TASTE_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
+const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
 const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], ...SELF_RANGE };
-const TASTE_LOOK = Object.keys(loopDefaults());
+const TASTE_DEF = loopDefaults();
+const TASTE_LOOK = Object.keys(TASTE_DEF);
 const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
-const taste = { votes: [], model: null, shared: null, pending: [], sid: randId(6) };
+const TASTE_FILE_KIND = 'phosphor-loop-taste';
+// profiles: your own, My taste first ({ id, name, votes, thumb, saved }); sharedList: the admin's, from presets.json;
+// active: the lit profile's id; session: a taste session under way ({ votes, started })
+const taste = { profiles: [], sharedList: [], active: 'mine', session: null, model: null, pending: [], sid: randId(6) };
 const tasteVoteOK = (v) => !!v && typeof v === 'object' && Number.isFinite(v.w) &&
   ((v.look && typeof v.look === 'object') || (Array.isArray(v.feats) && v.feats.every((f) => typeof f === 'string')));
+const tasteThumbOK = (t) => typeof t === 'string' && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(t);
+const tasteNew = () => 't' + Date.now().toString(36) + randId(4);
+function cleanTasteProfile(p) {
+  if (!p || typeof p !== 'object' || typeof p.id !== 'string' || !/^[a-z0-9]{1,40}$/i.test(p.id) || !Array.isArray(p.votes)) return null;
+  return { id: p.id, name: String(p.name || 'Taste').slice(0, 40), votes: p.votes.filter(tasteVoteOK).slice(-TASTE_MAX),
+    thumb: tasteThumbOK(p.thumb) ? p.thumb : '', saved: Number(p.saved) || 0 };
+}
 try {
   const t = JSON.parse(localStorage.getItem(TASTE_KEY) || 'null');
-  if (t && Array.isArray(t.votes)) taste.votes = t.votes.filter(tasteVoteOK).slice(-TASTE_MAX);
+  if (t && Array.isArray(t.profiles)) {
+    taste.profiles = t.profiles.map(cleanTasteProfile).filter(Boolean);
+    if (typeof t.active === 'string') taste.active = t.active;
+    if (t.session && Array.isArray(t.session.votes)) taste.session = { votes: t.session.votes.filter(tasteVoteOK), started: t.session.started || Date.now() };
+  } else {
+    // Ratings from before there were profiles become My taste
+    const old = JSON.parse(localStorage.getItem(TASTE_OLD_KEY) || 'null');
+    if (old && Array.isArray(old.votes)) taste.profiles = [{ id: 'mine', name: 'My taste', votes: old.votes.filter(tasteVoteOK).slice(-TASTE_MAX), thumb: '', saved: Date.now() }];
+  }
 } catch (_) {}
-function saveTaste() {
-  if (taste.votes.length > TASTE_MAX) taste.votes = taste.votes.slice(-TASTE_MAX);
-  taste.model = null;
-  try { localStorage.setItem(TASTE_KEY, JSON.stringify({ v: 1, votes: taste.votes })); } catch (_) {}
-  tasteSummary();
+// My taste is always there, and always first
+{
+  const i = taste.profiles.findIndex((p) => p.id === 'mine');
+  taste.profiles.unshift(i >= 0 ? taste.profiles.splice(i, 1)[0] : { id: 'mine', name: 'My taste', votes: [], thumb: '', saved: 0 });
 }
+function saveTaste() {
+  for (const p of taste.profiles) if (p.votes.length > TASTE_MAX) p.votes = p.votes.slice(-TASTE_MAX);
+  taste.model = null;
+  try {
+    localStorage.setItem(TASTE_KEY, JSON.stringify({ v: 2, active: taste.active, profiles: taste.profiles, session: taste.session }));
+  } catch (_) { toast('This browser’s storage for the page is full, so the newest ratings couldn’t be kept. Delete a taste profile or a few presets.', 8000); }
+  renderTaste();
+}
+// What Autopilot follows right now: the taste session if one is under way, otherwise the lit profile
+// (My taste if the lit one has gone, or a shared one hasn't arrived yet)
+function tasteSource() {
+  if (taste.session) return { kind: 'session', name: 'this taste session', votes: taste.session.votes, presets: false };
+  const own = taste.profiles.find((p) => p.id === taste.active);
+  if (own) return { kind: 'own', p: own, name: own.name, votes: own.votes, presets: own.id === 'mine' };
+  const sh = taste.sharedList.find((p) => p.id === taste.active);
+  if (sh) return { kind: 'shared', p: sh, name: sh.name, votes: sh.votes, presets: false };
+  const mine = taste.profiles[0];
+  return { kind: 'own', p: mine, name: mine.name, votes: mine.votes, presets: true };
+}
+// Where a new rating goes. A shared profile can't be changed, so rating while one is lit starts your own copy.
+function tasteTarget() {
+  const s = tasteSource();
+  if (s.kind !== 'shared') return { votes: s.votes, note: '' };
+  const copy = { id: tasteNew(), name: tasteFreeName(`${s.name} (mine)`), votes: s.votes.map((v) => ({ ...v })), thumb: s.p.thumb || '', saved: Date.now() };
+  taste.profiles.push(copy);
+  taste.active = copy.id;
+  return { votes: copy.votes, note: ` “${s.name}” is shared, so this starts your own copy, “${copy.name}”.` };
+}
+// A name no profile of yours has yet ("Chill", then "Chill 2" and so on)
+function tasteFreeName(name, except) {
+  name = String(name).trim().slice(0, 40) || 'Taste';
+  const used = (n) => taste.profiles.some((p) => p.id !== except && p.name.toLowerCase() === n.toLowerCase());
+  if (!used(name)) return name;
+  let i = 2;
+  while (used(`${name.slice(0, 36)} ${i}`)) i++;
+  return `${name.slice(0, 36)} ${i}`;
+}
+const tasteCount = (votes) => votes.filter((v) => v.src === 'up' || v.src === 'down').length;
 
 // What a look is made of, in words Autopilot can count: its inputs, which effects are on (and how many), its
 // mirror, and roughly where Zoom, Spin, Trails, Color shift and Warp sit
 const tasteSrc = (s) => (is3D(s) ? 'world' : s);
 function tasteBand(v, cuts, names) { let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return names[i]; }
 function tasteFeats(L) {
+  L = { ...TASTE_DEF, ...L };
   const f = ['in:' + tasteSrc(L.in1)];
   if (is3D(L.in1)) f.push('world:' + L.in1);
   if (L.in2 && L.in2 !== 'none') f.push('in2:' + tasteSrc(L.in2));
@@ -5904,9 +6034,13 @@ function tasteFeats(L) {
   f.push('warp:' + tasteBand(L.warp ?? 0, [10, 30], ['low', 'mid', 'high']));
   return f;
 }
+// Loop k's look, keeping only what differs from the defaults (so ratings take little room and travel well)
 function tasteLook(k) {
   const t = loops[k].tgt, o = {};
-  for (const f of TASTE_LOOK) { const v = t[f]; o[f] = typeof v === 'number' ? Math.round(v * 100) / 100 : v; }
+  for (const f of TASTE_LOOK) {
+    const v = typeof t[f] === 'number' ? Math.round(t[f] * 100) / 100 : t[f];
+    if (v !== TASTE_DEF[f]) o[f] = v;
+  }
   return o;
 }
 // How a look looks, from the eye's copies of it (all 0 to 1)
@@ -5946,7 +6080,8 @@ function tasteFill(now) {
 function tasteModel() {
   if (taste.model) return taste.model;
   const feat = {}, favs = [], picUp = [], picDown = [];
-  const n = { up: 0, down: 0, presets: 0, shared: 0, sharedTaste: 0, evidence: 0 };
+  const src = tasteSource();
+  const n = { up: 0, down: 0, presets: 0, shared: 0, evidence: 0 };
   const add = (f, w) => { const e = feat[f] || (feat[f] = { up: 0, down: 0 }); if (w > 0) e.up += w; else e.down -= w; };
   const take = (v, scale) => {
     const w = v.w * scale;
@@ -5955,11 +6090,11 @@ function tasteModel() {
     if (v.look) {
       for (const f of tasteFeats(v.look)) add(f, w);
       add(v.both ? 'mix:both' : 'mix:one', w * 0.7);
-      if (w > 0) favs.push({ look: v.look, w });
+      if (w > 0) favs.push({ look: { ...TASTE_DEF, ...v.look }, w });
       if (v.pic) (w > 0 ? picUp : picDown).push({ p: v.pic, w: Math.abs(w) });
     } else for (const f of v.feats) add(f, w);
   };
-  for (const v of taste.votes) {
+  for (const v of src.votes) {
     take(v, 1);
     if (v.src === 'up') n.up++;
     else if (v.src === 'down') n.down++;
@@ -5980,15 +6115,10 @@ function tasteModel() {
     }
     return count;
   };
-  try { n.presets = fromPresets(presets, 1.5); } catch (_) { /* not loaded yet */ }
-  try { n.shared = fromPresets(shared, 0.5); } catch (_) {}
-  // The admin's shared taste, as a starting point that fades as you rate (the admin has their own already)
-  let admin = false;
-  try { admin = !!adminKey; } catch (_) {}
-  if (taste.shared && !admin) {
-    const scale = 0.5 * Math.max(0.25, 1 - (n.up + n.down) / 40);
-    for (const v of taste.shared.votes) take(v, scale);
-    n.sharedTaste = taste.shared.votes.length;
+  // In My taste, presets count too
+  if (src.presets) {
+    try { n.presets = fromPresets(presets, 1.5); } catch (_) { /* not loaded yet */ }
+    try { n.shared = fromPresets(shared, 0.5); } catch (_) {}
   }
   const pref = {};
   for (const [f, e] of Object.entries(feat)) pref[f] = (e.up - e.down) / (e.up + e.down + 1.5);
@@ -6002,7 +6132,7 @@ function tasteModel() {
     }
     return c;
   };
-  taste.model = { pref, favs, up: centroid(picUp), down: centroid(picDown), conf: Math.min(1, n.evidence / 15), n };
+  taste.model = { pref, favs, up: centroid(picUp), down: centroid(picDown), conf: Math.min(1, n.evidence / 15), n, src };
   return taste.model;
 }
 // How much a look's settings match what you've liked, from -1 to 1. Inputs and effects count most.
@@ -6106,20 +6236,21 @@ function rate(dir) {
   const now = performance.now(), [wA, wB] = weights(mix.cur.view);
   const shown = [['A', wA], ['B', wB]].filter(([, w]) => w > 0.25);
   const both = shown.length === 2;
+  const { votes, note } = tasteTarget();
   let added = 0;
   for (const [k, vis] of shown) {
     const gen = loops[k].gen, look = tasteLook(k), sig = tasteFeats(look).join();
     // The same look rated again: the same way is noted already, the other way replaces it
-    const old = taste.votes.findIndex((v) => v.sid === taste.sid && v.k === k && v.gen === gen && v.look && tasteFeats(v.look).join() === sig);
+    const old = votes.findIndex((v) => v.sid === taste.sid && v.k === k && v.gen === gen && v.look && tasteFeats(v.look).join() === sig);
     if (old >= 0) {
-      if (Math.sign(taste.votes[old].w) === dir && taste.votes[old].src !== 'skip') continue;
-      taste.votes.splice(old, 1);
+      if (Math.sign(votes[old].w) === dir && votes[old].src !== 'skip') continue;
+      votes.splice(old, 1);
     }
     const vote = { t: Date.now(), src: dir > 0 ? 'up' : 'down', w: dir * Math.round(Math.min(1, vis) * 100) / 100, look, both, sid: taste.sid, k, gen };
     const pic = tasteSeen(k, now);
     if (pic) vote.pic = pic;
     else { taste.pending.push({ vote, k, gen, from: now }); tasteLookSoon(); }
-    taste.votes.push(vote);
+    votes.push(vote);
     added++;
   }
   const b = rateBtns[dir];
@@ -6127,11 +6258,12 @@ function rate(dir) {
   void b.offsetWidth;
   b.classList.add('flash');
   showOSD('TASTE', dir > 0 ? 'MORE LIKE THIS' : 'NOT THIS');
-  if (added) saveTaste();
+  if (added || note) saveTaste();
   const M = tasteModel(), count = M.n.up + M.n.down;
-  const off = apSet.taste === 0 ? ' Follow my taste is at Off under Autopilot settings, so Autopilot isn’t using it yet.' : '';
+  const off = (apSet.taste === 0 ? ' Follow my taste is at Off under Taste profiles, so Autopilot isn’t using it yet.' : '') + note;
   const loopsSaid = both ? ' (both loops on screen)' : '';
-  if (dir > 0) toast(added ? `Noted${loopsSaid}: more looks like this. ${count} rating${count === 1 ? '' : 's'} so far.${off}` : 'Already noted: you like this look.');
+  const sofar = taste.session ? `${count} in this taste session.` : `${count} rating${count === 1 ? '' : 's'} in “${M.src.name}”.`;
+  if (dir > 0) toast(added ? `Noted${loopsSaid}: more looks like this. ${sofar}${off}` : 'Already noted: you like this look.');
   else if (ap.on) {
     toast(added ? `Noted${loopsSaid}: fewer looks like this. Skipping to the next one.${off}` : 'Already noted. Skipping to the next one.');
     nextLook('rated');
@@ -6145,11 +6277,13 @@ function tasteHintSkip(now) {
   const c = ap.cameIn;
   if (!apSet.hints || !c || now - c.at > TASTE_SKIP_MS || loops[c.k].gen !== c.gen) return;
   ap.cameIn = null;
-  if (taste.votes.some((v) => v.sid === taste.sid && v.k === c.k && v.gen === c.gen)) return;
+  if (tasteSource().kind === 'shared') return;   // a hint alone doesn't start a copy of a shared profile
+  const { votes } = tasteTarget();
+  if (votes.some((v) => v.sid === taste.sid && v.k === c.k && v.gen === c.gen)) return;
   const vote = { t: Date.now(), src: 'skip', w: -0.5, look: tasteLook(c.k), both: false, sid: taste.sid, k: c.k, gen: c.gen };
   const pic = tasteSeen(c.k, now);
   if (pic) vote.pic = pic;
-  taste.votes.push(vote);
+  votes.push(vote);
   saveTaste();
 }
 // Learn from hints: pinning a setting counts for that setting (pinning an effect at nothing counts against it)
@@ -6166,10 +6300,12 @@ function tasteHintPin(key, L) {
     else if (['zoom', 'spin', 'trails', 'color', 'warp'].includes(key)) feats.push([tasteFeats(t).find((f) => f.startsWith(key + ':')), 1]);
     else if (TASTE_FX.includes(key)) feats.push(['fx:' + key, (t[key] || 0) > 12 ? 1 : -1]);
   }
+  if (!feats.length || tasteSource().kind === 'shared') return;
+  const { votes } = tasteTarget();
   let added = 0;
   for (const [f, s] of feats) {
-    if (!f || taste.votes.some((v) => v.src === 'pin' && v.sid === taste.sid && v.feats[0] === f && Date.now() - v.t < 60000)) continue;
-    taste.votes.push({ t: Date.now(), src: 'pin', w: 0.5 * s, feats: [f], sid: taste.sid });
+    if (!f || votes.some((v) => v.src === 'pin' && v.sid === taste.sid && v.feats[0] === f && Date.now() - v.t < 60000)) continue;
+    votes.push({ t: Date.now(), src: 'pin', w: 0.5 * s, feats: [f], sid: taste.sid });
     added++;
   }
   if (added) saveTaste();
@@ -6181,50 +6317,254 @@ function tastePresetPic() {
   return Object.keys(out).length ? out : undefined;
 }
 
-// The line under Follow my taste
+// The lines that say what Autopilot follows and what it has learned
 function tasteSummary() {
   const el = $('#tasteSum');
   if (!el) return;
   let M;
   try { taste.model = null; M = tasteModel(); } catch (_) { return; }
-  const { up, down, presets: P, shared: S, sharedTaste } = M.n;
+  const { up, down, presets: P, shared: S } = M.n, src = M.src;
   const parts = [];
   if (up + down) parts.push(`${up + down} rating${up + down === 1 ? '' : 's'} (${up} more like this, ${down} not this)`);
   if (P) parts.push(`your ${P} preset${P === 1 ? '' : 's'}`);
   if (S) parts.push(`${S} shared preset${S === 1 ? '' : 's'}`);
-  if (sharedTaste) parts.push('the shared taste');
-  let text = parts.length ? `Learned from ${parts.join(', ').replace(/, ([^,]*)$/, ' and $1')}.` : 'Nothing learned yet. Press More like this or Not this under the picture.';
+  const said = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+  let text = parts.length ? `Learned from ${said}.`
+    : src.kind === 'session' ? 'Nothing rated in this session yet. Press More like this or Not this under the picture.'
+    : 'Nothing learned yet. Press More like this or Not this under the picture.';
   if (parts.length && apSet.taste === 0) text += ' Follow my taste is Off, so Autopilot isn’t using it.';
   else if (parts.length && up + down < 15) text += ' It gets better at guessing after about 15 ratings.';
   el.textContent = text;
+  const st = $('#tasteState');
+  st.innerHTML = src.kind === 'session'
+    ? '<span class="live"></span><b>Taste session under way.</b> Your ratings make a new profile; Autopilot learns from them as you go.'
+    : `Autopilot follows <b>${escapeHTML(src.name)}</b>${src.kind === 'shared' ? ' (shared by the admin)' : ''}.`;
+  // The bar under the picture during a session
+  $('#sessionBar').hidden = !taste.session;
+  const sb = $('#sessionStart');
+  sb.setAttribute('aria-pressed', String(!!taste.session));
+  sb.lastChild.textContent = taste.session ? 'Taste session under way' : 'Start taste session';
+  if (taste.session) {
+    const v = taste.session.votes, u = v.filter((x) => x.src === 'up').length, d = v.filter((x) => x.src === 'down').length;
+    $('#sessionText').innerHTML = `<b>Taste session</b> · ${u + d ? `${u + d} rated (${u} more like this, ${d} not this)` : 'nothing rated yet'}`;
+  }
 }
+const tasteIsAdmin = () => { try { return !!adminKey; } catch (_) { return false; } };
+// The profile tiles: yours (My taste first), then the shared ones
+let tasteRen = null;
+function renderTaste() {
+  const list = $('#tasteList');
+  if (!list) return;
+  const admin = tasteIsAdmin(), lit = taste.session ? null : tasteSource().p;
+  list.innerHTML = '';
+  const tile = (p, isShared) => {
+    const t = document.createElement('div');
+    t.className = 'pre tp';
+    t.dataset.id = p.id;
+    const name = escapeHTML(p.name), n = tasteCount(p.votes), mine = p.id === 'mine';
+    const sw = p.thumb ? `<span class="sw" style="background-image:url(${p.thumb})"></span>` : '<span class="sw blank"></span>';
+    const ics = [];
+    if (!isShared || admin) ics.push(`<button class="tp-ic ren" title="Rename" aria-label="Rename ${name}">✎</button>`);
+    ics.push(`<button class="tp-ic file" title="Save as a file to send to someone" aria-label="Save ${name} as a file">⤓</button>`);
+    if (!isShared && admin && n) ics.push(`<button class="tp-ic share" title="Share with everyone" aria-label="Share ${name} with everyone">⇪</button>`);
+    if (!isShared || admin) ics.push(`<button class="tp-ic del" title="${isShared ? 'Take away from everyone' : mine ? 'Clear every rating' : 'Delete'}" aria-label="${isShared ? 'Take ' + name + ' away from everyone' : mine ? 'Clear ' + name : 'Delete ' + name}">×</button>`);
+    const ask = isShared ? `Take “${name}” away from everyone?` : mine ? `Clear every rating in “${name}”?` : `Delete “${name}”?`;
+    const yes = isShared ? 'Take away' : mine ? 'Clear' : 'Delete';
+    t.innerHTML =
+      `<button class="tp-load" aria-pressed="${lit === p}" title="Have Autopilot follow ${name}">${sw}` +
+      `${isShared ? '<span class="pre-auto">SHARED</span>' : ''}<span class="nm">${name}</span>` +
+      `<span class="ct">${n ? `${n} rating${n === 1 ? '' : 's'}` : mine ? 'your presets count' : 'no ratings'}</span></button>` +
+      `<div class="tp-ics">${ics.join('')}</div>` +
+      `<div class="pre-confirm" hidden><span>${ask}</span><div><button class="yes">${yes}</button><button class="no">Keep</button></div></div>`;
+    t.querySelector('.tp-load').addEventListener('click', () => tasteUse(p));
+    const on = (cls, fn) => { const b = t.querySelector('.tp-ic.' + cls); if (b) b.addEventListener('click', fn); };
+    const confirmBox = t.querySelector('.pre-confirm');
+    on('ren', () => tasteRenOpen(p, isShared));
+    on('file', () => tasteFileSave(p));
+    on('share', () => tasteShare(p));
+    on('del', () => { confirmBox.hidden = false; confirmBox.querySelector('.no').focus(); });
+    confirmBox.querySelector('.no').addEventListener('click', () => { confirmBox.hidden = true; });
+    confirmBox.querySelector('.yes').addEventListener('click', () => { confirmBox.hidden = true; if (isShared) tasteUnshare(p); else tasteDelete(p); });
+    return t;
+  };
+  for (const p of taste.profiles) list.appendChild(tile(p, false));
+  for (const p of taste.sharedList) list.appendChild(tile(p, true));
+  $('#tasteAdminNote').hidden = !admin;
+  tasteSummary();
+}
+// Tapping a profile: Autopilot follows it (during a session, the session comes first)
+function tasteUse(p) {
+  if (taste.session) { toast('A taste session is under way. Finish or cancel it under the picture first.'); return; }
+  taste.active = p.id;
+  saveTaste();
+  toast(`Autopilot follows “${p.name}” now.${apSet.taste === 0 ? ' (Follow my taste is at Off, so turn it up to hear it.)' : ''}`);
+}
+function tasteDelete(p) {
+  if (p.id === 'mine') {
+    p.votes = [];
+    toast('My taste is cleared. Your presets still count as likes in it.', 6000);
+  } else {
+    taste.profiles = taste.profiles.filter((x) => x !== p);
+    if (taste.active === p.id) taste.active = 'mine';
+    toast(`Deleted “${p.name}”.${taste.active === 'mine' ? ' Autopilot follows My taste.' : ''}`);
+  }
+  taste.pending = [];
+  saveTaste();
+}
+// Renaming, in the little form under the tiles
+function tasteRenOpen(p, isShared) {
+  tasteRen = { id: p.id, shared: isShared };
+  $('#tasteRenLbl').textContent = `New name for “${p.name}”`;
+  $('#tasteRenName').value = p.name;
+  $('#tasteRenForm').hidden = false;
+  $('#tasteRenName').focus();
+  $('#tasteRenName').select();
+}
+function tasteRenClose() { $('#tasteRenForm').hidden = true; tasteRen = null; }
+$('#tasteRenCancel').addEventListener('click', tasteRenClose);
+$('#tasteRenName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); tasteRenClose(); } });
+$('#tasteRenForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = tasteRen;
+  tasteRenClose();
+  if (!r) return;
+  const name = $('#tasteRenName').value.trim().slice(0, 40);
+  if (!name) return;
+  if (r.shared) {
+    toast('Renaming…', 15000);
+    if (await changeShared((list) => list, `Rename shared taste profile to "${name}"`, (tl) => tl.map((p) => (p.id === r.id ? { ...p, name } : p)))) {
+      toast(`Renamed to “${name}”. Everyone sees the new name in about a minute.`);
+    }
+    return;
+  }
+  const p = taste.profiles.find((x) => x.id === r.id);
+  if (!p) return;
+  p.name = tasteFreeName(name, p.id);
+  saveTaste();
+  toast(`Renamed to “${p.name}”.`);
+});
+
+// Taste sessions: a new profile from scratch, named when it's finished
+function sessionStart() {
+  if (taste.session) { toast('A taste session is already under way. Rate looks, then press Finish under the picture.'); return; }
+  taste.session = { votes: [], started: Date.now() };
+  taste.pending = [];
+  saveTaste();
+  // Autopilot brings looks to rate, starting with a new one now
+  nextLook('session');
+  toast('Taste session started. Rate looks with More like this and Not this under the picture (or Y and X), then press Finish and name it.', 9000);
+}
+function sessionFinish() {
+  const s = taste.session;
+  if (!s) return;
+  if (!tasteCount(s.votes)) { toast('Rate a few looks first with More like this and Not this, then finish.'); return; }
+  $('#sessionForm').hidden = false;
+  $('#sessionName').value = tasteFreeName(`Taste ${taste.profiles.length}`);
+  $('#sessionName').focus();
+  $('#sessionName').select();
+}
+function sessionFormClose() { $('#sessionForm').hidden = true; }
+let sessionCancelArmed = 0;
+function sessionCancel() {
+  const s = taste.session;
+  if (!s) return;
+  const n = tasteCount(s.votes), b = $('#sessionCancel');
+  if (n && !sessionCancelArmed) {
+    b.classList.add('armed');
+    b.textContent = `Press again to throw away ${n} rating${n === 1 ? '' : 's'}`;
+    sessionCancelArmed = setTimeout(() => { sessionCancelArmed = 0; b.classList.remove('armed'); b.textContent = 'Cancel'; }, 4000);
+    return;
+  }
+  clearTimeout(sessionCancelArmed);
+  sessionCancelArmed = 0;
+  b.classList.remove('armed');
+  b.textContent = 'Cancel';
+  taste.session = null;
+  taste.pending = [];
+  sessionFormClose();
+  saveTaste();
+  toast(`Taste session cancelled. Autopilot follows “${tasteSource().name}” again.`);
+}
+$('#sessionStart').addEventListener('click', sessionStart);
+$('#sessionFinish').addEventListener('click', sessionFinish);
+$('#sessionCancel').addEventListener('click', sessionCancel);
+$('#sessionBack').addEventListener('click', sessionFormClose);
+$('#sessionName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); sessionFormClose(); } });
+$('#sessionForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const s = taste.session;
+  if (!s) { sessionFormClose(); return; }
+  const name = tasteFreeName($('#sessionName').value.trim() || `Taste ${taste.profiles.length}`);
+  sessionFormClose();
+  // A picture of the screen as it finishes, for the profile's tile
+  let thumb = '';
+  try { thumb = await Promise.race([new Promise((res) => { thumbReq = res; }), new Promise((res) => setTimeout(() => res(''), 3000))]); } catch (_) {}
+  const p = { id: tasteNew(), name, votes: s.votes, thumb: tasteThumbOK(thumb) ? thumb : '', saved: Date.now() };
+  taste.profiles.push(p);
+  taste.active = p.id;
+  taste.session = null;
+  taste.pending = [];
+  saveTaste();
+  const n = tasteCount(p.votes);
+  toast(`Saved the taste profile “${name}” (${n} rating${n === 1 ? '' : 's'}). Autopilot follows it now.`, 7000);
+});
+
+// Files: a profile saved as a small .json file that anyone can open in Phosphor Loop (Open a taste file…, or drop
+// it on the page)
+const tasteSlim = (votes) => votes.map(({ sid, k, gen, ...v }) => v);
+function tasteFileSave(p) {
+  const data = { kind: TASTE_FILE_KIND, v: 1, name: p.name, saved: Date.now(), thumb: p.thumb || '', votes: tasteSlim(p.votes) };
+  const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'taste';
+  offerFile(`taste-${slug}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
+}
+async function tasteFileOpen(file) {
+  let d = null;
+  try { d = JSON.parse(await file.text()); } catch (_) {}
+  if (!d || d.kind !== TASTE_FILE_KIND || !Array.isArray(d.votes)) { toast('That file isn’t a Phosphor Loop taste profile.'); return; }
+  const p = cleanTasteProfile({ id: tasteNew(), name: tasteFreeName(d.name || file.name.replace(/\.json$/i, '')), votes: d.votes, thumb: d.thumb, saved: Date.now() });
+  if (!p || !p.votes.length) { toast('That taste file has no ratings in it.'); return; }
+  taste.profiles.push(p);
+  if (!taste.session) taste.active = p.id;
+  saveTaste();
+  const n = tasteCount(p.votes);
+  toast(`Added the taste profile “${p.name}” (${n} rating${n === 1 ? '' : 's'}).${taste.session ? ' Tap it after your session to follow it.' : ' Autopilot follows it now.'}`, 7000);
+}
+$('#tasteOpen').addEventListener('click', () => $('#tasteFile').click());
+$('#tasteFile').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) tasteFileOpen(f); e.target.value = ''; });
+
+// Admin: sharing a profile with everyone (the same name replaces the shared one), renaming or taking one away
+async function tasteShare(p) {
+  if (!tasteCount(p.votes)) { toast('Rate a few looks into this profile first.'); return; }
+  toast('Sharing…', 15000);
+  const entry = { name: p.name, votes: tasteSlim(p.votes).slice(-200), thumb: p.thumb || '', saved: Date.now() };
+  if (await changeShared((list) => list, `Share taste profile "${p.name}"`, (tl) => {
+    const same = tl.find((x) => x.name.toLowerCase() === p.name.toLowerCase());
+    return same ? tl.map((x) => (x === same ? { ...x, ...entry } : x)) : [...tl, { id: 'x' + Date.now().toString(36) + randId(4), ...entry }];
+  })) toast(`Shared “${p.name}” with everyone. They see it under Taste profiles in about a minute.`, 7000);
+}
+async function tasteUnshare(p) {
+  toast(`Taking “${p.name}” away…`, 15000);
+  if (await changeShared((list) => list, `Remove shared taste profile "${p.name}"`, (tl) => tl.filter((x) => x.id !== p.id))) {
+    if (taste.active === p.id) { taste.active = 'mine'; saveTaste(); }
+    toast(`“${p.name}” is gone for everyone in about a minute.`);
+  }
+}
+// The shared profiles in presets.json (and the single shared taste from before there were profiles)
+function cleanSharedTastes(list, old) {
+  const out = Array.isArray(list) ? list.map(cleanTasteProfile).filter(Boolean) : [];
+  if (!out.length && old && Array.isArray(old.votes)) {
+    const p = cleanTasteProfile({ id: 'sharedtaste', name: 'Shared taste', votes: old.votes, saved: old.saved });
+    if (p && p.votes.length) out.push(p);
+  }
+  return out.slice(0, 16);
+}
+
 $('#apHints').addEventListener('click', () => {
   apSet.hints = !apSet.hints;
   saveAp();
   syncApUI();
-  toast(apSet.hints ? 'Learn from hints is on: quick skips and pins count a little too.' : 'Learn from hints is off: only More like this, Not this and your presets count.');
+  toast(apSet.hints ? 'Learn from hints is on: quick skips and pins count a little too.' : 'Learn from hints is off: only More like this and Not this count (and presets, in My taste).');
 });
-// Forget my taste: press twice (the first press asks)
-{
-  const b = $('#tasteForget');
-  let armed = 0;
-  b.addEventListener('click', () => {
-    if (!armed) {
-      b.classList.add('armed');
-      b.textContent = 'Press again to forget every rating';
-      armed = setTimeout(() => { armed = 0; b.classList.remove('armed'); b.textContent = 'Forget my taste'; }, 4000);
-      return;
-    }
-    clearTimeout(armed);
-    armed = 0;
-    b.classList.remove('armed');
-    b.textContent = 'Forget my taste';
-    taste.votes = [];
-    taste.pending = [];
-    saveTaste();
-    toast('Every rating is forgotten. Your presets still count as likes (delete one to stop it counting).', 7000);
-  });
-}
 
 /* ================= autopilot settings ================= */
 function fmtDur(s) {
@@ -6583,6 +6923,8 @@ function feedInto(src) {
 function loadFile(file) {
   if (!file) return;
   const type = file.type || '';
+  // A taste profile someone sent (see Taste profiles)
+  if (/\.json$/i.test(file.name || '') || type === 'application/json') { tasteFileOpen(file); return; }
   if (type.startsWith('image/')) {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -7655,15 +7997,9 @@ function renderShared() {
   hint.textContent = shared.length ? 'Looks picked out for everyone. Tap one to load it.'
     : admin ? 'Nothing shared yet. Set up a look you like, then press Share current look with everyone.' : '';
   hint.hidden = !hint.textContent;
-  // Learn my taste: whether the admin's taste is shared at the moment
-  const tv = taste.shared ? taste.shared.votes.filter((v) => v.src === 'up' || v.src === 'down').length : 0;
-  $('#tasteShare').textContent = taste.shared ? 'Update my shared taste' : 'Share my taste with everyone';
-  $('#tasteShareHint').textContent = taste.shared
-    ? `Your taste is shared (${tv} rating${tv === 1 ? '' : 's'}). Everyone’s Autopilot starts out leaning towards what you like, and their own ratings take over as they rate. Update it to send your newest ratings.`
-    : 'Everyone’s Autopilot starts out leaning towards what you like. Their own ratings take over as they rate.';
-  $('#tasteUnshare').hidden = !taste.shared;
+  // Taste profiles: the admin's buttons on them, and shared presets counting in My taste
   taste.model = null;
-  tasteSummary();
+  renderTaste();
   sharedList.innerHTML = '';
   shared.forEach((pr) => {
     const t = document.createElement('div');
@@ -7715,13 +8051,7 @@ async function readSharedGH() {
   if (r.status === 404) return { sha: null, list: [] };
   if (!r.ok) throw r;
   const j = await r.json(), file = JSON.parse(b64dec(j.content || ''));
-  return { sha: j.sha, list: cleanShared(file.presets), taste: cleanSharedTaste(file.taste) };
-}
-// The admin's shared taste (Learn my taste), kept in presets.json beside the shared presets
-function cleanSharedTaste(t) {
-  if (!t || typeof t !== 'object' || !Array.isArray(t.votes)) return null;
-  const votes = t.votes.filter(tasteVoteOK).slice(-300);
-  return votes.length ? { votes, saved: t.saved || 0 } : null;
+  return { sha: j.sha, list: cleanShared(file.presets), tastes: cleanSharedTastes(file.tastes, file.taste) };
 }
 function adminTrouble(e) {
   const st = e && e.status;
@@ -7731,23 +8061,23 @@ function adminTrouble(e) {
   return 'Couldn’t reach GitHub. Check the internet connection and try again.';
 }
 // Reads the newest list, makes one change and saves it, so nothing shared from elsewhere gets lost.
-// changeTaste, when given, changes the shared taste too (null takes it away); otherwise it stays as it is.
-async function changeShared(change, message, changeTaste) {
+// changeTastes, when given, changes the shared taste profiles too; otherwise they stay as they are.
+async function changeShared(change, message, changeTastes) {
   if (sharedBusy) { toast('Still saving the last change. Try again in a moment.'); return false; }
   sharedBusy = true;
   sharedAdd.disabled = true;
   try {
-    const { sha, list, taste: oldTaste } = await readSharedGH();
+    const { sha, list, tastes } = await readSharedGH();
     const next = change(list).slice(-SHARED_MAX);
-    const newTaste = changeTaste ? changeTaste(oldTaste) : oldTaste;
+    const nextTastes = (changeTastes ? changeTastes(tastes) : tastes).slice(-16);
     const file = { v: 1, presets: next };
-    if (newTaste) file.taste = newTaste;
+    if (nextTastes.length) file.tastes = nextTastes;
     const body = { message, branch: 'main', content: b64enc(JSON.stringify(file)) };
     if (sha) body.sha = sha;
     const w = await gh(`/contents/${SHARED_FILE}`, { method: 'PUT', body: JSON.stringify(body) });
     if (!w.ok) throw w;
     shared = next;
-    taste.shared = newTaste || null;
+    taste.sharedList = nextTastes;
     taste.model = null;
     renderShared();
     return true;
@@ -7862,30 +8192,15 @@ window.addEventListener('hashchange', () => {
 async function loadShared() {
   try {
     const r = await fetch(SHARED_FILE, { cache: 'no-cache' });
-    if (r.ok) { const j = await r.json(); shared = cleanShared(j.presets); taste.shared = cleanSharedTaste(j.taste); }
+    if (r.ok) { const j = await r.json(); shared = cleanShared(j.presets); taste.sharedList = cleanSharedTastes(j.tastes, j.taste); }
   } catch (_) {}
-  if (adminKey) { try { const g = await readSharedGH(); shared = g.list; taste.shared = g.taste; } catch (_) {} }
+  if (adminKey) { try { const g = await readSharedGH(); shared = g.list; taste.sharedList = g.tastes; } catch (_) {} }
   taste.model = null;
   renderShared();
 }
-// Share my taste with everyone (admin only): your ratings become everyone's starting point
-$('#tasteShare').addEventListener('click', async () => {
-  const votes = taste.votes.filter((v) => v.src !== 'skip' || v.look).slice(-200).map(({ sid, k, gen, ...v }) => v);
-  if (!votes.some((v) => v.src === 'up' || v.src === 'down')) { toast('Rate a few looks first with More like this and Not this under the picture.'); return; }
-  toast('Sharing your taste…', 15000);
-  const n = votes.filter((v) => v.src === 'up' || v.src === 'down').length;
-  if (await changeShared((list) => list, `Share Autopilot taste (${n} ratings)`, () => ({ votes, saved: Date.now() }))) {
-    toast(`Shared your taste (${n} ratings). Everyone’s Autopilot starts from it in about a minute.`, 7000);
-  }
-});
-$('#tasteUnshare').addEventListener('click', async () => {
-  toast('Taking your taste away…', 15000);
-  if (await changeShared((list) => list, 'Take shared Autopilot taste away', () => null)) {
-    toast('Your taste is no longer shared. Everyone’s Autopilot goes back to its own ratings in about a minute.', 7000);
-  }
-});
 renderShared();
 loadShared();
+renderTaste();
 
 /* ================= folding sections ================= */
 // Every section heading folds its section away. What's folded is remembered in this browser.
@@ -8012,8 +8327,8 @@ function cleanName(typed, ext, fallback) {
 }
 function showNameBox(base, ext) {
   return new Promise((resolve) => {
-    const video = ext !== '.png';
-    $('#nameTitle').textContent = video ? 'Name this video' : 'Name this picture';
+    const video = ext !== '.png' && ext !== '.json';
+    $('#nameTitle').textContent = ext === '.json' ? 'Name this taste file' : video ? 'Name this video' : 'Name this picture';
     $('#nameExt').textContent = ext;
     nameDrop.textContent = 'Don’t save';
     let armed = false;
@@ -8045,7 +8360,7 @@ function askName(name) {
 }
 async function offerFile(name, blob) {
   const named = await askName(name);
-  if (named === null) { recNote(name.endsWith('.png') ? 'The picture wasn’t saved.' : 'The video wasn’t saved.'); return; }
+  if (named === null) { recNote(name.endsWith('.png') ? 'The picture wasn’t saved.' : name.endsWith('.json') ? 'The taste file wasn’t saved.' : 'The video wasn’t saved.'); return; }
   name = named;
   if (APP) { appSave(name, blob); return; }
   if (saveMode === 'claude' && downloadsNS) {
@@ -8826,6 +9141,7 @@ const LOOP_KEYS = LOOP_SLIDERS;
 const GROUP_NAMES = { inputs: 'Input', apInputs: 'Autopilot uses', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
                       specShape: 'Spectrograph', specListen: 'Spectrograph hears', textStyle: 'Text style', growSize: 'Grow size', timeShape: 'Time warp' };
 const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-ren, #adminBox *, #adminLogin *, .pre-confirm button, #presetForm button, #presetSave, ' +
+  '.tp-ic, #tasteRenForm *, #sessionForm *, #tasteOpen, ' +
   '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen';
 function labelFor(el) {
   const l = document.querySelector(`label[for="${el.id}"]`);

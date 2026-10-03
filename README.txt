@@ -223,18 +223,26 @@ TIPS
     how many shades, how much detail, movement and color), then brings more
     looks like the ones you like. While Autopilot runs, Not this also skips
     to the next look. Ratings stay in this browser (the newest 400).
-  - Follow my taste (under Autopilot settings) goes from "Surprise me"
+  - Taste profiles (the section under Autopilot settings): ratings are kept
+    in named profiles and Autopilot follows the lit one. My taste is always
+    there (your presets count as likes in it). "Start taste session" makes
+    a new profile from scratch: rate Autopilot's looks, then press "Finish
+    and name it" in the green bar under the picture. On your own profiles:
+    ✎ rename, ⤓ save as a file to send to someone, × delete (on My taste,
+    clear). "Open a taste file…" (or dropping the file on the page) adds a
+    profile someone sent. Rating while a SHARED profile is lit makes your
+    own copy of it.
+  - Follow my taste (under Taste profiles) goes from "Surprise me"
     (ignores your taste) to "Stick to what I like". Autopilot then makes
     several looks and keeps one you'd probably like, starts some looks from
     one you liked (varied a little), and Check each look leans towards
     tries that look like your favourites. It also learns whether you like
-    both loops showing at once. Your presets count as likes, shared presets
-    as mild ones. Learn from hints counts a skip in a new look's first few
-    seconds a little against it, and a pinned setting for that setting.
-    Forget my taste (press twice) wipes every rating.
-  - Admin: "Share my taste with everyone" (in the admin box under Shared
-    presets) puts your ratings in presets.json as everyone's starting
-    point; their own ratings take over as they rate.
+    both loops showing at once. Learn from hints counts a skip in a new
+    look's first few seconds a little against it, and a pinned setting for
+    that setting.
+  - Admin: ⇪ on one of your own taste profiles shares it with everyone
+    (kept in presets.json; the same name replaces it). On a shared one, ✎
+    renames it and × takes it away.
   - Next look (beside Autopilot under the picture, under Autopilot
     settings, or the L key): skips straight to Autopilot's next new look,
     cutting in quickly, and starts Autopilot if it's off. The wait for the
