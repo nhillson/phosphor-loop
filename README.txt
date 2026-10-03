@@ -307,4 +307,8 @@ TIPS
     screen" button shows at the top right (it fades again when you stop).
     Esc works too. The output window has the same button.
   - Keys: Space freeze, N neutral, R surprise,
-    P autopilot, L next look, C clear, F full screen, G guide.
+    P autopilot, L next look, C clear, F full screen, V record (press
+    again to stop and save; works in full screen too), G guide.
+  - Naming: before a picture or video saves, a box on the picture shows its
+    usual name. Type a new one, or press Enter to keep it. "Don't save"
+    throws it away, but only after a second click.

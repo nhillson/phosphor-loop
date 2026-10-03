@@ -145,6 +145,17 @@
     transition: opacity .6s ease;
   }
   .tip.gone { opacity: 0; }
+  .name-box {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5;
+    width: min(440px, 90%); display: flex; flex-direction: column; gap: 9px; padding: 14px 16px;
+    border-radius: 10px; background: rgba(32,30,27,.97); border: 1px solid var(--line);
+    box-shadow: 0 14px 44px rgba(0,0,0,.65); cursor: auto; text-align: left;
+  }
+  .name-box[hidden] { display: none; }
+  .name-title { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .name-ext { align-self: center; color: var(--dim); font-size: 14px; }
+  .name-btns { justify-content: flex-end; }
+  .name-save { border-color: var(--amber); }
 
   .drop, .screen-msg {
     position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
@@ -688,9 +699,22 @@
             <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to draw light."></canvas>
             <div class="osd on" id="osd" aria-hidden="true"><span class="osd-a">CH 01</span><span class="osd-b">TUNNEL</span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
+            <div class="tip" id="fsNote" hidden></div>
             <div class="tip" id="tip">Drag on the screen to draw light into the loop. New here? Open the Guide.</div>
             <div class="drop" id="drop" hidden>Drop to feed it into the loop</div>
             <div class="screen-msg" id="msg" hidden></div>
+            <form class="name-box" id="nameBox" hidden>
+              <label for="nameIn" class="name-title" id="nameTitle">Name this video</label>
+              <div class="preset-row">
+                <input type="text" id="nameIn" maxlength="100" autocomplete="off" spellcheck="false">
+                <span class="name-ext" id="nameExt">.webm</span>
+              </div>
+              <div class="preset-row name-btns">
+                <button class="btn small" type="button" id="nameDrop">Don’t save</button>
+                <button class="btn small name-save" type="submit">Save</button>
+              </div>
+              <p class="hint">Type a name, or press Enter to keep this one.</p>
+            </form>
           </div>
         </div>
         <button class="fs-exit" id="fsExit" hidden><span class="x" aria-hidden="true">✕</span>Exit full screen <kbd>Esc</kbd></button>
@@ -707,10 +731,10 @@
         <span class="spacer" aria-hidden="true"></span>
         <button class="btn" id="snap" hidden>Save picture</button>
         <button class="btn" id="recMic" aria-pressed="true" hidden title="Which sound goes into videos you record. Click to change it: Off, Mic, Computer or Both."><span class="led"></span><span id="recSoundLabel">Video sound: Both</span></button>
-        <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
+        <button class="btn rec" id="rec" aria-pressed="false" hidden title="Record a video; press again to stop and save it (key V, works in full screen too)"><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>L</kbd> next look · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>L</kbd> next look · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>V</kbd> record · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -1368,7 +1392,7 @@
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
-            <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. Videos are large, up to about 75 MB a minute.</dd>
+            <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. The V key does the same, even in full screen. Before anything saves, a box asks for a name: type one, or press Enter to keep the usual name. Videos are large, up to about 75 MB a minute.</dd>
             <dt>Video sound</dt><dd>Which sound goes into videos you record. Click it to step through Off, Mic, Computer and Both (mic and computer mixed). If React to sound is already hearing that sound, the video simply keeps it. If not, Record asks first: for Mic the browser asks to use the microphone (choose Allow); for Computer, Chrome’s sharing box opens (pick a screen on the Entire Screen tab, switch on Also share system audio, press Share). On the phone app it says Phone: choose Phone sound under React to sound first.</dd>
           </dl></div>
           <div class="g-card"><h3>Show setup</h3><dl>
@@ -1397,6 +1421,7 @@
           <div><kbd>L</kbd>Next look</div>
           <div><kbd>C</kbd>Clear</div>
           <div><kbd>F</kbd>Full screen</div>
+          <div><kbd>V</kbd>Record (again to stop)</div>
           <div><kbd>G</kbd>This guide</div>
           <div><kbd>Esc</kbd>Close the guide</div>
         </div>
@@ -7437,6 +7462,7 @@ function onKey(e) {
   else if (e.key === 'n' || e.key === 'N') neutral();
   else if (e.key === 'c' || e.key === 'C') clearScreen();
   else if (e.key === 'f' || e.key === 'F') toggleFS();
+  else if ((e.key === 'v' || e.key === 'V') && !e.repeat) toggleRec();
   else if (e.key === 'g' || e.key === 'G' || e.key === '?') openGuide();
 }
 window.addEventListener('keydown', onKey);
@@ -7482,7 +7508,65 @@ async function appSave(name, blob) {
   try { where = APP.saveEnd(ok) || ''; } catch (_) { where = ''; }
   toast(ok && where ? `Saved to ${where}.` : 'That couldn’t be saved. Check the phone has free space, then try again.');
 }
+// In full screen the message line under the picture is hidden, so recording messages also show on the picture
+const fsNote = $('#fsNote');
+let fsNoteTimer = null;
+function recNote(text, ms = 4500) {
+  toast(text, ms);
+  clearTimeout(fsNoteTimer);
+  if (!(document.fullscreenElement || document.webkitFullscreenElement)) { fsNote.hidden = true; return; }
+  fsNote.textContent = text;
+  fsNote.hidden = false;
+  fsNoteTimer = setTimeout(() => { fsNote.hidden = true; }, ms);
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) fsNote.hidden = true; });
+// Before each save, a box on the picture offers the usual name, ready to type over. Enter keeps it.
+// Don't save asks twice, so a long video isn't thrown away by one stray click.
+const nameBox = $('#nameBox'), nameIn = $('#nameIn'), nameDrop = $('#nameDrop');
+let nameQueue = Promise.resolve();
+function cleanName(typed, ext, fallback) {
+  let n = String(typed || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (n.toLowerCase().endsWith(ext.toLowerCase())) n = n.slice(0, -ext.length).trim();
+  n = n.replace(/[. ]+$/, '');
+  return n || fallback;
+}
+function showNameBox(base, ext) {
+  return new Promise((resolve) => {
+    const video = ext !== '.png';
+    $('#nameTitle').textContent = video ? 'Name this video' : 'Name this picture';
+    $('#nameExt').textContent = ext;
+    nameDrop.textContent = 'Don’t save';
+    let armed = false;
+    nameIn.value = base;
+    nameBox.hidden = false;
+    nameIn.focus();
+    nameIn.select();
+    const done = (value) => {
+      nameBox.hidden = true;
+      nameBox.removeEventListener('submit', onSave);
+      nameDrop.removeEventListener('click', onDrop);
+      nameIn.blur();
+      resolve(value);
+    };
+    const onSave = (e) => { e.preventDefault(); done(cleanName(nameIn.value, ext, base)); };
+    const onDrop = () => {
+      if (!armed) { armed = true; nameDrop.textContent = video ? 'Throw the video away?' : 'Throw it away?'; return; }
+      done(null);
+    };
+    nameBox.addEventListener('submit', onSave);
+    nameDrop.addEventListener('click', onDrop);
+  });
+}
+function askName(name) {
+  const dot = name.lastIndexOf('.');
+  const run = nameQueue.then(() => showNameBox(name.slice(0, dot), name.slice(dot)));
+  nameQueue = run.catch(() => {});
+  return run.then((base) => (base === null ? null : base + name.slice(dot)));
+}
 async function offerFile(name, blob) {
+  const named = await askName(name);
+  if (named === null) { recNote(name.endsWith('.png') ? 'The picture wasn’t saved.' : 'The video wasn’t saved.'); return; }
+  name = named;
   if (APP) { appSave(name, blob); return; }
   if (saveMode === 'claude' && downloadsNS) {
     try {
@@ -7502,7 +7586,7 @@ async function offerFile(name, blob) {
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
-  toast(`Saved ${name} to your Downloads folder.`);
+  recNote(`Saved ${name} to your Downloads folder.`);
 }
 let snapPending = false;
 snapBtn.addEventListener('click', () => { snapPending = true; });
@@ -7554,6 +7638,8 @@ function soundErr(name) { const e = new Error(name); e.name = name; return e; }
 // use Stereo Mix or a similar input, if the computer has one.
 async function openRecComputer() {
   if (!noScreenAudio && navigator.mediaDevices.getDisplayMedia) {
+    // Chrome only opens the sharing box right after a click or key press in this window
+    if (navigator.userActivation && !navigator.userActivation.isActive) throw soundErr('NeedPress');
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { displaySurface: 'monitor' },
       audio: { ...noSoundFixes, suppressLocalAudioPlayback: false },
@@ -7699,7 +7785,7 @@ async function startRec() {
     const needComp = wantComp && !gotComp && !APP;
     const tryMic = async () => {
       // If the browser stops to ask about the microphone, say what to press
-      const asking = setTimeout(() => { asked = true; toast('Your browser is asking to use the microphone. Choose Allow and recording starts.', 30000); }, 600);
+      const asking = setTimeout(() => { asked = true; recNote('Your browser is asking to use the microphone. Choose Allow and recording starts.', 30000); }, 600);
       try { sounds.push(await openRecMic()); gotMic = true; }
       catch (err) {
         const n = err && err.name;
@@ -7714,12 +7800,13 @@ async function startRec() {
     const tryComp = async () => {
       if (!noScreenAudio) {
         asked = true;
-        toast('To record this computer’s sound: in the box that opens, pick a screen on the Entire Screen tab, switch on Also share system audio, then press Share. Recording starts after.', 60000);
+        recNote('To record this computer’s sound: in the box that opens, pick a screen on the Entire Screen tab, switch on Also share system audio, then press Share. Recording starts after.', 60000);
       }
       try { sounds.push(await openRecComputer()); gotComp = true; }
       catch (err) {
         const n = err && err.name;
-        if (n === 'NoLoopback') notes.push(`${browserName} can’t record this computer’s sound. Use Chrome or Edge, or turn on Stereo Mix (the Guide shows how).`);
+        if (n === 'NeedPress' || n === 'InvalidStateError') notes.push('This video has no computer sound: sharing it has to start from this window. Press Record or V here, or first choose Computer sound under React to sound, and then V works from the Output window too.');
+        else if (n === 'NoLoopback') notes.push(`${browserName} can’t record this computer’s sound. Use Chrome or Edge, or turn on Stereo Mix (the Guide shows how).`);
         else if (n === 'NoSoundShared') notes.push('No sound came with the share, so this video has no computer sound. Next time, switch on Also share system audio under the screen you pick.');
         else if (n === 'NotAllowedError' && !noScreenAudio) notes.push('Sharing was cancelled, so this video has no computer sound.');
         else notes.push('This computer’s sound couldn’t start, so this video doesn’t have it.');
@@ -7736,12 +7823,12 @@ async function startRec() {
       recLabel.textContent = 'Record';
     }
     const what = gotMic && gotComp ? `the microphone and ${compSound}` : gotMic ? 'the microphone' : gotComp ? compSound : '';
-    if (notes.length) toast(notes.join(' ') + (what ? ` Recording with ${what}.` : ''), 14000);
-    else if (asked) toast(`Recording with ${what}.`);
+    if (notes.length) recNote(notes.join(' ') + (what ? ` Recording with ${what}.` : ''), 14000);
+    else if (asked) recNote(`Recording with ${what}.`);
   }
   const stopSounds = () => sounds.forEach((t) => t.stop());
   let stream;
-  try { stream = canvas.captureStream(30); } catch (e) { stopSounds(); toast('Recording isn’t supported in this browser.'); return; }
+  try { stream = canvas.captureStream(30); } catch (e) { stopSounds(); recNote('Recording isn’t supported in this browser.'); return; }
   const blend = blendSounds(sounds);
   if (blend.track) stream.addTrack(blend.track);
   const withSound = !!blend.track;
@@ -7756,7 +7843,7 @@ async function startRec() {
   };
   try {
     recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 10000000 } : undefined);
-  } catch (e) { cleanUp(); recorder = null; toast('Recording isn’t supported in this browser.'); return; }
+  } catch (e) { cleanUp(); recorder = null; recNote('Recording isn’t supported in this browser.'); return; }
   recChunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
   recorder.onstop = () => {
@@ -7772,7 +7859,7 @@ async function startRec() {
     recBtn.setAttribute('aria-pressed', 'false');
     recLabel.textContent = 'Record';
     if (blob.size) addWebmDuration(blob, ms).then((file) => offerFile(`phosphor-loop-${stamp()}.${ext}`, file));
-    else toast('Nothing was recorded. Try again.');
+    else recNote('Nothing was recorded. Try again.');
   };
   recorder.start(250);
   recStart = performance.now();
@@ -7790,7 +7877,11 @@ async function startRec() {
 function stopRec() {
   if (recorder && recorder.state !== 'inactive') { recStopAt = performance.now(); recorder.stop(); }
 }
-recBtn.addEventListener('click', () => { recorder ? stopRec() : startRec(); });
+function toggleRec() {
+  if (recBtn.hidden) { toast('Recording isn’t available here.'); return; }
+  recorder ? stopRec() : startRec();
+}
+recBtn.addEventListener('click', toggleRec);
 
 /* ================= sizing ================= */
 const narrowMQ = window.matchMedia('(max-width: 900px)');
