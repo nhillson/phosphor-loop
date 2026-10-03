@@ -216,6 +216,25 @@ TIPS
     plain or frozen is thrown away and another tried, up to six in all,
     and it keeps the richest. Switch it off to see every look it makes.
     Watching the picture uses tiny copies that never make it stutter.
+  - More like this and Not this (right under the picture, or the Y and X
+    keys; they can go on MIDI pads too) teach Autopilot your taste. It
+    remembers what the look on screen is made of (inputs, effects, mirror,
+    how much zoom, spin, trails, color and warp) and how it looks (how busy,
+    how many shades, how much detail, movement and color), then brings more
+    looks like the ones you like. While Autopilot runs, Not this also skips
+    to the next look. Ratings stay in this browser (the newest 400).
+  - Follow my taste (under Autopilot settings) goes from "Surprise me"
+    (ignores your taste) to "Stick to what I like". Autopilot then makes
+    several looks and keeps one you'd probably like, starts some looks from
+    one you liked (varied a little), and Check each look leans towards
+    tries that look like your favourites. It also learns whether you like
+    both loops showing at once. Your presets count as likes, shared presets
+    as mild ones. Learn from hints counts a skip in a new look's first few
+    seconds a little against it, and a pinned setting for that setting.
+    Forget my taste (press twice) wipes every rating.
+  - Admin: "Share my taste with everyone" (in the admin box under Shared
+    presets) puts your ratings in presets.json as everyone's starting
+    point; their own ratings take over as they rate.
   - Next look (beside Autopilot under the picture, under Autopilot
     settings, or the L key): skips straight to Autopilot's next new look,
     cutting in quickly, and starts Autopilot if it's off. The wait for the

@@ -107,7 +107,9 @@ class Check:
 def run(c, a, base, problems):
     pg = c.pg
     # 1. It loads and draws
-    pg.goto(base + 'index.html')
+    # Opening the page builds every shader, which takes 1 to 6 s in this workspace's software graphics, so the
+    # page load gets the same ceiling as the first frames rather than the 5 s for a click
+    pg.goto(base + 'index.html', timeout=START_CEILING_S * 1000)
     pg.add_style_tag(content='#tip, #osd, #toast { display: none !important; }')
     t = time.time()
     c.wait_frames(30, 'starting up', ceiling=START_CEILING_S)

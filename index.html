@@ -449,6 +449,20 @@
 
   /* Next look: Autopilot's next new look straight away */
   .next-look .skip { width: 15px; height: 11px; flex: none; color: var(--loop-a); }
+  /* More like this and Not this, under the picture: a thumb up and a thumb down, and a quick glow when pressed */
+  .rate .thumb { width: 16px; height: 16px; flex: none; }
+  .rate-up .thumb { color: var(--gun-g); }
+  .rate-down .thumb { color: var(--tally); transform: rotate(180deg); }
+  .rate.flash { animation: rate-flash .9s ease-out; }
+  .rate-up.flash { --rate-glow: rgba(61, 220, 132, .55); }
+  .rate-down.flash { --rate-glow: rgba(255, 75, 62, .55); }
+  @keyframes rate-flash {
+    from { box-shadow: 0 0 0 2px var(--rate-glow), 0 0 18px var(--rate-glow); }
+    to { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.4); }
+  }
+  @media (prefers-reduced-motion: reduce) { .rate.flash { animation: none; } }
+  .taste-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+  .btn.armed { border-color: var(--tally); color: #ffd9d5; }
 
   /* Fader limits: the button under Autopilot settings, and the menu it opens over the controls */
   .lim-btn svg { width: 24px; height: 12px; flex: none; color: var(--amber); }
@@ -726,6 +740,8 @@
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         <button class="btn next-look" id="nextLookBar" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
+        <button class="btn rate rate-up" id="rateUp" title="More like this (key Y): Autopilot learns you like the look on screen and brings more like it"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>More like this</button>
+        <button class="btn rate rate-down" id="rateDown" title="Not this (key X): skips to the next look, and Autopilot learns to steer away from looks like it"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>Not this</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <span class="spacer" aria-hidden="true"></span>
@@ -734,7 +750,7 @@
         <button class="btn rec" id="rec" aria-pressed="false" hidden title="Record a video; press again to stop and save it (key V, works in full screen too)"><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
-        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>L</kbd> next look · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>V</kbd> record · <kbd>G</kbd> guide</p>
+        <p class="keys">Keys: <kbd>Space</kbd> freeze · <kbd>N</kbd> neutral · <kbd>R</kbd> surprise · <kbd>P</kbd> autopilot · <kbd>L</kbd> next look · <kbd>Y</kbd> more like this · <kbd>X</kbd> not this · <kbd>C</kbd> clear · <kbd>F</kbd> full screen · <kbd>V</kbd> record · <kbd>G</kbd> guide</p>
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -790,6 +806,15 @@
           <span class="hint">Tries each new look out of sight first, skips ones that are dull, nearly black or turning white, and keeps the richest. Switch it off to see every look Autopilot makes.</span>
         </div>
         <div class="ctl">
+          <div class="ctl-head"><label for="apTaste">Follow my taste</label><output id="apTasteOut" for="apTaste"></output></div>
+          <input type="range" id="apTaste" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Surprise me</span><span>Stick to what I like</span></div>
+          <span class="hint" id="tasteSum">Nothing learned yet. Press More like this or Not this under the picture.</span>
+          <div class="chips"><button class="chip" id="apHints" aria-pressed="true"><span class="led"></span>Learn from hints</button></div>
+          <span class="hint">Also learns without you pressing anything: saving a preset counts as a like, skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that setting.</span>
+          <div class="taste-actions"><button class="btn small" id="tasteForget">Forget my taste</button></div>
+        </div>
+        <div class="ctl">
           <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
@@ -829,6 +854,9 @@
           </form>
           <button class="btn wide" id="sharedAdd">Share current look with everyone</button>
           <p class="hint">Everyone sees a new or changed shared preset about a minute later. Share while Autopilot runs and it keeps Autopilot too. On a shared preset, ✎ renames it and × takes it away.</p>
+          <button class="btn wide" id="tasteShare">Share my taste with everyone</button>
+          <p class="hint" id="tasteShareHint">Everyone’s Autopilot starts out leaning towards what you like. Their own ratings take over as they rate.</p>
+          <button class="linkish" id="tasteUnshare" type="button" hidden>Take my taste away from everyone</button>
           <button class="linkish" id="adminOut" type="button">Stop being the admin on this device</button>
         </div>
         <form class="preset-form admin" id="adminLogin" hidden>
@@ -1330,6 +1358,8 @@
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
+            <dt>More like this and Not this</dt><dd>Right under the picture, or the Y and X keys (they can go on MIDI pads too). They teach Autopilot your taste: it remembers what the look on screen is made of and how it looks, then brings more like the ones you like and fewer like the ones you don’t. While Autopilot runs, Not this also skips to the next look. With both loops showing, a rating counts for both. Rate the same look the other way and the new rating replaces the old one. Ratings stay in this browser.</dd>
+            <dt>Follow my taste</dt><dd>Under Autopilot settings. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Your presets count as likes too. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting). Forget my taste, pressed twice, wipes every rating.</dd>
             <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. With Check each look on, a look that’s ready goes on at once; otherwise it takes two or three seconds to find one that passes. The wait for the look after starts over.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
@@ -1419,6 +1449,8 @@
           <div><kbd>R</kbd>Surprise me</div>
           <div><kbd>P</kbd>Autopilot</div>
           <div><kbd>L</kbd>Next look</div>
+          <div><kbd>Y</kbd>More like this</div>
+          <div><kbd>X</kbd>Not this</div>
           <div><kbd>C</kbd>Clear</div>
           <div><kbd>F</kbd>Full screen</div>
           <div><kbd>V</kbd>Record (again to stop)</div>
@@ -4246,6 +4278,8 @@ function patchLoop(k, p, force) {
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
+  // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
+  L.gen = (L.gen || 0) + 1;
 }
 function applyPatch(c) {
   patchLoop('A', c.A);
@@ -5007,14 +5041,15 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, beat: false, check: true, touch: 'pin', off: [] };
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, touch: 'pin', off: [] };
 const apSet = { ...AP_DEFAULTS, lim: {} };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
   if (s && typeof s === 'object') {
-    for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
+    for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.check = s.check !== false;
+    apSet.hints = s.hints !== false;
     apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(s.off);
     apSet.lim = cleanLim(s.lim);
@@ -5062,7 +5097,7 @@ const pinned = (k, L) => ap.on && isPinned(k, L);
 // how much is lit at all, how much detail it has, how colorful it is and how fast it's changing.
 // Check each look and the white-out watch, below, decide what to do with them.
 const EYE_W = 64, EYE_H = 36;
-const eye = { tgt: null, prog: null, pbo: null, sync: null, failed: false, key: '', gen: { A: 0, B: 0, comp: 0 }, askGen: 0,
+const eye = { tgt: null, prog: null, pbo: null, sync: null, failed: false, key: '', gen: { A: 0, B: 0, comp: 0 }, askGen: 0, askLook: 0, wantUntil: 0,
   askT: 0, age: 0, turn: 0, buf: new Uint8Array(EYE_W * EYE_H * 4), last: {}, hist: { A: [], B: [], comp: [] } };
 // A picture that has just been wiped or given a whole new look starts with a clean slate (a copy already on its
 // way of what was there before is thrown away when it arrives)
@@ -5222,7 +5257,7 @@ function prepJudge(now) {
   const S = eye.hist[P.k].filter((s) => s.t >= from);
   if (S.length < 3 && age < 8) return;   // a few copies are needed to judge it
   if (!S.length) { P.ok = true; return; }   // nothing to go on (very slow graphics): don't hold Autopilot up
-  const v = lookVerdict(S);
+  const v = tasteJudge(lookVerdict(S), P.look, S);
   P.v = v;
   if (betterLook(v, P.best && P.best.v)) P.best = { v, look: P.look };
   const left = (ap.next - now) / 1000;
@@ -5409,6 +5444,7 @@ function takeOver(key, from) {
     ap.pins.add(id);
     queueMicrotask(() => holdPin(id, loopKey));
     if (fresh) {
+      queueMicrotask(() => tasteHintPin(key, loopKey));
       syncPins();
       saveAp();
       apStatus();
@@ -5482,6 +5518,7 @@ function togglePin(key) {
     } else {
       ap.pins.add(key);
       holdPin(key, edit);
+      tasteHintPin(key, edit);
       toast(ap.on ? `Pinned ${name}. Autopilot keeps changing the rest.` : `Pinned ${name}. Autopilot will leave it where it is.`);
     }
     pinsChanged();
@@ -5501,6 +5538,7 @@ function togglePin(key) {
   } else {
     ap.pins.add(`${key}@${L}`);
     holdPin(`${key}@${L}`, L);
+    tasteHintPin(key, L);
     toast(`Pinned ${name} on loop ${L}. Right-click the pin to hold it on both loops.`);
   }
   pinsChanged();
@@ -5517,6 +5555,7 @@ function togglePinBoth(key) {
   } else {
     ap.pins.add(`${key}@both`);
     holdPin(`${key}@both`, edit);
+    tasteHintPin(key, edit);
     toast(`Pinned ${name} on both loops, where loop ${edit} has it. Right-click the pin again to free both.`);
   }
   pinsChanged();
@@ -5598,7 +5637,8 @@ function apSelf(sc, w) {
     sc[key] = Math.round(rnd(lo, lo + (hi - lo) * (0.4 + 0.6 * w)));
   }
 }
-function apScene(k) {
+// The look as Autopilot would make it without your taste (apScene, under Learn my taste, leans it your way)
+function apSceneRaw(k) {
   const pool = apPool(), w = apSet.wild / 100;
   let sc;
   if (Math.random() < 0.45) {
@@ -5629,19 +5669,26 @@ function apScene(k) {
     if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
   }
   apSelf(sc, w);
+  return apFinish(sc, k);
+}
+// The last touches on a new look: pinned settings, and a size that suits its input. A look varied from one you
+// liked (keep: its input) keeps its own size while the input is still the same one.
+function apFinish(sc, k, keep) {
   // Pinned inputs go in first, so the size below suits the input really used
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
-  if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
-  if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
-  if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
-  if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
-    sc.size = Math.round(rnd(60, 100));
-    if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
-  }
-  if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
-    if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
-    if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
+  if (!keep || keep !== sc.in1) {
+    if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
+    if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
+    if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
+    if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
+      sc.size = Math.round(rnd(60, 100));
+      if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
+    }
+    if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
+      if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
+      if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
+    }
   }
   withPins(sc, k);
   return sc;
@@ -5738,8 +5785,9 @@ function apStep(now, onBeat) {
         if (!prepReady(hidden, now, rush)) { ap.next = now + 250; ap.quick = 0; apStatus(); return; }
       } else freshLook(hidden, shown);
       nudge(shown);
+      ap.cameIn = { k: hidden, at: now, gen: loops[hidden].gen };
       // Two loops that would add up to white on screen are shown one at a time
-      let both = Math.random() < 0.8 * m;
+      let both = Math.random() < tasteBoth(0.8 * m);
       if (both && overlayWhite(hidden, shown) > WATCH.white * 0.7) both = false;
       mix.tgt.view = both ? 50 : (hidden === 'B' ? 100 : 0);
     } else {
@@ -5753,6 +5801,7 @@ function apStep(now, onBeat) {
     const k = pick(onScreen.length ? onScreen : ['A']);
     glideLook(k);
     nudge(k === 'A' ? 'B' : 'A');
+    ap.cameIn = { k, at: now, gen: loops[k].gen };
     // Check each look: once it has faded in, Autopilot looks at it (see glideJudge)
     ap.glide = checking() ? { k, at: now + (apFadeSec() + 2.5) * 1000 } : null;
   }
@@ -5784,8 +5833,11 @@ function apPicture() {
 // them cuts away so the hidden one can take the new look (unless What you see is pinned or limited, when the
 // loops change in place as usual). With Check each look on, a look that's ready and checked goes on at once;
 // otherwise the quickest look that passes does, usually within two or three seconds.
-function nextLook() {
+// how: 'rated' when Not this asked for it (that rating already counts, so a quick skip isn't counted again)
+function nextLook(how) {
   const was = ap.on;
+  // Learn from hints: skipping a look that came in only a few seconds ago counts a little against it
+  if (was && how !== 'rated') tasteHintSkip(performance.now());
   if (frozen) toggleFreeze(false);
   if (!was) setAutopilot(true, true);
   ap.beatWait = null;
@@ -5798,7 +5850,380 @@ function nextLook() {
   showOSD('AUTOPILOT', 'NEXT LOOK');
   if (!was) toast('Autopilot is on, starting with a new look. Press Next look any time to skip ahead.');
 }
-$$('.next-look').forEach((b) => b.addEventListener('click', nextLook));
+$$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
+
+/* ================= learn my taste ================= */
+// More like this and Not this (under the picture, keys Y and X) teach Autopilot what you like. A rating keeps the
+// look on screen (both loops when both are showing, each counted by how much of it shows) and, once Autopilot's
+// eye has seen it, how it looks: how much is lit, how busy it is, how many shades and how much detail it has, how
+// much it moves and how colorful it is. With Learn from hints on, some smaller ratings come by themselves:
+// skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that
+// setting. Saved presets count as strong likes and shared presets as mild ones, so it doesn't start from nothing.
+// The admin can also share their ratings as everyone's starting point; a person's own ratings take over as they
+// rate. Ratings stay in this browser, the newest 400.
+// Autopilot uses what it learned in three ways, as far as Follow my taste says (not at all at Off):
+//   1. it makes several looks and keeps one whose inputs, effects, mirror and slider ranges you've liked most
+//   2. some new looks start from a look you liked (or a preset) and vary it
+//   3. Check each look leans towards tries that look like the ones you liked
+// It also learns whether you like seeing both loops at once, and shows both more or less often.
+const TASTE_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
+const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
+const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], ...SELF_RANGE };
+const TASTE_LOOK = Object.keys(loopDefaults());
+const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
+const taste = { votes: [], model: null, shared: null, pending: [], sid: randId(6) };
+const tasteVoteOK = (v) => !!v && typeof v === 'object' && Number.isFinite(v.w) &&
+  ((v.look && typeof v.look === 'object') || (Array.isArray(v.feats) && v.feats.every((f) => typeof f === 'string')));
+try {
+  const t = JSON.parse(localStorage.getItem(TASTE_KEY) || 'null');
+  if (t && Array.isArray(t.votes)) taste.votes = t.votes.filter(tasteVoteOK).slice(-TASTE_MAX);
+} catch (_) {}
+function saveTaste() {
+  if (taste.votes.length > TASTE_MAX) taste.votes = taste.votes.slice(-TASTE_MAX);
+  taste.model = null;
+  try { localStorage.setItem(TASTE_KEY, JSON.stringify({ v: 1, votes: taste.votes })); } catch (_) {}
+  tasteSummary();
+}
+
+// What a look is made of, in words Autopilot can count: its inputs, which effects are on (and how many), its
+// mirror, and roughly where Zoom, Spin, Trails, Color shift and Warp sit
+const tasteSrc = (s) => (is3D(s) ? 'world' : s);
+function tasteBand(v, cuts, names) { let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return names[i]; }
+function tasteFeats(L) {
+  const f = ['in:' + tasteSrc(L.in1)];
+  if (is3D(L.in1)) f.push('world:' + L.in1);
+  if (L.in2 && L.in2 !== 'none') f.push('in2:' + tasteSrc(L.in2));
+  let fx = 0;
+  for (const k of TASTE_FX) if ((L[k] || 0) > 12) { f.push('fx:' + k); fx++; }
+  f.push(fx ? 'fxn:' + Math.min(fx, 3) : 'fx:none');
+  f.push('mirror:' + (L.mirror || 0));
+  f.push('zoom:' + tasteBand(L.zoom ?? 0, [-8, 8, 40], ['out', 'still', 'in', 'deep']));
+  f.push('spin:' + tasteBand(Math.abs(L.spin ?? 0), [8, 35], ['calm', 'turn', 'fast']));
+  f.push('trails:' + tasteBand(L.trails ?? 88, [60, 88], ['short', 'mid', 'long']));
+  f.push('color:' + tasteBand(L.color ?? 10, [10, 30], ['low', 'mid', 'high']));
+  f.push('warp:' + tasteBand(L.warp ?? 0, [10, 30], ['low', 'mid', 'high']));
+  return f;
+}
+function tasteLook(k) {
+  const t = loops[k].tgt, o = {};
+  for (const f of TASTE_LOOK) { const v = t[f]; o[f] = typeof v === 'number' ? Math.round(v * 100) / 100 : v; }
+  return o;
+}
+// How a look looks, from the eye's copies of it (all 0 to 1)
+function tastePicOf(S) {
+  if (!S || !S.length) return null;
+  const moving = S.filter((s) => s.motion != null);
+  const p = { mean: eyeAvg(S, 'mean'), lit: eyeAvg(S, 'lit'), busy: eyeAvg(S, 'busy'), shades: eyeAvg(S, 'shades'),
+    detail: Math.min(1, eyeAvg(S, 'detail') / 0.15), motion: moving.length ? Math.min(1, eyeAvg(moving, 'motion') / 0.2) : null,
+    color: Math.min(1, eyeAvg(S, 'colorful') * 2.5) * (0.35 + 0.65 * eyeAvg(S, 'variety')) };
+  for (const d of TASTE_PIC) if (p[d] != null) p[d] = Math.round(p[d] * 1000) / 1000;
+  return p;
+}
+// The eye's recent copies of loop k's current look (none from an earlier look); at least `least` of them
+function tasteSeen(k, now, least = 2) {
+  const S = (eye.hist[k] || []).filter((s) => s.gen === loops[k].gen && now - s.t < 30000).slice(-8);
+  return S.length >= least ? tastePicOf(S) : null;
+}
+// Opens Autopilot's eye for a moment when it isn't running, to see a look that's just been rated or is being saved
+function tasteLookSoon() { eye.wantUntil = performance.now() + 2500; }
+// A rating made before the eye had seen the look gets the picture as soon as the eye has a few copies of it
+function tasteFill(now) {
+  if (!taste.pending.length) return;
+  let changed = false;
+  taste.pending = taste.pending.filter((q) => {
+    if (loops[q.k].gen !== q.gen) return false;
+    // A few copies if they come in time (a slow computer gets 6 seconds), or else whatever there is by then
+    const late = now - q.from > 6000, p = tasteSeen(q.k, now, late ? 1 : 3);
+    if (!p) return !late;
+    q.vote.pic = p;
+    changed = true;
+    return false;
+  });
+  if (changed) saveTaste();
+}
+
+// Everything learned so far, worked out again whenever a rating or preset changes
+function tasteModel() {
+  if (taste.model) return taste.model;
+  const feat = {}, favs = [], picUp = [], picDown = [];
+  const n = { up: 0, down: 0, presets: 0, shared: 0, sharedTaste: 0, evidence: 0 };
+  const add = (f, w) => { const e = feat[f] || (feat[f] = { up: 0, down: 0 }); if (w > 0) e.up += w; else e.down -= w; };
+  const take = (v, scale) => {
+    const w = v.w * scale;
+    if (!w) return;
+    n.evidence += Math.abs(w);
+    if (v.look) {
+      for (const f of tasteFeats(v.look)) add(f, w);
+      add(v.both ? 'mix:both' : 'mix:one', w * 0.7);
+      if (w > 0) favs.push({ look: v.look, w });
+      if (v.pic) (w > 0 ? picUp : picDown).push({ p: v.pic, w: Math.abs(w) });
+    } else for (const f of v.feats) add(f, w);
+  };
+  for (const v of taste.votes) {
+    take(v, 1);
+    if (v.src === 'up') n.up++;
+    else if (v.src === 'down') n.down++;
+  }
+  // Presets: each loop that shows in it counts as a like (My presets strongly, shared ones mildly)
+  const fromPresets = (list, w) => {
+    let count = 0;
+    for (const pr of list) {
+      const d = pr && pr.data;
+      if (!d || !d.A) continue;
+      const [wA, wB] = weights(d.mix && Number.isFinite(d.mix.view) ? d.mix.view : 0);
+      for (const k of ['A', 'B']) {
+        const vis = k === 'A' ? wA : wB;
+        if (vis < 0.25 || !d[k]) continue;
+        take({ w: w * Math.min(1, vis), look: { ...loopDefaults(), ...d[k] }, both: wA > 0.25 && wB > 0.25, pic: d.pic && d.pic[k] }, 1);
+      }
+      count++;
+    }
+    return count;
+  };
+  try { n.presets = fromPresets(presets, 1.5); } catch (_) { /* not loaded yet */ }
+  try { n.shared = fromPresets(shared, 0.5); } catch (_) {}
+  // The admin's shared taste, as a starting point that fades as you rate (the admin has their own already)
+  let admin = false;
+  try { admin = !!adminKey; } catch (_) {}
+  if (taste.shared && !admin) {
+    const scale = 0.5 * Math.max(0.25, 1 - (n.up + n.down) / 40);
+    for (const v of taste.shared.votes) take(v, scale);
+    n.sharedTaste = taste.shared.votes.length;
+  }
+  const pref = {};
+  for (const [f, e] of Object.entries(feat)) pref[f] = (e.up - e.down) / (e.up + e.down + 1.5);
+  const centroid = (L) => {
+    if (L.reduce((a, x) => a + x.w, 0) < 1.5) return null;
+    const c = {};
+    for (const d of TASTE_PIC) {
+      let s = 0, m = 0;
+      for (const { p, w } of L) if (p[d] != null) { s += p[d] * w; m += w; }
+      c[d] = m ? s / m : null;
+    }
+    return c;
+  };
+  taste.model = { pref, favs, up: centroid(picUp), down: centroid(picDown), conf: Math.min(1, n.evidence / 15), n };
+  return taste.model;
+}
+// How much a look's settings match what you've liked, from -1 to 1. Inputs and effects count most.
+function tasteSettings(look, M) {
+  let s = 0, n = 0;
+  for (const f of tasteFeats(look)) {
+    const w = f.startsWith('in:') || f.startsWith('world:') ? 1.6 : f.startsWith('fx:') ? 1.3 : 1;
+    if (f in M.pref) s += M.pref[f] * w;
+    n += w;
+  }
+  return n ? s / n : 0;
+}
+// How close a picture is to the ones you liked (and far from the ones you didn't), from 0 to 1
+function tastePicFit(p, M) {
+  if (!p || !M.up) return null;
+  const dist = (c) => {
+    let s = 0, n = 0;
+    for (const d of TASTE_PIC) if (p[d] != null && c[d] != null) { s += (p[d] - c[d]) ** 2; n++; }
+    return n ? Math.sqrt(s / n) : null;
+  };
+  const du = dist(M.up), dd = M.down ? dist(M.down) : null;
+  if (du == null) return null;
+  return dd == null ? clamp(1 - 3 * du, 0, 1) : 0.5 + 0.5 * Math.tanh(6 * (dd - du));
+}
+function tasteFit(look, pic, M) {
+  const s = 0.5 + 0.5 * clamp(2 * tasteSettings(look, M), -1, 1), p = tastePicFit(pic, M);
+  return p == null ? s : 0.5 * s + 0.5 * p;
+}
+// How strongly Autopilot follows your taste right now: the slider, times how much it has learned
+const tasteHow = () => (apSet.taste / 100) * tasteModel().conf;
+
+// 1 and 2: a new look for loop k, leaning towards your taste
+function apScene(k) {
+  const M = tasteModel(), f = apSet.taste / 100, c = f * M.conf;
+  if (!c) return apSceneRaw(k);
+  if (M.favs.length && Math.random() < (0.1 + 0.4 * f) * M.conf) {
+    const sc = tasteFavScene(k, M);
+    if (sc) return sc;
+  }
+  // Several looks, keeping one you'd probably like, with some luck left in (less as Follow my taste goes up)
+  const cands = [];
+  for (let i = 1 + Math.round(5 * c); i > 0; i--) { const sc = apSceneRaw(k); cands.push({ sc, s: tasteSettings(sc, M) }); }
+  const temp = 0.3 - 0.24 * f, top = Math.max(...cands.map((x) => x.s));
+  let sum = 0;
+  for (const x of cands) sum += (x.p = Math.exp((x.s - top) / temp));
+  let r = Math.random() * sum;
+  for (const x of cands) if ((r -= x.p) <= 0) return x.sc;
+  return cands[0].sc;
+}
+// Whether Autopilot may bring this input in right now
+function apUsable(src) {
+  if (!src || src === 'none' || !(src in SRC_ID) || !apAllowed(src)) return false;
+  if (is3D(src)) return worldOK(src);
+  if (src === 'video') return vid.on;
+  if (DEVICE.includes(src)) return liveActive(src);
+  if (src === 'spectro') return !!snd.analyser;
+  if (src === 'loop') return apSet.mix > 10;
+  return true;
+}
+// A look you liked (or a preset), varied: a little more zoom or spin or color, now and then an effect in or out or
+// a different mirror. How wild sets how far it strays. An input it can't use now gives way to another.
+function tasteFavScene(k, M) {
+  let r = Math.random() * M.favs.reduce((a, x) => a + x.w, 0), fav = M.favs[0];
+  for (const x of M.favs) if ((r -= x.w) <= 0) { fav = x; break; }
+  const w = apSet.wild / 100, j = 0.5 + w;
+  const sc = { ...loopDefaults(), ...JSON.parse(JSON.stringify(fav.look)) };
+  const from = sc.in1;
+  sc.zoom = Math.round(clamp(sc.zoom + rnd(-8, 8) * j, -60, 85));
+  sc.spin = Math.round(clamp(sc.spin + rnd(-10, 10) * j, -70, 70));
+  sc.color = Math.round(clamp(sc.color + rnd(-6, 6) * j, 0, 70));
+  sc.warp = Math.round(clamp(sc.warp + rnd(-6, 6) * j, 0, 70));
+  if (Math.random() < 0.3 * j) {
+    const key = pick(TASTE_FX), [lo, hi] = TASTE_RANGE[key];
+    sc[key] = sc[key] > 12 ? 0 : Math.round(rnd(lo, hi));
+  }
+  if (Math.random() < 0.2 * j) sc.mirror = pick([0, 0, 2, 4, 6, 8]);
+  if (!apUsable(sc.in1) || Math.random() < 0.15) { sc.in1 = pick(apPool()); delete sc.size; }
+  if (sc.in2 && sc.in2 !== 'none' && (!apUsable(sc.in2) || sc.in2 === sc.in1)) sc.in2 = 'none';
+  return apFinish(sc, k, from);
+}
+// 3: Check each look's score for a try, leaning towards how the looks you liked looked
+function tasteJudge(v, look, S) {
+  const M = tasteModel(), a = 0.6 * (apSet.taste / 100) * M.conf;
+  if (!a) return v;
+  v.taste = tasteFit(look, tastePicOf(S), M);
+  v.raw = v.score;
+  v.score = (1 - a) * v.score + a * v.taste;
+  return v;
+}
+// How often to show both loops at once, nudged by whether you've liked looks with both showing
+function tasteBoth(p) {
+  const c = tasteHow();
+  if (!c || p <= 0) return p;
+  const M = tasteModel(), d = (M.pref['mix:both'] || 0) - (M.pref['mix:one'] || 0);
+  return clamp(p * (1 + 0.9 * c * d), 0.03, 0.95);
+}
+
+// More like this (dir 1) and Not this (dir -1), for the loops on screen
+const rateBtns = { 1: $('#rateUp'), [-1]: $('#rateDown') };
+function rate(dir) {
+  const now = performance.now(), [wA, wB] = weights(mix.cur.view);
+  const shown = [['A', wA], ['B', wB]].filter(([, w]) => w > 0.25);
+  const both = shown.length === 2;
+  let added = 0;
+  for (const [k, vis] of shown) {
+    const gen = loops[k].gen, look = tasteLook(k), sig = tasteFeats(look).join();
+    // The same look rated again: the same way is noted already, the other way replaces it
+    const old = taste.votes.findIndex((v) => v.sid === taste.sid && v.k === k && v.gen === gen && v.look && tasteFeats(v.look).join() === sig);
+    if (old >= 0) {
+      if (Math.sign(taste.votes[old].w) === dir && taste.votes[old].src !== 'skip') continue;
+      taste.votes.splice(old, 1);
+    }
+    const vote = { t: Date.now(), src: dir > 0 ? 'up' : 'down', w: dir * Math.round(Math.min(1, vis) * 100) / 100, look, both, sid: taste.sid, k, gen };
+    const pic = tasteSeen(k, now);
+    if (pic) vote.pic = pic;
+    else { taste.pending.push({ vote, k, gen, from: now }); tasteLookSoon(); }
+    taste.votes.push(vote);
+    added++;
+  }
+  const b = rateBtns[dir];
+  b.classList.remove('flash');
+  void b.offsetWidth;
+  b.classList.add('flash');
+  showOSD('TASTE', dir > 0 ? 'MORE LIKE THIS' : 'NOT THIS');
+  if (added) saveTaste();
+  const M = tasteModel(), count = M.n.up + M.n.down;
+  const off = apSet.taste === 0 ? ' Follow my taste is at Off under Autopilot settings, so Autopilot isn’t using it yet.' : '';
+  const loopsSaid = both ? ' (both loops on screen)' : '';
+  if (dir > 0) toast(added ? `Noted${loopsSaid}: more looks like this. ${count} rating${count === 1 ? '' : 's'} so far.${off}` : 'Already noted: you like this look.');
+  else if (ap.on) {
+    toast(added ? `Noted${loopsSaid}: fewer looks like this. Skipping to the next one.${off}` : 'Already noted. Skipping to the next one.');
+    nextLook('rated');
+  } else toast(`Noted${loopsSaid}: Autopilot will steer away from looks like this. Press Next look for a new one.${off}`);
+}
+rateBtns[1].addEventListener('click', () => rate(1));
+rateBtns[-1].addEventListener('click', () => rate(-1));
+// Learn from hints: a quick skip of a look that has just come in counts a little against it
+function tasteHintSkip(now) {
+  const c = ap.cameIn;
+  if (!apSet.hints || !c || now - c.at > TASTE_SKIP_MS || loops[c.k].gen !== c.gen) return;
+  ap.cameIn = null;
+  if (taste.votes.some((v) => v.sid === taste.sid && v.k === c.k && v.gen === c.gen)) return;
+  const vote = { t: Date.now(), src: 'skip', w: -0.5, look: tasteLook(c.k), both: false, sid: taste.sid, k: c.k, gen: c.gen };
+  const pic = tasteSeen(c.k, now);
+  if (pic) vote.pic = pic;
+  taste.votes.push(vote);
+  saveTaste();
+}
+// Learn from hints: pinning a setting counts for that setting (pinning an effect at nothing counts against it)
+function tasteHintPin(key, L) {
+  if (!apSet.hints || !PINS[key]) return;
+  const feats = [];
+  if (PINS[key].mix) {
+    if (key === 'view') { const [a, b] = weights(mix.tgt.view); feats.push([a > 0.25 && b > 0.25 ? 'mix:both' : 'mix:one', 1]); }
+  } else {
+    const t = loops[L].tgt;
+    if (key === 'in1') feats.push(['in:' + tasteSrc(t.in1), 1]);
+    else if (key === 'in2') { if (t.in2 && t.in2 !== 'none') feats.push(['in2:' + tasteSrc(t.in2), 1]); }
+    else if (key === 'mirror') feats.push(['mirror:' + (t.mirror || 0), 1]);
+    else if (['zoom', 'spin', 'trails', 'color', 'warp'].includes(key)) feats.push([tasteFeats(t).find((f) => f.startsWith(key + ':')), 1]);
+    else if (TASTE_FX.includes(key)) feats.push(['fx:' + key, (t[key] || 0) > 12 ? 1 : -1]);
+  }
+  let added = 0;
+  for (const [f, s] of feats) {
+    if (!f || taste.votes.some((v) => v.src === 'pin' && v.sid === taste.sid && v.feats[0] === f && Date.now() - v.t < 60000)) continue;
+    taste.votes.push({ t: Date.now(), src: 'pin', w: 0.5 * s, feats: [f], sid: taste.sid });
+    added++;
+  }
+  if (added) saveTaste();
+}
+// The picture of each loop, kept with a preset as it's saved (so the preset teaches how a liked look looks too)
+function tastePresetPic() {
+  const now = performance.now(), out = {};
+  for (const k of ['A', 'B']) { const p = tasteSeen(k, now); if (p) out[k] = p; }
+  return Object.keys(out).length ? out : undefined;
+}
+
+// The line under Follow my taste
+function tasteSummary() {
+  const el = $('#tasteSum');
+  if (!el) return;
+  let M;
+  try { taste.model = null; M = tasteModel(); } catch (_) { return; }
+  const { up, down, presets: P, shared: S, sharedTaste } = M.n;
+  const parts = [];
+  if (up + down) parts.push(`${up + down} rating${up + down === 1 ? '' : 's'} (${up} more like this, ${down} not this)`);
+  if (P) parts.push(`your ${P} preset${P === 1 ? '' : 's'}`);
+  if (S) parts.push(`${S} shared preset${S === 1 ? '' : 's'}`);
+  if (sharedTaste) parts.push('the shared taste');
+  let text = parts.length ? `Learned from ${parts.join(', ').replace(/, ([^,]*)$/, ' and $1')}.` : 'Nothing learned yet. Press More like this or Not this under the picture.';
+  if (parts.length && apSet.taste === 0) text += ' Follow my taste is Off, so Autopilot isn’t using it.';
+  else if (parts.length && up + down < 15) text += ' It gets better at guessing after about 15 ratings.';
+  el.textContent = text;
+}
+$('#apHints').addEventListener('click', () => {
+  apSet.hints = !apSet.hints;
+  saveAp();
+  syncApUI();
+  toast(apSet.hints ? 'Learn from hints is on: quick skips and pins count a little too.' : 'Learn from hints is off: only More like this, Not this and your presets count.');
+});
+// Forget my taste: press twice (the first press asks)
+{
+  const b = $('#tasteForget');
+  let armed = 0;
+  b.addEventListener('click', () => {
+    if (!armed) {
+      b.classList.add('armed');
+      b.textContent = 'Press again to forget every rating';
+      armed = setTimeout(() => { armed = 0; b.classList.remove('armed'); b.textContent = 'Forget my taste'; }, 4000);
+      return;
+    }
+    clearTimeout(armed);
+    armed = 0;
+    b.classList.remove('armed');
+    b.textContent = 'Forget my taste';
+    taste.votes = [];
+    taste.pending = [];
+    saveTaste();
+    toast('Every rating is forgotten. Your presets still count as likes (delete one to stop it counting).', 7000);
+  });
+}
 
 /* ================= autopilot settings ================= */
 function fmtDur(s) {
@@ -5812,6 +6237,7 @@ const apCtl = {
   fade: { text: () => fmtDur(apFadeSec()) },
   wild: { text: (v) => (v === 50 ? 'USUAL' : String(v)) },
   mix: { text: (v) => (v === 0 ? 'NEVER' : v === 50 ? 'USUAL' : String(v)) },
+  taste: { text: (v) => (v === 0 ? 'OFF' : v === 50 ? 'USUAL' : String(v)) },
 };
 function showAp(k) {
   const c = apCtl[k];
@@ -5823,6 +6249,8 @@ function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $('#apCheck').setAttribute('aria-pressed', String(apSet.check));
+  $('#apHints').setAttribute('aria-pressed', String(apSet.hints));
+  tasteSummary();
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
   $$('#apInputs button').forEach((b) => b.setAttribute('aria-pressed', String(!apSet.off.includes(b.dataset.apsrc))));
   syncLimUI();
@@ -5895,7 +6323,7 @@ $('#apUnpin').addEventListener('click', () => {
   toast(ap.on ? 'Nothing is pinned now. Autopilot changes everything from its next look.' : 'Nothing is pinned now.');
 });
 $('#apReset').addEventListener('click', () => {
-  for (const k of ['every', 'fade', 'wild', 'mix', 'beat', 'check', 'touch']) apSet[k] = AP_DEFAULTS[k];
+  for (const k of ['every', 'fade', 'wild', 'mix', 'taste', 'beat', 'check', 'hints', 'touch']) apSet[k] = AP_DEFAULTS[k];
   apSet.off = [];
   apSet.lim = {};
   saveAp();
@@ -7062,7 +7490,8 @@ function snapshot() {
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
-  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, beat: apSet.beat, check: apSet.check, touch: apSet.touch,
+  return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, taste: apSet.taste, beat: apSet.beat, check: apSet.check,
+    hints: apSet.hints, touch: apSet.touch,
     off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim) };
 }
 function markPreset(id) {
@@ -7097,6 +7526,9 @@ function renderPresets() {
     });
     presetList.appendChild(t);
   });
+  // Presets count as likes for Learn my taste
+  taste.model = null;
+  tasteSummary();
 }
 function nextPresetName() {
   let n = presets.length + 1;
@@ -7104,6 +7536,7 @@ function nextPresetName() {
   return `My look ${n}`;
 }
 presetSaveBtn.addEventListener('click', () => {
+  tasteLookSoon();
   presetForm.hidden = false;
   presetSaveBtn.hidden = true;
   presetName.value = activePresetId ? (presets.find((p) => p.id === activePresetId) || {}).name || nextPresetName() : nextPresetName();
@@ -7118,6 +7551,9 @@ presetForm.addEventListener('submit', async (e) => {
   const name = presetName.value.trim().slice(0, 40) || nextPresetName();
   const data = snapshot();
   if (ap.on) data.ap = apSnapshot();
+  // How the look looks, so the preset teaches Autopilot's taste that too (see Learn my taste)
+  const pic = tastePresetPic();
+  if (pic) data.pic = pic;
   const thumb = await new Promise((res) => { thumbReq = res; });
   const existing = presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
   if (existing) { existing.data = data; existing.thumb = thumb; existing.saved = Date.now(); }
@@ -7166,10 +7602,11 @@ function loadPreset(pr, quiet) {
   // Saved while Autopilot was running: its settings and pins come back, and it carries on from this look
   const a = d.ap;
   if (a && typeof a === 'object') {
-    for (const k of ['every', 'fade', 'wild', 'mix']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
+    for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
     apSet.beat = a.beat === true;
-    // Presets saved before Check each look existed have it on
+    // Presets saved before Check each look (or Learn from hints) existed have it on
     apSet.check = a.check !== false;
+    apSet.hints = a.hints !== false;
     apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
     apSet.off = cleanOff(a.off);
     // Presets saved before fader limits existed leave the limits as they are
@@ -7217,6 +7654,15 @@ function renderShared() {
   hint.textContent = shared.length ? 'Looks picked out for everyone. Tap one to load it.'
     : admin ? 'Nothing shared yet. Set up a look you like, then press Share current look with everyone.' : '';
   hint.hidden = !hint.textContent;
+  // Learn my taste: whether the admin's taste is shared at the moment
+  const tv = taste.shared ? taste.shared.votes.filter((v) => v.src === 'up' || v.src === 'down').length : 0;
+  $('#tasteShare').textContent = taste.shared ? 'Update my shared taste' : 'Share my taste with everyone';
+  $('#tasteShareHint').textContent = taste.shared
+    ? `Your taste is shared (${tv} rating${tv === 1 ? '' : 's'}). Everyone’s Autopilot starts out leaning towards what you like, and their own ratings take over as they rate. Update it to send your newest ratings.`
+    : 'Everyone’s Autopilot starts out leaning towards what you like. Their own ratings take over as they rate.';
+  $('#tasteUnshare').hidden = !taste.shared;
+  taste.model = null;
+  tasteSummary();
   sharedList.innerHTML = '';
   shared.forEach((pr) => {
     const t = document.createElement('div');
@@ -7267,8 +7713,14 @@ async function readSharedGH() {
   const r = await gh(`/contents/${SHARED_FILE}?ref=main`);
   if (r.status === 404) return { sha: null, list: [] };
   if (!r.ok) throw r;
-  const j = await r.json();
-  return { sha: j.sha, list: cleanShared(JSON.parse(b64dec(j.content || '')).presets) };
+  const j = await r.json(), file = JSON.parse(b64dec(j.content || ''));
+  return { sha: j.sha, list: cleanShared(file.presets), taste: cleanSharedTaste(file.taste) };
+}
+// The admin's shared taste (Learn my taste), kept in presets.json beside the shared presets
+function cleanSharedTaste(t) {
+  if (!t || typeof t !== 'object' || !Array.isArray(t.votes)) return null;
+  const votes = t.votes.filter(tasteVoteOK).slice(-300);
+  return votes.length ? { votes, saved: t.saved || 0 } : null;
 }
 function adminTrouble(e) {
   const st = e && e.status;
@@ -7277,19 +7729,25 @@ function adminTrouble(e) {
   if (st === 409 || st === 422) return 'Something else changed the shared presets at the same moment. Try again.';
   return 'Couldn’t reach GitHub. Check the internet connection and try again.';
 }
-// Reads the newest list, makes one change and saves it, so nothing shared from elsewhere gets lost
-async function changeShared(change, message) {
+// Reads the newest list, makes one change and saves it, so nothing shared from elsewhere gets lost.
+// changeTaste, when given, changes the shared taste too (null takes it away); otherwise it stays as it is.
+async function changeShared(change, message, changeTaste) {
   if (sharedBusy) { toast('Still saving the last change. Try again in a moment.'); return false; }
   sharedBusy = true;
   sharedAdd.disabled = true;
   try {
-    const { sha, list } = await readSharedGH();
+    const { sha, list, taste: oldTaste } = await readSharedGH();
     const next = change(list).slice(-SHARED_MAX);
-    const body = { message, branch: 'main', content: b64enc(JSON.stringify({ v: 1, presets: next })) };
+    const newTaste = changeTaste ? changeTaste(oldTaste) : oldTaste;
+    const file = { v: 1, presets: next };
+    if (newTaste) file.taste = newTaste;
+    const body = { message, branch: 'main', content: b64enc(JSON.stringify(file)) };
     if (sha) body.sha = sha;
     const w = await gh(`/contents/${SHARED_FILE}`, { method: 'PUT', body: JSON.stringify(body) });
     if (!w.ok) throw w;
     shared = next;
+    taste.shared = newTaste || null;
+    taste.model = null;
     renderShared();
     return true;
   } catch (e) {
@@ -7319,7 +7777,7 @@ function openSharedForm(mode) {
   sharedName.select();
 }
 function closeSharedForm() { sharedForm.hidden = true; sharedAdd.hidden = false; sharedMode = null; }
-sharedAdd.addEventListener('click', () => openSharedForm({ kind: 'add' }));
+sharedAdd.addEventListener('click', () => { tasteLookSoon(); openSharedForm({ kind: 'add' }); });
 $('#sharedCancel').addEventListener('click', closeSharedForm);
 sharedName.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closeSharedForm(); } });
 sharedForm.addEventListener('submit', async (e) => {
@@ -7337,6 +7795,8 @@ sharedForm.addEventListener('submit', async (e) => {
   }
   const data = snapshot();
   if (ap.on) data.ap = apSnapshot();
+  const pic = tastePresetPic();
+  if (pic) data.pic = pic;
   const thumb = await new Promise((res) => { thumbReq = res; });
   toast('Sharing…', 15000);
   let id = '';
@@ -7401,11 +7861,28 @@ window.addEventListener('hashchange', () => {
 async function loadShared() {
   try {
     const r = await fetch(SHARED_FILE, { cache: 'no-cache' });
-    if (r.ok) shared = cleanShared((await r.json()).presets);
+    if (r.ok) { const j = await r.json(); shared = cleanShared(j.presets); taste.shared = cleanSharedTaste(j.taste); }
   } catch (_) {}
-  if (adminKey) { try { shared = (await readSharedGH()).list; } catch (_) {} }
+  if (adminKey) { try { const g = await readSharedGH(); shared = g.list; taste.shared = g.taste; } catch (_) {} }
+  taste.model = null;
   renderShared();
 }
+// Share my taste with everyone (admin only): your ratings become everyone's starting point
+$('#tasteShare').addEventListener('click', async () => {
+  const votes = taste.votes.filter((v) => v.src !== 'skip' || v.look).slice(-200).map(({ sid, k, gen, ...v }) => v);
+  if (!votes.some((v) => v.src === 'up' || v.src === 'down')) { toast('Rate a few looks first with More like this and Not this under the picture.'); return; }
+  toast('Sharing your taste…', 15000);
+  const n = votes.filter((v) => v.src === 'up' || v.src === 'down').length;
+  if (await changeShared((list) => list, `Share Autopilot taste (${n} ratings)`, () => ({ votes, saved: Date.now() }))) {
+    toast(`Shared your taste (${n} ratings). Everyone’s Autopilot starts from it in about a minute.`, 7000);
+  }
+});
+$('#tasteUnshare').addEventListener('click', async () => {
+  toast('Taking your taste away…', 15000);
+  if (await changeShared((list) => list, 'Take shared Autopilot taste away', () => null)) {
+    toast('Your taste is no longer shared. Everyone’s Autopilot goes back to its own ratings in about a minute.', 7000);
+  }
+});
 renderShared();
 loadShared();
 
@@ -7459,6 +7936,8 @@ function onKey(e) {
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
   else if (e.key === 'l' || e.key === 'L') nextLook();
+  else if ((e.key === 'y' || e.key === 'Y') && !e.repeat) rate(1);
+  else if ((e.key === 'x' || e.key === 'X') && !e.repeat) rate(-1);
   else if (e.key === 'n' || e.key === 'N') neutral();
   else if (e.key === 'c' || e.key === 'C') clearScreen();
   else if (e.key === 'f' || e.key === 'F') toggleFS();
@@ -9228,6 +9707,7 @@ function eyeAsk(key, tex, now) {
   eye.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
   eye.key = key;
   eye.askGen = eye.gen[key];
+  eye.askLook = key === 'comp' ? 0 : loops[key].gen;
   eye.askT = now;
   eye.age = 0;
 }
@@ -9244,27 +9724,34 @@ function eyeCollect() {
   gl.bindBuffer(gl.PIXEL_PACK_BUFFER, eye.pbo);
   gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, eye.buf);
   gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-  eyeStats(eye.key, eye.buf, eye.askT);
+  eyeStats(eye.key, eye.buf, eye.askT).gen = eye.askLook;
   return eye.key;
 }
 // Once a frame while Autopilot runs: collects the last copy, starts trying out the next look when it's nearly
 // due (Check each look), keeps the white-out watch going, and asks for the next copy. The look being tried out
 // gets every other copy; the rest go round the picture on screen and the loops showing in it.
 function eyeTick(now, dt, wA, wB) {
-  if (!ap.on || eye.failed) return;
+  if (eye.failed) return;
+  // With Autopilot off the eye only opens for a moment, to see a look that has just been rated or is being saved
+  // (and stays open while a rating is still waiting for its picture, a few seconds at most)
+  const looking = ap.on || now <= eye.wantUntil || taste.pending.length > 0;
+  if (!looking && !eye.sync) return;
   const got = eyeCollect();
+  if (got) tasteFill(now);
   if (frozen) return;
-  if (got && ap.prep && got === ap.prep.k) prepJudge(now);
-  if (checking() && canTryOut()) {
-    const v = mix.tgt.view, P = ap.prep;
-    const hidden = v <= 1 ? 'B' : v >= 99 ? 'A' : null;
-    // The view moved (or a person moved it) while a look was being tried: try again for the next one
-    if (P && P.k !== hidden) ap.prep = null;
-    else if (!P && hidden && (hidden === 'A' ? wA : wB) <= 0.02 && now > ap.next - CHECK.lead * 1000) prepBegin(hidden, now, false);
-  } else if (ap.prep) ap.prep = null;
-  if (ap.glide && now >= ap.glide.at) glideJudge(now);
-  whiteWatch(now, dt, wA, wB);
-  if (!eye.sync && now - eye.askT > 55) {
+  if (ap.on) {
+    if (got && ap.prep && got === ap.prep.k) prepJudge(now);
+    if (checking() && canTryOut()) {
+      const v = mix.tgt.view, P = ap.prep;
+      const hidden = v <= 1 ? 'B' : v >= 99 ? 'A' : null;
+      // The view moved (or a person moved it) while a look was being tried: try again for the next one
+      if (P && P.k !== hidden) ap.prep = null;
+      else if (!P && hidden && (hidden === 'A' ? wA : wB) <= 0.02 && now > ap.next - CHECK.lead * 1000) prepBegin(hidden, now, false);
+    } else if (ap.prep) ap.prep = null;
+    if (ap.glide && now >= ap.glide.at) glideJudge(now);
+    whiteWatch(now, dt, wA, wB);
+  }
+  if (looking && !eye.sync && now - eye.askT > 55) {
     const P = ap.prep, keys = P ? [P.k, 'comp', P.k] : ['comp'];
     for (const k of ['A', 'B']) if ((k === 'A' ? wA : wB) > 0.02 && !(P && P.k === k)) keys.push(k);
     const key = keys[eye.turn++ % keys.length];
