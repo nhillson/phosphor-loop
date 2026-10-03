@@ -243,11 +243,14 @@ TIPS
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
     switch on "Also share system audio" and press Share, then play Spotify
-    or anything else. Microphone listens to the room instead. Record keeps
-    the sound in the video.
-  - Include mic (next to Record): when its light is on, videos you record
-    include the microphone too, mixed with any music. The first time, the
-    browser asks to use the microphone; choose Allow.
+    or anything else. Microphone listens to the room instead.
+  - Video sound (next to Record): picks the sound in videos you record.
+    Click it to step through Off, Mic, Computer and Both (mic and computer
+    mixed together). If React to sound already hears that sound, the video
+    keeps it with nothing more to allow. If not, Record asks first: for Mic,
+    choose Allow; for Computer, Chrome's sharing box opens (pick a screen on
+    the Entire Screen tab, switch on "Also share system audio", press Share).
+    In the phone app it says Phone: choose Phone sound under React to sound.
   - Computer sound works in Chrome and Edge. Firefox and Safari don't pass
     sound through screen sharing, so use Microphone there.
   - No screen sharing on Windows: choose Microphone and pick Stereo Mix

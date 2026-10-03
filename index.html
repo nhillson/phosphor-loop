@@ -706,7 +706,7 @@
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <span class="spacer" aria-hidden="true"></span>
         <button class="btn" id="snap" hidden>Save picture</button>
-        <button class="btn" id="recMic" aria-pressed="true" hidden title="When lit, videos you record include the microphone"><span class="led"></span>Include mic</button>
+        <button class="btn" id="recMic" aria-pressed="true" hidden title="Which sound goes into videos you record. Click to change it: Off, Mic, Computer or Both."><span class="led"></span><span id="recSoundLabel">Video sound: Both</span></button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="foot">
@@ -1360,7 +1360,7 @@
             <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
             <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on every kick, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>
             <dt>Which browser</dt><dd>Computer sound works in Chrome and Edge. Firefox and Safari don’t pass sound through screen sharing, so use Microphone there (Stereo Mix on Windows hears the computer itself).</dd>
-            <dt>Record</dt><dd>Keeps the sound in the video while React to sound is on. With Include mic lit, the microphone goes in too, mixed with the music.</dd>
+            <dt>Record</dt><dd>Video sound, next to Record, picks what goes into the video: the microphone, this computer’s sound, or both mixed together. Whatever React to sound is already hearing goes straight in, with nothing more to allow.</dd>
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
@@ -1369,7 +1369,7 @@
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
             <dt>Save picture and Record</dt><dd>Save a still, or a video as long as you like: press Record again to stop and save it. Videos are large, up to about 75 MB a minute.</dd>
-            <dt>Include mic</dt><dd>When its light is on, videos you record include the microphone, so you can talk over the picture or catch the room. The first time, the browser asks to use the microphone: choose Allow. Press it again to turn the mic off.</dd>
+            <dt>Video sound</dt><dd>Which sound goes into videos you record. Click it to step through Off, Mic, Computer and Both (mic and computer mixed). If React to sound is already hearing that sound, the video simply keeps it. If not, Record asks first: for Mic the browser asks to use the microphone (choose Allow); for Computer, Chrome’s sharing box opens (pick a screen on the Entire Screen tab, switch on Also share system audio, press Share). On the phone app it says Phone: choose Phone sound under React to sound first.</dd>
           </dl></div>
           <div class="g-card"><h3>Show setup</h3><dl>
             <dt>Show mode</dt><dd>For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look and Autopilot, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake. Tap Fill my other screen in the output window to put the picture on the projector.</dd>
@@ -7516,22 +7516,67 @@ function fmt(s) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
-// Include mic: videos also carry the microphone, on top of any music React to sound is hearing.
-// On unless switched off; the choice is remembered in this browser.
-let recMic = true;
-try { recMic = localStorage.getItem('phosphor-recmic') !== '0'; } catch (_) {}
-function setRecMic(on) {
-  recMic = on;
-  recMicBtn.setAttribute('aria-pressed', String(on));
-  try { localStorage.setItem('phosphor-recmic', on ? '1' : '0'); } catch (_) {}
+// Video sound: which sound goes into videos. Each click steps on: Off, Mic, Computer, Both.
+// (On the phone app, Computer is called Phone.) The choice is remembered in this browser.
+const REC_SOUNDS = ['off', 'mic', 'computer', 'both'];
+const REC_SOUND_NAMES = { off: 'Off', mic: 'Mic', computer: APP ? 'Phone' : 'Computer', both: 'Both' };
+const compSound = APP ? 'this phone’s sound' : 'this computer’s sound';
+const recSoundLabel = $('#recSoundLabel');
+let recSound = 'both';
+try {
+  const saved = localStorage.getItem('phosphor-recsound');
+  if (REC_SOUNDS.includes(saved)) recSound = saved;
+  else if (localStorage.getItem('phosphor-recmic') === '0') recSound = 'computer';   // the old Include mic, switched off
+} catch (_) {}
+function setRecSound(mode) {
+  recSound = mode;
+  recMicBtn.setAttribute('aria-pressed', String(mode !== 'off'));
+  recSoundLabel.textContent = `Video sound: ${REC_SOUND_NAMES[mode]}`;
+  try { localStorage.setItem('phosphor-recsound', mode); } catch (_) {}
 }
-setRecMic(recMic);
+setRecSound(recSound);
 recMicBtn.addEventListener('click', () => {
-  if (recorder || recStarting) { toast('Stop the recording first, then switch Include mic on or off.'); return; }
-  setRecMic(!recMic);
-  toast(recMic ? 'Videos you record will include the microphone.' : 'Videos you record won’t include the microphone.');
+  if (recorder || recStarting) { toast('Stop the recording first, then change Video sound.'); return; }
+  const next = REC_SOUNDS[(REC_SOUNDS.indexOf(recSound) + 1) % REC_SOUNDS.length];
+  setRecSound(next);
+  toast({
+    off: 'Videos you record will be silent.',
+    mic: 'Videos you record will have the microphone.',
+    computer: `Videos you record will have ${compSound}: Spotify, YouTube, anything it plays.`,
+    both: `Videos you record will have the microphone and ${compSound}, mixed together.`,
+  }[next], 6000);
 });
 const isLoopback = (label) => LOOPBACK.test(label || '');
+const noSoundFixes = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+function soundErr(name) { const e = new Error(name); e.name = name; return e; }
+// This computer's sound for a video, when React to sound isn't already hearing it. Chrome and Edge get it by
+// sharing a screen with its sound (the screen's picture is dropped at once). Firefox and Safari can't, so they
+// use Stereo Mix or a similar input, if the computer has one.
+async function openRecComputer() {
+  if (!noScreenAudio && navigator.mediaDevices.getDisplayMedia) {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface: 'monitor' },
+      audio: { ...noSoundFixes, suppressLocalAudioPlayback: false },
+      systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
+    });
+    stream.getVideoTracks().forEach((t) => t.stop());
+    const track = stream.getAudioTracks()[0];
+    if (!track) throw soundErr('NoSoundShared');
+    return track;
+  }
+  const inputs = async () => (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  let ins = await inputs();
+  if (ins.length && ins.every((d) => !d.label)) {
+    // The browser only shows the inputs' names once the microphone is allowed
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    s.getTracks().forEach((t) => t.stop());
+    ins = await inputs();
+  }
+  const loop = ins.find((d) => isLoopback(d.label));
+  if (!loop) throw soundErr('NoLoopback');
+  const s = await navigator.mediaDevices.getUserMedia({ audio: { ...noSoundFixes, deviceId: { exact: loop.deviceId } }, video: false });
+  return s.getAudioTracks()[0];
+}
 // A room microphone, never Stereo Mix and the like (those carry the computer's sound, not a voice)
 async function openRecMic() {
   const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
@@ -7634,32 +7679,65 @@ async function addWebmDuration(blob, ms) {
 async function startRec() {
   if (recStarting || recorder) return;
   const sounds = [];
-  // With React to sound on, the recording keeps the sound (a copy, so stopping it leaves listening alone).
-  // When that sound is the room microphone itself, Include mic decides whether it goes in.
+  // React to sound may already be hearing the mic or the computer. Then the video takes a copy of that
+  // (so stopping the copy leaves listening alone) and nothing new is asked for.
   const heard = snd.track && snd.track.readyState === 'live' ? snd.track : null;
   const heardIsMic = !!heard && snd.src === 'mic' && !isLoopback(heard.label);
-  if (heard && (!heardIsMic || recMic)) sounds.push(heard.clone());
-  if (recMic && canRecMic && !heardIsMic) {
-    recStarting = true;
-    recLabel.textContent = 'Starting…';
-    // If the browser stops to ask about the microphone, say what to press
-    let asked = false;
-    const asking = setTimeout(() => { asked = true; toast('Your browser is asking to use the microphone. Choose Allow and recording starts.', 30000); }, 600);
-    try {
-      sounds.push(await openRecMic());
-      if (asked) toast('Recording with the microphone.');
-    } catch (err) {
-      const n = err && err.name;
-      if (n === 'NotAllowedError' || n === 'SecurityError') {
-        setRecMic(false);
-        toast('The microphone is blocked, so this video has no mic. To fix it, click the microphone icon in the address bar, choose Allow, then turn Include mic back on.', 12000);
-      } else {
-        toast('No microphone was found, so this video has no mic.', 8000);
+  if (recMicBtn.hidden) {
+    // No Video sound button here (inside Claude, say): keep whatever React to sound hears, as before
+    if (heard) sounds.push(heard.clone());
+  } else {
+    const wantMic = recSound === 'mic' || recSound === 'both';
+    const wantComp = recSound === 'computer' || recSound === 'both';
+    let gotMic = false, gotComp = false, asked = false;
+    const notes = [];
+    if (heard && wantMic && heardIsMic) { sounds.push(heard.clone()); gotMic = true; }
+    if (heard && wantComp && !heardIsMic) { sounds.push(heard.clone()); gotComp = true; }
+    // The phone's sound only comes through React to sound's Phone sound (Android has to ask for it there)
+    if (wantComp && !gotComp && APP) notes.push('To put the phone’s sound in videos, first choose Phone sound under React to sound.');
+    const needMic = wantMic && !gotMic && canRecMic;
+    const needComp = wantComp && !gotComp && !APP;
+    const tryMic = async () => {
+      // If the browser stops to ask about the microphone, say what to press
+      const asking = setTimeout(() => { asked = true; toast('Your browser is asking to use the microphone. Choose Allow and recording starts.', 30000); }, 600);
+      try { sounds.push(await openRecMic()); gotMic = true; }
+      catch (err) {
+        const n = err && err.name;
+        if (n === 'NotAllowedError' || n === 'SecurityError') {
+          setRecSound(recSound === 'both' ? 'computer' : 'off');
+          notes.push(APP ? 'The microphone wasn’t allowed, so this video has no mic. To try again, set Video sound back to Mic or Both.'
+            : 'The microphone is blocked, so this video has no mic. To fix it, click the microphone icon in the address bar, choose Allow, then set Video sound back to Mic or Both.');
+        } else notes.push('No microphone was found, so this video has no mic.');
       }
+      clearTimeout(asking);
+    };
+    const tryComp = async () => {
+      if (!noScreenAudio) {
+        asked = true;
+        toast('To record this computer’s sound: in the box that opens, pick a screen on the Entire Screen tab, switch on Also share system audio, then press Share. Recording starts after.', 60000);
+      }
+      try { sounds.push(await openRecComputer()); gotComp = true; }
+      catch (err) {
+        const n = err && err.name;
+        if (n === 'NoLoopback') notes.push(`${browserName} can’t record this computer’s sound. Use Chrome or Edge, or turn on Stereo Mix (the Guide shows how).`);
+        else if (n === 'NoSoundShared') notes.push('No sound came with the share, so this video has no computer sound. Next time, switch on Also share system audio under the screen you pick.');
+        else if (n === 'NotAllowedError' && !noScreenAudio) notes.push('Sharing was cancelled, so this video has no computer sound.');
+        else notes.push('This computer’s sound couldn’t start, so this video doesn’t have it.');
+      }
+    };
+    if (needMic || needComp) {
+      recStarting = true;
+      recLabel.textContent = 'Starting…';
+      // Chrome only opens its sharing box straight after a press of Record, so it asks for the computer first.
+      // Firefox and Safari ask for the mic first, which also lets them see Stereo Mix by name.
+      if (noScreenAudio) { if (needMic) await tryMic(); if (needComp) await tryComp(); }
+      else { if (needComp) await tryComp(); if (needMic) await tryMic(); }
+      recStarting = false;
+      recLabel.textContent = 'Record';
     }
-    clearTimeout(asking);
-    recStarting = false;
-    recLabel.textContent = 'Record';
+    const what = gotMic && gotComp ? `the microphone and ${compSound}` : gotMic ? 'the microphone' : gotComp ? compSound : '';
+    if (notes.length) toast(notes.join(' ') + (what ? ` Recording with ${what}.` : ''), 14000);
+    else if (asked) toast(`Recording with ${what}.`);
   }
   const stopSounds = () => sounds.forEach((t) => t.stop());
   let stream;
