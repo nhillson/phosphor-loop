@@ -216,13 +216,18 @@ TIPS
     plain or frozen is thrown away and another tried, up to six in all,
     and it keeps the richest. Switch it off to see every look it makes.
     Watching the picture uses tiny copies that never make it stutter.
-  - More like this and Not this (right under the picture, or the Y and X
-    keys; they can go on MIDI pads too) teach Autopilot your taste. It
-    remembers what the look on screen is made of (inputs, effects, mirror,
-    how much zoom, spin, trails, color and warp) and how it looks (how busy,
-    how many shades, how much detail, movement and color), then brings more
-    looks like the ones you like. While Autopilot runs, Not this also skips
-    to the next look. Ratings stay in this browser (the newest 400).
+  - More like this and Not this (in the small strip right under the picture,
+    or the Y and X keys; they can go on MIDI pads too) teach Autopilot your
+    taste. Beside them, a countdown shows the seconds this look has left.
+    A rating is for the whole picture on screen, never one loop alone: both
+    loops' looks, how they're shown and fed into each other (one pushing,
+    dyeing or being the input of the other; zooming and turning alike or
+    apart; which inputs and effects meet) and how the screen looks (how
+    busy, how many shades, how much detail, movement and color). Autopilot
+    picks each new look, and how to mix it with the other loop, by the
+    picture they'd make together. While Autopilot runs, Not this also skips
+    to the next look. Ratings stay in this browser (the newest 400 per
+    taste profile).
   - Taste profiles (the section under Autopilot settings): ratings are kept
     in named profiles and Autopilot follows the lit one. My taste is always
     there (your presets count as likes in it). "Start taste session" makes

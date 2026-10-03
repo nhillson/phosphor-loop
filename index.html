@@ -451,6 +451,24 @@
   .next-look .skip { width: 15px; height: 11px; flex: none; color: var(--loop-a); }
   /* More like this and Not this, under the picture: a thumb up and a thumb down, and a quick glow when pressed */
   .rate .thumb { width: 16px; height: 16px; flex: none; }
+  /* The small strip under the picture: More like this, Not this, and how long this look has left */
+  .taste-strip {
+    width: fit-content; max-width: 100%; margin-inline: auto; gap: 6px; padding: 5px 6px;
+    border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.025);
+  }
+  .taste-strip .btn { min-height: 34px; padding: 5px 12px; }
+  .look-clock {
+    display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 10px 0 8px;
+    border-radius: 6px; background: var(--well); color: var(--dim); font-size: 14px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .look-clock b { color: var(--ink); font-weight: 600; display: inline-block; min-width: 3.2ch; text-align: right; }
+  .look-clock .ring {
+    width: 14px; height: 14px; border-radius: 50%; flex: none;
+    background: conic-gradient(var(--loop-a) calc(var(--p, 0) * 1turn), rgba(255,255,255,.13) 0);
+  }
+  .look-clock.off .ring { background: rgba(255,255,255,.13); }
+  .look-clock.off { color: var(--faint); }
   .rate-up .thumb { color: var(--gun-g); }
   .rate-down .thumb { color: var(--tally); transform: rotate(180deg); }
   .rate.flash { animation: rate-flash .9s ease-out; }
@@ -768,14 +786,17 @@
         <button class="fs-exit" id="fsExit" hidden><span class="x" aria-hidden="true">✕</span>Exit full screen <kbd>Esc</kbd></button>
       </div>
 
+      <div class="transport taste-strip" id="tasteStrip" role="group" aria-label="Rate this look">
+        <button class="btn rate rate-up" id="rateUp" title="More like this (key Y): Autopilot learns you like the look on screen and brings more like it"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>More like this</button>
+        <button class="btn rate rate-down" id="rateDown" title="Not this (key X): skips to the next look, and Autopilot learns to steer away from looks like it"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>Not this</button>
+        <span class="look-clock off" id="lookClock" title="How long until Autopilot’s next new look"><span class="ring" aria-hidden="true"></span><span id="lookClockText">Autopilot off</span></span>
+      </div>
       <div class="transport">
         <button class="btn" id="freeze" aria-pressed="false"><span class="led"></span>Freeze</button>
         <button class="btn" id="clear">Clear</button>
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         <button class="btn next-look" id="nextLookBar" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
-        <button class="btn rate rate-up" id="rateUp" title="More like this (key Y): Autopilot learns you like the look on screen and brings more like it"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>More like this</button>
-        <button class="btn rate rate-down" id="rateDown" title="Not this (key X): skips to the next look, and Autopilot learns to steer away from looks like it"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>Not this</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <span class="spacer" aria-hidden="true"></span>
@@ -1424,7 +1445,7 @@
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
-            <dt>More like this and Not this</dt><dd>Right under the picture, or the Y and X keys (they can go on MIDI pads too). They teach Autopilot your taste: it remembers what the look on screen is made of and how it looks, then brings more like the ones you like and fewer like the ones you don’t. While Autopilot runs, Not this also skips to the next look. With both loops showing, a rating counts for both. Rate the same look the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
+            <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
             <dt>Taste profiles</dt><dd>Your ratings are kept in named taste profiles, and Autopilot follows the lit one (tap another to switch). My taste is always there, and in it your saved presets count as likes too. Ratings you make outside a session go into the lit profile. On your own profiles, ✎ renames, ⤓ saves the profile as a small file you can send to someone, and × deletes it (on My taste it clears the ratings). Open a taste file… (or dropping the file on the page) adds a profile someone sent you. Profiles marked SHARED come from the admin; rating while one is lit starts your own copy of it.</dd>
             <dt>Taste session</dt><dd>Start taste session, under Taste profiles, makes a new profile from scratch. Autopilot brings looks, you rate them with More like this and Not this, and Autopilot learns from them as you go. A green bar under the picture counts your ratings; press Finish and name it to keep the profile, or Cancel (twice, once you’ve rated) to throw it away.</dd>
             <dt>Follow my taste</dt><dd>Under Taste profiles. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting).</dd>
@@ -5006,7 +5027,7 @@ $('#neutral').addEventListener('click', neutral);
 // loop being edited only; right-click it (or press and hold it on a touchscreen) to hold it on both loops at once.
 // prep: the next look being tried out of sight (Check each look); glide: a look changed in place, waiting to be
 // looked at; rush: bring the next look as soon as one is ready (Next look, or the white-out watch)
-const ap = { on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
+const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
   in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'motion'] },
@@ -5173,7 +5194,8 @@ function eyeForget(key) { delete eye.last[key]; eye.hist[key] = []; eye.gen[key]
 function eyeReset() { for (const key of ['A', 'B', 'comp']) eyeForget(key); }
 const eyeAvg = (S, f) => S.reduce((a, s) => a + s[f], 0) / S.length;
 const eyeRecent = (key, ms, now) => eye.hist[key].filter((s) => now - s.t <= ms);
-function eyeStats(key, b, t) {
+// The numbers for one tiny copy: how much is near white, how much is lit, detail, edges, shades and color
+function eyeMeasure(b) {
   const W = EYE_W, H = EYE_H, n = W * H;
   const lum = new Float32Array(n), hue = new Float32Array(12);
   let sum = 0, white = 0, lit = 0, colorful = 0;
@@ -5216,6 +5238,11 @@ function eyeStats(key, b, t) {
   let ent = 0;
   for (const c of hue) if (c > 0) { const q = c / colorful; ent -= q * Math.log(q); }
   const variety = colorful ? ent / Math.log(12) : 0;
+  return { lum, mean: sum / n, white: white / n, lit: lit / n, detail: (fine / nf + coarse / nc) / 2, busy: busy / n, shades,
+    colorful: colorful / n, variety };
+}
+function eyeStats(key, b, t) {
+  const m = eyeMeasure(b), lum = m.lum, n = EYE_W * EYE_H;
   // Movement: how much it has changed since the last copy of the same picture, per second
   const prev = eye.last[key];
   let motion = null;
@@ -5225,8 +5252,8 @@ function eyeStats(key, b, t) {
     motion = d / n / ((t - prev.t) / 1000);
   }
   eye.last[key] = { lum, rgb: b.slice(0), t };
-  const s = { t, mean: sum / n, white: white / n, lit: lit / n, detail: (fine / nf + coarse / nc) / 2, busy: busy / n, shades,
-    colorful: colorful / n, variety, motion };
+  const s = { t, mean: m.mean, white: m.white, lit: m.lit, detail: m.detail, busy: m.busy, shades: m.shades,
+    colorful: m.colorful, variety: m.variety, motion };
   const h = eye.hist[key];
   h.push(s);
   while (h.length > 1 && t - h[0].t > 8000) h.shift();
@@ -5288,6 +5315,7 @@ function prepTry(now) {
   const P = ap.prep;
   freshLook(P.k, otherLoop(P.k));
   P.look = JSON.parse(JSON.stringify(loops[P.k].tgt));
+  P.favMix = loops[P.k].favMix;
   P.since = now;
   P.tries++;
   P.v = null;
@@ -5295,9 +5323,10 @@ function prepTry(now) {
   apStatus();
 }
 // Puts back a look tried earlier (the best one), from a clean slate
-function prepRestore(look, now) {
+function prepRestore(look, now, favMix) {
   const P = ap.prep, L = loops[P.k];
   patchLoop(P.k, look, true);
+  L.favMix = favMix || null;
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
   clearLoop(P.k);
   eyeForget(P.k);
@@ -5325,14 +5354,14 @@ function prepJudge(now) {
   const S = eye.hist[P.k].filter((s) => s.t >= from);
   if (S.length < 3 && age < 8) return;   // a few copies are needed to judge it
   if (!S.length) { P.ok = true; return; }   // nothing to go on (very slow graphics): don't hold Autopilot up
-  const v = tasteJudge(lookVerdict(S), P.look, S);
+  const v = tasteJudge(lookVerdict(S), P.k, P.look, S);
   P.v = v;
-  if (betterLook(v, P.best && P.best.v)) P.best = { v, look: P.look };
+  if (betterLook(v, P.best && P.best.v)) P.best = { v, look: P.look, favMix: P.favMix };
   const left = (ap.next - now) / 1000;
   const great = v.pass && v.score >= CHECK.great;
   const more = !great && P.tries < CHECK.tries && (P.best.v.pass ? !P.rush && left > CHECK.judge + 0.5 : true);
   if (more) { prepTry(now); return; }
-  if (P.best.look !== P.look) prepRestore(P.best.look, now);
+  if (P.best.look !== P.look) prepRestore(P.best.look, now, P.best.favMix);
   P.v = P.best.v;
   P.ok = true;
   apStatus();
@@ -5346,7 +5375,7 @@ function prepReady(k, now, rush) {
   if (rush) P.rush = true;
   if (!P.hold) P.hold = now;
   if (!P.ok && now - P.hold > CHECK.hold * 1000 * (P.rush ? 0.6 : 1)) {
-    if (P.best && P.best.look !== P.look && betterLook(P.best.v, P.v)) prepRestore(P.best.look, now);
+    if (P.best && P.best.look !== P.look && betterLook(P.best.v, P.v)) prepRestore(P.best.look, now, P.best.favMix);
     P.ok = true;
   }
   if (!P.ok) return false;
@@ -5361,7 +5390,7 @@ function glideJudge(now) {
   const S = eyeRecent(k, 2500, now);
   if (S.length < 2) return;
   const v = lookVerdict(S);
-  if (!v.pass && ap.glideRedo < 3) { ap.glideRedo++; ap.next = Math.min(ap.next, now + 1200); }
+  if (!v.pass && ap.glideRedo < 3) { ap.glideRedo++; ap.next = Math.min(ap.next, now + 1200); ap.due = Math.min(ap.due, ap.next); }
   else ap.glideRedo = 0;
 }
 // How much of the screen would be near white with both loops showing at once (on screen they add up, like two
@@ -5451,6 +5480,7 @@ function whiteWatch(now, dt, wA, wB) {
     watch.skipped = true;
     ap.rush = true;
     ap.next = Math.min(ap.next, now);
+    ap.due = Math.min(ap.due, now);
   }
   // Solid white even so: wipe the loops that are white and let them build up again
   if (watch.hot > WATCH.wipe && last.mean > 0.85 && last.white > 0.6) {
@@ -5480,6 +5510,8 @@ function setAutopilot(on, quiet) {
     setDrift(true);
     channel = -1;
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
+    ap.due = ap.next;
+    ap.span = ap.next - performance.now();
     ap.picIn = apPicGap();
     // Pinned settings start from what the sliders show now (a pin on both loops from the loop being edited)
     for (const id of ap.pins) holdPin(id, edit);
@@ -5787,7 +5819,8 @@ function capTrails(sc, other) {
 }
 // A hidden loop gets a whole new look at once, from a clean slate
 function freshLook(k, shown) {
-  const sc = apScene(k);
+  const sc = apScene(k), favMix = sc.favMix;
+  delete sc.favMix;
   // Two loops that only feed on each other fade to black, so one of them keeps a real input
   if (sc.in1 === 'loop' && [loops[shown].tgt.in1, loops[shown].tgt.in2].includes('loop')) {
     if (!isPinned('in1', k)) sc.in1 = apRealInput();
@@ -5797,6 +5830,7 @@ function freshLook(k, shown) {
   capTrails(sc, shown);
   patchLoop(k, sc, true);
   const L = loops[k];
+  L.favMix = favMix || null;
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
   clearLoop(k);
   eyeForget(k);
@@ -5804,7 +5838,8 @@ function freshLook(k, shown) {
 // With What you see pinned, a loop on screen changes in place instead, gliding into its new look.
 // Most of the time it keeps its input and mirror, so the picture changes shape rather than jumping.
 function glideLook(k) {
-  const L = loops[k], sc = apScene(k);
+  const L = loops[k], sc = apScene(k), favMix = sc.favMix;
+  delete sc.favMix;
   if (Math.random() < 0.7) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs, unless one of them has been switched off under Autopilot settings
   if (Math.random() < 0.65 && apAllowed(L.tgt.in1)) {
@@ -5817,6 +5852,7 @@ function glideLook(k) {
   apLimit(sc, k);
   capTrails(sc, other);
   patchLoop(k, sc, true);
+  L.favMix = favMix || null;
 }
 // Time for a new look. With Change on the beat and music coming in, it waits (up to 4 seconds) for the next beat,
 // unless Next look or the white-out watch asked for it straight away.
@@ -5838,6 +5874,11 @@ function apStep(now, onBeat) {
   ap.quick = onBeat || rush ? now + 1500 : 0;   // on a beat (or when rushed) the new look cuts in fast
   const m = apSet.mix / 100;
   const v = mix.tgt.view;
+  // How much one loop is fed into the other, as Autopilot picks it (a pinned feed stays where it is), and how many
+  // ways of showing and feeding the loops it weighs up against your taste (just one when it isn't following it)
+  const feed = (key) => (ap.pins.has(key) ? mix.tgt[key] : inLim(key, Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0));
+  const ways = 1 + Math.round(5 * tasteHow());
+  let came = null, mixSet = false;
   // A narrowed What you see limit means Autopilot can't hide a loop to swap it out, so it moves What you see
   // somewhere inside the limit and changes the loops in place, the same as when What you see is pinned
   const viewLim = limSpan('view');
@@ -5854,10 +5895,16 @@ function apStep(now, onBeat) {
       } else freshLook(hidden, shown);
       nudge(shown);
       ap.cameIn = { k: hidden, at: now, gen: loops[hidden].gen };
+      came = hidden;
+      // Both loops at once or just the new one, and how they feed each other: picked as a whole picture
+      const one = hidden === 'B' ? 100 : 0, opts = [];
+      for (let i = ways; i > 0; i--) opts.push({ view: Math.random() < 0.8 * m ? 50 : one, xab: feed('xab'), xba: feed('xba') });
+      const w = tasteMix(opts, hidden);
       // Two loops that would add up to white on screen are shown one at a time
-      let both = Math.random() < tasteBoth(0.8 * m);
-      if (both && overlayWhite(hidden, shown) > WATCH.white * 0.7) both = false;
-      mix.tgt.view = both ? 50 : (hidden === 'B' ? 100 : 0);
+      mix.tgt.view = w.view === 50 && overlayWhite(hidden, shown) > WATCH.white * 0.7 ? one : w.view;
+      mix.tgt.xab = w.xab;
+      mix.tgt.xba = w.xba;
+      mixSet = true;
     } else {
       mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
       nudge('A'); nudge('B');
@@ -5870,13 +5917,22 @@ function apStep(now, onBeat) {
     glideLook(k);
     nudge(k === 'A' ? 'B' : 'A');
     ap.cameIn = { k, at: now, gen: loops[k].gen };
+    came = k;
     // Check each look: once it has faded in, Autopilot looks at it (see glideJudge)
     ap.glide = checking() ? { k, at: now + (apFadeSec() + 2.5) * 1000 } : null;
   }
   ap.rush = false;
-  const feed = () => (Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0);
-  if (!ap.pins.has('xab')) mix.tgt.xab = inLim('xab', feed());
-  if (!ap.pins.has('xba')) mix.tgt.xba = inLim('xba', feed());
+  // The countdown under the picture counts down to the next look from here
+  ap.due = ap.next;
+  ap.span = Math.max(1, ap.next - now);
+  // Otherwise What you see is settled already, and only the feeds are picked (as a whole picture again)
+  if (!mixSet) {
+    const opts = [];
+    for (let i = ways; i > 0; i--) opts.push({ view: mix.tgt.view, fixedView: true, xab: feed('xab'), xba: feed('xba') });
+    const w = tasteMix(opts, came);
+    mix.tgt.xab = w.xab;
+    mix.tgt.xba = w.xba;
+  }
   if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
   apPicture();
   syncUI();
@@ -5922,10 +5978,12 @@ function nextLook(how) {
 $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
 
 /* ================= learn my taste ================= */
-// More like this and Not this (under the picture, keys Y and X) teach Autopilot what you like. A rating keeps the
-// look on screen (both loops when both are showing, each counted by how much of it shows) and, once Autopilot's
-// eye has seen it, how it looks: how much is lit, how busy it is, how many shades and how much detail it has, how
-// much it moves and how colorful it is. With Learn from hints on, some smaller ratings come by themselves:
+// More like this and Not this (under the picture, keys Y and X) teach Autopilot what you like. A rating is for the
+// whole picture on screen, never one loop on its own: it keeps both loops' looks and how they're shown and fed into
+// each other (see sceneFeats for what's counted: the inputs and effects that meet, feeds, one loop being the
+// other's input or pushing or dyeing it, zooming and turning alike or apart), and, once Autopilot's eye has seen
+// it, how the screen looks: how much is lit, how busy it is, how many shades and how much detail it has, how much
+// it moves and how colorful it is. With Learn from hints on, some smaller ratings come by themselves:
 // skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that
 // setting.
 // Ratings are kept in named taste profiles (under Taste profiles), and Autopilot follows the lit one. My taste is
@@ -5934,11 +5992,12 @@ $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
 // names it and keeps it. Profiles can be saved as a file to send to someone, and opened from one; the admin can
 // share them with everyone (they live in presets.json beside the shared presets). Rating while a shared profile
 // is lit starts your own copy of it. Everything stays in this browser, the newest 400 ratings per profile.
-// Autopilot uses the lit profile in three ways, as far as Follow my taste says (not at all at Off):
-//   1. it makes several looks and keeps one whose inputs, effects, mirror and slider ranges you've liked most
-//   2. some new looks start from a look you liked (or a preset) and vary it
-//   3. Check each look leans towards tries that look like the ones you liked
-// It also learns whether you like seeing both loops at once, and shows both more or less often.
+// Autopilot uses the lit profile in four ways, as far as Follow my taste says (not at all at Off), always judging
+// the picture a new look would make together with the other loop:
+//   1. it makes several looks and keeps one that would make a picture like the ones you liked
+//   2. some new looks bring back a picture you liked (or a preset): one of its loops, varied, and how it was mixed
+//   3. Check each look leans towards tries that look like your favourites, alone and blended with the other loop
+//   4. how the loops are shown and fed into each other is picked the same way, as a whole picture
 const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
 const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], ...SELF_RANGE };
@@ -5950,7 +6009,8 @@ const TASTE_FILE_KIND = 'phosphor-loop-taste';
 // active: the lit profile's id; session: a taste session under way ({ votes, started })
 const taste = { profiles: [], sharedList: [], active: 'mine', session: null, model: null, pending: [], sid: randId(6) };
 const tasteVoteOK = (v) => !!v && typeof v === 'object' && Number.isFinite(v.w) &&
-  ((v.look && typeof v.look === 'object') || (Array.isArray(v.feats) && v.feats.every((f) => typeof f === 'string')));
+  ((v.scene && typeof v.scene === 'object' && v.scene.A && typeof v.scene.A === 'object') || (v.look && typeof v.look === 'object') ||
+   (Array.isArray(v.feats) && v.feats.every((f) => typeof f === 'string')));
 const tasteThumbOK = (t) => typeof t === 'string' && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(t);
 const tasteNew = () => 't' + Date.now().toString(36) + randId(4);
 function cleanTasteProfile(p) {
@@ -6043,7 +6103,7 @@ function tasteLook(k) {
   }
   return o;
 }
-// How a look looks, from the eye's copies of it (all 0 to 1)
+// How a picture looks, from the eye's copies of it (all 0 to 1)
 function tastePicOf(S) {
   if (!S || !S.length) return null;
   const moving = S.filter((s) => s.motion != null);
@@ -6053,21 +6113,39 @@ function tastePicOf(S) {
   for (const d of TASTE_PIC) if (p[d] != null) p[d] = Math.round(p[d] * 1000) / 1000;
   return p;
 }
-// The eye's recent copies of loop k's current look (none from an earlier look); at least `least` of them
-function tasteSeen(k, now, least = 2) {
-  const S = (eye.hist[k] || []).filter((s) => s.gen === loops[k].gen && now - s.t < 30000).slice(-8);
+// The whole picture on screen, from the eye's copies of the screen since `from` (the last second and a half if
+// not said); at least `least` of them
+function tasteScreenPic(now, from = now - 1500, least = 2) {
+  const S = (eye.hist.comp || []).filter((s) => s.t >= from && now - s.t < 30000).slice(-8);
   return S.length >= least ? tastePicOf(S) : null;
 }
-// Opens Autopilot's eye for a moment when it isn't running, to see a look that's just been rated or is being saved
+// How two loops would look on screen together (they add up, like two projectors on one wall), from the newest copy
+// of each; the movement is the two loops' own, averaged. Used for a look being tried out of sight.
+function tasteBlendPic(a, b) {
+  const A = eye.last[a], B = eye.last[b];
+  if (!A || !B) return null;
+  const x = A.rgb, y = B.rgb, buf = new Uint8Array(x.length);
+  for (let i = 0; i < x.length; i++) buf[i] = 255 - ((255 - x[i]) * (255 - y[i])) / 255;
+  const now = performance.now(), mot = (k) => { const R = eyeRecent(k, 2000, now).filter((s) => s.motion != null); return R.length ? eyeAvg(R, 'motion') : null; };
+  const ma = mot(a), mb = mot(b);
+  return tastePicOf([{ ...eyeMeasure(buf), motion: ma != null && mb != null ? (ma + mb) / 2 : (ma ?? mb) }]);
+}
+// The whole picture's settings: both loops' looks (kept short) and how they're shown and fed into each other
+function tasteSceneNow() {
+  return { A: tasteLook('A'), B: tasteLook('B'), mix: { view: Math.round(mix.cur.view), xab: Math.round(mix.cur.xab), xba: Math.round(mix.cur.xba) } };
+}
+// Which looks are on the loops: a rating is "the same picture" only while neither loop has a new look
+const tasteGens = () => `${loops.A.gen}.${loops.B.gen}`;
+// Opens Autopilot's eye for a moment when it isn't running, to see a picture that's just been rated or is being saved
 function tasteLookSoon() { eye.wantUntil = performance.now() + 2500; }
-// A rating made before the eye had seen the look gets the picture as soon as the eye has a few copies of it
+// A rating made before the eye had seen the screen gets the picture as soon as the eye has a few copies of it
 function tasteFill(now) {
   if (!taste.pending.length) return;
   let changed = false;
   taste.pending = taste.pending.filter((q) => {
-    if (loops[q.k].gen !== q.gen) return false;
+    if (tasteGens() !== q.gens) return false;   // a new look came before the eye saw this one
     // A few copies if they come in time (a slow computer gets 6 seconds), or else whatever there is by then
-    const late = now - q.from > 6000, p = tasteSeen(q.k, now, late ? 1 : 3);
+    const late = now - q.from > 6000, p = tasteScreenPic(now, q.from, late ? 1 : 3);
     if (!p) return !late;
     q.vote.pic = p;
     changed = true;
@@ -6075,6 +6153,65 @@ function tasteFill(now) {
   });
   if (changed) saveTaste();
 }
+
+// What a whole picture is made of, in words Autopilot can count, each with how much it counts. The looks of the
+// loops you see (and, more faintly, a hidden loop that still reaches the screen through the other one), and how
+// the two work together: which inputs and effects meet, whether both show at once, how much one feeds the other,
+// whether one is the other's input or pushes or dyes it, and whether they zoom, turn and mirror alike or apart.
+function sceneFeats(sc) {
+  const L = { A: { ...TASTE_DEF, ...(sc.A || {}) }, B: sc.B ? { ...TASTE_DEF, ...sc.B } : null };
+  const m = sc.mix || {};
+  const [wA, wB] = weights(Number.isFinite(m.view) ? m.view : 0);
+  const vis = { A: wA, B: L.B ? wB : 0 };
+  const feedInto = { A: clamp(m.xba || 0, 0, 100) / 100, B: clamp(m.xab || 0, 0, 100) / 100 };   // xab is Feed A into B
+  // How much loop s takes from the other one: fed in, used as an input, or pushed or dyed by it
+  const takes = (s) => {
+    const t = L[s];
+    if (!t) return 0;
+    let r = feedInto[s];
+    if (t.in1 === 'loop' || t.in2 === 'loop') r = Math.max(r, 0.8);
+    if ((t.push || 0) > 12 || (t.dye || 0) > 12) r = Math.max(r, 0.5);
+    return Math.min(1, r);
+  };
+  const reach = { A: Math.max(vis.A, L.B ? vis.B * takes('B') : 0), B: L.B ? Math.max(vis.B, vis.A * takes('A')) : 0 };
+  const out = [], add = (f, w) => { if (w > 0.05) out.push([f, w]); };
+  for (const k of ['A', 'B']) {
+    if (!L[k] || reach[k] <= 0.05) continue;
+    const w = vis[k] > 0.25 ? Math.min(1, vis[k]) : 0.4 * reach[k];
+    for (const f of tasteFeats(L[k])) add(f, w);
+  }
+  add(vis.A > 0.25 && vis.B > 0.25 ? 'view:both' : 'view:one', 1);
+  // How the two loops meet, when both reach the screen
+  if (L.B && reach.A > 0.25 && reach.B > 0.25) {
+    add('pair:' + [tasteSrc(L.A.in1), tasteSrc(L.B.in1)].sort().join('+'), 1);
+    const fxA = TASTE_FX.filter((x) => L.A[x] > 12), fxB = TASTE_FX.filter((x) => L.B[x] > 12);
+    for (const a of fxA) for (const b of fxB) add('pfx:' + [a, b].sort().join('+'), 0.5);
+    const dir = (v, cut) => (Math.abs(v) > cut ? Math.sign(v) : 0);
+    const za = dir(L.A.zoom, 8), zb = dir(L.B.zoom, 8), sa = dir(L.A.spin, 8), sb = dir(L.B.spin, 8);
+    add('rel:zoom:' + (za && zb ? (za === zb ? 'same' : 'opposed') : 'still'), 0.7);
+    add('rel:spin:' + (sa && sb ? (sa === sb ? 'same' : 'counter') : 'calm'), 0.7);
+    add('rel:mirror:' + (L.A.mirror === L.B.mirror ? 'same' : 'apart'), 0.5);
+  }
+  // How they act on each other
+  const fed = Math.max(vis.A > 0.25 ? feedInto.A : 0, vis.B > 0.25 ? feedInto.B : 0);
+  add('feed:' + (fed > 0.4 ? 'strong' : fed > 0.08 ? 'some' : 'none'), 1);
+  if (L.B && feedInto.A > 0.08 && feedInto.B > 0.08) add('feed:both-ways', 0.8);
+  for (const s of ['A', 'B']) {
+    const t = L[s];
+    if (!t || vis[s] <= 0.25) continue;
+    if (t.in1 === 'loop' || t.in2 === 'loop') add('inter:other-loop-in', 1);
+    if ((t.push || 0) > 12) add('inter:pushed', 1);
+    if ((t.dye || 0) > 12) add('inter:dyed', 1);
+  }
+  return out;
+}
+// A rating's words: a whole picture, or (ratings from before) one loop's look, or a pinned setting
+function voteFeats(v) {
+  if (v.scene) return sceneFeats(v.scene);
+  if (v.look) return [...tasteFeats(v.look).map((f) => [f, 1]), [v.both ? 'view:both' : 'view:one', 0.7]];
+  return v.feats.map((f) => [f === 'mix:both' ? 'view:both' : f === 'mix:one' ? 'view:one' : f, 1]);
+}
+const voteScene = (v) => v.scene || { A: v.look, B: null, mix: { view: 0 } };
 
 // Everything learned so far, worked out again whenever a rating or preset changes
 function tasteModel() {
@@ -6087,30 +6224,25 @@ function tasteModel() {
     const w = v.w * scale;
     if (!w) return;
     n.evidence += Math.abs(w);
-    if (v.look) {
-      for (const f of tasteFeats(v.look)) add(f, w);
-      add(v.both ? 'mix:both' : 'mix:one', w * 0.7);
-      if (w > 0) favs.push({ look: { ...TASTE_DEF, ...v.look }, w });
+    for (const [f, fw] of voteFeats(v)) add(f, w * fw);
+    if (v.scene || v.look) {
+      if (w > 0) favs.push({ scene: voteScene(v), w });
       if (v.pic) (w > 0 ? picUp : picDown).push({ p: v.pic, w: Math.abs(w) });
-    } else for (const f of v.feats) add(f, w);
+    }
   };
   for (const v of src.votes) {
     take(v, 1);
     if (v.src === 'up') n.up++;
     else if (v.src === 'down') n.down++;
   }
-  // Presets: each loop that shows in it counts as a like (My presets strongly, shared ones mildly)
+  // Presets: the whole picture each one makes counts as a like (My presets strongly, shared ones mildly)
   const fromPresets = (list, w) => {
     let count = 0;
     for (const pr of list) {
       const d = pr && pr.data;
       if (!d || !d.A) continue;
-      const [wA, wB] = weights(d.mix && Number.isFinite(d.mix.view) ? d.mix.view : 0);
-      for (const k of ['A', 'B']) {
-        const vis = k === 'A' ? wA : wB;
-        if (vis < 0.25 || !d[k]) continue;
-        take({ w: w * Math.min(1, vis), look: { ...loopDefaults(), ...d[k] }, both: wA > 0.25 && wB > 0.25, pic: d.pic && d.pic[k] }, 1);
-      }
+      const pic = d.pic && (d.pic.screen || d.pic.A || d.pic.B);
+      take({ w, scene: { A: d.A, B: d.B || null, mix: d.mix || { view: 0 } }, pic }, 1);
       count++;
     }
     return count;
@@ -6135,15 +6267,17 @@ function tasteModel() {
   taste.model = { pref, favs, up: centroid(picUp), down: centroid(picDown), conf: Math.min(1, n.evidence / 15), n, src };
   return taste.model;
 }
-// How much a look's settings match what you've liked, from -1 to 1. Inputs and effects count most.
-function tasteSettings(look, M) {
-  let s = 0, n = 0;
-  for (const f of tasteFeats(look)) {
-    const w = f.startsWith('in:') || f.startsWith('world:') ? 1.6 : f.startsWith('fx:') ? 1.3 : 1;
-    if (f in M.pref) s += M.pref[f] * w;
-    n += w;
+// How much a whole picture's settings match what you've liked, from -1 to 1. Inputs, effects, and how the loops
+// meet and act on each other count most. It adds up (rather than averages), so a picture with both loops in it
+// isn't marked down just for having more in it.
+function tasteSettings(sc, M) {
+  let s = 0;
+  for (const [f, w0] of sceneFeats(sc)) {
+    if (!(f in M.pref)) continue;
+    const w = w0 * (f.startsWith('in:') || f.startsWith('world:') ? 1.6 : /^(fx:|pair:|pfx:|inter:|feed:)/.test(f) ? 1.3 : 1);
+    s += M.pref[f] * w;
   }
-  return n ? s / n : 0;
+  return Math.tanh(s / 6);
 }
 // How close a picture is to the ones you liked (and far from the ones you didn't), from 0 to 1
 function tastePicFit(p, M) {
@@ -6157,30 +6291,43 @@ function tastePicFit(p, M) {
   if (du == null) return null;
   return dd == null ? clamp(1 - 3 * du, 0, 1) : 0.5 + 0.5 * Math.tanh(6 * (dd - du));
 }
-function tasteFit(look, pic, M) {
-  const s = 0.5 + 0.5 * clamp(2 * tasteSettings(look, M), -1, 1), p = tastePicFit(pic, M);
+// A settings score (-1 to 1) and a picture together, from 0 to 1
+function tasteFit(score, pic, M) {
+  const s = 0.5 + 0.5 * score, p = tastePicFit(pic, M);
   return p == null ? s : 0.5 * s + 0.5 * p;
 }
 // How strongly Autopilot follows your taste right now: the slider, times how much it has learned
 const tasteHow = () => (apSet.taste / 100) * tasteModel().conf;
+// How well a new look for loop k goes with the other loop as it is: shown alone (where the other can still reach
+// it through feeds, as an input, pushing or dyeing) and both together, each counted by how often Autopilot shows
+// the loops that way (Mix the two loops), so a pair you don't like together is marked down
+function tasteWith(k, sc, M) {
+  const o = otherLoop(k), both = apSet.mix > 0 ? clamp(0.8 * apSet.mix / 100, 0.15, 0.85) : 0;
+  const scene = (view) => ({ [k]: sc, [o]: loops[o].tgt, mix: { view, xab: mix.tgt.xab, xba: mix.tgt.xba } });
+  const alone = tasteSettings(scene(k === 'A' ? 0 : 100), M);
+  return both ? (1 - both) * alone + both * tasteSettings(scene(50), M) : alone;
+}
+// Picks one of several choices by score, with some luck left in (less as Follow my taste goes up)
+function tastePickBy(items, score) {
+  const f = apSet.taste / 100, temp = 0.3 - 0.24 * f;
+  const s = items.map(score), top = Math.max(...s);
+  const p = s.map((x) => Math.exp((x - top) / temp));
+  let r = Math.random() * p.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < items.length; i++) if ((r -= p[i]) <= 0) return items[i];
+  return items[0];
+}
 
-// 1 and 2: a new look for loop k, leaning towards your taste
+// 1 and 2: a new look for loop k, leaning towards pictures you've liked. Several new looks, often with a loop or two
+// brought back from pictures you liked, and the one that would make the best picture with the other loop is kept.
 function apScene(k) {
   const M = tasteModel(), f = apSet.taste / 100, c = f * M.conf;
   if (!c) return apSceneRaw(k);
-  if (M.favs.length && Math.random() < (0.1 + 0.4 * f) * M.conf) {
-    const sc = tasteFavScene(k, M);
-    if (sc) return sc;
-  }
-  // Several looks, keeping one you'd probably like, with some luck left in (less as Follow my taste goes up)
   const cands = [];
-  for (let i = 1 + Math.round(5 * c); i > 0; i--) { const sc = apSceneRaw(k); cands.push({ sc, s: tasteSettings(sc, M) }); }
-  const temp = 0.3 - 0.24 * f, top = Math.max(...cands.map((x) => x.s));
-  let sum = 0;
-  for (const x of cands) sum += (x.p = Math.exp((x.s - top) / temp));
-  let r = Math.random() * sum;
-  for (const x of cands) if ((r -= x.p) <= 0) return x.sc;
-  return cands[0].sc;
+  for (let i = 1 + Math.round(5 * c); i > 0; i--) cands.push(apSceneRaw(k));
+  if (M.favs.length && Math.random() < (0.3 + 0.5 * f) * M.conf) {
+    for (let i = Math.round(1 + 2 * f); i > 0; i--) cands.push(...tasteFavLooks(k, M));
+  }
+  return tastePickBy(cands, (sc) => tasteWith(k, sc, M));
 }
 // Whether Autopilot may bring this input in right now
 function apUsable(src) {
@@ -6192,66 +6339,83 @@ function apUsable(src) {
   if (src === 'loop') return apSet.mix > 10;
   return true;
 }
-// A look you liked (or a preset), varied: a little more zoom or spin or color, now and then an effect in or out or
-// a different mirror. How wild sets how far it strays. An input it can't use now gives way to another.
-function tasteFavScene(k, M) {
+// A picture you liked (or a preset), brought back on loop k: each of its loops that showed, varied a little (more
+// or less zoom, spin or color, now and then an effect in or out or a different mirror), each carrying how that
+// picture showed and fed its loops (favMix) for Autopilot to use when the look comes in. apScene then keeps the one
+// that goes best with the loop on screen. How wild sets how far they stray. An input it can't use now gives way.
+function tasteFavLooks(k, M) {
   let r = Math.random() * M.favs.reduce((a, x) => a + x.w, 0), fav = M.favs[0];
   for (const x of M.favs) if ((r -= x.w) <= 0) { fav = x; break; }
-  const w = apSet.wild / 100, j = 0.5 + w;
-  const sc = { ...loopDefaults(), ...JSON.parse(JSON.stringify(fav.look)) };
-  const from = sc.in1;
-  sc.zoom = Math.round(clamp(sc.zoom + rnd(-8, 8) * j, -60, 85));
-  sc.spin = Math.round(clamp(sc.spin + rnd(-10, 10) * j, -70, 70));
-  sc.color = Math.round(clamp(sc.color + rnd(-6, 6) * j, 0, 70));
-  sc.warp = Math.round(clamp(sc.warp + rnd(-6, 6) * j, 0, 70));
-  if (Math.random() < 0.3 * j) {
-    const key = pick(TASTE_FX), [lo, hi] = TASTE_RANGE[key];
-    sc[key] = sc[key] > 12 ? 0 : Math.round(rnd(lo, hi));
+  const fs = fav.scene;
+  if (!fs || !fs.A) return [];
+  const [vA, vB] = weights(fs.mix && Number.isFinite(fs.mix.view) ? fs.mix.view : 0);
+  const fm = fs.mix || {}, into = { A: fm.xba || 0, B: fm.xab || 0 }, both = !!fs.B && vA > 0.25 && vB > 0.25;
+  const w = apSet.wild / 100, j = 0.5 + w, out = [];
+  for (const from of ['A', 'B']) {
+    if (!fs[from] || (from === 'A' ? vA : vB) <= 0.25) continue;
+    const sc = { ...loopDefaults(), ...JSON.parse(JSON.stringify(fs[from])) };
+    const was = sc.in1;
+    sc.zoom = Math.round(clamp(sc.zoom + rnd(-8, 8) * j, -60, 85));
+    sc.spin = Math.round(clamp(sc.spin + rnd(-10, 10) * j, -70, 70));
+    sc.color = Math.round(clamp(sc.color + rnd(-6, 6) * j, 0, 70));
+    sc.warp = Math.round(clamp(sc.warp + rnd(-6, 6) * j, 0, 70));
+    if (Math.random() < 0.3 * j) {
+      const key = pick(TASTE_FX), [lo, hi] = TASTE_RANGE[key];
+      sc[key] = sc[key] > 12 ? 0 : Math.round(rnd(lo, hi));
+    }
+    if (Math.random() < 0.2 * j) sc.mirror = pick([0, 0, 2, 4, 6, 8]);
+    if (!apUsable(sc.in1) || Math.random() < 0.15) { sc.in1 = pick(apPool()); delete sc.size; }
+    if (sc.in2 && sc.in2 !== 'none' && (!apUsable(sc.in2) || sc.in2 === sc.in1)) sc.in2 = 'none';
+    const look = apFinish(sc, k, was);
+    look.favMix = { both, into: into[from], out: fs.B ? into[from === 'A' ? 'B' : 'A'] : 0 };
+    out.push(look);
   }
-  if (Math.random() < 0.2 * j) sc.mirror = pick([0, 0, 2, 4, 6, 8]);
-  if (!apUsable(sc.in1) || Math.random() < 0.15) { sc.in1 = pick(apPool()); delete sc.size; }
-  if (sc.in2 && sc.in2 !== 'none' && (!apUsable(sc.in2) || sc.in2 === sc.in1)) sc.in2 = 'none';
-  return apFinish(sc, k, from);
+  return out;
 }
-// 3: Check each look's score for a try, leaning towards how the looks you liked looked
-function tasteJudge(v, look, S) {
+// 3: Check each look's score for a look tried out of sight on loop k, leaning towards pictures you liked: how its
+// settings go with the other loop, and how it looks alone and blended with the other loop on screen
+function tasteJudge(v, k, look, S) {
   const M = tasteModel(), a = 0.6 * (apSet.taste / 100) * M.conf;
   if (!a) return v;
-  v.taste = tasteFit(look, tastePicOf(S), M);
+  const score = tasteWith(k, look, M);
+  const blend = apSet.mix > 0 ? tasteBlendPic(k, otherLoop(k)) : null;
+  v.taste = Math.max(tasteFit(score, tastePicOf(S), M), blend ? tasteFit(score, blend, M) : 0);
   v.raw = v.score;
   v.score = (1 - a) * v.score + a * v.taste;
   return v;
 }
-// How often to show both loops at once, nudged by whether you've liked looks with both showing
-function tasteBoth(p) {
+// How to show and feed the two loops when a look comes in: a few ways (as Autopilot always picks them), plus the
+// way a liked picture did it if the look came from one, and the one that makes a picture you'd like best is kept
+function tasteMix(opts, k) {
   const c = tasteHow();
-  if (!c || p <= 0) return p;
-  const M = tasteModel(), d = (M.pref['mix:both'] || 0) - (M.pref['mix:one'] || 0);
-  return clamp(p * (1 + 0.9 * c * d), 0.03, 0.95);
+  if (!c) return opts[0];
+  const fm = k && loops[k].favMix;
+  if (fm) {
+    const one = k === 'B' ? 100 : 0, o = { view: opts[0].fixedView ? opts[0].view : (fm.both && apSet.mix > 0 ? 50 : one) };
+    for (const [key, into] of [['xab', k === 'B'], ['xba', k === 'A']]) o[key] = ap.pins.has(key) ? mix.tgt[key] : inLim(key, Math.round(into ? fm.into : fm.out));
+    opts.push(o);
+  }
+  const M = tasteModel();
+  return tastePickBy(opts, (o) => tasteSettings({ A: loops.A.tgt, B: loops.B.tgt, mix: o }, M));
 }
 
-// More like this (dir 1) and Not this (dir -1), for the loops on screen
+// More like this (dir 1) and Not this (dir -1), for the whole picture on screen: both loops and how they mix
 const rateBtns = { 1: $('#rateUp'), [-1]: $('#rateDown') };
 function rate(dir) {
-  const now = performance.now(), [wA, wB] = weights(mix.cur.view);
-  const shown = [['A', wA], ['B', wB]].filter(([, w]) => w > 0.25);
-  const both = shown.length === 2;
+  const now = performance.now(), gens = tasteGens(), scene = tasteSceneNow();
+  const sig = sceneFeats(scene).map(([f]) => f).join();
   const { votes, note } = tasteTarget();
   let added = 0;
-  for (const [k, vis] of shown) {
-    const gen = loops[k].gen, look = tasteLook(k), sig = tasteFeats(look).join();
-    // The same look rated again: the same way is noted already, the other way replaces it
-    const old = votes.findIndex((v) => v.sid === taste.sid && v.k === k && v.gen === gen && v.look && tasteFeats(v.look).join() === sig);
-    if (old >= 0) {
-      if (Math.sign(votes[old].w) === dir && votes[old].src !== 'skip') continue;
-      votes.splice(old, 1);
-    }
-    const vote = { t: Date.now(), src: dir > 0 ? 'up' : 'down', w: dir * Math.round(Math.min(1, vis) * 100) / 100, look, both, sid: taste.sid, k, gen };
-    const pic = tasteSeen(k, now);
+  // The same picture rated again: the same way is noted already, the other way replaces it
+  const old = votes.findIndex((v) => v.sid === taste.sid && v.gens === gens && v.scene && sceneFeats(v.scene).map(([f]) => f).join() === sig);
+  if (!(old >= 0 && Math.sign(votes[old].w) === dir && votes[old].src !== 'skip')) {
+    if (old >= 0) votes.splice(old, 1);
+    const vote = { t: Date.now(), src: dir > 0 ? 'up' : 'down', w: dir, scene, sid: taste.sid, gens };
+    const pic = tasteScreenPic(now);
     if (pic) vote.pic = pic;
-    else { taste.pending.push({ vote, k, gen, from: now }); tasteLookSoon(); }
+    else { taste.pending.push({ vote, gens, from: now }); tasteLookSoon(); }
     votes.push(vote);
-    added++;
+    added = 1;
   }
   const b = rateBtns[dir];
   b.classList.remove('flash');
@@ -6261,27 +6425,26 @@ function rate(dir) {
   if (added || note) saveTaste();
   const M = tasteModel(), count = M.n.up + M.n.down;
   const off = (apSet.taste === 0 ? ' Follow my taste is at Off under Taste profiles, so Autopilot isn’t using it yet.' : '') + note;
-  const loopsSaid = both ? ' (both loops on screen)' : '';
   const sofar = taste.session ? `${count} in this taste session.` : `${count} rating${count === 1 ? '' : 's'} in “${M.src.name}”.`;
-  if (dir > 0) toast(added ? `Noted${loopsSaid}: more looks like this. ${sofar}${off}` : 'Already noted: you like this look.');
+  if (dir > 0) toast(added ? `Noted: more pictures like this. ${sofar}${off}` : 'Already noted: you like this picture.');
   else if (ap.on) {
-    toast(added ? `Noted${loopsSaid}: fewer looks like this. Skipping to the next one.${off}` : 'Already noted. Skipping to the next one.');
+    toast(added ? `Noted: fewer pictures like this. Skipping to the next look.${off}` : 'Already noted. Skipping to the next look.');
     nextLook('rated');
-  } else toast(added ? `Noted${loopsSaid}: Autopilot will steer away from looks like this. Press Next look for a new one.${off}`
-    : 'Already noted: you don’t like this look. Press Next look for a new one.');
+  } else toast(added ? `Noted: Autopilot will steer away from pictures like this. Press Next look for a new one.${off}`
+    : 'Already noted: you don’t like this picture. Press Next look for a new one.');
 }
 rateBtns[1].addEventListener('click', () => rate(1));
 rateBtns[-1].addEventListener('click', () => rate(-1));
-// Learn from hints: a quick skip of a look that has just come in counts a little against it
+// Learn from hints: a quick skip of a look that has just come in counts a little against the picture it made
 function tasteHintSkip(now) {
   const c = ap.cameIn;
   if (!apSet.hints || !c || now - c.at > TASTE_SKIP_MS || loops[c.k].gen !== c.gen) return;
   ap.cameIn = null;
   if (tasteSource().kind === 'shared') return;   // a hint alone doesn't start a copy of a shared profile
-  const { votes } = tasteTarget();
-  if (votes.some((v) => v.sid === taste.sid && v.k === c.k && v.gen === c.gen)) return;
-  const vote = { t: Date.now(), src: 'skip', w: -0.5, look: tasteLook(c.k), both: false, sid: taste.sid, k: c.k, gen: c.gen };
-  const pic = tasteSeen(c.k, now);
+  const { votes } = tasteTarget(), gens = tasteGens();
+  if (votes.some((v) => v.sid === taste.sid && v.gens === gens)) return;
+  const vote = { t: Date.now(), src: 'skip', w: -0.5, scene: tasteSceneNow(), sid: taste.sid, gens };
+  const pic = tasteScreenPic(now);
   if (pic) vote.pic = pic;
   votes.push(vote);
   saveTaste();
@@ -6291,7 +6454,8 @@ function tasteHintPin(key, L) {
   if (!apSet.hints || !PINS[key]) return;
   const feats = [];
   if (PINS[key].mix) {
-    if (key === 'view') { const [a, b] = weights(mix.tgt.view); feats.push([a > 0.25 && b > 0.25 ? 'mix:both' : 'mix:one', 1]); }
+    if (key === 'view') { const [a, b] = weights(mix.tgt.view); feats.push([a > 0.25 && b > 0.25 ? 'view:both' : 'view:one', 1]); }
+    else { const v = mix.tgt[key] / 100; feats.push(['feed:' + (v > 0.4 ? 'strong' : v > 0.08 ? 'some' : 'none'), 1]); }
   } else {
     const t = loops[L].tgt;
     if (key === 'in1') feats.push(['in:' + tasteSrc(t.in1), 1]);
@@ -6310,11 +6474,10 @@ function tasteHintPin(key, L) {
   }
   if (added) saveTaste();
 }
-// The picture of each loop, kept with a preset as it's saved (so the preset teaches how a liked look looks too)
+// How the whole picture looks, kept with a preset as it's saved (so the preset teaches how a liked picture looks)
 function tastePresetPic() {
-  const now = performance.now(), out = {};
-  for (const k of ['A', 'B']) { const p = tasteSeen(k, now); if (p) out[k] = p; }
-  return Object.keys(out).length ? out : undefined;
+  const now = performance.now(), p = tasteScreenPic(now, now - 4000, 1);
+  return p ? { screen: p } : undefined;
 }
 
 // The lines that say what Autopilot follows and what it has learned
@@ -6511,7 +6674,7 @@ $('#sessionForm').addEventListener('submit', async (e) => {
 
 // Files: a profile saved as a small .json file that anyone can open in Phosphor Loop (Open a taste file…, or drop
 // it on the page)
-const tasteSlim = (votes) => votes.map(({ sid, k, gen, ...v }) => v);
+const tasteSlim = (votes) => votes.map(({ sid, k, gen, gens, ...v }) => v);
 function tasteFileSave(p) {
   const data = { kind: TASTE_FILE_KIND, v: 1, name: p.name, saved: Date.now(), thumb: p.thumb || '', votes: tasteSlim(p.votes) };
   const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'taste';
@@ -6607,7 +6770,7 @@ for (const [k, c] of Object.entries(apCtl)) {
     showAp(k);
     saveAp();
     // A shorter wait takes effect straight away
-    if (k === 'every' && ap.on) ap.next = Math.min(ap.next, performance.now() + apEverySec() * 1000);
+    if (k === 'every' && ap.on) { ap.next = Math.min(ap.next, performance.now() + apEverySec() * 1000); ap.due = Math.min(ap.due, ap.next); }
     apStatus();
   };
   c.el.addEventListener('input', () => set(+c.el.value));
@@ -6819,6 +6982,26 @@ limDlg.addEventListener('keydown', (e) => {
 });
 
 setInterval(apStatus, 500);
+// The countdown beside More like this and Not this: seconds left on this look, with a ring that empties as they
+// run out. Once the time is up it says what it's waiting for (a look passing its check, or the beat).
+function lookClock() {
+  const el = $('#lookClock');
+  let text, p = 0, off = false;
+  if (!ap.on) { text = 'Autopilot off'; off = true; }
+  else if (frozen) { text = 'Frozen'; off = true; }
+  else if (ap.beatWait) text = 'Next look on the beat';
+  else {
+    const left = (ap.due - performance.now()) / 1000;
+    if (left > 0.5) {
+      const s = Math.ceil(left);
+      text = `Next look in <b>${s < 60 ? s + ' s' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`}</b>`;
+      p = clamp(left * 1000 / ap.span, 0, 1);
+    } else text = ap.prep && ap.prep.hold && !ap.prep.ok ? 'Checking the next look…' : 'Next look coming up';
+  }
+  if (text !== lookClock.shown) { lookClock.shown = text; $('#lookClockText').innerHTML = text; el.classList.toggle('off', off); }
+  el.style.setProperty('--p', p.toFixed(3));
+}
+setInterval(lookClock, 200);
 syncApUI();
 
 /* ================= transport ================= */
