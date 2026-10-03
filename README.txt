@@ -229,14 +229,14 @@ TIPS
     to the next look. Ratings stay in this browser (the newest 400 per
     taste profile).
   - Taste profiles (the section under Autopilot settings): ratings are kept
-    in named profiles and Autopilot follows the lit one. My taste is always
-    there (your presets count as likes in it). "Start taste session" makes
-    a new profile from scratch: rate Autopilot's looks, then press "Finish
-    and name it" in the green bar under the picture. On your own profiles:
-    ✎ rename, ⤓ save as a file to send to someone, × delete (on My taste,
-    clear). "Open a taste file…" (or dropping the file on the page) adds a
-    profile someone sent. Rating while a SHARED profile is lit makes your
-    own copy of it.
+    in named profiles and Autopilot follows the lit one. Tap the lit one
+    again to follow no taste at all. "Start taste session" makes a new
+    profile from scratch: rate Autopilot's looks, then press "Finish and
+    name it" in the green bar under the picture (rating with no profile lit
+    starts a session too). On your own profiles: ✎ rename, ⤓ save as a file
+    to send to someone, × delete. "Open a taste file…" (or dropping the file
+    on the page) adds a profile someone sent. Rating while a SHARED profile
+    is lit makes your own copy of it. Saved presets don't count as likes.
   - Train again: with one of your profiles lit, "Train … again" starts
     another session for it. Autopilot follows the profile as it would live,
     you rate what it brings, and "Finish and add them" adds the new ratings.
