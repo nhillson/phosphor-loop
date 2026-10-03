@@ -101,6 +101,32 @@
   .fs-exit kbd { font: 16px/1 var(--f-osd); padding: 3px 6px; border: 1px solid rgba(255, 255, 255, .25); border-radius: 4px; color: var(--dim); }
   @media (hover: none) { .fs-exit kbd { display: none; } }
   .fs-exit.away { opacity: 0; pointer-events: none; }
+  /* Full screen during a taste session: the timer stays; the rating buttons come and go with the mouse */
+  .fs-taste {
+    position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .fs-taste[hidden] { display: none; }
+  .fs-rate {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 18px; border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, .25); background: rgba(12, 11, 10, .82); color: var(--ink);
+    font: 600 17px/1 var(--f-body); cursor: pointer; box-shadow: 0 6px 24px rgba(0, 0, 0, .5); transition: opacity .4s;
+    white-space: nowrap;
+  }
+  .fs-rate .thumb { width: 18px; height: 18px; }
+  .fs-rate.rate-up { border-color: rgba(61, 220, 132, .6); }
+  .fs-rate.rate-down { border-color: rgba(255, 75, 62, .6); }
+  .fs-rate:hover { background: rgba(40, 36, 32, .92); }
+  .fs-taste.away .fs-rate { opacity: 0; pointer-events: none; }
+  .fs-clock {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+    background: rgba(0, 0, 0, .55); color: rgba(255, 255, 255, .85); font: 600 14px/1 var(--f-body);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .fs-clock .ring {
+    width: 12px; height: 12px; border-radius: 50%; flex: none;
+    background: conic-gradient(var(--gun-g) calc(var(--p, 0) * 1turn), rgba(255, 255, 255, .2) 0);
+  }
   .stage.idle canvas { cursor: none; }
   .bezel {
     padding: 8px;
@@ -791,6 +817,13 @@
           </div>
         </div>
         <button class="fs-exit" id="fsExit" hidden><span class="x" aria-hidden="true">✕</span>Exit full screen <kbd>Esc</kbd></button>
+        <!-- Full screen during a taste session: a small timer at the bottom middle, and the two rating buttons beside it
+             whenever the mouse moves (or the picture is tapped) -->
+        <div class="fs-taste" id="fsTaste" hidden role="group" aria-label="Rate this look">
+          <button class="fs-rate rate rate-up" id="fsRateUp" title="More like this (key Y)"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>More like this</button>
+          <span class="fs-clock" id="fsClock" title="How long until Autopilot’s next new look"><span class="ring" aria-hidden="true"></span><b id="fsClockText">Off</b></span>
+          <button class="fs-rate rate rate-down" id="fsRateDown" title="Not this (key X)"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>Not this</button>
+        </div>
       </div>
 
       <div class="transport taste-strip" id="tasteStrip" role="group" aria-label="Rate this look">
@@ -1453,7 +1486,7 @@
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
-            <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
+            <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. In full screen during a taste session, a small timer sits at the bottom middle of the picture, and More like this and Not this appear beside it whenever you move the mouse (or tap the picture). They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
             <dt>Taste profiles</dt><dd>Your ratings are kept in named taste profiles, and Autopilot follows the lit one (tap another to switch, or tap the lit one again so Autopilot follows no taste at all). Ratings you make outside a session go into the lit profile; with none lit, rating starts a taste session. On your own profiles, ✎ renames, ⤓ saves the profile as a small file you can send to someone, and × deletes it. Open a taste file… (or dropping the file on the page) adds a profile someone sent you. Profiles marked SHARED come from the admin; rating while one is lit starts your own copy of it.</dd>
             <dt>Taste session</dt><dd>Start taste session, under Taste profiles, makes a new profile from scratch. Autopilot brings looks, you rate them with More like this and Not this, and Autopilot learns from them as you go. A green bar under the picture counts your ratings; press Finish and name it to keep the profile, or Cancel (twice, once you’ve rated) to throw it away.</dd>
             <dt>Train again</dt><dd>With one of your profiles lit, Train “…” again starts another session for it: Autopilot follows the profile as it would live, you rate what it brings, and Finish and add them puts the new ratings into the profile. Made for one profile per song, trained over and over until you know what each song will bring.</dd>
@@ -6502,10 +6535,11 @@ function rate(dir) {
     votes.push(vote);
     added = 1;
   }
-  const b = rateBtns[dir];
-  b.classList.remove('flash');
-  void b.offsetWidth;
-  b.classList.add('flash');
+  for (const b of $$(dir > 0 ? '.rate-up' : '.rate-down')) {
+    b.classList.remove('flash');
+    void b.offsetWidth;
+    b.classList.add('flash');
+  }
   showOSD('TASTE', dir > 0 ? 'MORE LIKE THIS' : 'NOT THIS');
   if (added || note) saveTaste();
   const M = tasteModel(), count = M.n.up + M.n.down;
@@ -6587,8 +6621,9 @@ function tasteSummary() {
   const tr = $('#sessionTrain'), lit = src.kind === 'own' ? src.p : null;
   tr.hidden = !!taste.session || !lit;
   if (lit) $('#sessionTrainLbl').textContent = `Train “${lit.name}” again`;
-  // The bar under the picture during a session
+  // The bar under the picture during a session, and the rating buttons and timer in full screen
   $('#sessionBar').hidden = !taste.session;
+  fsTasteShow();
   const sb = $('#sessionStart');
   sb.setAttribute('aria-pressed', String(!!taste.session));
   sb.lastChild.textContent = taste.session ? 'Taste session under way' : 'Start taste session';
@@ -6598,6 +6633,11 @@ function tasteSummary() {
     $('#sessionText').innerHTML = `<b>${what}</b> · ${u + d ? `${u + d} rated (${u} more like this, ${d} not this)` : 'nothing rated yet'}`;
     $('#sessionFinish').textContent = src.training ? 'Finish and add them' : 'Finish and name it';
   }
+}
+// In full screen, the timer and rating buttons show only while a taste session is under way
+function fsTasteShow() {
+  const el = $('#fsTaste');
+  if (el) el.hidden = !(taste.session && (document.fullscreenElement || document.webkitFullscreenElement));
 }
 const tasteIsAdmin = () => { try { return !!adminKey; } catch (_) { return false; } };
 // The profile tiles: yours, then the shared ones
@@ -7093,8 +7133,9 @@ setInterval(apStatus, 500);
 function lookClock() {
   const el = $('#lookClock');
   let text, p = 0, off = false;
-  // Each said the long way and the short way (a phone shows the short one)
-  const say = (long, short) => `<span class="lc-l">${long}</span><span class="lc-s">${short}</span>`;
+  // Each said the long way and the short way (a phone, and the full-screen timer, show the short one)
+  let short = '';
+  const say = (long, sh) => { short = sh; return `<span class="lc-l">${long}</span><span class="lc-s">${sh}</span>`; };
   if (!ap.on) { text = say('Autopilot off', 'Off'); off = true; }
   else if (frozen) { text = say('Frozen', 'Frozen'); off = true; }
   else if (ap.beatWait) text = say('Next look on the beat', 'On beat');
@@ -7106,8 +7147,9 @@ function lookClock() {
       p = clamp(left * 1000 / ap.span, 0, 1);
     } else text = ap.prep && ap.prep.hold && !ap.prep.ok ? say('Checking the next look…', 'Checking…') : say('Next look coming up', 'Coming up');
   }
-  if (text !== lookClock.shown) { lookClock.shown = text; $('#lookClockText').innerHTML = text; el.classList.toggle('off', off); }
+  if (text !== lookClock.shown) { lookClock.shown = text; $('#lookClockText').innerHTML = text; el.classList.toggle('off', off); $('#fsClockText').innerHTML = short; }
   el.style.setProperty('--p', p.toFixed(3));
+  if (!$('#fsTaste').hidden) $('#fsClock').style.setProperty('--p', p.toFixed(3));
 }
 setInterval(lookClock, 200);
 syncApUI();
@@ -7147,17 +7189,22 @@ fullBtn.addEventListener('click', toggleFS);
 const fsExit = $('#fsExit');
 let fsIdleT = null;
 const isFS = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const fsTaste = $('#fsTaste');
 function fsWake(ms = 3000) {
   if (!isFS()) return;
   fsExit.classList.remove('away');
+  fsTaste.classList.remove('away');
   stage.classList.remove('idle');
   clearTimeout(fsIdleT);
   fsIdleT = setTimeout(() => {
-    if (fsExit.matches(':hover')) { fsWake(); return; }
+    if (fsExit.matches(':hover') || fsTaste.matches(':hover')) { fsWake(); return; }
     fsExit.classList.add('away');
+    fsTaste.classList.add('away');
     stage.classList.add('idle');
   }, ms);
 }
+$('#fsRateUp').addEventListener('click', (e) => { rate(1); e.currentTarget.blur(); fsWake(); });
+$('#fsRateDown').addEventListener('click', (e) => { rate(-1); e.currentTarget.blur(); fsWake(); });
 // A mouse shows it just by moving; a finger or pen by tapping. Drawing with the mouse button held leaves it away.
 stage.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && !e.buttons) fsWake(); }, { passive: true });
 stage.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') fsWake(); }, { passive: true });
@@ -7166,8 +7213,9 @@ fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
   const active = isFS();
   fullBtn.textContent = active ? 'Exit full screen' : 'Full screen';
   fsExit.hidden = !active;
+  fsTasteShow();
   if (active) fsWake(4000);
-  else { clearTimeout(fsIdleT); fsExit.classList.remove('away'); stage.classList.remove('idle'); }
+  else { clearTimeout(fsIdleT); fsExit.classList.remove('away'); fsTaste.classList.remove('away'); stage.classList.remove('idle'); }
   fit();
 }));
 

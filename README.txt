@@ -219,6 +219,9 @@ TIPS
   - More like this and Not this (in the small strip right under the picture,
     or the Y and X keys; they can go on MIDI pads too) teach Autopilot your
     taste. Beside them, a countdown shows the seconds this look has left.
+    In full screen during a taste session, a small timer sits at the bottom
+    middle, and the two buttons appear beside it when the mouse moves (or
+    the picture is tapped).
     A rating is for the whole picture on screen, never one loop alone: both
     loops' looks, how they're shown and fed into each other (one pushing,
     dyeing or being the input of the other; zooming and turning alike or
