@@ -778,7 +778,7 @@
         <div class="bezel" id="bezel">
           <div class="screen" id="screenWrap">
             <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to draw light."></canvas>
-            <div class="osd on" id="osd" aria-hidden="true"><span class="osd-a">CH 01</span><span class="osd-b">TUNNEL</span></div>
+            <div class="osd" id="osd" aria-hidden="true"><span class="osd-a"></span><span class="osd-b"></span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
             <div class="tip" id="fsNote" hidden></div>
             <div class="tip" id="tip">Drag on the screen to draw light into the loop. New here? Open the Guide.</div>
@@ -4403,7 +4403,7 @@ function surprise() {
   applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xab: both ? Math.round(rnd(0, 70)) : 0, xba: both ? Math.round(rnd(0, 70)) : 0 });
   syncUI();
   burst();
-  showOSD('CH --', 'SURPRISE');
+  showOSD('SURPRISE', 'NEW LOOK');
 }
 $('#surprise').addEventListener('click', surprise);
 
