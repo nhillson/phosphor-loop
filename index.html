@@ -313,24 +313,6 @@
     border: 1px solid #5a4630; background: rgba(255,174,59,.07); color: #ffc98a; }
   .feed-note .linkish { align-self: flex-start; font-size: 13px; }
 
-  .channels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-  .ch {
-    display: flex; flex-direction: column; gap: 5px; padding: 4px 4px 6px;
-    border-radius: 7px; border: 1px solid var(--line); border-bottom-color: #0c0b0a;
-    background: linear-gradient(var(--raise-2), var(--raise));
-    cursor: pointer; text-align: left; min-width: 0;
-  }
-  .ch:hover { border-color: #564f47; }
-  .ch .sw { position: relative; display: block; height: 30px; border-radius: 4px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
-  .ch .sw::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(20,18,16,.35); }
-  .ch .sw b {
-    position: absolute; left: 4px; top: 1px; z-index: 1;
-    font: 400 18px/1 var(--f-osd); color: #fff; text-shadow: 0 0 4px #000, 1px 1px 0 #000;
-  }
-  .ch .nm { font-size: 13px; line-height: 1.1; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ch .nm.long { font-size: 11px; letter-spacing: -0.01em; padding-inline: 1px; }
-  .ch[aria-pressed="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 1px var(--loop-a), 0 0 14px rgba(255,174,59,.18); }
-  .ch[aria-pressed="true"] .sw::before { background: transparent; }
 
   .meter { display: flex; align-items: stretch; gap: 8px; height: 58px; padding: 6px 8px 4px; border-radius: 6px; background: #070707; border: 1px solid var(--line); }
   .mbar { flex: 1; display: flex; flex-direction: column; gap: 3px; position: relative; }
@@ -349,8 +331,8 @@
   }
   .chip[aria-pressed="true"] { border-color: var(--loop-a); color: var(--press-ink); }
   .chip[aria-pressed="true"] .led { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
-  .ch-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-  .ch-actions .btn { padding-inline: 8px; }
+  .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .quick-actions .btn { padding-inline: 8px; }
   .seg { display: grid; gap: 6px; }
   .seg-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -863,13 +845,12 @@
     </section>
 
     <aside class="panel" aria-label="Controls">
-      <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick a channel</b>, move a slider, or <b>drag on the screen</b> to draw.</p>
+      <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick an input</b>, move a slider, or <b>drag on the screen</b> to draw.</p>
       <div class="panel-tools"><button class="linkish" id="foldAll">Collapse all</button><button class="linkish" id="openAll">Expand all</button></div>
 
-      <section class="group" aria-labelledby="h-ch">
-        <h2 id="h-ch">Channels</h2>
-        <div class="channels" id="channels"></div>
-        <div class="ch-actions">
+      <section class="group" aria-labelledby="h-looks">
+        <h2 id="h-looks">Looks</h2>
+        <div class="quick-actions">
           <button class="btn" id="neutral" title="Just the input, every effect off (key N)">Neutral</button>
           <button class="btn" id="surprise">Surprise me</button>
           <button class="btn" id="autopilot" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
@@ -1468,7 +1449,7 @@
       <section>
         <h2><small>Start here</small>Your first 30 seconds</h2>
         <ol class="g-steps">
-          <li><b>Pick a channel.</b> The buttons at the top of the controls are ready-made looks.</li>
+          <li><b>Pick an input.</b> Under What feeds loop A, choose what goes into the loop: a pattern, a picture, your camera or a 3D world.</li>
           <li><b>Drag on the screen.</b> You draw light straight into the loop and watch it echo.</li>
           <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
           <li><b>Press Surprise me</b> for something new, or <b>Autopilot</b> to let it run by itself.</li>
@@ -1478,8 +1459,7 @@
       <section>
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
-          <div class="g-card"><h3>Channels</h3><dl>
-            <dt>Channels</dt><dd>Ready-made looks. Twins and Weave use both loops. Ink drops colored ink into swirling water. Cubes to City are 3D worlds: floating cubes, a sunset valley, a coral cave, a black hole, northern lights, liquid metal, a fractal hall, a nebula and a wet city street at night drifting sideways. Coral grows zebra stripes and mazes out of a mandala, and Ribbons stretches a spinning pattern through time.</dd>
+          <div class="g-card"><h3>Looks</h3><dl>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
@@ -1561,7 +1541,7 @@
             <dt>Show mode</dt><dd>For a computer that plays at gigs. Each time Phosphor Loop starts it picks up the last look and Autopilot, reconnects the camera and microphone, opens the output window when a second screen is plugged in, and keeps the screen awake. Tap Fill my other screen in the output window to put the picture on the projector.</dd>
             <dt>Without internet</dt><dd>After one visit from its web address, the browser keeps a copy, so Phosphor Loop opens offline. Only the phone link still needs internet. Nature pictures you’ve used are kept too; press Save all nature pictures to keep every one.</dd>
             <dt>MIDI controller</dt><dd>Press Use a MIDI controller and allow it. Then press Learn, touch a slider or button, and move a fader, turn a knob or press a button on the controller. Repeat for each control. Mappings stay in this browser, like presets.</dd>
-            <dt>Pickup</dt><dd>A fader only takes over once it reaches the slider’s current position, so loading a channel or preset never makes the picture jump. Endless knobs work straight away.</dd>
+            <dt>Pickup</dt><dd>A fader only takes over once it reaches the slider’s current position, so loading a look or preset never makes the picture jump. Endless knobs work straight away.</dd>
           </dl></div>
         </div>
       </section>
@@ -1571,11 +1551,10 @@
         <ul class="g-list">
           <li><b>Draw</b> by dragging on the screen with a mouse or finger. What you draw goes into whichever loops are showing, and Mirror copies every stroke.</li>
           <li><b>Drop a file</b>, a picture or a video, onto the screen to feed it in.</li>
-          <li><b>Double-click any slider</b> to put it back where the channel had it.</li>
+          <li><b>Double-click any slider</b> to put it back where the look had it.</li>
           <li><b>Fold away sections</b> you’re not using by clicking their headings, or use Collapse all at the top of the controls.</li>
         </ul>
         <div class="g-keys">
-          <div><kbd>1 … 0, -, =</kbd>Channels</div>
           <div><kbd>Space</kbd>Freeze</div>
           <div><kbd>N</kbd>Neutral</div>
           <div><kbd>R</kbd>Surprise me</div>
@@ -1706,56 +1685,37 @@ const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crys
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
 const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 const MIX_SLIDERS = ['view', 'xab', 'xba'];
-// What loop B holds when a channel only uses loop A, so sliding over to B always shows something.
+// What loop B holds when a look only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
 
-const CHANNELS = [
-  { name: 'Tunnel', A: { in1: 'shape', form: 3, zoom: 45, spin: 14, trails: 86, color: 22, blur: -0.12 },
-    sw: 'linear-gradient(90deg,#1b0f3d,#7b3cff 40%,#ff4fa3 70%,#ffcf6b)' },
-  { name: 'Bloom', A: { in1: 'wave', form: 3, zoom: 18, trails: 90, color: 34, warp: 10, mirror: 6, blur: 0.2 },
-    sw: 'radial-gradient(circle at 50% 50%,#fff3b0 0 10%,#ff7ac6 28%,#6a2bd9 55%,#140a2a 85%)' },
-  { name: 'Vortex', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1 },
-    sw: 'conic-gradient(from 20deg,#ff3b3b,#ffd23b,#3bff9a,#3b8bff,#c43bff,#ff3b3b)' },
-  { name: 'Lattice', A: { in1: 'shape', form: 2, zoom: -30, spin: 9, trails: 90, color: 18, mirror: 4, edge: 1 },
-    sw: 'repeating-linear-gradient(45deg,#0b2a3a 0 6px,#39d0ff 6px 8px),#0b2a3a' },
-  { name: 'Embers', A: { in1: 'sparks', zoom: 55, spin: -22, trails: 84, color: 9, warp: 28, blur: 0.15, shift: [0, 0.0025] },
-    sw: 'radial-gradient(circle at 25% 70%,#ffcf6b 0 7%,transparent 9%),radial-gradient(circle at 70% 35%,#ff7a3b 0 6%,transparent 8%),radial-gradient(circle at 55% 80%,#ff3b3b 0 5%,transparent 7%),linear-gradient(#2a0d05,#120604)' },
-  { name: 'Calm', A: { in1: 'wave', size: 50, form: 2, zoom: 7, spin: 4, trails: 95, color: 5, warp: 14, mirror: 2, blur: 0.35 },
-    sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)' },
+// Looks Autopilot can start from and vary (the first one opens the page)
+const STARTERS = [
+  { name: 'Tunnel', A: { in1: 'shape', form: 3, zoom: 45, spin: 14, trails: 86, color: 22, blur: -0.12 } },
+  { name: 'Bloom', A: { in1: 'wave', form: 3, zoom: 18, trails: 90, color: 34, warp: 10, mirror: 6, blur: 0.2 } },
+  { name: 'Vortex', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1 } },
+  { name: 'Lattice', A: { in1: 'shape', form: 2, zoom: -30, spin: 9, trails: 90, color: 18, mirror: 4, edge: 1 } },
+  { name: 'Embers', A: { in1: 'sparks', zoom: 55, spin: -22, trails: 84, color: 9, warp: 28, blur: 0.15, shift: [0, 0.0025] } },
+  { name: 'Calm', A: { in1: 'wave', size: 50, form: 2, zoom: 7, spin: 4, trails: 95, color: 5, warp: 14, mirror: 2, blur: 0.35 } },
   { name: 'Twins',
     A: { in1: 'shape', form: 3, zoom: 35, spin: 20, trails: 88, color: 12 },
     B: { in1: 'wave', form: 3, zoom: -25, spin: -18, trails: 90, color: 26, mirror: 4, edge: 1, blur: 0.1 },
-    xab: 40, xba: 40, view: 50,
-    sw: 'linear-gradient(90deg,#ffae3b 0 46%,#0e0d0c 46% 54%,#4fd1c5 54%)' },
+    xab: 40, xba: 40, view: 50 },
   { name: 'Weave',
     A: { in1: 'bars', in2: 'wave', blend: 45, zoom: 20, spin: 30, trails: 90, color: 10, mirror: 2 },
     B: { in1: 'sparks', zoom: 50, spin: -40, trails: 86, color: 18, warp: 30 },
-    xab: 70, xba: 45, view: 35,
-    sw: 'repeating-linear-gradient(45deg,rgba(255,174,59,.95) 0 4px,transparent 4px 9px),repeating-linear-gradient(-45deg,rgba(79,209,197,.95) 0 4px,transparent 4px 9px),#101418' },
-  { name: 'Ink', A: { in1: 'ink', size: 70, zoom: 0, spin: 0, trails: 100, color: 3, flow: 75, blur: 0.03 },
-    sw: 'radial-gradient(ellipse at 30% 40%,#ff4fa3 0 8%,transparent 26%),radial-gradient(ellipse at 68% 62%,#3b8bff 0 10%,transparent 30%),radial-gradient(ellipse at 60% 25%,#3bffd0 0 5%,transparent 18%),#07080f' },
-  { name: 'Cubes', A: { in1: 'cubes', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 55% 50%,#fff 0 6%,#ff5ccf 8%,rgba(70,190,255,.7) 12%,transparent 34%),linear-gradient(#9aa6b4,#9aa6b4) 24% 26%/6px 6px no-repeat,linear-gradient(#c8202e,#c8202e) 74% 28%/5px 5px no-repeat,linear-gradient(#4a1420,#4a1420) 10% 90%/11px 11px no-repeat,linear-gradient(#b8c4d0,#b8c4d0) 84% 76%/4px 4px no-repeat,linear-gradient(#3a0f18,#3a0f18) 96% 8%/10px 10px no-repeat,linear-gradient(#6d7784,#6d7784) 38% 78%/4px 4px no-repeat,#050306' },
-  { name: 'Horizon', A: { in1: 'horizon', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 50% 58%,#ffd23b 0 14%,#ff4fae 22%,transparent 23%),repeating-linear-gradient(90deg,#ff3bd0 0 1px,transparent 1px 8px) 0 100%/100% 42% no-repeat,repeating-linear-gradient(0deg,#ff3bd0 0 1px,transparent 1px 4px) 0 100%/100% 42% no-repeat,linear-gradient(#12031f,#6a1756 56%,#1a0624 58%)' },
-  { name: 'Cavern', A: { in1: 'cavern', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 78% 28%,#7dff9a 0 3%,transparent 4%),radial-gradient(circle at 22% 70%,#6fe3ff 0 2%,transparent 3%),radial-gradient(circle at 50% 55%,#04060c 0 12%,transparent 13%),radial-gradient(circle at 50% 55%,transparent 0 22%,#c23bff 23% 25%,transparent 26%),radial-gradient(circle at 50% 55%,transparent 0 36%,#2de0c0 37% 39%,transparent 40%),radial-gradient(circle at 30% 30%,#3a2a6a,#0a1420 75%)' },
-  { name: 'Black hole', A: { in1: 'blackhole', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(ellipse 62% 13% at 50% 56%,transparent 0 22%,#ffb04a 34%,#ff6a1a 52%,transparent 74%),radial-gradient(circle at 50% 50%,#000 0 17%,#ffe0a0 20%,#ff8a3a 25%,transparent 32%),#040306' },
-  { name: 'Aurora', A: { in1: 'aurora', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'linear-gradient(180deg,transparent 0 58%,#03060c 58% 66%,transparent 66%),radial-gradient(ellipse 70% 26% at 45% 42%,#3dffa0 0 18%,rgba(90,110,255,.55) 48%,transparent 72%),linear-gradient(#1c0a30,#07121e 58%,#0b1d28 66%,#02050a)' },
-  { name: 'Mercury', A: { in1: 'mercury', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 36% 44%,#fff 0 5%,#c3cddd 11%,#3b4454 25%,transparent 27%),radial-gradient(circle at 64% 58%,#fff 0 4%,#cdb2ee 10%,#3a3150 21%,transparent 23%),linear-gradient(#2a1540,#0b0b12)' },
-  { name: 'Fractal', A: { in1: 'fractal', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 30% 42%,#ffb34a 0 12%,transparent 13%),radial-gradient(circle at 62% 36%,#4ad0a0 0 15%,transparent 16%),radial-gradient(circle at 50% 78%,#b44aff 0 10%,transparent 11%),radial-gradient(circle at 82% 72%,#ff4a8a 0 8%,transparent 9%),radial-gradient(circle at 14% 80%,#4a9aff 0 7%,transparent 8%),#1a0f22' },
-  { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 56% 40%,#fff 0 3%,transparent 7%),radial-gradient(ellipse at 34% 46%,rgba(255,80,170,.85) 0,transparent 48%),radial-gradient(ellipse at 66% 56%,rgba(90,110,255,.85) 0,transparent 52%),#0a0514' },
-  { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 },
-    sw: 'radial-gradient(circle at 76% 22%,#fff4dc 0 5%,transparent 6%),linear-gradient(#ffb04a,#ffb04a) 14% 64%/3px 3px no-repeat,linear-gradient(#ff6fb5,#ff6fb5) 38% 50%/3px 3px no-repeat,linear-gradient(#ffe6a0,#ffe6a0) 60% 72%/3px 3px no-repeat,linear-gradient(#ff6fb5,#ff6fb5) 88% 62%/3px 3px no-repeat,linear-gradient(#2c34f0,#2c34f0) 6% 100%/22% 54% no-repeat,linear-gradient(#5a3cd0,#5a3cd0) 36% 100%/18% 74% no-repeat,linear-gradient(#7474ff,#7474ff) 62% 100%/22% 46% no-repeat,linear-gradient(#1c1f9a,#1c1f9a) 92% 100%/20% 62% no-repeat,linear-gradient(180deg,#0b0a40,#2330f0 62%,#a24cf0)' },
-  { name: 'Coral', A: { in1: 'wave', form: 3, zoom: 14, trails: 92, color: 24, warp: 6, mirror: 6, blur: 0.1, grow: 60, growSize: 1 },
-    sw: 'repeating-radial-gradient(circle at 50% 55%,#06120f 0 3px,#3bffb0 3px 5px,#eafff6 5px 6px,#06120f 6px 9px)' },
-  { name: 'Ribbons', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1, time: 85, timeShape: 2 },
-    sw: 'repeating-linear-gradient(100deg,#1a0b2e 0 5px,#ff4fa3 5px 8px,#ffcf6b 8px 10px,#3b8bff 10px 13px)' }
+    xab: 70, xba: 45, view: 35 },
+  { name: 'Ink', A: { in1: 'ink', size: 70, zoom: 0, spin: 0, trails: 100, color: 3, flow: 75, blur: 0.03 } },
+  { name: 'Cubes', A: { in1: 'cubes', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Horizon', A: { in1: 'horizon', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Cavern', A: { in1: 'cavern', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Black hole', A: { in1: 'blackhole', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Aurora', A: { in1: 'aurora', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Mercury', A: { in1: 'mercury', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Fractal', A: { in1: 'fractal', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Coral', A: { in1: 'wave', form: 3, zoom: 14, trails: 92, color: 24, warp: 6, mirror: 6, blur: 0.1, grow: 60, growSize: 1 } },
+  { name: 'Ribbons', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1, time: 85, timeShape: 2 } }
 ];
 
 /* ================= state ================= */
@@ -1774,7 +1734,6 @@ const loops = { A: mkLoop(), B: mkLoop() };
 const mixDefaults = { view: 0, xab: 0, xba: 0 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
 let edit = 'A';
-let channel = -1;
 let activePresetId = null;
 let drift = !reduceMotion;
 let frozen = false;
@@ -4070,20 +4029,6 @@ function say(el, html, warn) {
   el.classList.toggle('warn', !!warn);
 }
 
-/* ================= UI: channels ================= */
-const chWrap = $('#channels');
-CHANNELS.forEach((c, i) => {
-  const b = document.createElement('button');
-  b.className = 'ch';
-  b.setAttribute('aria-pressed', 'false');
-  b.dataset.look = c.name;   // first, so a MIDI button learned on a channel follows it by name
-  b.dataset.ch = i;
-  b.title = `Channel ${i + 1}: ${c.name}`;
-  b.innerHTML = `<span class="sw" style="--sw:${c.sw}"></span><span class="nm${c.name.length > 8 ? ' long' : ''}">${c.name}</span>`;
-  b.addEventListener('click', () => loadChannel(i));
-  chWrap.appendChild(b);
-});
-
 /* ================= UI: sliders ================= */
 const sliderEls = {}, outputs = {};
 [...LOOP_SLIDERS, ...MIX_SLIDERS].forEach((k) => {
@@ -4365,7 +4310,6 @@ function syncUI() {
   $('#blendCtl').hidden = t.in2 === 'none';
   $$('#mirror button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mirror === t.mirror)));
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
-  $$('.ch').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ch === channel)));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text']) $('#row-' + s).hidden = !usesHere(s);
   syncTextUI();
@@ -4388,7 +4332,7 @@ function syncUI() {
   syncVisibility();
 }
 
-/* ================= channels & surprise ================= */
+/* ================= looks & surprise ================= */
 function liveActive(src) {
   if (src === 'phone') return pho.on;
   if (src === 'spectro') return !!snd.analyser;   // a spectrograph that's hearing something stays, like a running camera
@@ -4397,8 +4341,8 @@ function liveActive(src) {
 }
 function patchLoop(k, p, force) {
   const L = loops[k];
-  // On channel changes a running camera, phone, screen, video or spectrograph stays put, except that a 3D world's
-  // own channel always shows its world; recipes set everything
+  // On a new look a running camera, phone, screen, video or spectrograph stays put, unless the look is a
+  // 3D world; recipes and presets set everything
   const keep = !force && liveActive(L.tgt.in1) && !is3D(p.in1) ? L.tgt.in1 : null;
   const n = { ...loopDefaults(), ...p };
   if (p.shift) { n.shiftX = p.shift[0]; n.shiftY = p.shift[1]; }
@@ -4421,15 +4365,6 @@ function applyPatch(c) {
   mix.tgt.xba = c.xba ?? 0;
   mix.base = { ...mix.tgt };
   settleDevices();
-}
-function loadChannel(i) {
-  takeOver();
-  markPreset(null);
-  channel = i;
-  applyPatch(CHANNELS[i]);
-  syncUI();
-  burst();
-  showOSD(`CH ${String(i + 1).padStart(2, '0')}`, CHANNELS[i].name.toUpperCase());
 }
 function surpriseSelf() {
   const sc = {};
@@ -4465,7 +4400,6 @@ function surprise() {
   takeOver();
   markPreset(null);
   const both = Math.random() < 0.5;
-  channel = -1;
   applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xab: both ? Math.round(rnd(0, 70)) : 0, xba: both ? Math.round(rnd(0, 70)) : 0 });
   syncUI();
   burst();
@@ -5039,7 +4973,6 @@ function neutral() {
   if (frozen) toggleFreeze(false);
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
-  channel = -1;
   const flat = {
     in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
@@ -5534,7 +5467,7 @@ function whiteWatch(now, dt, wA, wB) {
   }
 }
 
-// Two Autopilot buttons: one under Channels, and one in the row under the picture,
+// Two Autopilot buttons: one under Looks, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
 const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
 function setAutopilot(on, quiet) {
@@ -5551,7 +5484,6 @@ function setAutopilot(on, quiet) {
   apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
   if (on) {
     setDrift(true);
-    channel = -1;
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
     ap.due = ap.next;
     ap.span = ap.next - performance.now();
@@ -5785,8 +5717,8 @@ function apSceneRaw(k) {
   const pool = apPool(), w = apSet.wild / 100;
   let sc;
   if (Math.random() < 0.45) {
-    // Start from one of the channels and vary it
-    const c = pick(CHANNELS), j = 2 * w;
+    // Start from one of the starter looks and vary it
+    const c = pick(STARTERS), j = 2 * w;
     sc = { ...((c.B && Math.random() < 0.5) ? c.B : c.A) };
     sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12) * j, -60, 80));
     sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15) * j, -70, 70));
@@ -6984,7 +6916,7 @@ $('#apReset').addEventListener('click', () => {
 // Check each look and the white-out watch are doing
 function apStatus() {
   let html;
-  if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (under Channels, under the picture, or the P key) to start it.';
+  if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (under Looks, under the picture, or the P key) to start it.';
   else {
     const s = Math.max(0, Math.round((ap.next - performance.now()) / 1000));
     const P = ap.prep, holding = P && P.hold && !P.ok;
@@ -7698,7 +7630,7 @@ $('#camOff').addEventListener('click', () => dropSource('camera'));
 function dropSource(src) {
   for (const k of ['A', 'B']) {
     const t = loops[k].tgt;
-    if (t.in1 === src) t.in1 = (channel >= 0 && CHANNELS[channel][k] && !LIVE.includes(CHANNELS[channel][k].in1)) ? CHANNELS[channel][k].in1 : (k === 'A' ? 'wave' : 'shape');
+    if (t.in1 === src) t.in1 = k === 'A' ? 'wave' : 'shape';
     if (t.in2 === src) t.in2 = 'none';
   }
   settleDevices();
@@ -8079,7 +8011,6 @@ function applyRecipe(r) {
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
   if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
-  channel = -1;
   patchLoop('A', p.A, true);
   patchLoop('B', p.B || B_PARTNER, true);
   mix.tgt.view = p.view ?? 0;
@@ -8253,7 +8184,6 @@ presetForm.addEventListener('submit', async (e) => {
 function loadPreset(pr, quiet) {
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
-  channel = -1;
   patchLoop('A', d.A || {}, true);
   patchLoop('B', d.B || B_PARTNER, true);
   const m = d.mix || {};
@@ -9670,7 +9600,7 @@ let midiSaved = { enabled: false, maps: [] };
 try {
   const v = JSON.parse(lsGet(MIDI_KEY) || 'null');
   if (v && Array.isArray(v.maps)) midiSaved = { enabled: !!v.enabled, maps: v.maps.filter((m) => m && m.t && m.key) };
-  // An input, channel, button or slider that has been taken out of Phosphor Loop loses its mappings
+  // An input, look, button or slider that has been taken out of Phosphor Loop loses its mappings
   const gone = (t) => (t.sel && /data-(src|look|when)=/.test(t.sel) && !document.querySelector(t.sel)) ||
     (t.kind === 'mix' && !MIX_SLIDERS.includes(t.key));
   const kept = midiSaved.maps.filter((m) => !gone(m.t));
@@ -9756,7 +9686,6 @@ function btnAddress(b) {
   return null;
 }
 function btnLabel(b) {
-  if (b.classList.contains('ch')) { const i = +b.dataset.ch; return `Channel ${i + 1}: ${CHANNELS[i].name}`; }
   const tile = b.closest('.pre');
   if (tile) { const pr = [...presets, ...shared].find((p) => p.id === tile.dataset.id); return `Preset: ${pr ? pr.name : 'saved look'}`; }
   const text = (b.getAttribute('aria-label') || b.textContent || '').replace(/­/g, '').replace(/\s+/g, ' ').trim();
@@ -10788,13 +10717,10 @@ function frame() {
 }
 
 /* ================= start ================= */
-const startCh = reduceMotion ? Math.max(0, CHANNELS.findIndex((c) => c.name === 'Calm')) : 0;
-channel = startCh;
-applyPatch(CHANNELS[startCh]);
+applyPatch(STARTERS[reduceMotion ? Math.max(0, STARTERS.findIndex((c) => c.name === 'Calm')) : 0]);
 for (const key of ['A', 'B']) Object.assign(loops[key].cur, loops[key].tgt);
 Object.assign(mix.cur, mix.tgt);
 setEdit('A');
-showOSD(`CH ${String(startCh + 1).padStart(2, '0')}`, CHANNELS[startCh].name.toUpperCase());
 // Autopilot's eye is made now, with everything else, so starting Autopilot never waits for it
 eyeSetup();
 requestAnimationFrame(frame);

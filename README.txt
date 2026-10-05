@@ -48,7 +48,7 @@ ANDROID APP
   To build it again by hand: Actions > Android app > Run workflow.
 
 YOU CAN JUST DOUBLE-CLICK index.html
-Everything works that way except the phone link: channels, both loops,
+Everything works that way except the phone link: both loops,
 cross-feed, drawing, pictures, video files, your webcam and screen sharing.
 Use Chrome or Edge.
 
@@ -152,7 +152,7 @@ TIPS
     classic "camera pointed at the TV" feedback.
   - Loop B: slide "What you see" to Both, then raise "Feed A into B" and/or
     "Feed B into A". Or pick "Loop A's picture" as loop B's input to feed it
-    in directly. The Twins and Weave channels show it off.
+    in directly.
   - The Feed sliders pour one loop into the other loop's trails, so the loop
     being fed has to be on screen and have some Trails. Raising a feed brings
     that loop on screen by itself, and if its Trails are at 0 a note under the
@@ -191,14 +191,14 @@ TIPS
   - Grow (in "Shape loop", under Dyed by) makes the picture grow patterns out
     of itself, like coral, zebra stripes or fingerprints. They start at
     outlines and spread through anything lit. Fine, Medium and Big set how far
-    apart the stripes sit. Keep Trails high. Try the Coral channel, or the
-    Guide's "Living picture" recipe.
+    apart the stripes sit. Keep Trails high. Try the Guide's "Living picture"
+    recipe.
   - Time warp (in "Shape loop", at the bottom) shows each part of the picture
     from a different moment: one edge (or the middle) is now, the other up to
     about a second and a half ago. Anything moving stretches into ribbons and
     waves. Top to bottom, Side to side and From the middle pick which way time
-    runs. Try the Ribbons channel, or the Guide's "Rubber time" recipe with a
-    camera and wave your arms.
+    runs. Try the Guide's "Rubber time" recipe with a camera and wave your
+    arms.
   - Autopilot (in the row of buttons under the picture, next to Surprise me,
     or the P key) changes the settings slowly by itself. Every 1 to 3 new
     looks (at random) it also puts in a different nature picture, from the
@@ -279,7 +279,7 @@ TIPS
   - Pin on both loops: right-click a pin (or press and hold it on a
     touchscreen) and the setting stays put on both loops, the same on each.
     The pin then says AB. Right-click it again to let it go on both.
-  - Autopilot settings (the section under Channels): how often a new look
+  - Autopilot settings (the section under Looks): how often a new look
     comes, how slowly it fades in, how wild it gets, and how often it mixes
     the two loops. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
@@ -314,10 +314,10 @@ TIPS
     your laptop. If nothing opens, allow pop-ups for the page.
   - Neutral (next to Surprise me, or the N key) shows just loop A's input
     with every effect off. Raise Trails first, then Zoom and Spin.
-  - Ink in water: the Ink channel drops colored ink that
+  - Ink in water: Ink under "What feeds the loop" drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
-    look, and Ink under "What feeds the loop" gives you the drops.
-  - 3D worlds: nine channels take you into a 3D world.
+    look.
+  - 3D worlds: 3D world under "What feeds the loop" takes you into one of nine.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
         glowing grid mountains on both sides.
