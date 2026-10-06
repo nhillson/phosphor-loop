@@ -283,7 +283,7 @@ TIPS
     comes, how slowly it fades in, how wild it gets, and how often it mixes
     the two loops. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
-    input (Camera, 3D worlds, Ink, Text and so on) you don't want it to bring in.
+    input (Camera, 3D worlds, Fractals, Ink, Text and so on) you don't want it to bring in.
   - Fader limits (the button under Autopilot settings): one slider with two
     handles for every slider Autopilot moves, both loops at once. Drag the
     left handle to the lowest and the right handle to the highest you want
@@ -335,6 +335,19 @@ TIPS
     widens or narrows the view. With React to sound on, the flight surges
     forward on the kick and the lights flare on the beat. For warp-speed
     streaks, raise Trails to about 60 and Zoom to about 30.
+  - Fractals: Fractals under "What feeds the loop" flies a camera through
+    one of six 3D fractals. Pick which in the row of buttons underneath.
+      Menger sponge: a cube with a cross-shaped hole through it, and the
+        same hole through every smaller cube, without end.
+      Mandelbulb: the Mandelbrot set worked out in 3D, buds on buds.
+      Mandelbox: a block folded over and over into arches, ribs and pits.
+      Sierpinski: a golden pyramid made of smaller and smaller pyramids.
+      Julia: a slice of a 4D Julia set, swirling rainbow tubes.
+      Kaleidoscope: a shape mirrored over and over into faceted crystal.
+    There's no set path: the camera wanders on its own, turning and rolling,
+    sweeping round the outside, diving deep into the detail (it never runs
+    out) and climbing back out again, about once a minute. Loop A and loop B
+    each take their own route. It never touches the surface.
   - Spectrograph: a picture of the sound itself. Under "What feeds the
     loop" press Spectrograph, then Computer sound or Microphone right
     underneath. Low sounds sit at the bottom, high ones at the top, and the
