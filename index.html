@@ -4225,11 +4225,9 @@ function sceneReady(sc, wait) {
 const is3D = (src) => !!SCENES[src];
 const worldOK = (name) => !!SCENES[name] && SCENES[name].state !== 'failed';
 const worldsOK = () => Object.keys(SCENES).filter(worldOK);
-// For Surprise and Autopilot's mix: two 3D worlds and one fractal, picked at random
-const someScenes = () => {
-  const mixed = worldsOK().sort(() => Math.random() - 0.5);
-  return [...mixed.filter((n) => SCENES[n].group !== 'fractal').slice(0, 2), ...mixed.filter((n) => SCENES[n].group === 'fractal').slice(0, 1)];
-};
+// For Surprise and Autopilot: every 3D world and every fractal this graphics card can draw, each one its own
+// input with the same chance of coming up as Wave, Shape or any other
+const allScenes = () => worldsOK();
 
 const U = (prog, name) => prog.u[name] || null;
 function set1f(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1f(l, v); }
@@ -4904,7 +4902,8 @@ function surpriseSelf() {
 }
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...someScenes(),
+  // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5,
@@ -6211,15 +6210,16 @@ function syncPins() {
   $('#apUnpin').hidden = !names.length;
 }
 
+// The inputs Autopilot can bring in right now, one chance each: every 3D world and every fractal is its own
+// input, as likely as Wave, Shape or a running camera
 function apPool() {
-  const pool = ['wave', 'wave', 'shape', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text'];
-  // Using the other loop as an input is one more way of mixing the loops
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...allScenes()];
+  // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
-  pool.push(...someScenes());
-  if (vid.on) pool.push('video', 'video');
-  for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src, src, src);
-  if (snd.analyser) pool.push('spectro', 'spectro');
+  if (vid.on) pool.push('video');
+  for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src);
+  if (snd.analyser) pool.push('spectro');
   // Leave out the inputs switched off under Autopilot settings. If that leaves nothing it can use right now
   // (say only Camera is on, and no camera is running), it uses them all rather than stall.
   const ok = pool.filter(apAllowed);
@@ -6247,20 +6247,25 @@ function apSelf(sc, w) {
 // The look as Autopilot would make it without your taste (apScene, under Learn my taste, leans it your way)
 function apSceneRaw(k) {
   const pool = apPool(), w = apSet.wild / 100;
+  // The input comes first, with the same chance for each, so the starter looks below can't tip it towards the
+  // inputs they happen to use
+  const in1 = pick(pool);
   let sc;
   if (Math.random() < 0.45) {
-    // Start from one of the starter looks and vary it
+    // Start from one of the starter looks and vary it: one made for this input when there is one
+    const fits = STARTERS.flatMap((c) => [c.A, c.B]).filter((s) => s && s.in1 === in1);
     const c = pick(STARTERS), j = 2 * w;
-    sc = { ...((c.B && Math.random() < 0.5) ? c.B : c.A) };
+    sc = { ...(fits.length ? pick(fits) : (c.B && Math.random() < 0.5) ? c.B : c.A) };
     sc.zoom = Math.round(clamp((sc.zoom ?? 0) + rnd(-12, 12) * j, -60, 80));
     sc.spin = Math.round(clamp((sc.spin ?? 0) + rnd(-15, 15) * j, -70, 70));
     sc.color = Math.round(clamp((sc.color ?? 10) + rnd(-6, 10) * j, 0, 30 + 30 * w));
-    if (Math.random() < 0.35 || !apAllowed(sc.in1)) sc.in1 = pick(pool);
+    // A starter made for another input gives up its size too, so the new input gets one that suits it
+    if (sc.in1 !== in1) { sc.in1 = in1; delete sc.size; }
     if (sc.in2 && !pool.includes(sc.in2)) sc.in2 = 'none';
   } else {
     const zoom = Math.round(Math.random() < 0.25 ? rnd(-(10 + 60 * w), -10) : Math.min(85, rnd(5, 15 + 90 * w)));
     sc = {
-      in1: pick(pool), form: 2 + Math.floor(Math.random() * 4), zoom,
+      in1, form: 2 + Math.floor(Math.random() * 4), zoom,
       spin: Math.round(rnd(-1, 1) * (10 + 70 * w)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 8 + 48 * w)),
       warp: Math.round(Math.random() < 0.9 - 0.6 * w ? rnd(0, 5 + 20 * w) : rnd(15, 15 + 60 * w)),
       flow: Math.random() < 0.5 * w ? Math.round(rnd(30, 80)) : 0,
