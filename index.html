@@ -1484,7 +1484,7 @@
             <dt>Follow my taste</dt><dd>Under Taste profiles. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting).</dd>
             <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. With Check each look on, a look that’s ready goes on at once; otherwise it takes two or three seconds to find one that passes. The wait for the look after starts over.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it (or just move that slider, with Pin it, keep going chosen) and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Under Autopilot settings, When you move a control while it runs offers two other ways: Play along (your move takes effect, nothing gets pinned, and Autopilot keeps going and changes it again with its next look) or Stop Autopilot.</dd>
-            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. How wild also sets how much each new look changes: at Calm only a few settings and inputs change, in the middle about 3 in 4 of them get something new (every effect is on in about half the looks), and at Wild nearly all of them change and most effects are on at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
@@ -4897,9 +4897,15 @@ function applyPatch(c) {
   mix.base = { ...mix.tgt };
   settleDevices();
 }
+// Surprise me: about half the time one of the feeds-on-itself effects, now and then two
 function surpriseSelf() {
   const sc = {};
-  apSelf(sc, 0.5);
+  for (const key of SELF) sc[key] = 0;
+  let n = Math.random() < 0.525 ? (Math.random() < 0.15 ? 2 : 1) : 0;
+  while (n-- > 0) {
+    const key = pick(SELF), [lo, hi] = SELF_RANGE[key];
+    sc[key] = Math.round(rnd(lo, lo + (hi - lo) * 0.7));
+  }
   return sc;
 }
 function randomLoop() {
@@ -6240,26 +6246,54 @@ function apRealInput() {
   const p = apPool().filter((x) => x !== 'loop');
   return p.length ? pick(p) : 'wave';
 }
-// A new look. How wild (w) stretches how far it zooms, spins and tints, and how often it warps, flows and melts;
-// at the middle of the slider it behaves as Autopilot always has.
+// A new look. How wild (w) stretches how far it zooms, spins and tints, and sets the odds of every setting changing
+// (see apOdds and apSwitch).
 // (k: the loop it's for, whose own pins it keeps)
-// Feeds on itself, for a new look: about half the time one of them, and in wilder looks sometimes two, each
-// somewhere in its own useful range
+// How wild sets Autopilot's odds, for every setting alike:
+//  - apOdds: the chance each effect (Flow, Melt, Push, Dye, Split, Grow, Time warp, the seven feeds-on-itself
+//    effects, and a second input) is on in a new look. 5% at 0, about half at the middle, 90% at the top. At the
+//    middle each effect gets a new value in about 3 new looks in 4.
+//  - apSwitch: the chance the input and the main sliders (Zoom, Spin, Trails, Color, Warp, mirror, softness,
+//    pattern) get something new rather than staying as the loop on screen has them. 20% at 0, 80% at the middle,
+//    every time from about 67 up.
+const apOdds = (w) => Math.min(0.9, 0.05 + 0.85 * w);
+const apSwitch = (w) => Math.min(1, 0.2 + 1.2 * w);
+// Feeds on itself, for a new look: each of the seven on its own roll, somewhere in its own useful range
 const SELF_RANGE = { lookup: [25, 80], chase: [35, 90], breathe: [35, 90], chroma: [25, 80], restless: [30, 85], julia: [35, 100], crystal: [30, 85] };
 function apSelf(sc, w) {
-  for (const key of SELF) sc[key] = 0;
-  let n = Math.random() < 0.35 + 0.35 * w ? (Math.random() < 0.3 * w ? 2 : 1) : 0;
-  while (n-- > 0) {
-    const key = pick(SELF), [lo, hi] = SELF_RANGE[key];
-    sc[key] = Math.round(rnd(lo, lo + (hi - lo) * (0.4 + 0.6 * w)));
+  for (const key of SELF) {
+    const [lo, hi] = SELF_RANGE[key];
+    sc[key] = Math.random() < apOdds(w) ? Math.round(rnd(lo, lo + (hi - lo) * (0.4 + 0.6 * w))) : 0;
   }
+}
+// The other effects, each on its own roll, somewhere in its own useful range (How wild stretches how strong).
+// One a starter look already has on stays as the starter has it.
+const AP_FX = {
+  flow: () => rnd(30, 80),
+  melt: (w) => rnd(20, 20 + 80 * w),
+  push: (w) => rnd(25, 25 + 60 * w),
+  dye: (w) => rnd(20, 20 + 70 * w),
+  split: (w) => rnd(10, 10 + 60 * w),
+  grow: (w) => rnd(35, 35 + 55 * w),
+  time: (w) => rnd(30, 30 + 70 * w),
+};
+function apFx(sc, w) {
+  for (const [key, val] of Object.entries(AP_FX)) {
+    if (sc[key] > 0) continue;
+    sc[key] = Math.random() < apOdds(w) ? Math.round(val(w)) : 0;
+  }
+  if (sc.grow && sc.growSize == null) sc.growSize = Math.floor(Math.random() * 3);
+  if (sc.time && sc.timeShape == null) sc.timeShape = Math.floor(Math.random() * 3);
 }
 // The look as Autopilot would make it without your taste (apScene, under Learn my taste, leans it your way)
 function apSceneRaw(k) {
-  const pool = apPool(), w = apSet.wild / 100;
-  // The input comes first, with the same chance for each, so the starter looks below can't tip it towards the
-  // inputs they happen to use
-  const in1 = pick(pool);
+  const pool = apPool(), w = apSet.wild / 100, sw = apSwitch(w);
+  // The loop on screen now (the new look goes on the other one)
+  const shown = loops[k === 'A' ? 'B' : 'A'].tgt;
+  // The input comes first: as How wild says, a new one (the same chance for each, so the starter looks below can't
+  // tip it towards the inputs they happen to use) or the one on screen now
+  const keepIn = Math.random() >= sw && shown.in1 !== 'loop' && pool.includes(shown.in1);
+  const in1 = keepIn ? shown.in1 : pick(pool);
   let sc;
   if (Math.random() < 0.45) {
     // Start from one of the starter looks and vary it: one made for this input when there is one
@@ -6278,19 +6312,25 @@ function apSceneRaw(k) {
       in1, form: 2 + Math.floor(Math.random() * 4), zoom,
       spin: Math.round(rnd(-1, 1) * (10 + 70 * w)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 8 + 48 * w)),
       warp: Math.round(Math.random() < 0.9 - 0.6 * w ? rnd(0, 5 + 20 * w) : rnd(15, 15 + 60 * w)),
-      flow: Math.random() < 0.5 * w ? Math.round(rnd(30, 80)) : 0,
-      melt: Math.random() < 0.4 * w ? Math.round(rnd(20, 20 + 80 * w)) : 0,
-      push: Math.random() < 0.3 * w ? Math.round(rnd(25, 25 + 60 * w)) : 0,
-      dye: Math.random() < 0.3 * w ? Math.round(rnd(20, 20 + 70 * w)) : 0,
-      split: Math.random() < 0.2 * w ? Math.round(rnd(10, 10 + 60 * w)) : 0,
-      grow: Math.random() < 0.3 * w ? Math.round(rnd(35, 35 + 55 * w)) : 0, growSize: Math.floor(Math.random() * 3),
-      time: Math.random() < 0.3 * w ? Math.round(rnd(30, 30 + 70 * w)) : 0, timeShape: Math.floor(Math.random() * 3),
+      growSize: Math.floor(Math.random() * 3), timeShape: Math.floor(Math.random() * 3),
       mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
       edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
     };
-    if (Math.random() < 0.25) { sc.in2 = pick(pool.filter((x) => x !== sc.in1)); sc.blend = Math.round(rnd(30, 70)); }
+  }
+  // Each effect, and a second input, on its own roll (see apOdds), on starter looks and new ones alike
+  apFx(sc, w);
+  if ((!sc.in2 || sc.in2 === 'none') && Math.random() < apOdds(w)) {
+    const two = pool.filter((x) => x !== sc.in1);
+    if (two.length) { sc.in2 = pick(two); sc.blend = Math.round(rnd(30, 70)); }
   }
   apSelf(sc, w);
+  // The main sliders: as How wild says, each one new or kept as the loop on screen has it
+  for (const key of ['zoom', 'spin', 'trails', 'color', 'warp', 'mirror', 'blur', 'form']) {
+    if (Math.random() >= sw && shown[key] != null) {
+      sc[key] = shown[key];
+      if (key === 'zoom') sc.edge = shown.edge;
+    }
+  }
   return apFinish(sc, k);
 }
 // The last touches on a new look: pinned settings, and a size that suits its input. A look varied from one you
@@ -6358,13 +6398,13 @@ function freshLook(k, shown) {
   eyeForget(k);
 }
 // With What you see pinned, a loop on screen changes in place instead, gliding into its new look.
-// Most of the time it keeps its input and mirror, so the picture changes shape rather than jumping.
+// As often as How wild says, it keeps its input and mirror, so the picture changes shape rather than jumping.
 function glideLook(k) {
-  const L = loops[k], sc = apScene(k), favMix = sc.favMix;
+  const L = loops[k], sc = apScene(k), favMix = sc.favMix, sw = apSwitch(apSet.wild / 100);
   delete sc.favMix;
-  if (Math.random() < 0.7) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
-  // Keeping its inputs, unless one of them has been switched off under Autopilot settings
-  if (Math.random() < 0.65 && apAllowed(L.tgt.in1)) {
+  if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
+  // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
+  if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
     for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }

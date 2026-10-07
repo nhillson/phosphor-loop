@@ -286,7 +286,14 @@ TIPS
     The pin then says AB. Right-click it again to let it go on both.
   - Autopilot settings (the section under Looks): how often a new look
     comes, how slowly it fades in, how wild it gets, and how often it mixes
-    the two loops. "Change on the beat" makes each new look cut in on a beat
+    the two loops.
+  - How wild also sets how much each new look changes, for every slider and
+    input alike. At Calm only a few change (about 1 in 5 inputs and main
+    sliders, effects rarely on). In the middle about 3 in 4 get something
+    new: the input usually switches, and every effect (Flow, Melt, Push,
+    Dye, Split, Grow, Time warp, the seven feeds-on-itself effects and a
+    second input) is on in about half the looks, on its own roll. At Wild
+    nearly everything changes and most effects are on at once. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
     input (Camera, 3D worlds, Fractals, Ink, Text and so on) you don't want it to bring in.
   - Fader limits (the button under Autopilot settings): one slider with two
