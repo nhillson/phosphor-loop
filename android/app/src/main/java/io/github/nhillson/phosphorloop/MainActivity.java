@@ -546,10 +546,10 @@ public class MainActivity extends Activity {
 
     private void showCantOpen() {
         String html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
-                + "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#191816;"
-                + "color:#ece5d6;font:18px/1.5 sans-serif;text-align:center;padding:24px;box-sizing:border-box}"
-                + "a{display:inline-block;margin-top:18px;padding:14px 26px;border-radius:8px;background:#4a3a22;color:#ffe2b8;"
-                + "border:1px solid #ffae3b;text-decoration:none;font-weight:600}</style></head><body><div>"
+                + "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#181619;"
+                + "color:#e4dae8;font:18px/1.5 sans-serif;text-align:center;padding:24px;box-sizing:border-box}"
+                + "a{display:inline-block;margin-top:18px;padding:14px 26px;border-radius:8px;background:#431f51;color:#f2d9fc;"
+                + "border:1px solid #8b1ab8;text-decoration:none;font-weight:600}</style></head><body><div>"
                 + "Phosphor Loop needs the internet the very first time it opens.<br>Connect to Wi-Fi or mobile data, then tap Try again."
                 + "<br><a href='" + SITE + "'>Try again</a></div></body></html>";
         web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null);
