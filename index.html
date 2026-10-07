@@ -1484,7 +1484,7 @@
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
-            <dt>3D worlds and Fractals under Autopilot</dt><dd>Autopilot brings them in now and then, about 1 new look in 15. So you can see them, a 3D world or fractal that Autopilot brings in arrives clean, with no Trails, Zoom, Spin, color shift, Warp, drift or effects, shown on its own and staying about 1⅔ times as long as other looks. Once it has faded in, its effects build up slowly, peak in the middle of its stay, and ease back to clean before the next look fades in over it. Pinned settings stay put, and a setting with a fader limit starts from that limit.</dd>
+            <dt>3D worlds and Fractals under Autopilot</dt><dd>Autopilot brings them in as a showcase now and then, about 1 new look in 15. Fractals also come up as an ordinary input, as often as Wave or Shape, with effects and timing like any other look. As a showcase, so you can see them, a 3D world or fractal arrives clean, with no Trails, Zoom, Spin, color shift, Warp, drift or effects, shown on its own and staying about 1⅔ times as long as other looks. Once it has faded in, its effects build up slowly, peak in the middle of its stay, and ease back to clean before the next look fades in over it. Pinned settings stay put, and a setting with a fader limit starts from that limit.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
             <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. In full screen during a taste session, a small timer and More like this and Not this appear at the bottom middle of the picture whenever you move the mouse (or tap the picture), and fade away again after a few still seconds (switch on “Keep timer and rating buttons showing in full screen” under Taste profiles to keep them showing). Whichever button you’ve pressed for the look on screen glows, so you can see you’ve already rated it; it stops glowing when a new look comes in. They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
             <dt>Taste profiles</dt><dd>Your ratings are kept in named taste profiles, and Autopilot follows the lit one (tap another to switch, or tap the lit one again so Autopilot follows no taste at all). Ratings you make outside a session go into the lit profile; with none lit, rating starts a taste session. On your own profiles, ✎ renames, ⤓ saves the profile as a small file you can send to someone, and × deletes it. Open a taste file… (or dropping the file on the page) adds a profile someone sent you. Profiles marked SHARED come from the admin; rating while one is lit starts your own copy of it.</dd>
@@ -4888,6 +4888,9 @@ function patchLoop(k, p, force) {
   const n = { ...loopDefaults(), ...p };
   if (p.shift) { n.shiftX = p.shift[0]; n.shiftY = p.shift[1]; }
   delete n.shift;
+  // A fractal Autopilot brought in as an ordinary input gets no showcase (see rampStart)
+  L.asInput = !!p.asInput;
+  delete n.asInput;
   n.motion = p.motion ?? (force ? false : L.tgt.motion);
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
@@ -6276,14 +6279,22 @@ function apPool() {
   const ok = pool.filter(apAllowed);
   return ok.length ? ok : pool;
 }
-// Autopilot's pick of an input from a list. The 3D worlds and fractals, which get special room (see rampStart),
-// come up a tenth as often as they would with one chance each like the rest: with nine worlds and six fractals
-// against eight other inputs, about 1 new look in 15 instead of 2 in 3.
+// Autopilot's pick of an input from a list. The 3D worlds and fractals as a showcase (clean, building up slowly, a
+// longer stay: see rampStart) come up a tenth as often as they would with one chance each like the rest: with nine
+// worlds and six fractals against eight other inputs, about 1 new look in 15 instead of 2 in 3. Fractals also come
+// up as an ordinary input, all six together having the same chance as Wave or Shape, with effects and timing like
+// any other look; then out.asInput is set, so the look gets no showcase.
 const AP_WORLD_SHARE = 0.1;
-function apPick(list) {
-  const worlds = list.filter(is3D), rest = list.filter((x) => !is3D(x));
-  if (!worlds.length || !rest.length) return pick(list);
-  return Math.random() < AP_WORLD_SHARE * worlds.length / list.length ? pick(worlds) : pick(rest);
+function apPick(list, out) {
+  const worlds = list.filter(is3D), fracs = worlds.filter((x) => sceneGroup(x) === 'fractal');
+  const rest = list.filter((x) => !is3D(x)).concat(fracs.length ? ['fractal-as-input'] : []);
+  if (!worlds.length) return pick(list);
+  let src = Math.random() < AP_WORLD_SHARE * worlds.length / list.length || !rest.length ? pick(worlds) : pick(rest);
+  if (src === 'fractal-as-input') {
+    src = pick(fracs);
+    if (out) out.asInput = true;
+  }
+  return src;
 }
 // A real input (not the other loop's picture), for when both loops would only feed on each other
 function apRealInput() {
@@ -6337,7 +6348,9 @@ function apSceneRaw(k) {
   // The input comes first: as How wild says, a new one (picked by apPick before anything else, so the starter looks
   // below can't tip it towards the inputs they happen to use) or the one on screen now
   const keepIn = Math.random() >= sw && shown.in1 !== 'loop' && pool.includes(shown.in1);
-  const in1 = keepIn ? shown.in1 : apPick(pool);
+  const how = {};
+  const in1 = keepIn ? shown.in1 : apPick(pool, how);
+  const asInput = keepIn ? !!loops[k === 'A' ? 'B' : 'A'].asInput : !!how.asInput;
   let sc;
   if (Math.random() < 0.45) {
     // Start from one of the starter looks and vary it: one made for this input when there is one
@@ -6375,6 +6388,7 @@ function apSceneRaw(k) {
       if (key === 'zoom') sc.edge = shown.edge;
     }
   }
+  if (asInput) sc.asInput = true;
   return apFinish(sc, k);
 }
 // The last touches on a new look: pinned settings, and a size that suits its input. A look varied from one you
@@ -6475,7 +6489,7 @@ const RAMP_CLEAN = { trails: 0, zoom: 0, spin: 0, color: 0, warp: 0, blur: 0, sh
 function rampStart(k, now, snap) {
   const L = loops[k];
   L.ramp = null;
-  if (!is3D(L.tgt.in1)) return false;
+  if (!is3D(L.tgt.in1) || L.asInput) return false;
   const keys = {};
   for (const [key, c] of Object.entries(RAMP_CLEAN)) {
     if (isPinned(key, k)) continue;

@@ -298,10 +298,12 @@ TIPS
     Dye, Split, Grow, Time warp, the seven feeds-on-itself effects and a
     second input) is on in about half the looks, on its own roll. At Wild
     nearly everything changes and most effects are on at once.
-  - 3D worlds and Fractals come up in about 1 new Autopilot look in 15 (a
-    tenth as often as if each counted like any other input; Surprise me
-    still gives each one the same chance as Wave or Shape). They arrive
-    clean (no Trails, Zoom,
+  - 3D worlds and Fractals come up as a showcase in about 1 new Autopilot
+    look in 15 (a tenth as often as if each counted like any other input;
+    Surprise me still gives each one the same chance as Wave or Shape).
+    Fractals also come up as an ordinary input, all six together as often
+    as Wave or Shape (about 1 new look in 10), with effects and timing like
+    any other look. A showcase arrives clean (no Trails, Zoom,
     Spin, color shift, Warp, drift or effects, nothing fed in from the
     other loop), are shown on their own and stay about 1 2/3 times as long.
     Once one has faded in, its effects build up slowly, peak in the middle
