@@ -216,6 +216,8 @@ TIPS
     plain or frozen is thrown away and another tried, up to six in all,
     and it keeps the richest. Switch it off to see every look it makes.
     Watching the picture uses tiny copies that never make it stutter.
+    Under it, a tally shows how many looks have been judged since the page
+    opened, how many passed (and on the first try), and why the rest didn't.
   - More like this and Not this (in the small strip right under the picture,
     or the Y and X keys; they can go on MIDI pads too) teach Autopilot your
     taste. Beside them, a countdown shows the seconds this look has left.

@@ -898,6 +898,7 @@
         <div class="ctl">
           <div class="chips"><button class="chip" id="apCheck" aria-pressed="true"><span class="led"></span>Check each look</button></div>
           <span class="hint">Tries each new look out of sight first, skips ones that are dull, nearly black or turning white, and keeps the richest. Switch it off to see every look Autopilot makes.</span>
+          <span class="hint" id="apCheckStat">Nothing judged yet since this page opened.</span>
         </div>
         <div class="ctl">
           <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
@@ -5832,6 +5833,22 @@ function betterLook(a, b) {
 // place instead, so each look is looked at once it's on screen and a poor one is followed by another soon after.
 const CHECK = { tries: 6, settle: 1.5, judge: 3.5, rushSettle: 0.7, rushJudge: 2, lead: 14, hold: 8, great: 0.75 };
 const checking = () => apSet.check && !eye.failed;
+// A tally of how the checks have gone since this page opened: every look judged, how many passed, how many passed
+// on the very first try, and why the others didn't
+const checkStat = { n: 0, ok: 0, first: 0, firstOk: 0, why: { white: 0, dark: 0, plain: 0, still: 0 } };
+function checkTally(v, firstTry) {
+  checkStat.n++;
+  if (v.pass) checkStat.ok++;
+  else if (v.why in checkStat.why) checkStat.why[v.why]++;
+  if (firstTry) { checkStat.first++; if (v.pass) checkStat.firstOk++; }
+}
+const pct = (a, b) => (b ? Math.round((100 * a) / b) + '%' : '–');
+function checkStatText() {
+  const c = checkStat;
+  if (!c.n) return 'Nothing judged yet since this page opened. It counts while Autopilot runs with Check each look on.';
+  const bad = Object.entries(c.why).filter(([, n]) => n).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${n} ${w === 'white' ? 'turning white' : w === 'dark' ? 'nearly black' : w === 'plain' ? 'dull' : 'frozen'}`);
+  return `Since this page opened: ${c.n} look${c.n === 1 ? '' : 's'} judged, ${c.ok} passed (${pct(c.ok, c.n)}). ${c.firstOk} of ${c.first} passed on the first try (${pct(c.firstOk, c.first)}).` + (bad.length ? ` Thrown away: ${bad.join(', ')}.` : '');
+}
 const otherLoop = (k) => (k === 'A' ? 'B' : 'A');
 const canTryOut = () => !ap.pins.has('view') && !limSpan('view');
 function prepBegin(k, now, rush) {
@@ -5883,6 +5900,7 @@ function prepJudge(now) {
   if (!S.length) { P.ok = true; return; }   // nothing to go on (very slow graphics): don't hold Autopilot up
   const v = tasteJudge(lookVerdict(S), P.k, P.look, S);
   P.v = v;
+  checkTally(v, P.tries === 1);
   if (betterLook(v, P.best && P.best.v)) P.best = { v, look: P.look, favMix: P.favMix };
   const left = (ap.next - now) / 1000;
   const great = v.pass && v.score >= CHECK.great;
@@ -5917,6 +5935,7 @@ function glideJudge(now) {
   const S = eyeRecent(k, 2500, now);
   if (S.length < 2) return;
   const v = lookVerdict(S);
+  checkTally(v, ap.glideRedo === 0);
   if (!v.pass && ap.glideRedo < 3) { ap.glideRedo++; ap.next = Math.min(ap.next, now + 1200); ap.due = Math.min(ap.due, ap.next); }
   else ap.glideRedo = 0;
 }
@@ -7557,6 +7576,8 @@ function apStatus() {
     if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
   }
   if (html !== apStatus.shown) { apStatus.shown = html; $('#apState').innerHTML = html; }
+  const cs = checkStatText();
+  if (cs !== apStatus.cs) { apStatus.cs = cs; $('#apCheckStat').textContent = cs; }
 }
 
 /* ================= fader limits ================= */
