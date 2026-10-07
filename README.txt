@@ -297,7 +297,16 @@ TIPS
     new: the input usually switches, and every effect (Flow, Melt, Push,
     Dye, Split, Grow, Time warp, the seven feeds-on-itself effects and a
     second input) is on in about half the looks, on its own roll. At Wild
-    nearly everything changes and most effects are on at once. "Change on the beat" makes each new look cut in on a beat
+    nearly everything changes and most effects are on at once.
+  - 3D worlds and Fractals under Autopilot arrive clean (no Trails, Zoom,
+    Spin, color shift, Warp, drift or effects, nothing fed in from the
+    other loop), are shown on their own and stay about 1 2/3 times as long.
+    Once one has faded in, its effects build up slowly, peak in the middle
+    of its stay and ease back to clean before the next look fades in over
+    it. Check each look still tries the full look out of sight first.
+    Pinned settings stay put, a setting with a fader limit starts from that
+    limit, a slider moved with Play along stays where you put it, and the
+    white-out watch lowers the peak as well. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
     input (Camera, 3D worlds, Fractals, Ink, Text and so on) you don't want it to bring in.
   - Fader limits (the button under Autopilot settings): one slider with two
