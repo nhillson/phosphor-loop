@@ -1484,7 +1484,7 @@
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
             <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
-            <dt>3D worlds and Fractals under Autopilot</dt><dd>So you can see them, a 3D world or fractal that Autopilot brings in arrives clean, with no Trails, Zoom, Spin, color shift, Warp, drift or effects, shown on its own and staying about 1⅔ times as long as other looks. Once it has faded in, its effects build up slowly, peak in the middle of its stay, and ease back to clean before the next look fades in over it. Pinned settings stay put, and a setting with a fader limit starts from that limit.</dd>
+            <dt>3D worlds and Fractals under Autopilot</dt><dd>Autopilot brings them in now and then, about 1 new look in 15. So you can see them, a 3D world or fractal that Autopilot brings in arrives clean, with no Trails, Zoom, Spin, color shift, Warp, drift or effects, shown on its own and staying about 1⅔ times as long as other looks. Once it has faded in, its effects build up slowly, peak in the middle of its stay, and ease back to clean before the next look fades in over it. Pinned settings stay put, and a setting with a fader limit starts from that limit.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
             <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. In full screen during a taste session, a small timer and More like this and Not this appear at the bottom middle of the picture whenever you move the mouse (or tap the picture), and fade away again after a few still seconds (switch on “Keep timer and rating buttons showing in full screen” under Taste profiles to keep them showing). Whichever button you’ve pressed for the look on screen glows, so you can see you’ve already rated it; it stops glowing when a new look comes in. They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
             <dt>Taste profiles</dt><dd>Your ratings are kept in named taste profiles, and Autopilot follows the lit one (tap another to switch, or tap the lit one again so Autopilot follows no taste at all). Ratings you make outside a session go into the lit profile; with none lit, rating starts a taste session. On your own profiles, ✎ renames, ⤓ saves the profile as a small file you can send to someone, and × deletes it. Open a taste file… (or dropping the file on the page) adds a profile someone sent you. Profiles marked SHARED come from the admin; rating while one is lit starts your own copy of it.</dd>
@@ -6262,8 +6262,7 @@ function syncPins() {
   $('#apUnpin').hidden = !names.length;
 }
 
-// The inputs Autopilot can bring in right now, one chance each: every 3D world and every fractal is its own
-// input, as likely as Wave, Shape or a running camera
+// The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
   const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
@@ -6277,10 +6276,19 @@ function apPool() {
   const ok = pool.filter(apAllowed);
   return ok.length ? ok : pool;
 }
+// Autopilot's pick of an input from a list. The 3D worlds and fractals, which get special room (see rampStart),
+// come up a tenth as often as they would with one chance each like the rest: with nine worlds and six fractals
+// against eight other inputs, about 1 new look in 15 instead of 2 in 3.
+const AP_WORLD_SHARE = 0.1;
+function apPick(list) {
+  const worlds = list.filter(is3D), rest = list.filter((x) => !is3D(x));
+  if (!worlds.length || !rest.length) return pick(list);
+  return Math.random() < AP_WORLD_SHARE * worlds.length / list.length ? pick(worlds) : pick(rest);
+}
 // A real input (not the other loop's picture), for when both loops would only feed on each other
 function apRealInput() {
   const p = apPool().filter((x) => x !== 'loop');
-  return p.length ? pick(p) : 'wave';
+  return p.length ? apPick(p) : 'wave';
 }
 // A new look. How wild (w) stretches how far it zooms, spins and tints, and sets the odds of every setting changing
 // (see apOdds and apSwitch).
@@ -6326,10 +6334,10 @@ function apSceneRaw(k) {
   const pool = apPool(), w = apSet.wild / 100, sw = apSwitch(w);
   // The loop on screen now (the new look goes on the other one), as Autopilot picked it
   const shown = rampLook(k === 'A' ? 'B' : 'A');
-  // The input comes first: as How wild says, a new one (the same chance for each, so the starter looks below can't
-  // tip it towards the inputs they happen to use) or the one on screen now
+  // The input comes first: as How wild says, a new one (picked by apPick before anything else, so the starter looks
+  // below can't tip it towards the inputs they happen to use) or the one on screen now
   const keepIn = Math.random() >= sw && shown.in1 !== 'loop' && pool.includes(shown.in1);
-  const in1 = keepIn ? shown.in1 : pick(pool);
+  const in1 = keepIn ? shown.in1 : apPick(pool);
   let sc;
   if (Math.random() < 0.45) {
     // Start from one of the starter looks and vary it: one made for this input when there is one
@@ -6357,7 +6365,7 @@ function apSceneRaw(k) {
   apFx(sc, w);
   if ((!sc.in2 || sc.in2 === 'none') && Math.random() < apOdds(w)) {
     const two = pool.filter((x) => x !== sc.in1);
-    if (two.length) { sc.in2 = pick(two); sc.blend = Math.round(rnd(30, 70)); }
+    if (two.length) { sc.in2 = apPick(two); sc.blend = Math.round(rnd(30, 70)); }
   }
   apSelf(sc, w);
   // The main sliders: as How wild says, each one new or kept as the loop on screen has it
@@ -7114,7 +7122,7 @@ function tasteFavLooks(k, M) {
       sc[key] = sc[key] > 12 ? 0 : Math.round(rnd(lo, hi));
     }
     if (Math.random() < 0.2 * j) sc.mirror = pick([0, 0, 2, 4, 6, 8]);
-    if (!apUsable(sc.in1) || Math.random() < 0.15 * (1 - f)) { sc.in1 = pick(apPool()); delete sc.size; }
+    if (!apUsable(sc.in1) || Math.random() < 0.15 * (1 - f)) { sc.in1 = apPick(apPool()); delete sc.size; }
     if (sc.in2 && sc.in2 !== 'none' && (!apUsable(sc.in2) || sc.in2 === sc.in1)) sc.in2 = 'none';
     const look = apFinish(sc, k, was);
     look.favMix = { both, into: into[from], out: fs.B ? into[from === 'A' ? 'B' : 'A'] : 0, nat: fs.nat ? fs.nat.f : null };
