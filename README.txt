@@ -273,9 +273,14 @@ TIPS
     cutting in quickly, and starts Autopilot if it's off. The wait for the
     look after that starts over. It can be learned onto a MIDI button too.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
-    it, or just move that slider, and the setting stays put on the loop
-    you're changing (the A or B tab) while Autopilot keeps changing
-    everything else. Tap a lit pin to let it go again.
+    it (or just move that slider, with "Pin it, keep going" chosen) and the
+    setting stays put on the loop you're changing (the A or B tab) while
+    Autopilot keeps changing everything else. Tap a lit pin to let it go
+    again.
+  - When you move a control while it runs (under Autopilot settings): "Pin
+    it, keep going" pins what you move; "Play along" lets you play with the
+    sliders without pinning anything or stopping Autopilot (it changes them
+    again with its next look); "Stop Autopilot" hands everything to you.
   - Pin on both loops: right-click a pin (or press and hold it on a
     touchscreen) and the setting stays put on both loops, the same on each.
     The pin then says AB. Right-click it again to let it go on both.

@@ -906,10 +906,12 @@
         </div>
         <div class="ctl">
           <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
-          <div class="seg seg-2" id="apTouch" role="group" aria-labelledby="apTouchLbl">
+          <div class="seg seg-3" id="apTouch" role="group" aria-labelledby="apTouchLbl">
             <button data-touch="pin" aria-pressed="true">Pin it, keep going</button>
+            <button data-touch="play" aria-pressed="false">Play along</button>
             <button data-touch="stop" aria-pressed="false">Stop Autopilot</button>
           </div>
+          <span class="hint">Play along: your change shows straight away, nothing gets pinned, and Autopilot keeps going, changing that setting again with its next look.</span>
         </div>
         <div class="ctl">
           <span class="lbl">Pinned</span>
@@ -1481,7 +1483,7 @@
             <dt>What it learns</dt><dd>Every setting of both loops (inputs, effects and how strong, mirror, zoom, spin, trails, color, warp, Input size, Blend, softness, Wave and Shape patterns, Grow’s size, Time warp’s direction, Only movement, edges, drift, brightness, the Spectrograph’s style), which nature picture is showing, and how the screen looks. And not just which ones you like, but which go together: each loop’s settings tied to its input (“Shape with Melt, zoomed in”), the effects that come together, whole looks, and whole pairs of looks with how they’re shown and fed into each other (“that Shape next to Wave with a 6-sided mirror, Wave feeding into Shape”). At Stick to what I like, Autopilot mostly brings back pictures you rated up, changed only a little, so you know roughly what will be on screen; How wild sets how much they change.</dd>
             <dt>Follow my taste</dt><dd>Under Taste profiles. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting).</dd>
             <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. With Check each look on, a look that’s ready goes on at once; otherwise it takes two or three seconds to find one that passes. The wait for the look after starts over.</dd>
-            <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it, or just move that slider, and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Want touching a control to stop Autopilot instead? Choose Stop Autopilot under Autopilot settings.</dd>
+            <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it (or just move that slider, with Pin it, keep going chosen) and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Under Autopilot settings, When you move a control while it runs offers two other ways: Play along (your move takes effect, nothing gets pinned, and Autopilot keeps going and changes it again with its next look) or Stop Autopilot.</dd>
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
@@ -5638,6 +5640,9 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
 const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, touch: 'pin', off: [] };
+// When you move a control while Autopilot runs: pin it ('pin'), just play along without pinning ('play'), or stop
+// Autopilot ('stop')
+const cleanTouch = (v) => (v === 'stop' || v === 'play' ? v : 'pin');
 const apSet = { ...AP_DEFAULTS, lim: {} };
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
@@ -5646,7 +5651,7 @@ try {
     apSet.beat = s.beat === true;
     apSet.check = s.check !== false;
     apSet.hints = s.hints !== false;
-    apSet.touch = s.touch === 'stop' ? 'stop' : 'pin';
+    apSet.touch = cleanTouch(s.touch);
     apSet.off = cleanOff(s.off);
     apSet.lim = cleanLim(s.lim);
     if (Array.isArray(s.pins)) s.pins.forEach(addSavedPin);
@@ -6029,7 +6034,9 @@ function setAutopilot(on, quiet) {
       showOSD('AUTOPILOT', 'ON');
       toast(apSet.touch === 'pin'
         ? 'Autopilot is on. Move any slider to pin it where you want it; Autopilot keeps changing the rest.'
-        : 'Autopilot is on. It changes a little at a time. Touch any control to take over.');
+        : apSet.touch === 'play'
+          ? 'Autopilot is on. Play with any slider; nothing gets pinned and Autopilot keeps going.'
+          : 'Autopilot is on. It changes a little at a time. Touch any control to take over.');
     }
   } else {
     settleDevices();
@@ -6038,10 +6045,13 @@ function setAutopilot(on, quiet) {
   apStatus();
 }
 // Someone moved a control. With "Pin it, keep going" that setting is pinned where they put it and Autopilot
-// carries on; otherwise Autopilot stops. The new value is read just after the control has finished handling
-// the move, which is why holdPin waits for a microtask.
+// carries on; with "Play along" the move simply takes effect, nothing is pinned, and Autopilot carries on (it
+// changes that setting again with its next look); otherwise Autopilot stops. Buttons that replace the whole look
+// (Surprise me, no key) stop Autopilot whichever is chosen. The new value is read just after the control has
+// finished handling the move, which is why holdPin waits for a microtask.
 function takeOver(key, from) {
   if (!ap.on) return;
+  if (key && PINS[key] && apSet.touch === 'play') return;
   if (key && PINS[key] && apSet.touch === 'pin') {
     const P = PINS[key], loopKey = from || edit;
     const fresh = !isPinned(key, loopKey);
@@ -6206,7 +6216,7 @@ function syncPins() {
     else if (a || b) names.push(`${P.name} (loop ${a ? 'A' : 'B'})`);
   }
   $('#apPinList').textContent = names.length ? names.join(' · ')
-    : 'Nothing pinned. While Autopilot runs, a pin shows beside each setting. Tap it, or just move that slider, to keep the setting where it is on the loop you’re changing. Right-click a pin to keep it on both loops.';
+    : `Nothing pinned. While Autopilot runs, a pin shows beside each setting. Tap it${apSet.touch === 'pin' ? ', or just move that slider,' : ''} to keep the setting where it is on the loop you’re changing. Right-click a pin to keep it on both loops.`;
   $('#apUnpin').hidden = !names.length;
 }
 
@@ -8753,7 +8763,7 @@ function loadPreset(pr, quiet) {
     // Presets saved before Check each look (or Learn from hints) existed have it on
     apSet.check = a.check !== false;
     apSet.hints = a.hints !== false;
-    apSet.touch = a.touch === 'stop' ? 'stop' : 'pin';
+    apSet.touch = cleanTouch(a.touch);
     apSet.off = cleanOff(a.off);
     // Presets saved before fader limits existed leave the limits as they are
     if (a.lim && typeof a.lim === 'object') apSet.lim = cleanLim(a.lim);
