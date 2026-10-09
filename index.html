@@ -496,9 +496,15 @@
     to { box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.4); }
   }
   /* Lit for as long as this very look is rated that way, so you can see at a glance that you've already pressed it */
-  .rate.rated.rate-up { --rate-glow: rgba(61, 220, 132, .6); border-color: rgba(61, 220, 132, .9); background-color: rgba(61, 220, 132, .14); }
-  .rate.rated.rate-down { --rate-glow: rgba(255, 75, 62, .6); border-color: rgba(255, 75, 62, .9); background-color: rgba(255, 75, 62, .14); }
-  .rate.rated { box-shadow: 0 0 0 1px var(--rate-glow), 0 0 16px var(--rate-glow); color: var(--ink); }
+  .rate.rated.rate-up, .rate.rated.rate-up:hover {
+    --rate-glow: rgba(61, 220, 132, .6); border-color: rgba(61, 220, 132, .95);
+    background: linear-gradient(rgba(61, 220, 132, .38), rgba(61, 220, 132, .24)); color: #eafff1;
+  }
+  .rate.rated.rate-down, .rate.rated.rate-down:hover {
+    --rate-glow: rgba(255, 75, 62, .6); border-color: rgba(255, 75, 62, .95);
+    background: linear-gradient(rgba(255, 75, 62, .38), rgba(255, 75, 62, .24)); color: #ffe6e3;
+  }
+  .rate.rated { box-shadow: 0 0 0 1px var(--rate-glow), 0 0 16px var(--rate-glow); }
   @media (prefers-reduced-motion: reduce) { .rate.flash { animation: none; } }
   .taste-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
   /* Taste profiles: tiles like presets, two to a row so their buttons fit */
@@ -1486,7 +1492,7 @@
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
             <dt>3D worlds and Fractals under Autopilot</dt><dd>Autopilot brings them in as a showcase now and then, about 1 new look in 15. Fractals also come up as an ordinary input, as often as Wave or Shape, with effects and timing like any other look. As a showcase, so you can see them, a 3D world or fractal arrives clean, with no Trails, Zoom, Spin, color shift, Warp, drift or effects, shown on its own and staying about 1⅔ times as long as other looks. Once it has faded in, its effects build up slowly, peak in the middle of its stay, and ease back to clean before the next look fades in over it. Pinned settings stay put, and a setting with a fader limit starts from that limit.</dd>
             <dt>Check each look</dt><dd>Under Autopilot settings, on unless you switch it off. Autopilot tries each new look out of sight on the hidden loop first and looks at it for a few seconds. One that’s turning white, nearly black, plain or frozen is thrown away and another tried, up to six in all, and it keeps the richest. The status line at the top of Autopilot settings says when it’s trying looks. Switch it off to see every look Autopilot makes, straight away.</dd>
-            <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. In full screen during a taste session, a small timer and More like this and Not this appear at the bottom middle of the picture whenever you move the mouse (or tap the picture), and fade away again after a few still seconds (switch on “Keep timer and rating buttons showing in full screen” under Taste profiles to keep them showing). Whichever button you’ve pressed for the look on screen glows, so you can see you’ve already rated it; it stops glowing when a new look comes in. They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
+            <dt>More like this and Not this</dt><dd>In the small strip right under the picture, or the Y and X keys (they can go on MIDI pads too). Beside them, a countdown shows how many seconds this look has left before Autopilot’s next one. In full screen during a taste session, a small timer and More like this and Not this appear at the bottom middle of the picture whenever you move the mouse (or tap the picture), and fade away again after a few still seconds (switch on “Keep timer and rating buttons showing in full screen” under Taste profiles to keep them showing). Whichever button you’ve pressed for the look on screen lights up green or red, so you can see you’ve already rated it. It stays lit the whole time that look is on screen (even while you move sliders, or Autopilot tries out its next look out of sight) and goes back to normal the moment a new look comes in, ready for the next rating. They teach Autopilot your taste. A rating is for the whole picture on screen: both loops together, how they’re shown and fed into each other (whether one pushes, dyes or is the input of the other, whether they zoom and turn alike or apart), and how the picture looks. Autopilot then picks new looks, and how to mix them, by the picture they’d make together. While Autopilot runs, Not this also skips to the next look. Rate the same picture the other way and the new rating replaces the old one. Ratings go into the lit taste profile (or the taste session, while one is under way) and stay in this browser.</dd>
             <dt>Taste profiles</dt><dd>Your ratings are kept in named taste profiles, and Autopilot follows the lit one (tap another to switch, or tap the lit one again so Autopilot follows no taste at all). Ratings you make outside a session go into the lit profile; with none lit, rating starts a taste session. On your own profiles, ✎ renames, ⤓ saves the profile as a small file you can send to someone, and × deletes it. Open a taste file… (or dropping the file on the page) adds a profile someone sent you. Profiles marked SHARED come from the admin; rating while one is lit starts your own copy of it.</dd>
             <dt>Taste session</dt><dd>Start taste session, under Taste profiles, makes a new profile from scratch. Autopilot brings looks, you rate them with More like this and Not this, and Autopilot learns from them as you go. A green bar under the picture counts your ratings; press Finish and name it to keep the profile, or Cancel (twice, once you’ve rated) to throw it away.</dd>
             <dt>Train again</dt><dd>With one of your profiles lit, Train “…” again starts another session for it: Autopilot follows the profile as it would live, you rate what it brings, and Finish and add them puts the new ratings into the profile. Made for one profile per song, trained over and over until you know what each song will bring.</dd>
@@ -1756,6 +1762,10 @@ function mkLoop() {
 const loops = { A: mkLoop(), B: mkLoop() };
 const mixDefaults = { view: 0, xab: 0, xba: 0 };
 const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
+// Which look is on screen: goes up by one whenever a new look comes on screen (one Autopilot brings in, or a whole
+// new look on a loop that's showing), but not when Autopilot tries out its next look out of sight, nudges a slider
+// or builds a 3D world up. A rating stands for the look on screen until this changes, and the rating buttons stay lit.
+let lookOnScreen = 0;
 let edit = 'A';
 let activePresetId = null;
 let drift = !reduceMotion;
@@ -4900,6 +4910,7 @@ function patchLoop(k, p, force) {
   L.base = { ...L.tgt };
   // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
   L.gen = (L.gen || 0) + 1;
+  if (weights(mix.tgt.view)[k === 'A' ? 0 : 1] > 0.05) lookOnScreen++;
 }
 function applyPatch(c) {
   patchLoop('A', c.A);
@@ -6611,6 +6622,7 @@ function apStep(now, onBeat) {
     // Check each look: once it has faded in, Autopilot looks at it (see glideJudge)
     ap.glide = checking() ? { k, at: now + (apFadeSec() + 2.5) * 1000 } : null;
   }
+  if (came) lookOnScreen++;
   ap.rush = false;
   // The countdown under the picture counts down to the next look from here
   ap.due = ap.next;
@@ -6903,7 +6915,7 @@ function tasteFill(now) {
   if (!taste.pending.length) return;
   let changed = false;
   taste.pending = taste.pending.filter((q) => {
-    if (tasteGens() !== q.gens) return false;   // a new look came before the eye saw this one
+    if (lookOnScreen !== q.look) return false;   // a new look came before the eye saw this one
     // A few copies if they come in time (a slow computer gets 6 seconds), or else whatever there is by then
     const late = now - q.from > 6000, p = tasteScreenPic(now, q.from, late ? 1 : 3);
     if (!p) return !late;
@@ -7174,18 +7186,17 @@ function tasteMix(opts, k) {
 // More like this (dir 1) and Not this (dir -1), for the whole picture on screen: both loops and how they mix
 const rateBtns = { 1: $('#rateUp'), [-1]: $('#rateDown') };
 function rate(dir) {
-  const now = performance.now(), gens = tasteGens(), scene = tasteSceneNow();
-  const sig = sceneFeats(scene).map(([f]) => f).join();
+  const now = performance.now(), gens = tasteGens(), look = lookOnScreen, scene = tasteSceneNow();
   const { votes, note } = tasteTarget();
   let added = 0;
-  // The same picture rated again: the same way is noted already, the other way replaces it
-  const old = votes.findIndex((v) => v.sid === taste.sid && v.gens === gens && v.scene && sceneFeats(v.scene).map(([f]) => f).join() === sig);
+  // The same look on screen rated again: the same way is noted already, the other way replaces it
+  const old = votes.findIndex((v) => v.sid === taste.sid && v.look === look);
   if (!(old >= 0 && Math.sign(votes[old].w) === dir && votes[old].src !== 'skip')) {
     if (old >= 0) votes.splice(old, 1);
-    const vote = { t: Date.now(), src: dir > 0 ? 'up' : 'down', w: dir, scene, sid: taste.sid, gens };
+    const vote = { t: Date.now(), src: dir > 0 ? 'up' : 'down', w: dir, scene, sid: taste.sid, gens, look };
     const pic = tasteScreenPic(now);
     if (pic) vote.pic = pic;
-    else { taste.pending.push({ vote, gens, from: now }); tasteLookSoon(); }
+    else { taste.pending.push({ vote, look, from: now }); tasteLookSoon(); }
     votes.push(vote);
     added = 1;
   }
@@ -7208,19 +7219,18 @@ function rate(dir) {
   } else toast(added ? `Noted: Autopilot will steer away from pictures like this. Press Next look for a new one.${off}`
     : 'Already noted: you don’t like this picture. Press Next look for a new one.');
 }
-// Which way this very picture has been rated (1 more like this, -1 not this, 0 not yet): the same test rate() uses
+// Which way the look on screen has been rated (1 more like this, -1 not this, 0 not yet): the same test rate() uses.
+// It holds until a new look comes on screen, so the button stays lit until it can be pressed for a new look.
 function ratedNow() {
   const s = tasteSource();
   if (s.kind === 'none') return 0;
-  const gens = tasteGens();
-  const cand = s.votes.filter((v) => v.sid === taste.sid && v.gens === gens && v.scene && (v.src === 'up' || v.src === 'down'));
-  if (!cand.length) return 0;
-  const sig = sceneFeats(tasteSceneNow()).map(([f]) => f).join();
-  const m = cand.find((v) => sceneFeats(v.scene).map(([f]) => f).join() === sig);
+  const m = s.votes.find((v) => v.sid === taste.sid && v.look === lookOnScreen && (v.src === 'up' || v.src === 'down'));
   return m ? Math.sign(m.w) : 0;
 }
-let ratedShown = null;
+let ratedShown = null, ratedLook = -1;
+// Checked four times a second, and on the very frame a new look comes on screen (see frame)
 function syncRated() {
+  ratedLook = lookOnScreen;
   const r = ratedNow();
   if (r === ratedShown) return;
   ratedShown = r;
@@ -7236,9 +7246,9 @@ function tasteHintSkip(now) {
   if (!apSet.hints || !c || now - c.at > TASTE_SKIP_MS || loops[c.k].gen !== c.gen) return;
   ap.cameIn = null;
   if (['shared', 'none'].includes(tasteSource().kind)) return;   // a hint alone doesn't start a copy or a session
-  const { votes } = tasteTarget(), gens = tasteGens();
-  if (votes.some((v) => v.sid === taste.sid && v.gens === gens)) return;
-  const vote = { t: Date.now(), src: 'skip', w: -0.5, scene: tasteSceneNow(), sid: taste.sid, gens };
+  const { votes } = tasteTarget(), gens = tasteGens(), look = lookOnScreen;
+  if (votes.some((v) => v.sid === taste.sid && v.look === look)) return;
+  const vote = { t: Date.now(), src: 'skip', w: -0.5, scene: tasteSceneNow(), sid: taste.sid, gens, look };
   const pic = tasteScreenPic(now);
   if (pic) vote.pic = pic;
   votes.push(vote);
@@ -7498,7 +7508,7 @@ $('#sessionForm').addEventListener('submit', async (e) => {
 
 // Files: a profile saved as a small .json file that anyone can open in Phosphor Loop (Open a taste file…, or drop
 // it on the page)
-const tasteSlim = (votes) => votes.map(({ sid, k, gen, gens, ...v }) => v);
+const tasteSlim = (votes) => votes.map(({ sid, k, gen, gens, look, ...v }) => v);
 function tasteFileSave(p) {
   const data = { kind: TASTE_FILE_KIND, v: 1, name: p.name, saved: Date.now(), thumb: p.thumb || '', votes: tasteSlim(p.votes) };
   const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'taste';
@@ -11382,6 +11392,7 @@ function frame() {
   }
   for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (pinned(p) || rampingMix(p) ? k : kMix);
   if (ap.on && !frozen && now >= ap.next) apTick(now);
+  if (lookOnScreen !== ratedLook) syncRated();
   if (!frozen) simT += dt;
   if (drift && !frozen) driftT += dt;
   staticAmt = Math.max(0, staticAmt - dt * 3);

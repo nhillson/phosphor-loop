@@ -225,7 +225,8 @@ TIPS
     appear at the bottom middle when the mouse moves (or the picture is
     tapped), and fade away after a few still seconds; "Keep timer and rating
     buttons showing in full screen" (under Taste profiles) keeps them showing.
-    The button you pressed glows for as long as that look is on screen.
+    The button you pressed stays lit (green or red) for as long as that
+    look is on screen, and goes back to normal when a new look comes in.
     A rating is for the whole picture on screen, never one loop alone: both
     loops' looks, how they're shown and fed into each other (one pushing,
     dyeing or being the input of the other; zooming and turning alike or
