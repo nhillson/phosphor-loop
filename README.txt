@@ -319,9 +319,12 @@ TIPS
     handles for every slider Autopilot moves, both loops at once. Drag the
     left handle to the lowest and the right handle to the highest you want
     (Trails between 40 and 90, say). Autopilot only picks values between
-    them. It never moves the handles and doesn't sit on them. Sliders you
-    move yourself and pinned ones aren't limited. Double-click a slider in
-    the menu to open it back up. Presets saved with Autopilot keep them.
+    them. It never moves the handles and doesn't sit on them. Mirror is
+    there too, with its five stops (Off, 2, 4, 6, 8): its handles snap to
+    them and the stops they sit on count, so lowest 2 and highest 6 means
+    2, 4 or 6. Sliders you move yourself and pinned ones aren't limited.
+    Double-click a slider in the menu to open it back up. Presets saved
+    with Autopilot keep them.
   - Music visualizer: under "React to sound" choose Computer sound. In the
     box Chrome opens, pick any screen on the Entire Screen tab (with two
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
