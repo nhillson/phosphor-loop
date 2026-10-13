@@ -10112,7 +10112,7 @@ body.idle .fsx{opacity:0;pointer-events:none}
 .hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:max-content;max-width:min(560px,90vw);box-sizing:border-box;
   padding:12px 16px;border-radius:10px;background:rgba(11,10,12,.86);border:1px solid rgba(255,255,255,.14);
   color:#e4dae8;font:15px/1.45 Barlow,"Helvetica Neue",Arial,sans-serif;text-align:center;transition:opacity .4s}
-.hint.gone{opacity:0;pointer-events:none}
+.hint.gone,body.idle .hint{opacity:0;pointer-events:none}
 .hint b{color:#8b1ab8}
 .hint button{margin-top:8px;min-height:34px;padding:5px 14px;border-radius:6px;border:1px solid #37313a;background:#322c35;color:#e4dae8;font:inherit;cursor:pointer}
 .show .hint button{min-height:60px;padding:12px 30px;font-size:21px;font-weight:600;border-color:#8b1ab8;background:#431f51;color:#f2d9fc}
@@ -10120,6 +10120,26 @@ body.idle .fsx{opacity:0;pointer-events:none}
 <div class="hint" id="hint"><span id="hintText">Drag this window onto your projector or second screen, then <b>double-click the picture</b> (or press F) to fill it.</span><br><button id="other" hidden>Fill my other screen</button></div>
 <button class="fsx" id="fsx"><span class="x" aria-hidden="true">✕</span>Exit full screen</button>
 </body></html>`;
+// Which screen "Fill my other screen" should use: one that isn't showing the controls. If the output window
+// is already on such a screen, that's the one, so a window dragged to the projector fills the projector
+// instead of jumping back over the controls.
+function pictureScreen(sd, here) {
+  const list = sd.screens || [];
+  const holds = (s, x, y) => x >= s.left && x < s.left + s.width && y >= s.top && y < s.top + s.height;
+  // Find the controls by the middle of this window, or failing that (say it's minimized) by its screen
+  let ctl = list.filter((s) => holds(s, window.screenX + window.outerWidth / 2, window.screenY + window.outerHeight / 2));
+  if (ctl.length !== 1 && window.screen && typeof window.screen.availLeft === 'number') {
+    const sc = window.screen;
+    ctl = list.filter((s) => holds(s, sc.availLeft + sc.availWidth / 2, sc.availTop + sc.availHeight / 2));
+  }
+  if (ctl.length === 1) {
+    const free = list.filter((s) => s !== ctl[0]);
+    if (free.includes(here)) return here;
+    if (free.length) return free[0];
+    return here;
+  }
+  return list.find((s) => s !== here) || here;
+}
 function openOutput() {
   let w = null;
   try { w = window.open('', 'phosphorOutput', 'popup,width=960,height=540'); } catch (_) {}
@@ -10158,16 +10178,21 @@ function openOutput() {
   outCanvas.addEventListener('pointerdown', (e) => startDraw(e, outCanvas));
   outCanvas.addEventListener('pointermove', (e) => moveDraw(e, outCanvas));
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => outCanvas.addEventListener(ev, endDraw));
+  // The help box, the Exit button and the pointer fade when the mouse rests and come back when it moves,
+  // so the help box never sits on the picture in a window that isn't full screen
   let idle = null;
   const fsx = doc.getElementById('fsx');
-  const wake = () => {
+  const wake = (ms) => {
     doc.body.classList.remove('idle');
     clearTimeout(idle);
-    idle = setTimeout(() => { if (fsx.matches(':hover')) wake(); else doc.body.classList.add('idle'); }, 3000);
+    idle = setTimeout(() => {
+      if (fsx.matches(':hover') || hint.matches(':hover')) wake();
+      else doc.body.classList.add('idle');
+    }, typeof ms === 'number' ? ms : 3000);
   };
-  doc.addEventListener('pointermove', wake);
+  doc.addEventListener('pointermove', () => wake());
   doc.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') wake(); });
-  wake();
+  wake(8000);   // a longer first look, so the help box gets noticed
   // With two or more screens, Chrome can fill the other one directly
   const other = doc.getElementById('other');
   const canFill = !!(w.screen && w.screen.isExtended && 'getScreenDetails' in w);
@@ -10181,8 +10206,7 @@ function openOutput() {
     other.addEventListener('click', async () => {
       try {
         const sd = await w.getScreenDetails();
-        const target = sd.screens.find((x) => x !== sd.currentScreen) || sd.currentScreen;
-        await doc.documentElement.requestFullscreen({ screen: target });
+        await doc.documentElement.requestFullscreen({ screen: pictureScreen(sd, sd.currentScreen) });
       } catch (_) {
         doc.getElementById('hintText').textContent = 'Allow the browser to use your other screens, then press the button again. Or drag this window over and double-click it.';
       }
