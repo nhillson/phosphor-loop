@@ -1,0 +1,13 @@
+{
+  "name": "phosphor-loop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node tools/capture/run.mjs",
+    "capture:test": "node --test tests/capture.test.mjs",
+    "audio:list": "swift tools/audio-route.swift list",
+    "audio:setup": "swift tools/audio-route.swift setup",
+    "audio:restore": "swift tools/audio-route.swift restore"
+  },
+  "dependencies": { "playwright-core": "^1.60.0" }
+}
