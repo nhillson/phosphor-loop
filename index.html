@@ -10072,9 +10072,10 @@ function fit() {
     aspect = w / h;
   }
   if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
-  clearTimeout(resimTimer);
+  // The wait runs on whichever window is showing: a hidden window's timers are slowed to once a second
+  if (resimTimer) { try { resimTimer[0].clearTimeout(resimTimer[1]); } catch (_) {} resimTimer = null; }
   if (firstFit) { firstFit = false; resim(aspect); }
-  else resimTimer = setTimeout(() => resim(aspect), 180);
+  else { const tw = outDrives() ? outWin : window; resimTimer = [tw, tw.setTimeout(() => resim(aspect), 180)]; }
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(stage);
 window.addEventListener('resize', fit);
@@ -10172,7 +10173,7 @@ function openOutput() {
   doc.addEventListener('fullscreenchange', () => {
     hint.classList.toggle('gone', !!doc.fullscreenElement);
     doc.body.classList.toggle('fs', !!doc.fullscreenElement);
-    setTimeout(fit, 60);
+    w.setTimeout(fit, 60);
   });
   doc.getElementById('fsx').addEventListener('click', () => { if (doc.fullscreenElement) toggleOutFS(); });
   outCanvas.addEventListener('pointerdown', (e) => startDraw(e, outCanvas));
@@ -10213,6 +10214,8 @@ function openOutput() {
     });
   }
   w.addEventListener('resize', fit);
+  // If this window is hidden, the Output window keeps the beat; it needs to know when it shows or hides too
+  doc.addEventListener('visibilitychange', scheduleFrame);
   outBtn.textContent = 'Close output window';
   outBtn.setAttribute('aria-pressed', 'true');
   $$('#shape button').forEach((b) => { b.disabled = true; });
@@ -10231,6 +10234,7 @@ function closeOutput(alreadyClosed) {
   $$('#shape button').forEach((b) => { b.disabled = false; });
   $('#shapeNote').hidden = true;
   fit();
+  scheduleFrame();
 }
 outBtn.addEventListener('click', () => (outputOpen() ? closeOutput() : openOutput()));
 // Android app: plugging in a projector or TV puts the picture there by itself; unplugging brings it back
@@ -11542,10 +11546,33 @@ function frame() {
     else { try { outCtx.drawImage(canvas, 0, 0, outCanvas.width, outCanvas.height); } catch (_) {} }
   }
   updateTC(now);
-  // If this window is covered or minimized while the output window is showing, let that window keep the beat
-  if (outputOpen() && document.hidden) outWin.requestAnimationFrame(frame);
-  else requestAnimationFrame(frame);
+  scheduleFrame();
 }
+// Who keeps the beat. This window normally asks for each frame. When it's hidden (minimized, covered, or, on a
+// Mac, left behind on another Space when the Output window goes full screen) the browser stops giving it frames,
+// so the Output window asks instead. The swap happens the moment either window shows or hides, rather than
+// waiting for a frame from a hidden window that would never come (which left the Output window black on Macs).
+// Each window has at most one frame on order, so the picture never runs double speed.
+let rafHere = 0, rafOut = 0, rafOutWin = null;
+function outDrives() { return outputOpen() && document.hidden; }
+function scheduleFrame() {
+  if (outDrives()) {
+    if (!rafOut || rafOutWin !== outWin) {
+      try { rafOutWin = outWin; rafOut = outWin.requestAnimationFrame(tickOut); } catch (_) { rafOut = 0; }
+    }
+  } else if (!rafHere) rafHere = requestAnimationFrame(tickHere);
+}
+function tickHere() {
+  rafHere = 0;
+  if (rafOut) { try { rafOutWin.cancelAnimationFrame(rafOut); } catch (_) {} rafOut = 0; }
+  frame();
+}
+function tickOut() {
+  rafOut = 0;
+  if (!outDrives()) { scheduleFrame(); return; }   // this window is showing again and takes the beat back
+  frame();
+}
+document.addEventListener('visibilitychange', scheduleFrame);
 
 /* ================= start ================= */
 applyPatch(STARTERS[reduceMotion ? Math.max(0, STARTERS.findIndex((c) => c.name === 'Calm')) : 0]);
@@ -11554,7 +11581,7 @@ Object.assign(mix.cur, mix.tgt);
 setEdit('A');
 // Autopilot's eye is made now, with everything else, so starting Autopilot never waits for it
 eyeSetup();
-requestAnimationFrame(frame);
+scheduleFrame();
 showStart();
 })();
 </script>
