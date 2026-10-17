@@ -17,6 +17,15 @@ OUT = os.path.join(REPO, 'android', 'app', 'build', 'offline-assets', 'offline')
 SITE = 'https://nhillson.github.io/phosphor-loop/'
 FILES = {
     'index.html': 'text/html',
+    'styles/base.css': 'text/css',
+    'styles/app.css': 'text/css',
+    'js/fractal-math.js': 'application/javascript',
+    'js/shaders.js': 'application/javascript',
+    'js/helpers.js': 'application/javascript',
+    'js/recording-formats.js': 'application/javascript',
+    'js/output-template.js': 'application/javascript',
+    'js/app.js': 'application/javascript',
+
     'phone.html': 'text/html',
     'qrcode.js': 'application/javascript',
     'sw.js': 'application/javascript',

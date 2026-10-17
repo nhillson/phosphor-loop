@@ -2,7 +2,10 @@ PHOSPHOR LOOP
 A video feedback synthesizer that runs in your web browser.
 
 WHAT'S IN THIS FOLDER
-  index.html   The workstation. Open this on your computer.
+  index.html   The workstation markup. Open this on your computer.
+  styles/      Base rules and the workstation stylesheet.
+  js/          App behavior, shader sources, fractal math, general helpers,
+               and WebM/MP4 recording utilities. Keep this folder with index.html.
   phone.html   The page your phone opens when you scan the QR code.
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
   sw.js        Keeps a copy in the browser so it opens without internet.
@@ -413,3 +416,33 @@ TIPS
   - Naming: before a picture or video saves, a box on the picture shows its
     usual name. Type a new one, or press Enter to keep it. "Don't save"
     throws it away, but only after a second click.
+
+DEVELOPMENT: FILE LAYOUT AND STARTUP COST
+  index.html contains the workstation markup. styles/app.css contains the
+  workstation styles; styles/base.css contains the small reset.
+  js/output-template.js contains the self-contained projector popup markup
+  and styles, which must be available synchronously when its window opens. js/app.js
+  owns application state, controls, inputs, and the render loop.
+  js/shaders.js contains GLSL sources and the fractal shader generator.
+  js/fractal-math.js contains CPU distance functions and wandering cameras.
+  js/helpers.js contains shared math, IDs, dates, and script loading.
+  js/recording-formats.js repairs WebM durations and finalizes MP4 files.
+
+  These are ordered classic scripts so double-clicking index.html still
+  works without a server or build step. Each helper file exposes a single
+  Phosphor namespace; app.js keeps its state private.
+
+  The opening 2D look compiles six rendering and analysis programs. The 15
+  optional 3D/fractal programs compile on first use and are reused afterward.
+  Selecting a world for the first time may briefly pause for compilation.
+  Splitting files improves maintenance and caching; it does not by itself
+  lower rendering cost. The app still runs continuous feedback at 576 lines,
+  with a separate composite and display pass. High resolution output and
+  ray-marched worlds remain expensive while running.
+
+  Run python3 tests/check.py with Playwright, its Chromium browser, and Pillow
+  installed. The harness inlines the app scripts in its test response to
+  instrument frames and lower resolution; production uses the separate files.
+  Run python3 tests/startup.py to check external assets, file:// opening,
+  and compilation/reuse of optional worlds.
+  New runtime files must also appear in sw.js and android/tools/bundle_site.py.

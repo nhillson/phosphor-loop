@@ -9,6 +9,8 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'js/**'
+      - 'styles/**'
       - 'phone.html'
       - 'qrcode.js'
       - 'sw.js'

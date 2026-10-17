@@ -18,6 +18,7 @@ import base64
 import functools
 import http.server
 import os
+import re
 import socketserver
 import sys
 import tempfile
@@ -66,6 +67,10 @@ def patched_index(res):
     """The page as served to the test: smaller picture, and a frame counter at the top of frame()."""
     with open(os.path.join(ROOT, 'index.html'), encoding='utf-8') as f:
         html = f.read()
+    def inline_script(match):
+        with open(os.path.join(ROOT, match[1]), encoding='utf-8') as f:
+            return '<script>' + f.read() + '</script>'
+    html = re.sub(r'<script src="(js/[^" ]+\.js)"></script>', inline_script, html)
     notes = []
     if 'const SIM_H = 576;' in html:
         html = html.replace('const SIM_H = 576;', f'const SIM_H = {res};', 1)
@@ -107,8 +112,7 @@ class Check:
 def run(c, a, base, problems):
     pg = c.pg
     # 1. It loads and draws
-    # Opening the page builds every shader, which takes 1 to 6 s in this workspace's software graphics, so the
-    # page load gets the same ceiling as the first frames rather than the 5 s for a click
+    # Initial shader compilation gets the first-frame ceiling rather than the 5 s click timeout.
     pg.goto(base + 'index.html', timeout=START_CEILING_S * 1000)
     pg.add_style_tag(content='#tip, #osd, #toast { display: none !important; }')
     t = time.time()
