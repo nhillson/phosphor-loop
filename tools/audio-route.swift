@@ -13,10 +13,11 @@ func check(_ status: OSStatus, _ action: String) throws {
     if status != noErr { throw NSError(domain: "CoreAudio", code: Int(status), userInfo: [NSLocalizedDescriptionKey: "\(action): CoreAudio error \(status)"]) }
 }
 func string(_ id: AudioObjectID, _ selector: AudioObjectPropertySelector) throws -> String {
-    var a = address(selector), value: CFString = "" as CFString
-    var size = UInt32(MemoryLayout<CFString>.size)
+    var a = address(selector), value: Unmanaged<CFString>?
+    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
     try check(AudioObjectGetPropertyData(id, &a, 0, nil, &size, &value), "Read device name/UID")
-    return value as String
+    guard let value else { throw fail("Missing device name/UID") }
+    return value.takeRetainedValue() as String
 }
 func defaultDevice(_ selector: AudioObjectPropertySelector) throws -> AudioObjectID {
     var a = address(selector), value = AudioObjectID(0), size = UInt32(MemoryLayout<AudioObjectID>.size)
@@ -61,8 +62,35 @@ do {
             let output = hasStreams(id, kAudioDevicePropertyScopeOutput) ? "output" : ""
             print("\(id == current ? "*" : " ") \(try string(id, kAudioObjectPropertyName)) [\(input) \(output)]")
         }
+    } else if command == "describe" {
+        guard let route = try all.first(where: { try string($0, kAudioDevicePropertyDeviceUID) == routeUID }) else { throw fail("No combined route exists") }
+        var a = address(kAudioAggregateDevicePropertyComposition), value: Unmanaged<CFDictionary>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFDictionary>?>.size)
+        try check(AudioObjectGetPropertyData(route, &a, 0, nil, &size, &value), "Read route composition")
+        if let value { print(value.takeRetainedValue()) }
+    } else if command == "repair" {
+        guard let route = try all.first(where: { try string($0, kAudioDevicePropertyDeviceUID) == routeUID }) else { throw fail("No combined route exists") }
+        var a = address(kAudioAggregateDevicePropertyComposition), value: Unmanaged<CFDictionary>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFDictionary>?>.size)
+        try check(AudioObjectGetPropertyData(route, &a, 0, nil, &size, &value), "Read route composition")
+        guard let value, var composition = value.takeRetainedValue() as? [String: Any] else { throw fail("Invalid route composition") }
+        composition[kAudioAggregateDeviceIsStackedKey] = 1
+        var updated = composition as CFDictionary
+        try withUnsafePointer(to: &updated) { pointer in
+            try check(AudioObjectSetPropertyData(route, &a, 0, nil, UInt32(MemoryLayout<CFDictionary>.size), pointer), "Enable mirrored output")
+        }
+        print("Updated the combined route to mirror its output streams.")
     } else if command == "restore" {
         try restore()
+    } else if command == "activate" {
+        guard let route = try all.first(where: { try string($0, kAudioDevicePropertyDeviceUID) == routeUID }) else {
+            throw fail("Choose your speakers/headphones as the output, then run setup first.")
+        }
+        let previous = try defaultDevice(kAudioHardwarePropertyDefaultOutputDevice)
+        try setDefault(kAudioHardwarePropertyDefaultOutputDevice, route)
+        do { try setDefault(kAudioHardwarePropertyDefaultSystemOutputDevice, route) }
+        catch { try? setDefault(kAudioHardwarePropertyDefaultOutputDevice, previous); throw error }
+        print("Activated Phosphor Loop + Speakers: use BlackHole in the webpage and this combined device as the macOS output.")
     } else if command == "setup" {
         guard let blackhole = try all.first(where: { try string($0, kAudioObjectPropertyName) == "BlackHole 2ch" }) else {
             throw fail("BlackHole 2ch is not available. Install with brew install --cask blackhole-2ch, then restart if needed.")
@@ -83,7 +111,9 @@ do {
             kAudioAggregateDeviceUIDKey: routeUID,
             kAudioAggregateDeviceMainSubDeviceKey: currentUID,
             kAudioAggregateDeviceIsPrivateKey: 0,
-            kAudioAggregateDeviceIsStackedKey: 0, // Feed the same stereo channels to both outputs.
+            // macOS uses stacked=1 for a mirrored Multi-Output Device. With 0 it
+            // exposes four separate channels and stereo never reaches BlackHole.
+            kAudioAggregateDeviceIsStackedKey: 1,
             kAudioAggregateDeviceSubDeviceListKey: [
                 [kAudioSubDeviceUIDKey: currentUID],
                 [kAudioSubDeviceUIDKey: try string(blackhole, kAudioDevicePropertyDeviceUID), kAudioSubDeviceDriftCompensationKey: 1]
@@ -100,7 +130,7 @@ do {
         }
         print("System audio now goes to \(try string(current, kAudioObjectPropertyName)) AND BlackHole 2ch.")
         print("Restore with: npm run audio:restore")
-    } else { throw fail("Use list, setup, or restore.") }
+    } else { throw fail("Use list, describe, setup, repair, activate, or restore.") }
 } catch {
     fputs("\(error.localizedDescription)\n", stderr)
     exit(1)

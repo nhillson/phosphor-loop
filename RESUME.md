@@ -1,6 +1,88 @@
 # Resume: system-audio capture and FFmpeg output
 
-User is restarting macOS so the BlackHole driver becomes available.
+User is restarting the Codex session. See latest status below before older notes.
+
+## Latest status — October 17, resumed session
+
+### Follow-up: webpage loopback option completed
+
+- Subsequent routing bug FIXED: `stacked=0` created a 4-output aggregate, sending
+  ordinary stereo only to SMSL. Despite the misleading installed SDK comment,
+  this Mac requires `stacked=1` for a true mirrored 2-output Multi-Output Device.
+  Repaired existing route in place, preserving device identity. System profiler
+  now shows 2 output channels, no input channels, and route remains default.
+  Setup helper now creates correct stacked=1 routes. Added describe/repair/activate
+  commands and npm audio:repair/audio:activate scripts; fixed CFString pointer warning.
+- `npm run audio:test` PASS: quiet 440Hz tone played through default combined output
+  was captured through actual Chrome BlackHole input (RMS ~0.01675). This verifies
+  real signal flow, not just device availability. Routing test lives in
+  tests/audio-route.mjs; it briefly plays an audible test tone.
+
+- Session now has full filesystem/network permissions.
+- User asked to add loopback selection to the webpage before returning to headless work.
+- Added **Loopback adapter** to React to sound and Spectrograph controls, with a
+  filtered adapter picker; BlackHole 2ch preferred, exact input ID, stereo requested,
+  speech processing disabled. Supports BlackHole/Soundflower and existing loopback names.
+- Missing adapter reports an error without using a room mic as the listening source.
+  Initial browser audio permission may briefly open the default input solely to reveal
+  device labels; that track is immediately stopped. Off cancels pending opens.
+- Show mode saves/restores chosen loopback source; existing recording Computer sound
+  reuses the loopback track. Android keeps its existing Phone sound controls.
+- Updated Guide/README. Added `npm run loopback:test` (mocked permission, missing
+  device, switching, cancellation, exact constraints). `-- --real` also verifies the
+  actual installed BlackHole through the webpage. Both PASS. Screenshot visually
+  inspected: /tmp/phosphor-loopback.png.
+- `npm run capture:smoke` with SwiftShader now PASSES both normal file:// startup
+  and fixed capture dimensions, including nonblack frames and control workout.
+  The previous black smoke result is resolved by software rendering in that test;
+  actual capture zero-chunk problem remains unresolved. No recording success claimed.
+- Changes remain local/uncommitted; no push or publish.
+
+### Earlier capture work
+
+- BlackHole 2ch is installed and visible to CoreAudio and Chrome.
+- Ran `swift -module-cache-path /tmp/phosphor-swift-cache tools/audio-route.swift setup`
+  outside sandbox successfully. Default output before setup was **SMSL USB AUDIO**,
+  not the MacBook speakers. The multi-output route is now ACTIVE; it mirrors SMSL
+  and BlackHole. Restore point is ignored `.capture-state/audio-route.json`.
+- `npm install` succeeded; package-lock.json exists, playwright-core available.
+- User asked for broader permissions to avoid repeated prompts. Explained that
+  agent cannot change session-wide permissions. Requested reusable prefix approvals.
+  Runtime explicitly confirmed saved prefixes `npm run capture` and
+  `npm run capture:test`. Requested `npm run capture:smoke` approval too, but it
+  was NOT saved (later un-escalated run hit EPERM). Swift helper prefix was requested,
+  but no saved-prefix confirmation was received. Use escalation when needed.
+- Implemented WIP files (all uncommitted): tools/capture/{run,browser,pipeline}.mjs,
+  tests/capture.test.mjs, tests/capture-smoke.mjs, package-lock.json; modified
+  package.json and js/app.js. DO NOT claim recording works yet.
+- Pipeline tests PASS outside sandbox: `npm run capture:test` (4 tests: ordered
+  authenticated chunks, static asset privacy, oversized chunk rejection, FFmpeg args).
+- Browser helper uses exact device ID, no echo/noise/gain processing. Chrome labels
+  BlackHole as `BlackHole 2ch (Virtual)`; matching handles a parenthesized suffix.
+- Real recording attempt selected correct device and reported 48kHz stereo with
+  processing disabled, but **MediaRecorder delivered zero chunks**, so FFmpeg failed
+  with invalid input. No successful recording exists. Need debug why canvas/audio
+  stream supplies no media. Potential clue: initial smoke test with headless Chrome
+  also reported a black picture despite 60 frame callbacks. Could be canvas drawing
+  timing/GPU issue, actual rendering, audio route sample flow, or track processing.
+- Added normal-file:// and fixed-resolution smoke checks using Node Playwright
+  because Python Playwright/Pillow are absent. Initial smoke failed black picture.
+  Changed smoke launch to existing tests' SwiftShader flags, but retry was blocked by
+  sandbox (localhost EPERM), so that version has NOT run. Next run needs escalation.
+  Production capture keeps real GPU ON; flags disable occlusion/background throttling.
+- Existing Python safety/startup tests have not run this session. No pushes.
+- No capture/test process should be active: last capture finalized unsuccessfully,
+  Chrome/FFmpeg cleanup completed. Audio routing remains active intentionally.
+- Next steps: debug zero media/black picture, verify actual audible loopback using a
+  short known test signal if necessary, improve failure/backpressure coverage,
+  inspect audio-route Swift CFString pointer warning, document commands, run real
+  recording + ffprobe audio/video validation, update this handoff.
+- Code review concerns: ensure early FFmpeg failure and closed-page paths return
+  errors; bounded delivery/clean stop must be verified. Current runner logs audio
+  settings and delivered chunk count to help debugging. Capture server binds only
+  localhost, token-authenticates POSTs, and hides private files and captures.
+
+## Older handoff (superseded by latest status above where different)
 
 ## Goal and authorization
 

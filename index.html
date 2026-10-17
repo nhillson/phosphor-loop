@@ -285,10 +285,11 @@
 
       <section class="group" id="soundGroup" aria-labelledby="h-sound">
         <h2 id="h-sound">React to sound</h2>
-        <div class="seg seg-3" id="soundSrc" role="group" aria-label="What to listen to">
+        <div class="seg seg-2" id="soundSrc" role="group" aria-label="What to listen to">
           <button data-snd="off" aria-pressed="true">Off</button>
           <button data-snd="system" aria-pressed="false">Computer sound</button>
           <button data-snd="mic" aria-pressed="false">Microphone</button>
+          <button data-snd="loopback" aria-pressed="false">Loopback adapter</button>
         </div>
         <div class="dev" id="soundRow" hidden>
           <span class="dev-status" id="sndStatus">Not listening.</span>
@@ -307,6 +308,7 @@
             <select id="micSel"></select>
             <span class="hint" id="micTip" hidden></span>
           </div>
+          <p class="hint" id="loopbackHint" hidden>Choose BlackHole, Stereo Mix or another loopback input. Route your computer’s audio to that adapter in your sound settings; use a multi-output device to keep hearing it through your speakers too. Your browser calls audio input access “microphone” permission.</p>
           <div class="ctl">
             <div class="ctl-head"><label for="sndAmt">Amount</label><output id="sndAmtOut" for="sndAmt"></output></div>
             <input type="range" id="sndAmt" min="0" max="100" step="1" value="60">
@@ -368,9 +370,10 @@
 
           <div class="dev" id="row-spectro" hidden>
             <span class="dev-status" id="specStatus">The spectrograph needs something to listen to. Pick one:</span>
-            <div class="seg seg-2" id="specListen" role="group" aria-label="What the spectrograph listens to">
+            <div class="seg seg-3" id="specListen" role="group" aria-label="What the spectrograph listens to">
               <button data-snd="system" aria-pressed="false">Computer sound</button>
               <button data-snd="mic" aria-pressed="false">Microphone</button>
+              <button data-snd="loopback" aria-pressed="false">Loopback adapter</button>
             </div>
             <div class="ctl">
               <span class="lbl" id="specShapeLbl">Shape</span>
@@ -795,6 +798,7 @@
           <div class="g-card"><h3>React to sound</h3><dl>
             <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: on the Entire Screen tab pick any screen (with two monitors, Screen 1 or Screen 2 both give the whole computer’s sound) and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
             <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works. Listen to picks which input when there’s more than one.</dd>
+            <dt>Loopback adapter</dt><dd>Hears the computer through BlackHole, Soundflower, Stereo Mix or another installed loopback input, without screen sharing. Pick the adapter under Listen to. On a Mac, route your output to a multi-output device that includes BlackHole and your speakers or headphones. Allow “microphone” access when the browser asks; that permission also covers loopback adapters. Video sound set to Computer keeps this same sound in recordings.</dd>
             <dt>Stereo Mix (Windows)</dt><dd>Hears the computer’s sound with no screen sharing at all: choose Microphone, then Stereo Mix under Listen to. If it isn’t listed, turn it on once in Windows Settings → System → Sound → More sound settings (Sound Control Panel on Windows 10) → Recording tab → right-click an empty spot → Show Disabled Devices → right-click Stereo Mix → Enable, then reload this page. Some computers don’t have it.</dd>
             <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
             <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on every kick, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>

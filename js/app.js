@@ -958,8 +958,8 @@ function surprise() {
 $('#surprise').addEventListener('click', surprise);
 
 /* ================= react to sound ================= */
-// Listens to the computer's sound (the browser only offers that through screen sharing with
-// "share system audio") or to the microphone, splits it into low, mid and high bands plus beats,
+// Listens to the computer's sound through screen sharing or a loopback adapter,
+// or to the microphone, splits it into low, mid and high bands plus beats,
 // and nudges both loops with them. Nothing is played back, so there is no echo.
 const snd = {
   src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null, prevBins: null,
@@ -972,16 +972,21 @@ const snd = {
 // How hard the picture reacts. The old full strength now sits near 50, and Wild goes well past it.
 const sndPower = () => Math.pow(clamp(snd.amount, 0, 100) / 100, 0.85) * 2.4;
 const sndStatus = $('#sndStatus'), sndRetry = $('#sndRetry'), sndAmt = $('#sndAmt'), micSel = $('#micSel');
-let micDeviceId = '';
+let micDeviceId = '', loopbackDeviceId = '', soundRequest = 0;
 // Firefox and Safari share screens without sound, so Computer sound only works in Chrome and Edge
 const UA = navigator.userAgent || '';
 const noScreenAudio = /Firefox\//.test(UA) || (/Safari\//.test(UA) && !/(Chrome|Chromium|Edg)\//.test(UA));
 const browserName = /Firefox\//.test(UA) ? 'Firefox' : 'Safari';
 if (noScreenAudio) {
-  $('#sndHint').innerHTML = `Computer sound needs Chrome or Edge. In ${browserName}, use <b>Microphone</b>; on Windows, pick <b>Stereo Mix</b> to hear the computer’s own sound.`;
+  $('#sndHint').innerHTML = `Computer sound sharing needs Chrome or Edge. In ${browserName}, use <b>Loopback adapter</b> with BlackHole or Stereo Mix to hear this computer, or <b>Microphone</b> to hear the room.`;
 }
 // Inputs that carry the computer's own sound rather than a room microphone
-const LOOPBACK = /stereo mix|what u hear|wave out|cable output|loopback|voicemeeter|monitor of/i;
+const LOOPBACK = /blackhole|soundflower|stereo mix|what u hear|wave out|cable output|loopback|voicemeeter|monitor of/i;
+if (APP) {
+  $$('[data-snd="loopback"]').forEach((b) => { b.hidden = true; });
+  $('#soundSrc').classList.replace('seg-2', 'seg-3');
+  $('#specListen').classList.replace('seg-3', 'seg-2');
+}
 if (inArtifact) $('#soundGroup').hidden = true;
 // The Spectrograph input's own row repeats what the sound is doing, so nobody has to scroll up to React to sound
 const specStatus = $('#specStatus');
@@ -1138,7 +1143,8 @@ function syncSoundUI() {
   $$('#specListen button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.snd === snd.src)));
   if (snd.src === 'off') say(specStatus, SPEC_IDLE);
   $('#soundRow').hidden = snd.src === 'off';
-  $('#micPick').hidden = snd.src !== 'mic' || micSel.options.length < 2;
+  $('#micPick').hidden = snd.src === 'loopback' ? micSel.options.length === 0 : snd.src !== 'mic' || micSel.options.length < 2;
+  $('#loopbackHint').hidden = snd.src !== 'loopback';
   $$('#sndMap button').forEach((b) => b.setAttribute('aria-pressed', String(!!snd.map[b.dataset.map])));
   sndAmt.value = snd.amount;
   fillTrack(sndAmt);
@@ -1284,34 +1290,62 @@ function listen(stream, appRate) {
   });
 }
 async function setSound(src) {
+  const request = ++soundRequest;
   stopSound();
   snd.src = src;
   syncSoundUI();
   if (src === 'off') { sndSay('Not listening.'); return; }
-  if (src === 'mic') {
+  if (src === 'mic' || src === 'loopback') {
+    const loopback = src === 'loopback';
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { sndSay('This browser can’t use a microphone on this page.', true); return; }
-    sndSay('Waiting for you to allow the microphone…');
+    sndSay(loopback ? 'Looking for a loopback adapter. Allow audio input access if your browser asks…' : 'Waiting for you to allow the microphone…');
     try {
       const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
-      if (micDeviceId) audio.deviceId = { exact: micDeviceId };
+      if (loopback) {
+        let ins = await listMics();
+        if (request !== soundRequest) return;
+        if (!ins.some((d) => d.label)) {
+          // Device names are private until audio input access has been granted.
+          const permission = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          permission.getTracks().forEach((t) => t.stop());
+          if (request !== soundRequest) return;
+          ins = await listMics();
+          if (request !== soundRequest) return;
+        }
+        const adapters = ins.filter((d) => LOOPBACK.test(d.label));
+        const device = adapters.find((d) => d.deviceId === loopbackDeviceId)
+          || adapters.find((d) => /blackhole 2ch/i.test(d.label)) || adapters[0];
+        if (!device) {
+          sndSay('No loopback adapter was found. Install or enable BlackHole, Stereo Mix or another loopback input, then press Try again. No microphone is being used.', true);
+          return;
+        }
+        loopbackDeviceId = device.deviceId;
+        audio.deviceId = { exact: loopbackDeviceId };
+        audio.channelCount = { ideal: 2 };
+      } else if (micDeviceId) audio.deviceId = { exact: micDeviceId };
       const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-      if (snd.src !== 'mic') { stream.getTracks().forEach((t) => t.stop()); return; }
+      if (request !== soundRequest) { stream.getTracks().forEach((t) => t.stop()); return; }
       listen(stream);
       const settings = stream.getAudioTracks()[0].getSettings ? stream.getAudioTracks()[0].getSettings() : {};
-      micDeviceId = settings.deviceId || micDeviceId;
+      if (loopback) loopbackDeviceId = settings.deviceId || loopbackDeviceId;
+      else micDeviceId = settings.deviceId || micDeviceId;
       const label = stream.getAudioTracks()[0].label || '';
       sndSay(LOOPBACK.test(label)
         ? `<span class="live"></span><b>Listening to this computer’s sound</b> through ${escapeHTML(label)}.`
         : '<span class="live"></span><b>Listening through the microphone.</b> Play music nearby, or clap.');
       listMics();
     } catch (err) {
+      if (request !== soundRequest) return;
       const n = err && err.name;
       if (n === 'NotAllowedError' || n === 'SecurityError') {
         sndSay(APP ? 'Microphone access was blocked. Press Try again and choose <b>Allow</b>.'
           : 'Microphone access was blocked. Click the microphone icon in the address bar, choose <b>Allow</b>, then press Try again.', true);
       }
-      else if (n === 'NotFoundError' || n === 'OverconstrainedError') { micDeviceId = ''; sndSay('That input wasn’t found. Plug it in or pick another, then press Try again.', true); }
-      else sndSay('The microphone couldn’t start. Press Try again.', true);
+      else if (n === 'NotFoundError' || n === 'OverconstrainedError') {
+        if (loopback) loopbackDeviceId = ''; else micDeviceId = '';
+        sndSay('That input wasn’t found. Plug it in or pick another, then press Try again.', true);
+      }
+      else sndSay(loopback ? 'The loopback adapter couldn’t start. Press Try again.' : 'The microphone couldn’t start. Press Try again.', true);
     }
     return;
   }
@@ -1343,23 +1377,31 @@ async function setSound(src) {
 async function listMics() {
   try {
     const ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const loopback = snd.src === 'loopback';
+    const shown = loopback ? ins.filter((d) => LOOPBACK.test(d.label)) : ins;
     micSel.innerHTML = '';
-    ins.forEach((d, i) => {
+    shown.forEach((d, i) => {
       const o = document.createElement('option');
       o.value = d.deviceId;
       o.textContent = (d.label || `Input ${i + 1}`) + (LOOPBACK.test(d.label) ? ' (this computer’s sound)' : '');
       micSel.appendChild(o);
     });
-    if ([...micSel.options].some((o) => o.value === micDeviceId)) micSel.value = micDeviceId;
+    const selected = loopback ? loopbackDeviceId : micDeviceId;
+    if ([...micSel.options].some((o) => o.value === selected)) micSel.value = selected;
     const loop = ins.find((d) => LOOPBACK.test(d.label));
     const tip = $('#micTip');
     const onLoop = loop && loop.deviceId === micSel.value;
-    tip.hidden = !loop || onLoop;
+    tip.hidden = loopback || !loop || onLoop;
     if (loop && !onLoop) tip.textContent = `Pick “${loop.label}” to hear everything this computer plays, with no screen sharing.`;
     syncSoundUI();
-  } catch (_) {}
+    return ins;
+  } catch (_) { return []; }
 }
-micSel.addEventListener('change', () => { micDeviceId = micSel.value; setSound('mic'); });
+micSel.addEventListener('change', () => {
+  if (snd.src === 'loopback') { loopbackDeviceId = micSel.value; setSound('loopback'); }
+  else { micDeviceId = micSel.value; setSound('mic'); }
+});
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', listMics);
 $('#sndUseMic').addEventListener('click', () => setSound('mic'));
 $$('#soundSrc button').forEach((b) => b.addEventListener('click', () => setSound(b.dataset.snd)));
 // Already hearing it? Then the spectrograph's button leaves it alone rather than asking all over again
@@ -5705,7 +5747,11 @@ function fit() {
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   let cw, ch, aspect;
-  if (out) {
+  if (window.__phosphorCaptureConfig) {
+    cw = window.__phosphorCaptureConfig.width;
+    ch = window.__phosphorCaptureConfig.height;
+    aspect = cw / ch;
+  } else if (out) {
     // Draw at the output window's own resolution; this screen shows a scaled preview of the same picture
     const ow = Math.max(1, outWin.innerWidth), oh = Math.max(1, outWin.innerHeight);
     const odpr = Math.min(outWin.devicePixelRatio || 1, 2, Math.sqrt(6e6 / (ow * oh)));
@@ -5905,7 +5951,8 @@ function saveSession() {
   let s;
   try {
     s = JSON.stringify({ v: 1, look: snapshot(), ap: ap.on, cam: camDeviceId,
-      snd: snd.src === 'mic' ? { src: 'mic', mic: micDeviceId } : { src: 'off' } });
+      snd: snd.src === 'loopback' ? { src: 'loopback', device: loopbackDeviceId }
+        : snd.src === 'mic' ? { src: 'mic', mic: micDeviceId } : { src: 'off' } });
   } catch (_) { return; }
   if (s !== lastSaved && lsSet(LAST_KEY, s)) lastSaved = s;
 }
@@ -5932,6 +5979,7 @@ function restoreSession() {
   loadPreset({ id: null, name: '', data: d }, true);
   if (s.ap) setAutopilot(true, true);
   if (s.snd && s.snd.src === 'mic') { micDeviceId = s.snd.mic || ''; setSound('mic'); }
+  if (s.snd && s.snd.src === 'loopback') { loopbackDeviceId = s.snd.device || ''; setSound('loopback'); }
   showOSD('SHOW', 'RESUMED');
   if (missing) toast(`Picked up where you left off. Choose ${missing} again to bring it back.`);
   return true;
@@ -7160,4 +7208,11 @@ setEdit('A');
 eyeSetup();
 requestAnimationFrame(frame);
 showStart();
+// Available only in the isolated local capture session; ordinary site behavior is unchanged.
+if (window.__phosphorCaptureConfig) window.__phosphorCapture = {
+  canvas,
+  listen(stream) { stopSound(); snd.src = 'mic'; listen(stream); syncSoundUI(); },
+  stopSound,
+  autopilot() { setAutopilot(true); },
+};
 })();

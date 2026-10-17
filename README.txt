@@ -333,6 +333,14 @@ TIPS
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
     switch on "Also share system audio" and press Share, then play Spotify
     or anything else. Microphone listens to the room instead.
+  - Loopback adapter (under React to sound): hears BlackHole on a Mac,
+    Stereo Mix on Windows, or another installed loopback input without screen
+    sharing. Choose the adapter under Listen to. Route computer audio to it
+    in your sound settings; on a Mac, use a multi-output device that includes
+    BlackHole and your speakers/headphones to keep hearing the music too.
+    Allow the browser's "microphone" permission (it covers all audio inputs).
+    Video sound set to Computer records the same sound. Show mode remembers
+    the adapter and reconnects it on the next start.
   - Video sound (next to Record): picks the sound in videos you record.
     Click it to step through Off, Mic, Computer and Both (mic and computer
     mixed together). If React to sound already hears that sound, the video
