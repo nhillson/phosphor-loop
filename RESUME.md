@@ -2,6 +2,13 @@
 
 See the latest streaming status below before older notes.
 
+## Broadcast STOPPED at user request
+
+The user explicitly said "stop broadcasting" after the checkpoint commit. Relay
+PID8164 and its FFmpeg PID8172 have exited. Do not restart remote publishing
+unless the user requests it. Local producer/window and audio routing remain running.
+The process details below describe the earlier checkpoint.
+
 ## Handoff: quality work checkpoint (2026-10-17)
 
 User is near usage cap and explicitly requested a commit and handoff. Preserve the
