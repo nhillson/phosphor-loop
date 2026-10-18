@@ -32,10 +32,10 @@ try {
  await received;clearTimeout(receiverCeiling);
  const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,channels,width,height','-of','json',file]);
  const streams=JSON.parse(stdout).streams;
- assert.ok(streams.some(s=>s.codec_name==='h264'&&s.width===1280&&s.height===720));
+ assert.ok(streams.some(s=>s.codec_name==='h264'&&s.width===1920&&s.height===1080));
  assert.ok(streams.some(s=>s.codec_name==='aac'&&s.channels===2));
  assert.ok(!senderLog.includes(url),'RTMP destination leaked in sender logs');
- console.log('PASS: local RTMP receiver got at least 120 video frames, 720p H.264, and stereo AAC; sender stopped cleanly.');
+ console.log('PASS: local RTMP receiver got at least 120 video frames, 1080p H.264, and stereo AAC; sender stopped cleanly.');
 }finally{
  clearTimeout(ceiling);
  if(sender.exitCode===null){sender.kill('SIGINT');const t=setTimeout(()=>sender.kill('SIGKILL'),5000);await sent;clearTimeout(t);}

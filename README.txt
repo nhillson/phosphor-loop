@@ -467,7 +467,8 @@ LOCAL LIVE STREAM (Mac)
 
   A separate Chrome workstation opens. Its controls change the streamed picture.
   It captures only the picture plus BlackHole audio, with no microphone processing.
-  The stream is H.264 video and stereo AAC audio, targeting 1280 x 720 at 30 fps.
+  The stream is H.264 video and stereo AAC audio, targeting 1920 x 1080 at 60 fps,
+  with 7 Mbps constant video bitrate, 192 Kbps audio, and two-second keyframes.
   GPU rendering is on. The ink shader avoids a Metal compiler issue on Apple GPUs.
 
   Watch in a browser:
@@ -486,7 +487,7 @@ LOCAL LIVE STREAM (Mac)
 
   Optional settings:
     npm run stream -- --autopilot
-    npm run stream -- --width 1920 --height 1080 --fps 30
+    npm run stream -- --width 1280 --height 720 --fps 30 --bitrate 6000000
     npm run stream -- --port 8788
 
   Record instead of serving a live stream (Chrome runs without a window):

@@ -41,18 +41,19 @@ try {
     return light>3 ? {width:v.videoWidth,height:v.videoHeight,light} : false;
   },null,{polling:'raf',timeout:20000});
   const picture = await pictureHandle.jsonValue();
-  assert.equal(picture.width,1280);assert.equal(picture.height,720);assert.ok(picture.light>3,JSON.stringify(picture));
+  assert.equal(picture.width,1920);assert.equal(picture.height,1080);assert.ok(picture.light>3,JSON.stringify(picture));
   assert.deepEqual(errors,[]);
   assert.ok(renderer && !/SwiftShader|llvmpipe/.test(renderer),'The sender must use real GPU rendering. '+logs);
   const url=`http://127.0.0.1:${port}/live/stream.m3u8`;
-  const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,channels,width,height','-of','json',url],{timeout:15000});
+  const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,channels,width,height,avg_frame_rate','-of','json',url],{timeout:15000});
   const streams=JSON.parse(stdout).streams;
-  assert.ok(streams.some(s=>s.codec_type==='video'&&s.codec_name==='h264'));
+  assert.ok(streams.some(s=>s.codec_type==='video'&&s.codec_name==='h264'&&s.avg_frame_rate==='60/1'));
   assert.ok(streams.some(s=>s.codec_type==='audio'&&s.codec_name==='aac'&&s.channels===2));
-  console.log(`PASS: real GPU, 1280×720 H.264, stereo AAC, live HTTP playback with a nonblack picture (brightness ${picture.light.toFixed(1)}).`);
+  console.log(`PASS: real GPU, 1920×1080 at 60 fps H.264, stereo AAC, live HTTP playback with a nonblack picture (brightness ${picture.light.toFixed(1)}).`);
   sender.kill('SIGINT'); assert.equal(await exited,0,logs);
   const performance = logs.match(/Captured \d+ frames \([\d.]+ fps\)/);
   assert.ok(performance,'Missing capture performance summary');
+  assert.ok(+performance[0].match(/\(([\d.]+) fps\)/)[1]>=55,'Capture is not sustaining close to 60 unique frames per second: '+performance[0]);
   console.log(performance[0]);
   console.log('PASS: clean stream stop and FFmpeg finalization.');
 } finally {

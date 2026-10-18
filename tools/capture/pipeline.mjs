@@ -9,7 +9,11 @@ export function ffmpegArgs(config) {
   const args = ['-hide_banner', '-loglevel', 'warning', '-n', '-analyzeduration', '1000000', '-probesize', '1000000', '-i', 'pipe:0',
     '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'libx264', '-preset', 'veryfast',
     '-tune', 'zerolatency', '-pix_fmt', 'yuv420p', '-r', String(config.fps), '-g', String(config.fps * 2), '-sc_threshold', '0',
-    '-b:v', String(config.bitrate), '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'];
+    '-b:v', String(config.bitrate), '-minrate', String(config.bitrate), '-maxrate', String(config.bitrate), '-bufsize', String(config.bitrate * 2),
+    '-profile:v', 'high', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'];
+  // Network output uses filler to maintain CBR, with a two-second VBV buffer.
+  // MP4 recordings retain capped rate control without transport filler packets.
+  if (config.liveDir || config.rtmp) args.push('-x264-params','nal-hrd=cbr:force-cfr=1');
   if (config.liveDir) args.push('-f', 'hls', '-hls_time', '2', '-hls_list_size', '6',
     '-hls_flags', 'delete_segments+independent_segments+temp_file',
     '-hls_segment_filename', resolve(config.liveDir,'segment-%09d.ts'), resolve(config.liveDir,'stream.m3u8'));

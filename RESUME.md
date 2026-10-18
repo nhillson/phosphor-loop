@@ -4,6 +4,19 @@ See the latest streaming status below before older notes.
 
 ## Latest: live streaming and Apple GPU fix completed
 
+### Follow-up: 1080p60 defaults
+
+- User requested 1080p60 at about 7 Mbps. Runner defaults now 1920x1080, 60 fps,
+  7,000,000 bps video, with stereo AAC 192 kbps. HLS/RTMP use CBR filler and
+  min/max 7 Mbps, 14 Mb VBV buffer, and 2-second GOP; recordings use capped rate.
+- Actual recording check: 600 captured frames in 10 seconds (60.0 fps), ffprobe
+  confirmed 1920x1080 H.264 at 60/1 and AAC. Updated live HLS test PASS: real GPU,
+  browser playback, **309 frames at 59.9 fps**, stereo AAC, clean stop. Pipeline
+  unit checks PASS. RTMP receiver test at 1080p also PASS (>=120 frames received).
+- YouTube official guidance checked: H.264 1080p60 minimum 6 Mbps, recommended
+  17 Mbps; requested 7 Mbps is above minimum. User was told recommendation is
+  higher; do not increase bitrate beyond requested 7ish without reason.
+
 - User confirmed loopback + SMSL working and requested a commit, then streaming
   video. Committed baseline as **6335e53** (loopback UI, mirrored SMSL routing,
   tests, and the then-WIP capture scaffold). Nothing pushed.

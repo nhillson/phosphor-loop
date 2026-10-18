@@ -9,15 +9,15 @@ import {createCaptureServer, ffmpegArgs} from './pipeline.mjs';
 import {startCapture} from './browser.mjs';
 
 const {values} = parseArgs({options: {
-  output: {type: 'string'}, seconds: {type: 'string'}, width: {type: 'string', default: '1280'},
-  height: {type: 'string', default: '720'}, fps: {type: 'string', default: '30'},
-  bitrate: {type: 'string', default: '6000000'}, device: {type: 'string', default: 'BlackHole 2ch'},
+  output: {type: 'string'}, seconds: {type: 'string'}, width: {type: 'string', default: '1920'},
+  height: {type: 'string', default: '1080'}, fps: {type: 'string', default: '60'},
+  bitrate: {type: 'string', default: '7000000'}, device: {type: 'string', default: 'BlackHole 2ch'},
   rtmp: {type: 'boolean'}, autopilot: {type: 'boolean'}, help: {type: 'boolean'},
   renderer: {type: 'string', default: 'gpu'}, headed: {type: 'boolean'},
   live: {type:'boolean'}, port: {type:'string',default:'8787'},
 }});
 if (values.help) {
-  console.log('npm run stream -- [--port 8787] [--autopilot]\nnpm run capture -- [--output captures/show.mp4] [--seconds 10]\n  [--width 1280 --height 720 --fps 30 --bitrate 6000000]\n  [--device "BlackHole 2ch"] [--renderer gpu|software] [--headed]\n  [--live | --rtmp (uses PHOSPHOR_RTMP_URL)]\nStop with Ctrl+C. GPU rendering is the default; software is an optional fallback.\nCHROME_PATH and FFMPEG_PATH optionally override executables.');
+  console.log('npm run stream -- [--port 8787] [--autopilot]\nnpm run capture -- [--output captures/show.mp4] [--seconds 10]\n  [--width 1920 --height 1080 --fps 60 --bitrate 7000000]\n  [--device "BlackHole 2ch"] [--renderer gpu|software] [--headed]\n  [--live | --rtmp (uses PHOSPHOR_RTMP_URL)]\nStop with Ctrl+C. GPU rendering is the default; software is an optional fallback.\nCHROME_PATH and FFMPEG_PATH optionally override executables.');
   process.exit(0);
 }
 const root = fileURLToPath(new URL('../../', import.meta.url));
