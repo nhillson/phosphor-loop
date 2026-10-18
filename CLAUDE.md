@@ -34,6 +34,15 @@ file don't rebuild the app.
 The workspace browser has no graphics chip (software drawing, about 5–9 frames a second at the test size), so
 its pictures show fewer, more separate echoes than Nick sees at 60 frames a second.
 
+## Twitch stream mode
+
+`index.html?stream=1&twitch=…&link=…` is the picture alone for OBS (section "stream mode" near the end of
+index.html); `stream.html` is the Go live page that makes that address and the OBS scene file, and links to the
+stream picture over the phone link's PeerJS service to send sound, ratings and settings. Check changes to either
+with `python3 tests/stream_check.py` (about 35 s): it stands in for Twitch chat and the connection service, so it
+works offline. While the work lives on a branch, its pages are reachable at
+`https://raw.githack.com/nhillson/phosphor-loop/<branch>/stream.html` (GitHub Pages only serves `main`).
+
 ## Working with Nick
 
 - Before starting a task, give a rough ETA. Send short progress updates with a fresh ETA at milestones, as

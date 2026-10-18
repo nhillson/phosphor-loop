@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#181618">
+<title>Phosphor Loop on Twitch</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Michroma&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --chassis: #181619; --raise: #29242b; --raise-2: #322c35; --well: #0e0d0f; --line: #37313a;
+    --ink: #e4dae8; --dim: #9e8ea5; --faint: #706375; --amber: #8b1ab8; --amber-ink: #d584f5; --ok: #7ee2a8; --warn: #ffc98a;
+    --f-display: "Michroma", "Eurostile", "Arial Black", sans-serif;
+    --f-body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--chassis); color: var(--ink); font: 17px/1.5 var(--f-body); -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-ink); }
+  b { font-weight: 600; color: #f6ecfa; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px 64px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 14px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .guns { display: inline-flex; gap: 4px; } .guns i { width: 9px; height: 9px; border-radius: 50%; }
+  .guns i:nth-child(1) { background: #ff5b8a; } .guns i:nth-child(2) { background: #7ee2a8; } .guns i:nth-child(3) { background: #7aa7ff; }
+  .wordmark { font-family: var(--f-display); font-size: 15px; letter-spacing: .2em; }
+  .wordmark em { font-style: normal; color: var(--amber-ink); }
+  .open-app { font-size: 15px; color: var(--dim); }
+
+  .tabs { display: flex; gap: 8px; margin: 22px 0 18px; }
+  .tabs button { flex: 1; min-height: 56px; border-radius: 12px; border: 1px solid var(--line); background: var(--raise); color: var(--ink);
+    font: 600 18px var(--f-body); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .tabs button small { font-weight: 400; color: var(--dim); font-size: 14px; }
+  .tabs button[aria-selected="true"] { border-color: var(--amber); background: #2d1838; box-shadow: inset 0 0 0 1px var(--amber); }
+
+  .card { background: var(--raise); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 4px; font-size: 21px; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+  .card > p { margin: 6px 0 12px; color: var(--dim); }
+  .num { flex: none; width: 34px; height: 34px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--amber); color: #fff;
+    font: 600 17px var(--f-body); }
+  .card.done .num { background: #1f5d3c; }
+  .card.done .num::after { content: "✓"; } .card.done .num span { display: none; }
+  .steps { margin: 10px 0 0; padding: 0; list-style: none; counter-reset: s; }
+  .steps li { counter-increment: s; position: relative; padding: 6px 0 6px 38px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 6px; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--amber-ink); color: var(--amber-ink); font-weight: 600; font-size: 14px; display: grid; place-items: center; }
+  figure { margin: 14px 0 6px; padding: 0; }
+  figure svg { display: block; width: 100%; height: auto; border-radius: 10px; background: #0d0c0e; border: 1px solid var(--line); }
+  figcaption { font-size: 14px; color: var(--faint); margin-top: 6px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; padding: 10px 20px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--raise-2); color: var(--ink); font: 600 17px var(--f-body); cursor: pointer; text-decoration: none; }
+  .btn:hover { border-color: var(--faint); }
+  .btn.big { min-height: 60px; padding: 12px 26px; font-size: 19px; }
+  .btn.go { background: var(--amber); border-color: var(--amber); color: #fff; }
+  .btn.go:hover { background: #9d2bcb; }
+  .btn[aria-pressed="true"] { border-color: var(--amber-ink); box-shadow: inset 0 0 0 1px var(--amber-ink); background: #2d1838; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn svg { width: 20px; height: 20px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+  label.field { display: block; margin: 12px 0; }
+  label.field > span { display: block; font-weight: 600; margin-bottom: 6px; }
+  label.field > small { display: block; color: var(--faint); font-size: 14px; margin-top: 4px; }
+  input[type=text], select { width: 100%; max-width: 420px; min-height: 48px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--well); color: var(--ink); font: 500 18px var(--f-body); }
+  input[type=text]:focus, select:focus { outline: 2px solid var(--amber); border-color: transparent; }
+  .tw-in { display: flex; align-items: center; max-width: 420px; border-radius: 10px; border: 1px solid var(--line); background: var(--well); }
+  .tw-in span { padding: 0 2px 0 12px; color: var(--faint); font-size: 17px; white-space: nowrap; }
+  .tw-in input { border: 0; background: none; padding-left: 2px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 18px; }
+  details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  summary { cursor: pointer; color: var(--amber-ink); font-weight: 600; padding: 6px 0; }
+  .note { font-size: 15px; color: var(--dim); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); }
+  .addr { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .addr code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 10px 12px; border-radius: 8px;
+    background: var(--well); border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+
+  /* Go live */
+  .live-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 0 4px rgba(126,226,168,.18); }
+  .dot.wait { background: var(--warn); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .state-big { font-size: 20px; font-weight: 600; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+  .stat { background: var(--well); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .stat .k { font-family: var(--f-display); font-size: 10.5px; letter-spacing: .16em; color: var(--faint); }
+  .stat .v { font-size: 19px; font-weight: 600; margin-top: 2px; }
+  .stat .v small { font-weight: 400; color: var(--dim); font-size: 14px; }
+  .meters { display: flex; gap: 10px; align-items: flex-end; height: 74px; padding: 10px 12px; border-radius: 10px; background: var(--well); border: 1px solid var(--line); margin-top: 12px; max-width: 420px; }
+  .meter { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+  .meter .bar { flex: 1; width: 100%; border-radius: 4px; background: #1b171d; position: relative; overflow: hidden; }
+  .meter .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform-origin: bottom; transform: scaleY(0);
+    background: linear-gradient(to top, var(--amber), var(--amber-ink)); transition: transform .08s linear; }
+  .meter span { font-size: 11px; color: var(--faint); font-family: var(--f-display); letter-spacing: .1em; }
+  .rate-row .btn { flex: 1; min-width: 150px; }
+  .thumb-dn svg { transform: rotate(180deg); }
+  input[type=range] { width: 100%; max-width: 420px; accent-color: var(--amber); }
+  .qr { background: #fff; padding: 10px; border-radius: 10px; width: 200px; height: 200px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #2d1838; border: 1px solid var(--amber); color: #f6ecfa;
+    padding: 12px 18px; border-radius: 12px; font-weight: 500; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+  .toast.on { opacity: 1; }
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    .tabs button { font-size: 16px; flex-direction: column; gap: 0; }
+    .card { padding: 16px 14px; }
+    .open-app { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="guns" aria-hidden="true"><i></i><i></i><i></i></span><span class="wordmark">PHOSPHOR LOOP <em>ON TWITCH</em></span></div>
+    <a class="open-app" href="index.html">Open the full Phosphor Loop →</a>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabLive" aria-selected="true" aria-controls="live">Go live <small>every time</small></button>
+    <button role="tab" id="tabSetup" aria-selected="false" aria-controls="setup">Set up <small>once, about 15 min</small></button>
+  </div>
+
+  <!-- ================= GO LIVE ================= -->
+  <section id="live" role="tabpanel" aria-labelledby="tabLive">
+    <div class="card" id="cardObs">
+      <h2><span class="num"><span>1</span></span>Open OBS</h2>
+      <p>The Phosphor Loop picture starts inside OBS by itself. This page finds it.</p>
+      <div class="live-head"><span class="dot wait" id="linkDot"></span><span class="state-big" id="linkState">Looking for the stream picture…</span></div>
+      <p class="note" id="linkHelp">Open OBS (it can take half a minute after OBS opens). Not set up yet? Press <b>Set up</b> above.</p>
+    </div>
+
+    <div class="card" id="cardSound">
+      <h2><span class="num"><span>2</span></span>Send your sound</h2>
+      <p>So the picture moves with your music. Press the button, then do what the picture shows.</p>
+      <div class="row">
+        <button class="btn go big" id="sndSystem">Send this computer’s sound</button>
+        <button class="btn" id="sndMic">Use a microphone instead</button>
+        <button class="btn" id="sndStop" hidden>Stop sending sound</button>
+      </div>
+      <label class="field" id="micPick" hidden><span>Listen to</span><select id="micSel"></select></label>
+      <p class="note" id="sndState">Not sending sound yet. The picture still runs without it, it just won’t react to music.</p>
+      <div class="meters" id="meters" aria-label="What the stream hears">
+        <div class="meter"><div class="bar"><i id="mLow"></i></div><span>LOW</span></div>
+        <div class="meter"><div class="bar"><i id="mMid"></i></div><span>MID</span></div>
+        <div class="meter"><div class="bar"><i id="mHigh"></i></div><span>HIGH</span></div>
+        <div class="meter"><div class="bar"><i id="mBeat"></i></div><span>BEAT</span></div>
+      </div>
+      <figure id="figShare"></figure>
+      <figcaption id="figShareCap">When Chrome asks: <b>1</b> pick the <b>Entire Screen</b> tab, <b>2</b> click the screen, <b>3</b> switch on <b>Also share system audio</b>, <b>4</b> press <b>Share</b>. Only the sound is used; nothing from your screen goes on the stream.</figcaption>
+      <p class="note">Twitch mutes or removes streams that play copyrighted songs (most of what’s on Spotify), so play music you’re allowed to stream.</p>
+    </div>
+
+    <div class="card" id="cardGo">
+      <h2><span class="num"><span>3</span></span>Press Start Streaming in OBS</h2>
+      <p>That’s it, you’re live. To finish, press the same button (it now says <b>Stop Streaming</b>).</p>
+      <figure id="figGo"></figure>
+    </div>
+
+    <div class="card" id="cardRun">
+      <h2>While you’re live</h2>
+      <p>Viewers type <b>!like</b> or <b>!skip</b> in your chat. You can vote from here too.</p>
+      <div class="stats">
+        <div class="stat"><div class="k">NEXT LOOK</div><div class="v" id="sLeft">–</div></div>
+        <div class="stat"><div class="k">CHAT</div><div class="v" id="sChat">–</div></div>
+        <div class="stat"><div class="k">VOTES ON THIS LOOK</div><div class="v" id="sVotes">–</div></div>
+        <div class="stat"><div class="k">AUTOPILOT FOLLOWS</div><div class="v" id="sTaste">–</div></div>
+      </div>
+      <div class="row rate-row" style="margin-top:14px">
+        <button class="btn" id="rUp"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>More like this</button>
+        <button class="btn thumb-dn" id="rDown"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>Not this</button>
+        <button class="btn" id="rNext"><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
+      </div>
+      <label class="field"><span>How strongly the picture reacts to sound: <b id="amtOut">60</b></span><input type="range" id="amt" min="0" max="100" value="60"></label>
+      <details>
+        <summary>Use your phone as a remote</summary>
+        <p class="note">Scan this with your phone’s camera. You get these buttons on your phone, and it can send the phone’s microphone as the sound.</p>
+        <canvas class="qr" id="qr" width="200" height="200"></canvas>
+      </details>
+      <details id="tasteBox">
+        <summary>Keep what your chat likes</summary>
+        <p class="note">Autopilot learns from the votes in a taste profile called <b>Twitch chat</b>, kept inside OBS. Save it as a file to open in the full Phosphor Loop (under <b>Taste profiles</b>, <b>Open a taste file…</b>) or to send to someone.</p>
+        <button class="btn" id="tasteSave">Save the chat’s taste as a file</button>
+      </details>
+    </div>
+  </section>
+
+  <!-- ================= SET UP ================= -->
+  <section id="setup" role="tabpanel" aria-labelledby="tabSetup" hidden>
+    <div class="card" id="st1">
+      <h2><span class="num"><span>1</span></span>Your Twitch channel</h2>
+      <p>The name at the end of your channel’s address, so the picture can read your chat’s votes.</p>
+      <label class="field"><span>Twitch channel name</span>
+        <div class="tw-in"><span>twitch.tv/</span><input type="text" id="twName" autocomplete="off" spellcheck="false" placeholder="yourname"></div>
+        <small id="twNote">Letters, numbers and _ only.</small>
+      </label>
+      <details>
+        <summary>More settings (the usual ones are already picked)</summary>
+        <div class="grid2">
+          <label class="field"><span>Autopilot follows</span><select id="tasteSel">
+            <option value="chat">What my chat likes (it learns as they vote)</option>
+            <option value="none">Nothing, just surprise everyone</option>
+          </select><small>Shared taste profiles show up here too.</small></label>
+          <label class="field"><span>Votes needed to skip a look</span><select id="skipN">
+            <option value="1">1 vote</option><option value="2" selected>2 votes</option><option value="3">3 votes</option>
+            <option value="5">5 votes</option><option value="10">10 votes</option>
+          </select><small>A look is skipped once this many viewers type <b>!skip</b> (and more skip than like it).</small></label>
+          <label class="field"><span>A new look every</span><select id="everyN">
+            <option value="20">20 seconds</option><option value="30" selected>30 seconds</option><option value="45">45 seconds</option>
+            <option value="60">1 minute</option><option value="90">1½ minutes</option>
+          </select></label>
+          <label class="field"><span>Vote counter on the stream</span><select id="votesOn">
+            <option value="1" selected>Show it (bottom left)</option><option value="0">Hide it</option>
+          </select></label>
+          <label class="field"><span>Words for the Text input</span><input type="text" id="textIn" maxlength="60" placeholder="PHOSPHOR LOOP"><small>Autopilot sometimes shows these words.</small></label>
+        </div>
+      </details>
+      <p class="note">Changes here reach the stream picture whenever this page is open.</p>
+    </div>
+
+    <div class="card" id="st2">
+      <h2><span class="num"><span>2</span></span>Install OBS Studio</h2>
+      <p>The free app that sends the picture to Twitch.</p>
+      <ol class="steps">
+        <li><a class="btn" href="https://obsproject.com/download" target="_blank" rel="noopener">Download OBS Studio for Windows</a></li>
+        <li>Open the file you downloaded and press <b>Next</b> until it’s finished.</li>
+        <li>Open <b>OBS Studio</b>.</li>
+      </ol>
+    </div>
+
+    <div class="card" id="st3">
+      <h2><span class="num"><span>3</span></span>Connect OBS to your Twitch</h2>
+      <p>The first time OBS opens, it asks whether to run the <b>Auto-Configuration Wizard</b>. Press <b>Yes</b>. (Missed it? In OBS’s top menu: <b>Tools</b> → <b>Auto-Configuration Wizard</b>.)</p>
+      <figure id="figWizard"></figure>
+      <ol class="steps">
+        <li>Leave <b>Optimize for streaming</b> picked. Press <b>Next</b>.</li>
+        <li>Set <b>Base (Canvas) Resolution</b> to <b>1920x1080</b> and <b>FPS</b> to <b>30</b>. Press <b>Next</b>.</li>
+        <li><b>Service</b>: Twitch. Press <b>Connect Account (recommended)</b> and log in to Twitch in the box that opens. Press <b>Next</b>; OBS tests your internet for a minute.</li>
+        <li>Press <b>Apply Settings</b>.</li>
+      </ol>
+    </div>
+
+    <div class="card" id="st4">
+      <h2><span class="num"><span>4</span></span>Put Phosphor Loop in OBS</h2>
+      <p>This file tells OBS everything: the picture, its size, your computer’s sound (your microphone starts muted).</p>
+      <div class="row"><button class="btn go big" id="obsFile">Download the OBS file</button><span class="note" id="obsNote"></span></div>
+      <figure id="figImport"></figure>
+      <ol class="steps">
+        <li>In OBS’s top menu, click <b>Scene Collection</b>, then <b>Import</b>.</li>
+        <li>In the box that opens, click <b>…</b> and pick <b>Phosphor Loop for OBS</b> (it’s in your <b>Downloads</b> folder).</li>
+        <li>Make sure the little box at the start of the line is <b>ticked</b>, then press <b>Import</b>, then <b>Close</b>.</li>
+        <li>Click <b>Scene Collection</b> again and pick <b>Phosphor Loop on Twitch</b>. The picture appears in OBS.</li>
+      </ol>
+      <details>
+        <summary>Picture didn’t show up? Add it by hand instead</summary>
+        <ol class="steps">
+          <li>In OBS, under <b>Sources</b> (bottom of the window), press <b>+</b> and choose <b>Browser</b>. Press <b>OK</b>.</li>
+          <li>Press this button, then click in the <b>URL</b> box and press <b>Ctrl+V</b>: <button class="btn" id="copyAddr">Copy the address</button></li>
+          <li>Set <b>Width</b> to <b>1920</b> and <b>Height</b> to <b>1080</b>. Press <b>OK</b>.</li>
+          <li>If the picture doesn’t fill OBS’s screen: right-click it, then <b>Transform</b> → <b>Fit to screen</b>.</li>
+        </ol>
+        <div class="addr"><code id="addr"></code></div>
+      </details>
+    </div>
+
+    <div class="card" id="st5">
+      <h2><span class="num"><span>5</span></span>You’re set</h2>
+      <p>From now on, going live is the three steps on the <b>Go live</b> tab. Bookmark this page (press <b>Ctrl+D</b>) so it’s one click away.</p>
+      <button class="btn go big" id="toLive">Go to Go live</button>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const params = new URLSearchParams(location.search);
+const SIGNAL_URL = params.get('signal') || 'wss://0.peerjs.com:443/peerjs';
+const LIVE_SHARED = 'https://nhillson.github.io/phosphor-loop/presets.json';
+const ICE = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+] };
+// Opened from the QR code on a phone: a remote only, with no setup
+const REMOTE = params.get('remote');
+const KEY = 'phosphor-golive-v1';
+function randId(n) {
+  const a = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const r = crypto.getRandomValues(new Uint8Array(n));
+  let s = '';
+  for (const x of r) s += a[x % a.length];
+  return s;
+}
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let toastT = 0;
+function toast(t, ms = 3500) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), ms); }
+
+// ---- saved in this browser: the link code that pairs this page with the stream picture, the settings, the sound choice ----
+const st = { link: '', cfg: { twitch: '', taste: 'chat', skip: 2, votes: true, every: 30, text: '', at: 0 }, snd: { src: '', mic: '' } };
+try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s) { st.link = s.link || ''; Object.assign(st.cfg, s.cfg || {}); Object.assign(st.snd, s.snd || {}); } } catch (_) {}
+if (!st.link) st.link = randId(10);
+const LINK = String(REMOTE || params.get('link') || st.link).replace(/[^a-z0-9]/gi, '').slice(0, 24);
+if (!REMOTE) st.link = LINK;
+function save() { if (REMOTE) return; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} }
+save();
+
+// ---- tabs ----
+function tab(which) {
+  const live = which === 'live';
+  $('#tabLive').setAttribute('aria-selected', String(live));
+  $('#tabSetup').setAttribute('aria-selected', String(!live));
+  $('#live').hidden = !live; $('#setup').hidden = live;
+  window.scrollTo(0, 0);
+}
+$('#tabLive').addEventListener('click', () => tab('live'));
+$('#tabSetup').addEventListener('click', () => tab('setup'));
+$('#toLive').addEventListener('click', () => tab('live'));
+if (REMOTE) {
+  $('.tabs').hidden = true;
+  $('#cardGo').hidden = true;
+  $('#tasteBox').hidden = true;
+  $$('details').forEach((d) => { if (d.querySelector('#qr')) d.hidden = true; });
+  $('#linkHelp').textContent = 'Keep OBS open on your computer. This phone works as a remote.';
+  $('#sndSystem').hidden = true;
+  $('#sndMic').textContent = 'Send this phone’s microphone';
+  $('#sndMic').classList.add('go', 'big');
+  $('#figShare').hidden = true; $('#figShareCap').hidden = true;
+  $('.open-app').hidden = true;
+} else if (!st.cfg.twitch) tab('setup');
+
+// ---- settings ----
+const cleanName = (v) => String(v || '').trim().toLowerCase().replace(/^.*twitch\.tv\//, '').replace(/^[@#]/, '').replace(/[^a-z0-9_]/g, '').slice(0, 25);
+function fillForm() {
+  $('#twName').value = st.cfg.twitch;
+  $('#skipN').value = String(st.cfg.skip);
+  $('#everyN').value = String(st.cfg.every);
+  $('#votesOn').value = st.cfg.votes ? '1' : '0';
+  $('#textIn').value = st.cfg.text;
+  if (![...$('#tasteSel').options].some((o) => o.value === st.cfg.taste)) {
+    const o = new Option(st.cfg.taste + ' (shared)', st.cfg.taste); $('#tasteSel').add(o);
+  }
+  $('#tasteSel').value = st.cfg.taste;
+  checkName();
+}
+function checkName() {
+  const v = cleanName($('#twName').value), n = $('#twNote');
+  if (!v) { n.innerHTML = 'Letters, numbers and _ only.'; n.className = ''; }
+  else if (v.length < 3) { n.innerHTML = 'That looks too short for a Twitch name.'; n.className = 'warn'; }
+  else { n.innerHTML = `Chat votes will come from <b>twitch.tv/${esc(v)}</b>.`; n.className = 'ok'; }
+}
+function readForm() {
+  st.cfg.twitch = cleanName($('#twName').value);
+  st.cfg.skip = clamp(+$('#skipN').value || 2, 1, 20);
+  st.cfg.every = clamp(+$('#everyN').value || 30, 10, 120);
+  st.cfg.votes = $('#votesOn').value === '1';
+  st.cfg.text = $('#textIn').value.slice(0, 60);
+  st.cfg.taste = $('#tasteSel').value || 'chat';
+  st.cfg.at = Date.now();
+  save();
+  sendCfg();
+  updateAddr();
+  marks();
+}
+['#skipN', '#everyN', '#votesOn', '#tasteSel', '#textIn', '#twName'].forEach((s) => $(s).addEventListener('change', readForm));
+$('#twName').addEventListener('input', checkName);
+fillForm();
+// Shared taste profiles (the admin's), newest from the live site, else the copy beside this page
+(async () => {
+  for (const url of [LIVE_SHARED, 'presets.json']) {
+    try {
+      const r = await fetch(url, { cache: 'no-cache' });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const names = (Array.isArray(j.tastes) ? j.tastes : []).map((t) => t && t.name).filter((n) => typeof n === 'string' && n);
+      const sel = $('#tasteSel');
+      [...sel.options].filter((o) => o.value !== 'chat' && o.value !== 'none').forEach((o) => o.remove());
+      names.forEach((n) => sel.add(new Option(`Shared: ${n}`, n)));
+      if (![...sel.options].some((o) => o.value === st.cfg.taste)) sel.add(new Option(st.cfg.taste + ' (shared)', st.cfg.taste));
+      sel.value = st.cfg.taste;
+      return;
+    } catch (_) {}
+  }
+})();
+
+// ---- the address OBS shows, and the OBS file ----
+function streamURL() {
+  const u = new URL('index.html', location.href);
+  u.search = ''; u.hash = '';
+  const c = st.cfg, q = u.searchParams;
+  q.set('stream', '1');
+  if (c.twitch) q.set('twitch', c.twitch);
+  q.set('taste', c.taste);
+  q.set('skip', String(c.skip));
+  q.set('every', String(c.every));
+  if (!c.votes) q.set('votes', '0');
+  if (c.text) q.set('text', c.text);
+  q.set('link', LINK);
+  q.set('at', String(c.at || Date.now()));
+  if (params.get('signal')) q.set('signal', params.get('signal'));
+  return u.toString();
+}
+function updateAddr() { $('#addr').textContent = streamURL(); }
+updateAddr();
+$('#copyAddr').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(streamURL()); toast('Copied. Now click in OBS’s URL box and press Ctrl+V.'); }
+  catch (_) { toast('Couldn’t copy. Select the address below the steps and copy it instead.'); }
+});
+// An OBS scene collection: one scene with the stream picture at 1920 x 1080, the computer's sound (a touch late,
+// so it lines up with the picture, which hears the music a moment after it plays), and the microphone muted
+function obsCollection() {
+  const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+    const r = Math.random() * 16 | 0; return (ch === 'x' ? r : (r & 3 | 8)).toString(16); }));
+  const source = (name, id, settings, extra) => Object.assign({
+    prev_ver: 503316480, name, uuid: uuid(), id, versioned_id: id, settings, mixers: 255, sync: 0, flags: 0, volume: 1.0,
+    balance: 0.5, enabled: true, muted: false, 'push-to-mute': false, 'push-to-mute-delay': 0, 'push-to-talk': false,
+    'push-to-talk-delay': 0, hotkeys: {}, deinterlace_mode: 0, deinterlace_field_order: 0, monitoring_type: 0, private_settings: {},
+  }, extra || {});
+  const pic = source('Phosphor Loop picture', 'browser_source', {
+    url: streamURL(), width: 1920, height: 1080, fps_custom: false, reroute_audio: false, is_local_file: false,
+    css: 'body { background-color: #000; margin: 0; overflow: hidden; }', shutdown: false, restart_when_active: false, webpage_control_level: 1,
+  }, { mixers: 0 });
+  const scene = source('Phosphor Loop', 'scene', {
+    id_counter: 1, custom_size: false,
+    items: [{
+      name: pic.name, source_uuid: pic.uuid, visible: true, locked: false, rot: 0.0, pos: { x: 0.0, y: 0.0 }, scale: { x: 1.0, y: 1.0 },
+      align: 5, bounds_type: 0, bounds_align: 0, bounds_crop: false, bounds: { x: 0.0, y: 0.0 }, crop_left: 0, crop_top: 0, crop_right: 0,
+      crop_bottom: 0, id: 1, group_item_backup: false, scale_filter: 'disable', blend_method: 'default', blend_type: 'normal',
+      show_transition: { duration: 0 }, hide_transition: { duration: 0 }, private_settings: {},
+    }],
+  }, { mixers: 0 });
+  return {
+    name: 'Phosphor Loop on Twitch', current_scene: scene.name, current_program_scene: scene.name, scene_order: [{ name: scene.name }],
+    sources: [pic, scene], groups: [], quick_transitions: [], transitions: [], saved_projectors: [], current_transition: 'Fade',
+    transition_duration: 300, preview_locked: false, scaling_enabled: false, scaling_level: 0, scaling_off_x: 0.0, scaling_off_y: 0.0,
+    modules: {},
+    DesktopAudioDevice1: source('Desktop Audio', 'wasapi_output_capture', { device_id: 'default' }, { sync: 80000000 }),
+    AuxAudioDevice1: source('Mic/Aux', 'wasapi_input_capture', { device_id: 'default' }, { muted: true }),
+  };
+}
+$('#obsFile').addEventListener('click', () => {
+  readForm();
+  if (!st.cfg.twitch) toast('Tip: fill in your Twitch name in step 1 first, so the chat can vote. (You can still add it later.)', 6000);
+  const blob = new Blob([JSON.stringify(obsCollection(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Phosphor Loop for OBS.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  st.obs = Date.now(); save();
+  $('#obsNote').innerHTML = '<span class="ok">Downloaded. It’s in your Downloads folder.</span>';
+  marks();
+});
+function marks() {
+  $('#st1').classList.toggle('done', !!st.cfg.twitch);
+  $('#st4').classList.toggle('done', !!st.obs);
+}
+marks();
+
+// ---- the connection service (PeerJS), the same one the phone camera uses ----
+class Signal {
+  constructor(base, id, h) { this.base = base; this.id = id; this.h = h; this.ws = null; this.hb = null; this.closed = false; this.open = false; }
+  connect() {
+    let ws;
+    try { ws = new WebSocket(`${this.base}?key=peerjs&id=${encodeURIComponent(this.id)}&token=${randId(12)}&version=1.5.5`); }
+    catch (e) { setTimeout(() => this.h.lost && this.h.lost(), 0); return; }
+    this.ws = ws;
+    ws.onmessage = (e) => {
+      let m;
+      try { m = JSON.parse(e.data); } catch (_) { return; }
+      if (m.type === 'OPEN') { this.open = true; this.h.open && this.h.open(); }
+      else if (m.type === 'ID-TAKEN' || m.type === 'ERROR') this.h.error && this.h.error(m.type);
+      else this.h.message && this.h.message(m);
+    };
+    ws.onclose = () => { clearInterval(this.hb); this.open = false; this.ws = null; if (!this.closed && this.h.lost) this.h.lost(); };
+    this.hb = setInterval(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'HEARTBEAT' })); }, 5000);
+  }
+  send(type, dst, payload) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type, dst, payload })); }
+  close() { this.closed = true; clearInterval(this.hb); if (this.ws) { try { this.ws.close(); } catch (_) {} } }
+}
+
+// ---- the link with the stream picture ----
+const STREAM_ID = 'plstream-' + LINK;
+const L = { sig: null, pc: null, dc: null, conn: '', cands: [], offerAt: 0, statusAt: 0, status: null, fails: 0, expired: 0 };
+function sigStart() {
+  if (L.sig && !L.sig.closed) return;
+  const s = new Signal(SIGNAL_URL, 'plgolive-' + randId(10), {
+    open: () => { L.fails = 0; offer(); },
+    message: onSignal,
+    error: () => { s.close(); if (L.sig === s) L.sig = null; setTimeout(sigStart, 2000); },
+    lost: () => { if (L.sig === s) L.sig = null; L.fails++; showLink(); setTimeout(sigStart, Math.min(20000, 1500 * L.fails)); },
+  });
+  L.sig = s;
+  s.connect();
+}
+function closePC() {
+  if (L.pc) { try { L.pc.close(); } catch (_) {} }
+  L.pc = null; L.dc = null; L.cands = [];
+}
+async function offer() {
+  if (!L.sig || !L.sig.open) return;
+  closePC();
+  const pc = new RTCPeerConnection(ICE);
+  L.pc = pc; L.conn = 'mc_' + randId(12); L.offerAt = Date.now();
+  if (snd.stream) snd.stream.getAudioTracks().forEach((t) => pc.addTrack(t, snd.stream));
+  const dc = pc.createDataChannel('ctl');
+  L.dc = dc;
+  dc.onopen = () => {
+    if (L.dc !== dc) return;
+    sendCfg();
+    send({ t: 'amount', v: +$('#amt').value });
+    if (!snd.stream) send({ t: 'nosound' });
+  };
+  dc.onmessage = (e) => { if (L.dc === dc) onMsg(e.data); };
+  pc.onicecandidate = (e) => { if (e.candidate && L.sig) L.sig.send('CANDIDATE', STREAM_ID, { candidate: e.candidate, type: 'media', connectionId: L.conn }); };
+  pc.onconnectionstatechange = () => { if (L.pc === pc && pc.connectionState === 'failed') { closePC(); showLink(); } };
+  try {
+    const o = await pc.createOffer();
+    await pc.setLocalDescription(o);
+    if (L.pc !== pc) return;
+    L.sig.send('OFFER', STREAM_ID, { sdp: pc.localDescription, type: 'media', connectionId: L.conn });
+  } catch (_) { closePC(); }
+}
+async function onSignal(m) {
+  if (m.src !== STREAM_ID) return;
+  const p = m.payload || {};
+  if (m.type === 'ANSWER' && L.pc && p.connectionId === L.conn) {
+    try {
+      await L.pc.setRemoteDescription(p.sdp);
+      for (const c of L.cands) await L.pc.addIceCandidate(c).catch(() => {});
+      L.cands = [];
+    } catch (_) { closePC(); }
+  } else if (m.type === 'CANDIDATE' && L.pc && p.connectionId === L.conn) {
+    if (L.pc.remoteDescription) L.pc.addIceCandidate(p.candidate).catch(() => {});
+    else L.cands.push(p.candidate);
+  } else if (m.type === 'EXPIRE') {
+    // The stream picture isn't running (OBS closed, or not set up yet)
+    L.expired = Date.now();
+    closePC();
+    showLink();
+  }
+}
+const linked = () => !!(L.dc && L.dc.readyState === 'open' && Date.now() - L.statusAt < 5000);
+// Keeps trying: every few seconds while the stream picture can't be reached
+setInterval(() => {
+  if (!L.sig || !L.sig.open) return;
+  if (linked()) return;
+  if (Date.now() - L.offerAt > 6000) offer();
+  showLink();
+}, 2000);
+function send(o) { if (L.dc && L.dc.readyState === 'open') { try { L.dc.send(JSON.stringify(o)); return true; } catch (_) {} } return false; }
+function sendCfg() { if (!REMOTE && st.cfg.at) send({ t: 'cfg', cfg: st.cfg }); }
+const taste = { parts: null, id: '' };
+function onMsg(data) {
+  let d;
+  try { d = JSON.parse(data); } catch (_) { return; }
+  if (d.t === 'status') { L.status = d; L.statusAt = Date.now(); showLink(); showStatus(); }
+  else if (d.t === 'lvl') showLevels(d);
+  else if (d.t === 'tastefile') {
+    if (taste.id !== d.id) { taste.id = d.id; taste.parts = new Array(d.n); }
+    taste.parts[d.i] = d.part;
+    if (taste.parts.every((x) => typeof x === 'string')) {
+      const text = taste.parts.join('');
+      taste.parts = null;
+      if (text === 'null') { toast('The chat hasn’t voted yet, so there’s nothing to save.'); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      a.download = 'taste-twitch-chat.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('Saved taste-twitch-chat.json in your Downloads folder.');
+    }
+  }
+}
+
+// ---- what the page shows about the link ----
+function showLink() {
+  const dot = $('#linkDot'), s = $('#linkState'), help = $('#linkHelp');
+  if (linked()) {
+    const x = L.status || {};
+    dot.className = 'dot on';
+    s.innerHTML = `Connected to the stream picture${x.fps ? ` <small class="note">· ${x.fps} frame${x.fps === 1 ? '' : 's'} a second</small>` : ''}`;
+    help.innerHTML = x.w && (x.w !== 1920 || x.h !== 1080) && !REMOTE
+      ? `It’s ${x.w} x ${x.h} in OBS. For the sharpest stream, set its Width to 1920 and Height to 1080 (double-click it under <b>Sources</b>).`
+      : (REMOTE ? 'This phone is the remote.' : 'All good. Next, send your sound.');
+    $('#cardObs').classList.add('done');
+    return;
+  }
+  $('#cardObs').classList.remove('done');
+  if (!L.sig || !L.sig.open) {
+    dot.className = 'dot wait';
+    s.textContent = 'Connecting to the internet…';
+    help.textContent = L.fails > 2 ? 'Can’t reach the connection service. Check that this computer is online.' : '';
+    return;
+  }
+  dot.className = 'dot wait';
+  s.textContent = 'Looking for the stream picture…';
+  help.innerHTML = REMOTE ? 'Open OBS on your computer. This phone finds the picture as soon as it starts.'
+    : 'Open OBS. The picture starts by itself and this page finds it (give it up to half a minute). Not set up yet? Press <b>Set up</b> above.';
+}
+const fmtLeft = (s) => (s < 0 ? 'Autopilot off' : s <= 1 ? 'coming up' : s < 60 ? `in ${s} s` : `in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+function showStatus() {
+  const x = L.status;
+  if (!x) return;
+  $('#sLeft').textContent = fmtLeft(x.left);
+  $('#sChat').innerHTML = !x.ch ? '<small>No channel set</small>'
+    : x.chat === 'joined' ? `<span class="ok">● </span>#${esc(x.ch)}` : `<small>Connecting to #${esc(x.ch)}…</small>`;
+  $('#sVotes').innerHTML = `${x.likes} like · ${x.skips} skip <small>of ${x.need}</small>`;
+  $('#sTaste').innerHTML = x.taste ? `${esc(x.taste)} <small>${x.rated} rating${x.rated === 1 ? '' : 's'}</small>` : '<small>Nothing (surprises)</small>';
+  $('#rUp').hidden = $('#rDown').hidden = !x.learn;
+  $('#tasteBox').hidden = REMOTE || !x.learn;
+  if (x.sound) {
+    $('#sndState').innerHTML = '<span class="ok">●</span> <b>The stream picture hears it.</b> Play some music and watch the bars.';
+    $('#cardSound').classList.add('done');
+  } else if (snd.stream) {
+    $('#sndState').textContent = 'Sending… waiting for the stream picture to hear it.';
+  }
+  if (!x.sound) { $('#cardSound').classList.remove('done'); document.body.dataset.heard = ''; }
+}
+function showLevels(d) {
+  $('#mLow').style.transform = `scaleY(${clamp(d.l, 0, 1)})`;
+  $('#mMid').style.transform = `scaleY(${clamp(d.m, 0, 1)})`;
+  $('#mHigh').style.transform = `scaleY(${clamp(d.h, 0, 1)})`;
+  $('#mBeat').style.transform = `scaleY(${clamp(d.b, 0, 1)})`;
+  if (d.l + d.m + d.h + d.b > 0.05) document.body.dataset.heard = '1';
+}
+
+// ---- sending sound ----
+const snd = { stream: null, src: '' };
+const LOOPBACK = /stereo mix|what u hear|wave out|cable output|loopback|voicemeeter|monitor of/i;
+const NOFIX = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+function soundOff(quiet) {
+  if (snd.stream) snd.stream.getTracks().forEach((t) => { t.onended = null; t.stop(); });
+  snd.stream = null; snd.src = '';
+  $('#sndStop').hidden = true;
+  $('#sndSystem').setAttribute('aria-pressed', 'false');
+  $('#sndMic').setAttribute('aria-pressed', 'false');
+  if (!quiet) $('#sndState').textContent = 'Not sending sound. The picture still runs, it just won’t react to music.';
+  send({ t: 'nosound' });
+  offer();
+}
+function soundOn(stream, src) {
+  if (snd.stream) snd.stream.getTracks().forEach((t) => { t.onended = null; t.stop(); });
+  snd.stream = stream; snd.src = src;
+  stream.getAudioTracks()[0].onended = () => { if (snd.stream === stream) { soundOff(); toast('Sound sharing stopped. Press the button again to send it.'); } };
+  $('#sndStop').hidden = false;
+  $('#sndSystem').setAttribute('aria-pressed', String(src === 'system'));
+  $('#sndMic').setAttribute('aria-pressed', String(src === 'mic'));
+  st.snd.src = src; save();
+  $('#sndState').textContent = linked() ? 'Sending… waiting for the stream picture to hear it.' : 'Ready. It goes to the stream picture as soon as OBS is open.';
+  offer();
+}
+$('#sndSystem').addEventListener('click', async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    $('#sndState').innerHTML = 'This browser can’t send the computer’s sound. Open this page in <b>Chrome</b> or <b>Edge</b>, or use a microphone.';
+    return;
+  }
+  $('#sndState').innerHTML = 'In Chrome’s box: <b>Entire Screen</b>, click the screen, switch on <b>Also share system audio</b>, then <b>Share</b>.';
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface: 'monitor' }, audio: { ...NOFIX, suppressLocalAudioPlayback: false },
+      systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
+    });
+    stream.getVideoTracks().forEach((t) => t.stop());   // only the sound is used
+    if (!stream.getAudioTracks().length) {
+      $('#sndState').innerHTML = '<span class="warn">No sound came through.</span> Press the button again and switch on <b>Also share system audio</b> (it’s under the screens, on the <b>Entire Screen</b> tab).';
+      return;
+    }
+    soundOn(new MediaStream(stream.getAudioTracks()), 'system');
+  } catch (_) {
+    $('#sndState').innerHTML = 'Sharing was cancelled. Press the button again, pick the <b>Entire Screen</b> tab, switch on <b>Also share system audio</b> and press <b>Share</b>.';
+  }
+});
+async function micStart(deviceId) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('#sndState').textContent = 'This browser can’t use a microphone here.'; return; }
+  $('#sndState').textContent = 'Waiting for you to allow the microphone…';
+  try {
+    const audio = { ...NOFIX };
+    if (deviceId) audio.deviceId = { exact: deviceId };
+    const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+    const tr = stream.getAudioTracks()[0];
+    st.snd.mic = (tr.getSettings && tr.getSettings().deviceId) || deviceId || '';
+    soundOn(stream, 'mic');
+    listMics();
+  } catch (err) {
+    const n = err && err.name;
+    if (deviceId && (n === 'NotFoundError' || n === 'OverconstrainedError')) { st.snd.mic = ''; micStart(''); return; }
+    $('#sndState').innerHTML = n === 'NotAllowedError' ? '<span class="warn">Microphone blocked.</span> Click the microphone icon in the address bar, choose <b>Allow</b>, and press the button again.'
+      : '<span class="warn">The microphone couldn’t start.</span> Press the button again.';
+  }
+}
+async function listMics() {
+  try {
+    const ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const sel = $('#micSel');
+    sel.innerHTML = '';
+    ins.forEach((d, i) => sel.add(new Option((d.label || `Input ${i + 1}`) + (LOOPBACK.test(d.label) ? ' (this computer’s sound, no sharing needed)' : ''), d.deviceId)));
+    if ([...sel.options].some((o) => o.value === st.snd.mic)) sel.value = st.snd.mic;
+    $('#micPick').hidden = sel.options.length < 2 || snd.src !== 'mic';
+  } catch (_) {}
+}
+$('#sndMic').addEventListener('click', () => micStart(st.snd.mic));
+$('#micSel').addEventListener('change', () => micStart($('#micSel').value));
+$('#sndStop').addEventListener('click', () => { st.snd.src = ''; save(); soundOff(); $('#micPick').hidden = true; });
+// A microphone (or Stereo Mix) picked last time starts again by itself, so going live is one step shorter
+(async () => {
+  if (st.snd.src !== 'mic' || !navigator.permissions || !navigator.permissions.query) return;
+  try { if ((await navigator.permissions.query({ name: 'microphone' })).state === 'granted') micStart(st.snd.mic); } catch (_) {}
+})();
+
+// ---- the streamer's own buttons ----
+$('#rUp').addEventListener('click', () => { if (send({ t: 'rate', dir: 1 })) toast('Noted: more looks like this.'); else toast('Not connected to the stream picture yet.'); });
+$('#rDown').addEventListener('click', () => { if (send({ t: 'rate', dir: -1 })) toast('Noted. A new look is on its way.'); else toast('Not connected to the stream picture yet.'); });
+$('#rNext').addEventListener('click', () => { if (send({ t: 'next' })) toast('A new look is on its way.'); else toast('Not connected to the stream picture yet.'); });
+$('#amt').addEventListener('input', () => { $('#amtOut').textContent = $('#amt').value; send({ t: 'amount', v: +$('#amt').value }); });
+$('#tasteSave').addEventListener('click', () => { if (!send({ t: 'taste' })) toast('Not connected to the stream picture yet.'); });
+
+// ---- the phone remote's QR code ----
+async function drawQR() {
+  try {
+    await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'qrcode.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+    const u = new URL('stream.html', location.href);
+    u.search = ''; u.hash = '';
+    u.searchParams.set('remote', LINK);
+    if (params.get('signal')) u.searchParams.set('signal', params.get('signal'));
+    const qr = window.qrcode(0, 'M');
+    qr.addData(u.toString()); qr.make();
+    const n = qr.getModuleCount(), c = $('#qr'), g = c.getContext('2d'), sc = Math.floor(180 / n), off = Math.floor((200 - sc * n) / 2);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 200, 200); g.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let q = 0; q < n; q++) if (qr.isDark(r, q)) g.fillRect(off + q * sc, off + r * sc, sc, sc);
+  } catch (_) { $('#qr').hidden = true; }
+}
+if (!REMOTE) drawQR();
+
+// ---- the pictures: simple drawings of OBS's and Chrome's windows, with the places to click circled ----
+const P = { bg: '#1c1d22', panel: '#26282f', panel2: '#2f323a', line: '#3b3e48', ink: '#d9dbe2', dim: '#8d919c', title: '#141519', hi: '#d584f5', badge: '#8b1ab8', blue: '#3d6ee0' };
+const T = (x, y, s, size = 13, fill = P.ink, w = 400, anchor = 'start') =>
+  `<text x="${x}" y="${y}" font-family="Segoe UI, Barlow, Arial, sans-serif" font-size="${size}" font-weight="${w}" fill="${fill}" text-anchor="${anchor}">${s}</text>`;
+const R = (x, y, w, h, fill, stroke = 'none', r = 4) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}" stroke="${stroke}"/>`;
+const BTN = (x, y, w, h, label, fill = P.panel2, ink = P.ink) => R(x, y, w, h, fill, P.line, 4) + T(x + w / 2, y + h / 2 + 4.5, label, 12.5, ink, 500, 'middle');
+const HI = (x, y, w, h, n, bx, by) => `<rect x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="7" fill="none" stroke="${P.hi}" stroke-width="3"/>` +
+  `<circle cx="${bx}" cy="${by}" r="13" fill="${P.badge}" stroke="#fff" stroke-width="1.5"/>` + T(bx, by + 5, n, 14, '#fff', 700, 'middle');
+const WIN = (x, y, w, h, title) => R(x, y, w, h, P.bg, P.line, 8) + `<path d="M${x} ${y + 8}a8 8 0 0 1 8-8h${w - 16}a8 8 0 0 1 8 8v16H${x}z" fill="${P.title}"/>` + T(x + 12, y + 16, title, 12, P.dim, 500);
+const svg = (w, h, body, label) => `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${label}">${body}</svg>`;
+
+function figWizard() {
+  const panel = (x, y, title, body) => WIN(x, y, 360, 205, 'Auto-Configuration Wizard') + T(x + 14, y + 46, title, 15, P.ink, 600) + body;
+  const radio = (x, y, on, s) => `<circle cx="${x}" cy="${y}" r="6" fill="none" stroke="${on ? P.blue : P.dim}" stroke-width="1.6"/>` + (on ? `<circle cx="${x}" cy="${y}" r="3" fill="${P.blue}"/>` : '') + T(x + 14, y + 4.5, s, 12);
+  const drop = (x, y, w, s) => R(x, y, w, 24, P.panel2, P.line) + T(x + 8, y + 16, s, 12.5) + T(x + w - 14, y + 16, '▾', 11, P.dim);
+  let b = '';
+  b += panel(10, 10, 'Usage Information',
+    radio(34, 82, true, 'Optimize for streaming, recording is secondary') + radio(34, 108, false, 'Optimize just for recording') +
+    radio(34, 134, false, 'I will only be using the virtual camera') + BTN(286, 176, 72, 26, 'Next >'));
+  b += HI(24, 72, 290, 20, '1', 330, 70) + HI(286, 176, 72, 26, '', 0, -40);
+  b += panel(390, 10, 'Video Settings',
+    T(404, 84, 'Base (Canvas) Resolution', 12, P.dim) + drop(560, 70, 180, '1920x1080') + T(404, 124, 'FPS', 12, P.dim) + drop(560, 110, 180, '30') +
+    BTN(666, 176, 72, 26, 'Next >'));
+  b += HI(560, 70, 180, 64, '2', 728, 62) + HI(666, 176, 72, 26, '', 0, -40);
+  b += panel(10, 240, 'Stream Information',
+    T(24, 314, 'Service', 12, P.dim) + drop(90, 300, 160, 'Twitch') + BTN(90, 334, 220, 28, 'Connect Account (recommended)', P.blue, '#fff') +
+    T(90, 380, 'then log in to Twitch', 11.5, P.dim) + BTN(286, 406, 72, 26, 'Next >'));
+  b += HI(90, 300, 220, 62, '3', 330, 330) + HI(286, 406, 72, 26, '', 0, -40);
+  b += panel(390, 240, 'Final Results',
+    T(404, 312, 'Resolution, FPS, Bitrate… (OBS picks these)', 12, P.dim) + R(404, 322, 330, 1, P.line) +
+    T(404, 344, 'Twitch · 1920x1080 · 30 FPS', 12) + BTN(616, 406, 122, 26, 'Apply Settings'));
+  b += HI(616, 406, 122, 26, '4', 600, 400);
+  // tidy: rings for Next without badges look like the numbered ones, so hide their badges
+  b = b.replace(/<circle cx="0" cy="-40"[^>]*\/><text[^>]*>[^<]*<\/text>/g, '');
+  return svg(760, 455, b, 'The four pages of OBS’s Auto-Configuration Wizard, with what to pick circled');
+}
+function obsWindow(w, h, menuOpen, step = 7) {
+  let b = WIN(0, 0, w, h, 'OBS Studio');
+  const items = ['File', 'Edit', 'View', 'Docks', 'Profile', 'Scene Collection', 'Tools', 'Help'];
+  let x = 12, at = 0;
+  b += R(0, 24, w, 24, P.panel, 'none', 0);
+  items.forEach((s) => {
+    const wd = s.length * step + 14;
+    if (x + wd > w) return;
+    if (s === menuOpen) { b += R(x - 4, 26, wd, 20, '#3a3f55', 'none', 3); at = x; }
+    b += T(x + 3, 41, s, 12.5);
+    x += wd;
+  });
+  obsWindow.at = at;
+  return b;
+}
+function figImport() {
+  // Left: the Scene Collection menu with Import; right: the import box
+  let b = obsWindow(366, 300, 'Scene Collection', 6.4);
+  const mx = obsWindow.at - 4;
+  b += R(10, 50, 346, 240, '#0b0b0d', 'none', 2);
+  const menu = ['New', 'Duplicate', 'Rename', 'Remove', '—', 'Import', 'Export', '—', 'Untitled', 'Phosphor Loop on Twitch'];
+  b += R(mx, 48, 156, menu.length * 22 + 8, P.panel, P.line, 4);
+  menu.forEach((s, i) => {
+    const y = 66 + i * 22;
+    if (s === '—') b += R(mx + 8, y - 6, 140, 1, P.line, 'none', 0);
+    else b += T(mx + 12, y, s, 12.5, s === 'Untitled' ? P.dim : P.ink);
+  });
+  b += HI(mx + 6, 66 + 5 * 22 - 15, 144, 21, '1', mx - 18, 66 + 5 * 22 - 5);
+  b += HI(mx + 6, 66 + 9 * 22 - 15, 144, 21, '4', mx - 18, 66 + 9 * 22 - 5);
+  // The import box
+  const X = 412;
+  b += WIN(X, 20, 368, 260, 'Import Scene Collection');
+  b += R(X + 12, 50, 344, 24, P.panel2, 'none', 2) + T(X + 46, 66, 'Collection Name', 11.5, P.dim) + T(X + 206, 66, 'Path', 11.5, P.dim);
+  b += R(X + 12, 76, 344, 30, P.panel, 'none', 2);
+  b += R(X + 20, 84, 14, 14, P.blue, 'none', 3) + `<path d="M${X + 23} ${91}l3 3 5-6" stroke="#fff" stroke-width="2" fill="none"/>`;
+  b += T(X + 46, 96, 'Phosphor Loop on Twitch', 11.5) + T(X + 206, 96, '…\\Downloads\\Phos…', 11.5, P.dim);
+  b += BTN(X + 322, 80, 26, 22, '…');
+  b += HI(X + 322, 80, 26, 22, '2', X + 335, 128);
+  b += `<rect x="${X + 16}" y="${80}" width="22" height="22" rx="6" fill="none" stroke="${P.hi}" stroke-width="3"/>`;
+  b += BTN(X + 196, 236, 76, 28, 'Import', P.blue, '#fff') + BTN(X + 280, 236, 76, 28, 'Close');
+  b += HI(X + 196, 236, 76, 28, '3', X + 178, 250);
+  return svg(790, 300, b, 'OBS: the Scene Collection menu with Import circled, and the import box with the file picked, ticked, and Import circled');
+}
+function figGo() {
+  const w = 760, h = 330;
+  let b = obsWindow(w, h, '');
+  // The preview, showing a purple feedback swirl
+  b += `<defs><radialGradient id="sw" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#f2d9fc"/><stop offset=".3" stop-color="#d584f5"/><stop offset=".6" stop-color="#8b1ab8"/><stop offset="1" stop-color="#120716"/></radialGradient></defs>`;
+  b += R(150, 54, 460, 172, '#000', 'none', 0) + R(150, 54, 460, 172, 'url(#sw)', 'none', 0);
+  b += '<clipPath id="pv"><rect x="150" y="54" width="460" height="172"/></clipPath><g clip-path="url(#pv)">';
+  for (let i = 1; i <= 6; i++) b += `<ellipse cx="380" cy="140" rx="${i * 38}" ry="${i * 14}" fill="none" stroke="rgba(255,255,255,${0.18 - i * 0.02})" stroke-width="2" transform="rotate(${i * 9} 380 140)"/>`;
+  b += '</g>';
+  const dock = (x, t, body, dw) => R(x, 234, dw, 88, P.panel, P.line, 4) + T(x + 8, 249, t, 11.5, P.dim, 600) + body;
+  b += dock(8, 'Scenes', R(14, 258, 130, 20, '#3a3f55', 'none', 3) + T(20, 272, 'Phosphor Loop', 11.5), 142);
+  b += dock(156, 'Sources', T(166, 272, 'Phosphor Loop picture', 11.5), 170);
+  b += dock(332, 'Audio Mixer', T(340, 270, 'Desktop Audio', 11) + R(340, 276, 150, 6, '#2e7d4f', 'none', 3) + T(340, 298, 'Mic/Aux (muted)', 11, P.dim) + R(340, 304, 150, 6, '#4a2f2f', 'none', 3), 170);
+  b += dock(508, 'Controls', '', 244);
+  b += BTN(516, 256, 140, 24, 'Start Streaming') + BTN(516, 286, 140, 24, 'Start Recording') + BTN(664, 256, 80, 24, 'Settings') + BTN(664, 286, 80, 24, 'Exit');
+  b += HI(516, 256, 140, 24, '✓', 500, 250);
+  return svg(w, h, b, 'OBS with the Phosphor Loop picture showing, and Start Streaming circled');
+}
+function figShare() {
+  const w = 760, h = 330;
+  let b = WIN(0, 0, w, h, 'Choose what to share with this page');
+  const tabs = ['Chrome Tab', 'Window', 'Entire Screen'];
+  tabs.forEach((s, i) => {
+    const x = 20 + i * 130;
+    b += T(x + 55, 54, s, 13, i === 2 ? '#8ab4f8' : P.ink, i === 2 ? 600 : 400, 'middle');
+    if (i === 2) b += R(x, 62, 110, 3, '#8ab4f8', 'none', 1);
+  });
+  b += R(0, 66, w, 1, P.line, 'none', 0);
+  b += HI(280, 38, 110, 26, '1', 410, 50);
+  // Two screens to pick from
+  b += R(24, 84, 220, 130, '#0b0b0d', '#8ab4f8', 6) + R(36, 96, 196, 106, '#2b2440', 'none', 3) + T(134, 230, 'Screen 1', 12, P.ink, 500, 'middle');
+  b += R(268, 84, 220, 130, '#0b0b0d', P.line, 6) + R(280, 96, 196, 106, '#202533', 'none', 3) + T(378, 230, 'Screen 2', 12, P.dim, 500, 'middle');
+  b += HI(24, 84, 220, 130, '2', 24, 84);
+  // The sound switch and the buttons
+  b += R(24, 272, 36, 18, '#8ab4f8', 'none', 9) + `<circle cx="51" cy="281" r="7" fill="#fff"/>` + T(70, 286, 'Also share system audio', 13);
+  b += HI(24, 272, 196, 18, '3', 236, 281);
+  b += BTN(560, 266, 80, 30, 'Cancel') + BTN(652, 266, 90, 30, 'Share', '#8ab4f8', '#11131a');
+  b += HI(652, 266, 90, 30, '4', 636, 250);
+  return svg(w, h, b, 'Chrome’s sharing box: the Entire Screen tab, a screen, the Also share system audio switch and the Share button, circled in order');
+}
+$('#figWizard').innerHTML = figWizard();
+$('#figImport').innerHTML = figImport();
+$('#figGo').innerHTML = figGo();
+$('#figShare').innerHTML = figShare();
+
+showLink();
+sigStart();
+window.addEventListener('pagehide', () => { if (L.sig) L.sig.send('LEAVE', STREAM_ID, {}); });
+})();
+</script>
+</body>
+</html>

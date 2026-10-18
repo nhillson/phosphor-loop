@@ -9,6 +9,12 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<script>
+// Stream mode (index.html?stream=1, what OBS shows on Twitch): only the picture, from the very first paint,
+// so the controls never flash up on the stream while the page loads
+if (/[?&]stream(=(?!0(&|$))|&|$)/.test(location.search)) document.documentElement.className += ' stream';
+</script>
+<style>html.stream,html.stream body{background:#000;overflow:hidden;cursor:none}html.stream body>*:not(#streamLayer){display:none!important}</style>
 <title>Phosphor Loop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -770,6 +776,30 @@
     .osd, .tip { transition: none; }
     .rec-ind .dot { animation: none; }
   }
+
+  /* Stream mode (?stream=1): the picture fills the window OBS gives it, with the chat's vote counter in a corner.
+     Sizes follow the window's height, so the counter looks the same at 720p and 1080p. */
+  #streamLayer { position: fixed; inset: 0; background: #000; overflow: hidden; }
+  #streamLayer canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+  .sv { position: absolute; left: 2.2vh; bottom: 2.2vh; display: flex; flex-direction: column; gap: .5vh;
+    padding: 1.1vh 1.7vh; border-radius: 1.4vh; background: rgba(11,10,12,.74); border: .12vh solid rgba(139,26,184,.75);
+    color: #f2d9fc; font: 500 2.3vh/1.2 var(--f-body); box-shadow: 0 .6vh 2.4vh rgba(0,0,0,.45);
+    transition: opacity .6s, transform .6s; pointer-events: none; }
+  .sv.off { opacity: 0; transform: translateY(1vh); }
+  .sv-row { display: flex; align-items: center; gap: 1.6vh; white-space: nowrap; }
+  .sv-row .sv-k { font-family: var(--f-display); font-size: 1.35vh; letter-spacing: .18em; color: var(--amber-ink); }
+  .sv-v { display: inline-flex; align-items: center; gap: .6vh; transition: transform .25s, color .25s; }
+  .sv-v svg { width: 2.3vh; height: 2.3vh; }
+  .sv-v.dn svg { transform: rotate(180deg); }
+  .sv-v b { font-weight: 600; color: #fff; }
+  .sv-v i { font-style: normal; color: var(--dim); }
+  .sv-v.pop { transform: scale(1.25); color: #fff; }
+  .sv-line { font-size: 1.8vh; color: var(--dim); white-space: nowrap; max-width: 46vh; overflow: hidden; text-overflow: ellipsis; }
+  .sv-line b { color: #f2d9fc; font-weight: 600; }
+  .sv-flash { position: absolute; left: 50%; bottom: 5vh; transform: translate(-50%, 1vh); padding: 1.2vh 2.4vh; border-radius: 99vh;
+    background: rgba(67,31,81,.9); border: .12vh solid #8b1ab8; color: #f2d9fc; font: 600 2.6vh/1 var(--f-body);
+    opacity: 0; transition: opacity .4s, transform .4s; pointer-events: none; white-space: nowrap; }
+  .sv-flash.on { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
@@ -1692,6 +1722,9 @@ function onApp(type, fn) {
 }
 let params;
 try { params = new URLSearchParams(location.search); } catch (_) { params = new URLSearchParams(); }
+// Stream mode: index.html?stream=1 is the picture alone, for OBS to send to Twitch, with Autopilot running and
+// the chat voting (see "stream mode" near the end, and stream.html, the page that sets it up)
+const STREAM = !inArtifact && params.has('stream') && params.get('stream') !== '0';
 // Keep a copy in the browser so Phosphor Loop opens without internet after one visit (see sw.js)
 const swOK = !inArtifact && 'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
@@ -1785,6 +1818,13 @@ const osd = $('#osd');
 const tip = $('#tip');
 const toastEl = $('#toast');
 const msg = $('#msg');
+// Stream mode: the picture (and any error message) moves out of the controls into a layer of its own
+if (STREAM) {
+  const layer = document.createElement('div');
+  layer.id = 'streamLayer';
+  layer.append(canvas, msg);
+  document.body.appendChild(layer);
+}
 
 /* ================= WebGL ================= */
 const gl = canvas.getContext('webgl2', {
@@ -9037,6 +9077,7 @@ renderPresets();
 // pasted once (open the page with #admin on the end of the address), kept in this browser only, and used to save
 // presets.json straight to the repository. GitHub Pages then puts the new list on the site within a minute or so.
 const SHARED_REPO = 'nhillson/phosphor-loop', SHARED_FILE = 'presets.json', SHARED_MAX = 48, ADMIN_KEY = 'phosphor-admin-v1';
+const LIVE_SHARED = 'https://nhillson.github.io/phosphor-loop/presets.json';
 const GH_API = `https://api.github.com/repos/${SHARED_REPO}`;
 let shared = [], adminKey = lsGet(ADMIN_KEY) || '', adminAsk = location.hash === '#admin', sharedBusy = false, sharedMode = null;
 const sharedGroup = $('#sharedGroup'), sharedList = $('#sharedList'), sharedForm = $('#sharedForm'), sharedName = $('#sharedName');
@@ -9247,13 +9288,19 @@ window.addEventListener('hashchange', () => {
 
 // Everyone gets the list from the site; the admin reads it straight from GitHub so a change shows at once
 async function loadShared() {
-  try {
-    const r = await fetch(SHARED_FILE, { cache: 'no-cache' });
-    if (r.ok) { const j = await r.json(); shared = cleanShared(j.presets); taste.sharedList = cleanSharedTastes(j.tastes, j.taste); }
-  } catch (_) {}
+  // Stream mode can run from a copy of the site somewhere else (a test branch), so it asks the live site first for the
+  // newest shared taste profiles, then falls back to the copy beside this page
+  const from = STREAM && location.hostname !== 'nhillson.github.io' ? [LIVE_SHARED, SHARED_FILE] : [SHARED_FILE];
+  for (const url of from) {
+    try {
+      const r = await fetch(url, { cache: 'no-cache' });
+      if (r.ok) { const j = await r.json(); shared = cleanShared(j.presets); taste.sharedList = cleanSharedTastes(j.tastes, j.taste); break; }
+    } catch (_) {}
+  }
   if (adminKey) { try { const g = await readSharedGH(); shared = g.list; taste.sharedList = g.tastes; } catch (_) {} }
   taste.model = null;
   renderShared();
+  if (STREAM) streamTasteReady();
 }
 renderShared();
 loadShared();
@@ -10041,6 +10088,7 @@ let resimTimer = null, firstFit = true;
 let outWin = null, outCanvas = null, outCtx = null;
 function outputOpen() { return !!(outWin && !outWin.closed && outCanvas); }
 function fit() {
+  if (STREAM) { fitStream(); return; }
   const fs = document.fullscreenElement || document.webkitFullscreenElement;
   const narrow = narrowMQ.matches && !fs;
   const sr = stage.getBoundingClientRect();
@@ -10076,6 +10124,17 @@ function fit() {
   if (resimTimer) { try { resimTimer[0].clearTimeout(resimTimer[1]); } catch (_) {} resimTimer = null; }
   if (firstFit) { firstFit = false; resim(aspect); }
   else { const tw = outDrives() ? outWin : window; resimTimer = [tw, tw.setTimeout(() => resim(aspect), 180)]; }
+}
+// Stream mode: the picture is exactly the size of the window OBS gives it (1920 x 1080 in the file stream.html makes),
+// drawn pixel for pixel, so OBS copies it as it is
+function fitStream() {
+  const w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
+  const dpr = Math.min(window.devicePixelRatio || 1, Math.sqrt(4.5e6 / (w * h)));
+  const cw = Math.max(1, Math.round(w * dpr)), ch = Math.max(1, Math.round(h * dpr));
+  if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+  if (resimTimer) { try { resimTimer[0].clearTimeout(resimTimer[1]); } catch (_) {} resimTimer = null; }
+  if (firstFit) { firstFit = false; resim(w / h); }
+  else resimTimer = [window, window.setTimeout(() => resim(w / h), 180)];
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(stage);
 window.addEventListener('resize', fit);
@@ -10263,7 +10322,7 @@ function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return n
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (_) { return false; } }
 // ?show=1 in the address turns it on for that visit; the Show mode button remembers it in this browser
 const showParam = params.get('show');
-let showMode = showParam != null ? showParam !== '0' : lsGet(SHOW_KEY) === '1';
+let showMode = !STREAM && (showParam != null ? showParam !== '0' : lsGet(SHOW_KEY) === '1');
 const showBtn = $('#showBtn'), offlineNote = $('#offlineNote');
 if (inArtifact) $('#showGroup').hidden = true;
 function syncShowUI() { showBtn.setAttribute('aria-pressed', String(showMode)); }
@@ -10746,6 +10805,7 @@ renderMidiList();
 
 function showStart() {
   syncShowUI();
+  if (STREAM) { streamStart(); return; }
   offlineStatus();
   if (inArtifact) { sessionReady = true; return; }
   if (showMode) {
@@ -11546,6 +11606,7 @@ function frame() {
     else { try { outCtx.drawImage(canvas, 0, 0, outCanvas.width, outCanvas.height); } catch (_) {} }
   }
   updateTC(now);
+  if (STREAM) streamTick(now);
   scheduleFrame();
 }
 // Who keeps the beat. This window normally asks for each frame. When it's hidden (minimized, covered, or, on a
@@ -11573,6 +11634,365 @@ function tickOut() {
   frame();
 }
 document.addEventListener('visibilitychange', scheduleFrame);
+
+/* ================= stream mode ================= */
+// index.html?stream=1 is what OBS sends to Twitch: the picture alone, filling OBS's browser source, with Autopilot
+// running by itself. stream.html (the Go live page) makes the address and a ready-made OBS file. The address says:
+//   twitch=  the Twitch channel whose chat votes      taste=  chat (learn from the chat, the default), none, or the
+//   skip=    how many !skip votes skip a look            name of a shared taste profile to follow
+//   votes=0  hides the vote counter on the picture      every=  seconds between Autopilot's new looks
+//   text=    words for the Text input                   link=   the code that pairs it with the Go live page
+//   at=      when the address was made; settings the Go live page sends later win over older ones
+// The chat is read the way Twitch lets anyone watch it (no login, nothing is ever written in it). Viewers type
+// !like or !skip; each viewer counts once per look. Enough skips (more skips than likes, too) bring a new look.
+// With taste=chat the votes also teach Autopilot, in a taste profile called Twitch chat kept in OBS's browser.
+// The Go live page, open in Chrome on the same computer (or a phone), links up through the same free connection
+// service as the phone camera. It sends the computer's sound, so the picture still reacts to the music, plus the
+// streamer's own ratings and settings; this page reports back how it's running.
+const STREAM_KEY = 'phosphor-stream-v1', STREAM_TASTE_ID = 'twitchchat';
+const streamCfg = { twitch: '', taste: 'chat', skip: 2, votes: true, every: 30, text: '', at: 0 };
+const streamLink = String(params.get('link') || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+function cleanStreamCfg(c, into) {
+  if (!c || typeof c !== 'object') return;
+  const num = (v) => (v === '' || v === null || v === undefined || typeof v === 'boolean' ? NaN : +v);
+  if (typeof c.twitch === 'string') into.twitch = c.twitch.trim().toLowerCase().replace(/^.*twitch\.tv\//, '').replace(/^[@#]/, '').replace(/[^a-z0-9_]/g, '').slice(0, 25);
+  if (typeof c.taste === 'string') into.taste = c.taste.trim().slice(0, 40) || 'chat';
+  if (Number.isFinite(num(c.skip))) into.skip = clamp(Math.round(num(c.skip)), 1, 20);
+  if (c.votes !== undefined) into.votes = !(c.votes === false || c.votes === 0 || c.votes === '0');
+  if (Number.isFinite(num(c.every))) into.every = clamp(Math.round(num(c.every)), 10, 120);
+  if (typeof c.text === 'string') into.text = c.text.slice(0, 60);
+  if (Number.isFinite(num(c.at))) into.at = num(c.at);
+}
+if (STREAM) {
+  cleanStreamCfg(Object.fromEntries(params), streamCfg);
+  try {
+    const saved = JSON.parse(lsGet(STREAM_KEY) || 'null');
+    if (saved && saved.at > streamCfg.at) cleanStreamCfg(saved, streamCfg);
+  } catch (_) {}
+}
+const streamLearning = () => streamCfg.taste === 'chat' && taste.active === STREAM_TASTE_ID && !taste.session;
+
+// Which taste Autopilot follows. Called again when the shared profiles arrive (loadShared).
+function streamTasteReady() {
+  if (!STREAM) return;
+  const want = streamCfg.taste.toLowerCase();
+  let id = null;
+  if (want === 'chat') {
+    let p = taste.profiles.find((x) => x.id === STREAM_TASTE_ID);
+    if (!p) { p = { id: STREAM_TASTE_ID, name: 'Twitch chat', votes: [], thumb: '', saved: Date.now() }; taste.profiles.push(p); }
+    id = p.id;
+  } else if (want !== 'none') {
+    const p = taste.sharedList.find((x) => x.name.toLowerCase() === want) || taste.profiles.find((x) => x.name.toLowerCase() === want);
+    if (p) id = p.id;
+  }
+  if (taste.active !== id || taste.session) { taste.active = id; taste.session = null; saveTaste(); }
+}
+
+// Settings: from the address, or newer ones from the Go live page
+function streamApply() {
+  apSet.every = clamp(Math.round(100 * Math.log(streamCfg.every / 10) / Math.log(12)), 0, 100);
+  if (streamCfg.text && streamCfg.text !== txt.str) { txt.str = streamCfg.text; textIn.value = txt.str; drawText(); }
+  streamTasteReady();
+  if (tw.ch !== streamCfg.twitch) twJoin(streamCfg.twitch);
+  svRender(true);
+}
+function streamSettings(c) {
+  if (!c || !(+c.at > streamCfg.at)) return;
+  cleanStreamCfg(c, streamCfg);
+  lsSet(STREAM_KEY, JSON.stringify(streamCfg));
+  streamApply();
+}
+
+// ---- Twitch chat ----
+const IRC_URL = params.get('irc') || 'wss://irc-ws.chat.twitch.tv:443';
+const TW_UP = /^!(like|more|love|yes|up)\b/i, TW_DOWN = /^!(skip|next|nope|no|down)\b/i;
+// likes and skips: who voted on the look on screen (viewer id -> name). cool: when a skip was set off, so
+// the rest of the skips for that look don't pile onto the next one
+const tw = { ch: '', ws: null, state: 'off', tries: 0, timer: 0, likes: new Map(), skips: new Map(), look: -1, cool: 0, upRated: false, last: null };
+function twJoin(ch) {
+  tw.ch = ch;
+  tw.tries = 0;
+  clearTimeout(tw.timer);
+  if (tw.ws) { const w = tw.ws; tw.ws = null; try { w.close(); } catch (_) {} }
+  tw.state = ch ? 'connecting' : 'off';
+  if (ch) twConnect();
+}
+function twConnect() {
+  const ch = tw.ch;
+  if (!ch) return;
+  let ws;
+  try { ws = new WebSocket(IRC_URL); } catch (_) { twRetry(); return; }
+  tw.ws = ws;
+  ws.onopen = () => {
+    ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+    ws.send('PASS SCHMOOPIIE');
+    ws.send(`NICK justinfan${10000 + Math.floor(Math.random() * 89999)}`);
+    ws.send(`JOIN #${ch}`);
+  };
+  ws.onmessage = (e) => { if (tw.ws === ws) String(e.data).split('\r\n').forEach((l) => { if (l) twLine(ws, l); }); };
+  ws.onclose = () => {
+    if (tw.ws !== ws) return;
+    tw.ws = null;
+    tw.state = 'connecting';
+    svRender(true);
+    twRetry();
+  };
+}
+function twRetry() {
+  clearTimeout(tw.timer);
+  if (!tw.ch) return;
+  tw.tries++;
+  tw.timer = setTimeout(twConnect, Math.min(30000, 1000 * Math.pow(2, Math.min(tw.tries, 5))));
+}
+// One line of Twitch chat: @tags :prefix COMMAND args
+function twLine(ws, line) {
+  const tags = {};
+  let rest = line;
+  if (rest[0] === '@') {
+    const sp = rest.indexOf(' ');
+    rest.slice(1, sp).split(';').forEach((kv) => { const i = kv.indexOf('='); if (i > 0) tags[kv.slice(0, i)] = kv.slice(i + 1); });
+    rest = rest.slice(sp + 1);
+  }
+  let prefix = '';
+  if (rest[0] === ':') { const sp = rest.indexOf(' '); prefix = rest.slice(1, sp); rest = rest.slice(sp + 1); }
+  const sp = rest.indexOf(' ');
+  const cmd = sp < 0 ? rest : rest.slice(0, sp), args = sp < 0 ? '' : rest.slice(sp + 1);
+  if (cmd === 'PING') { try { ws.send('PONG ' + (args || ':tmi.twitch.tv')); } catch (_) {} return; }
+  if (cmd === 'RECONNECT') { try { ws.close(); } catch (_) {} return; }
+  if (cmd === 'ROOMSTATE' || (cmd === 'JOIN' && /^justinfan/.test(prefix))) {
+    if (tw.state !== 'joined') { tw.state = 'joined'; tw.tries = 0; svRender(true); }
+    return;
+  }
+  if (cmd !== 'PRIVMSG') return;
+  const ci = args.indexOf(' :');
+  const text = ci < 0 ? '' : args.slice(ci + 2).trim();
+  const nick = prefix.split('!')[0];
+  const name = (tags['display-name'] || nick).replace(/\\s/g, ' ').slice(0, 25) || 'someone';
+  if (TW_UP.test(text)) streamVote(tags['user-id'] || nick, name, 1);
+  else if (TW_DOWN.test(text)) streamVote(tags['user-id'] || nick, name, -1);
+}
+// A viewer's vote on the look on screen
+function streamVote(user, name, dir) {
+  if (dir < 0 && tw.cool) return;
+  const mine = dir > 0 ? tw.likes : tw.skips, other = dir > 0 ? tw.skips : tw.likes;
+  if (mine.has(user)) return;
+  other.delete(user);
+  mine.set(user, name);
+  tw.last = { name, dir, at: performance.now() };
+  svPop(dir);
+  if (dir > 0 && streamLearning() && !tw.upRated) { tw.upRated = true; rate(1); }
+  if (dir < 0 && tw.skips.size >= streamCfg.skip && tw.skips.size > tw.likes.size) streamSkip('Chat skipped this look');
+  svRender(true);
+}
+function streamSkip(say) {
+  tw.cool = performance.now();
+  if (!ap.on) setAutopilot(true, true);
+  if (streamLearning()) rate(-1); else nextLook('chat');
+  svFlash(say);
+}
+// The streamer's own buttons on the Go live page: a rating counts at once, and Not this always skips
+function streamerRate(dir) {
+  if (dir < 0) { streamSkip('New look coming up'); return; }
+  if (streamLearning()) { tw.upRated = true; rate(1); }
+}
+
+// ---- the vote counter on the picture ----
+const THUMB = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>';
+const sv = { el: null, up: null, upN: null, dn: null, dnN: null, need: null, line: null, flash: null, flashT: 0, shown: '', lineT: 0 };
+function svBuild() {
+  const layer = $('#streamLayer');
+  if (!layer || sv.el) return;
+  const el = document.createElement('div');
+  el.className = 'sv off';
+  el.innerHTML = `<div class="sv-row"><span class="sv-k">CHAT</span><span class="sv-v up">${THUMB}!like <b>0</b></span>` +
+    `<span class="sv-v dn">${THUMB}!skip <b>0</b><i></i></span></div><div class="sv-line"></div>`;
+  const flash = document.createElement('div');
+  flash.className = 'sv-flash';
+  layer.append(el, flash);
+  Object.assign(sv, { el, flash, up: el.querySelector('.up'), dn: el.querySelector('.dn'), line: el.querySelector('.sv-line') });
+  sv.upN = sv.up.querySelector('b'); sv.dnN = sv.dn.querySelector('b'); sv.need = sv.dn.querySelector('i');
+}
+// Called on every vote and twice a second; it only touches the page when something changed
+function svRender(now) {
+  if (!sv.el) return;
+  const t = performance.now();
+  if (!now && t - sv.lineT < 500) return;
+  sv.lineT = t;
+  let line;
+  const L = tw.last;
+  if (L && t - L.at < 6000) line = `<b>${escapeHTML(L.name)}</b> ${L.dir > 0 ? 'likes this' : 'wants a new look'}`;
+  else line = streamLearning() ? 'Type it in chat. Autopilot learns what you like.' : 'Type it in chat to vote.';
+  const state = [streamCfg.votes && tw.state === 'joined', tw.likes.size, tw.skips.size, streamCfg.skip, line].join('|');
+  if (state === sv.shown) return;
+  sv.shown = state;
+  sv.el.classList.toggle('off', !(streamCfg.votes && tw.state === 'joined'));
+  sv.upN.textContent = tw.likes.size;
+  sv.dnN.textContent = tw.skips.size;
+  sv.need.textContent = ` of ${streamCfg.skip}`;
+  sv.line.innerHTML = line;
+}
+function svPop(dir) {
+  const b = dir > 0 ? sv.up : sv.dn;
+  if (!b) return;
+  b.classList.add('pop');
+  setTimeout(() => b.classList.remove('pop'), 260);
+}
+function svFlash(text) {
+  if (!sv.flash || !streamCfg.votes) return;
+  sv.flash.textContent = text;
+  sv.flash.classList.add('on');
+  clearTimeout(sv.flashT);
+  sv.flashT = setTimeout(() => sv.flash.classList.remove('on'), 2600);
+}
+
+// ---- the link with the Go live page ----
+// Any number of Go live pages can link up (the computer's and a phone's, say); each gets the reports, and the sound
+// comes from whichever sent some last.
+const link = { sig: null, fails: 0, peers: new Map(), sound: null, audio: null, lvlT: 0, statT: 0 };
+function linkStart() {
+  if (!streamLink || !phoneOK || (link.sig && !link.sig.closed)) return;
+  const s = new Signal(SIGNAL_URL, 'plstream-' + streamLink, {
+    open() { link.fails = 0; },
+    message: onLinkSignal,
+    // Taken: usually this page's own last visit, still known to the service for a few seconds after a reload
+    error(kind) { s.close(); if (link.sig === s) link.sig = null; setTimeout(linkStart, kind === 'id-taken' ? 4000 : 3000); },
+    lost() { if (link.sig === s) link.sig = null; link.fails++; setTimeout(linkStart, Math.min(30000, 1500 * link.fails)); },
+  });
+  link.sig = s;
+  s.connect();
+}
+function linkDrop(peer) {
+  const L = link.peers.get(peer);
+  if (!L) return;
+  link.peers.delete(peer);
+  try { L.pc.close(); } catch (_) {}
+  if (link.sound === peer) linkSoundOff();
+}
+function linkSoundOff() {
+  link.sound = null;
+  if (snd.src === 'remote') { stopSound(); snd.src = 'off'; }
+}
+async function onLinkSignal(m) {
+  const p = m.payload || {}, peer = m.src;
+  if (m.type === 'OFFER') {
+    // A Go live page connecting (or connecting again, with sound or without): a fresh link for it
+    linkDrop(peer);
+    const pc = new RTCPeerConnection(ICE);
+    const L = { pc, dc: null, conn: p.connectionId, cands: [] };
+    link.peers.set(peer, L);
+    const mine = () => link.peers.get(peer) === L;
+    pc.ontrack = (e) => {
+      if (!mine() || e.track.kind !== 'audio') return;
+      // As little waiting as the browser allows, so the picture moves with the music
+      try { if ('jitterBufferTarget' in e.receiver) e.receiver.jitterBufferTarget = 0; } catch (_) {}
+      link.sound = peer;
+      linkSound((e.streams && e.streams[0]) || new MediaStream([e.track]));
+    };
+    pc.ondatachannel = (e) => {
+      if (!mine()) return;
+      const dc = e.channel;
+      L.dc = dc;
+      dc.onmessage = (ev) => { if (mine()) linkMsg(peer, ev.data); };
+      dc.onopen = () => linkStatus();
+    };
+    pc.onicecandidate = (e) => { if (e.candidate && link.sig) link.sig.send('CANDIDATE', peer, { candidate: e.candidate, type: 'media', connectionId: L.conn }); };
+    pc.onconnectionstatechange = () => { if (mine() && (pc.connectionState === 'failed' || pc.connectionState === 'closed')) linkDrop(peer); };
+    try {
+      await pc.setRemoteDescription(p.sdp);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      if (!mine()) return;
+      if (link.sig) link.sig.send('ANSWER', peer, { sdp: pc.localDescription, type: 'media', connectionId: L.conn });
+      for (const c of L.cands) await pc.addIceCandidate(c).catch(() => {});
+      L.cands = [];
+    } catch (_) { if (mine()) linkDrop(peer); }
+  } else if (m.type === 'CANDIDATE') {
+    const L = link.peers.get(peer);
+    if (!L || p.connectionId !== L.conn) return;
+    if (L.pc.remoteDescription) L.pc.addIceCandidate(p.candidate).catch(() => {});
+    else L.cands.push(p.candidate);
+  } else if (m.type === 'LEAVE') {
+    linkDrop(peer);
+  }
+}
+// The sound from the Go live page goes into React to sound the way a microphone would. Chrome only passes on the
+// sound of a track from another browser while something plays it, so a muted player holds it (muted, so OBS never
+// hears it twice).
+function linkSound(ms) {
+  stopSound();
+  snd.src = 'remote';
+  if (!link.audio) { link.audio = document.createElement('audio'); link.audio.muted = true; }
+  link.audio.srcObject = ms;
+  const pl = link.audio.play();
+  if (pl && pl.catch) pl.catch(() => {});
+  listen(ms);
+}
+function linkSend(o, peer) {
+  const s = JSON.stringify(o);
+  for (const [k, L] of link.peers) {
+    if ((peer && k !== peer) || !L.dc || L.dc.readyState !== 'open') continue;
+    try { L.dc.send(s); } catch (_) {}
+  }
+}
+function linkMsg(peer, data) {
+  let d;
+  try { d = JSON.parse(data); } catch (_) { return; }
+  if (!d || typeof d !== 'object') return;
+  if (d.t === 'cfg') streamSettings(d.cfg);
+  else if (d.t === 'rate' && (d.dir === 1 || d.dir === -1)) streamerRate(d.dir);
+  else if (d.t === 'next') streamSkip('New look coming up');
+  else if (d.t === 'amount' && Number.isFinite(d.v)) snd.amount = clamp(Math.round(d.v), 0, 100);
+  else if (d.t === 'nosound') { if (link.sound === peer) linkSoundOff(); }
+  else if (d.t === 'taste') linkSendTaste(peer);
+  linkStatus();
+}
+// How the stream page is doing, for the Go live pages (once a second, and after each message)
+function linkStatus() {
+  if (!link.peers.size) return;
+  const src = tasteSource();
+  linkSend({ t: 'status', fps: Math.round(sfps.fps), w: canvas.width, h: canvas.height, chat: tw.state, ch: tw.ch,
+    likes: tw.likes.size, skips: tw.skips.size, need: streamCfg.skip, ap: ap.on,
+    left: ap.on ? Math.max(0, Math.ceil((ap.due - performance.now()) / 1000)) : -1,
+    taste: src.name || '', learn: streamLearning(), rated: tasteCount(src.votes || []),
+    sound: snd.src === 'remote' && !!snd.analyser, amount: snd.amount, cfg: streamCfg });
+}
+// The chat's taste profile as a file the full Phosphor Loop can open (Taste profiles, Open a file), sent in pieces
+function linkSendTaste(peer) {
+  const p = taste.profiles.find((x) => x.id === STREAM_TASTE_ID);
+  const data = JSON.stringify(p ? { kind: TASTE_FILE_KIND, v: 1, name: p.name, saved: Date.now(), thumb: p.thumb || '', votes: tasteSlim(p.votes) } : null);
+  const id = randId(6), size = 48000, n = Math.max(1, Math.ceil(data.length / size));
+  for (let i = 0; i < n; i++) linkSend({ t: 'tastefile', id, i, n, part: data.slice(i * size, (i + 1) * size) }, peer);
+}
+
+// ---- every frame ----
+const sfps = { t: 0, n: 0, fps: 0 };
+function streamTick(now) {
+  sfps.n++;
+  if (now - sfps.t >= 1000) { sfps.fps = sfps.t ? sfps.n * 1000 / (now - sfps.t) : 0; sfps.n = 0; sfps.t = now; }
+  // A new look on screen: a fresh vote
+  if (lookOnScreen !== tw.look) {
+    tw.look = lookOnScreen;
+    tw.likes.clear(); tw.skips.clear(); tw.cool = 0; tw.upRated = false;
+    svRender(true);
+  } else if (tw.cool && now - tw.cool > 20000) { tw.cool = 0; tw.skips.clear(); svRender(true); }
+  else svRender(false);
+  if (link.peers.size) {
+    if (now - link.statT > 1000) { link.statT = now; linkStatus(); }
+    // The sound meters on the Go live page show what this page hears
+    if (snd.src === 'remote' && snd.analyser && now - link.lvlT > 100) {
+      link.lvlT = now;
+      const E = snd.env;
+      linkSend({ t: 'lvl', l: +E.low.toFixed(2), m: +E.mid.toFixed(2), h: +E.high.toFixed(2), b: +E.beat.toFixed(2) });
+    }
+  }
+}
+function streamStart() {
+  document.title = 'Phosphor Loop stream';
+  svBuild();
+  streamApply();
+  setAutopilot(true, true);
+  linkStart();
+}
 
 /* ================= start ================= */
 applyPatch(STARTERS[reduceMotion ? Math.max(0, STARTERS.findIndex((c) => c.name === 'Calm')) : 0]);

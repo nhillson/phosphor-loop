@@ -4,6 +4,8 @@ A video feedback synthesizer that runs in your web browser.
 WHAT'S IN THIS FOLDER
   index.html   The workstation. Open this on your computer.
   phone.html   The page your phone opens when you scan the QR code.
+  stream.html  Go live on Twitch: sets up OBS and sends your sound to the stream
+               (see STREAMING ON TWITCH below).
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
   sw.js        Keeps a copy in the browser so it opens without internet.
   nature/      About 500 nature photos for the Picture input, with their credits
@@ -109,6 +111,23 @@ SHOW MODE (a computer that plays at gigs)
   4. To start it with Windows, press Win+R, type shell:startup, and make a
      shortcut there with this target (one line, with your address):
        "C:\Program Files\Google\Chrome\Application\chrome.exe" --start-fullscreen https://YOUR-GITHUB-NAME.github.io/phosphor-loop/?show=1
+
+STREAMING ON TWITCH
+  Open stream.html (the "Go live" page) in Chrome and follow its Set up tab
+  once: your Twitch name, install OBS Studio, connect OBS to Twitch, and
+  import the OBS file the page makes. After that, going live is:
+  1. Open OBS. The picture starts inside it by itself (index.html?stream=1:
+     no controls, Autopilot running).
+  2. On the Go live page, press "Send this computer's sound" so the picture
+     reacts to the music.
+  3. In OBS, press Start Streaming.
+  Viewers type !like or !skip in the chat. Each viewer counts once per look;
+  enough skips (2 by default, and more skips than likes) bring a new look.
+  With "What my chat likes" picked, the votes also teach Autopilot, in a
+  taste profile called "Twitch chat" kept inside OBS. The Go live page can
+  save it as a file to open under Taste profiles.
+  The chat is only read, the way anyone can watch it without logging in;
+  nothing is ever written in it.
 
 MIDI CONTROLLER
   Under Show setup press "Use a MIDI controller" and allow it. Press Learn,
