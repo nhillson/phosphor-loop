@@ -49,9 +49,26 @@ const stopRequested = new Promise(resolve => { resolveStop = resolve; });
 const requestStop = () => resolveStop();
 process.on('SIGINT', requestStop);
 process.on('SIGTERM', requestStop);
-const redact = text => config.rtmp ? text.split(config.rtmp).join('[RTMP destination]') : text;
+const streamKey = config.rtmp ? new URL(config.rtmp).pathname.split('/').filter(Boolean).at(-1) : '';
+const redact = text => {
+  if (!config.rtmp) return text;
+  const safe = text.split(config.rtmp).join('[RTMP destination]');
+  return streamKey ? safe.split(streamKey).join('[stream key]') : safe;
+};
 try {
-  encoder = spawn(process.env.FFMPEG_PATH || 'ffmpeg', ffmpegArgs(config), {stdio: ['pipe', 'ignore', 'pipe']});
+  encoder = spawn(process.env.FFMPEG_PATH || 'ffmpeg', ffmpegArgs(config), {stdio: ['pipe', 'pipe', 'pipe']});
+  let progressBuffer = '', confirmed = false;
+  encoder.stdout.on('data', data => {
+    progressBuffer += data.toString();
+    let end;
+    while ((end = progressBuffer.indexOf('\n')) >= 0) {
+      const line = progressBuffer.slice(0,end).trim(); progressBuffer = progressBuffer.slice(end+1);
+      if (config.rtmp && !confirmed && /^frame=\s*[1-9]\d*$/.test(line)) {
+        confirmed = true;
+        console.log('RTMP connection active: encoded video and audio are being sent.');
+      }
+    }
+  });
   let encoderError;
   encoderDone = new Promise(resolve => {
     encoder.on('error', error => { encoderError = error.message; requestStop(); resolve(-1); });

@@ -5,6 +5,7 @@
   "scripts": {
     "capture": "node tools/capture/run.mjs",
     "stream": "node tools/capture/run.mjs --live --headed",
+    "stream:push": "node tools/capture/relay.mjs",
     "stream:test": "node tests/stream.mjs",
     "stream:rtmp-test": "node tests/rtmp.mjs",
     "capture:test": "node --test tests/capture.test.mjs",

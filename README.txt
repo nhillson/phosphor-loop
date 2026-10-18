@@ -500,6 +500,11 @@ LOCAL LIVE STREAM (Mac)
   RTMPS URLs are accepted too. Destination credentials are not saved in this repo
   or printed by the runner. No remote destination is used unless you supply one.
 
+  To forward an already-running local stream without changing its controls or
+  encoding again, set PHOSPHOR_RTMP_URL and run npm run stream:push. The local
+  stream must stay running. Ctrl+C in the push terminal stops forwarding only.
+  PHOSPHOR_SOURCE_URL can override the default localhost HLS source.
+
   --device "BlackHole 2ch" selects another exact input name. --renderer software
   is a slower fallback; the normal default is --renderer gpu. CHROME_PATH and
   FFMPEG_PATH can override executable locations. Normal double-click page opening

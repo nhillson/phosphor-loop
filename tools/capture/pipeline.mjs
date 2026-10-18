@@ -14,6 +14,7 @@ export function ffmpegArgs(config) {
   // Network output uses filler to maintain CBR, with a two-second VBV buffer.
   // MP4 recordings retain capped rate control without transport filler packets.
   if (config.liveDir || config.rtmp) args.push('-x264-params','nal-hrd=cbr:force-cfr=1');
+  if (config.rtmp) args.push('-progress','pipe:1','-stats_period','2');
   if (config.liveDir) args.push('-f', 'hls', '-hls_time', '2', '-hls_list_size', '6',
     '-hls_flags', 'delete_segments+independent_segments+temp_file',
     '-hls_segment_filename', resolve(config.liveDir,'segment-%09d.ts'), resolve(config.liveDir,'stream.m3u8'));

@@ -4,6 +4,24 @@ See the latest streaming status below before older notes.
 
 ## Latest: live streaming and Apple GPU fix completed
 
+### Follow-up: remote RTMPS broadcast active
+
+- User explicitly authorized publishing to their supplied Amazon IVS ingest
+  endpoint and stream key. Connected successfully over RTMPS port 443, /app/ path.
+  FFmpeg confirmed encoded frames are being transmitted. No viewer playback URL
+  was supplied, so do not claim to have inspected remote playback.
+- Kept current local GPU workstation/HLS stream running and forwards it with
+  `npm run stream:push` (tools/capture/relay.mjs). H.264/AAC remux only; no second
+  render/encode, so same picture/controls and local preview remain available.
+- Credential is only provided through PHOSPHOR_RTMP_URL in the relay environment;
+  no key or complete publish URL stored in files. Do not print full FFmpeg process
+  arguments: its output argument includes the credential. Relay redacts stderr
+  by whole lines, including key-only errors; stdout confirms first sent frames.
+- Two processes must stay running: local `tools/capture/run.mjs --live --headed`
+  and `tools/capture/relay.mjs`. SIGINT relay stops remote publishing only.
+- Direct RTMP runner also now reports initial muxed frames and redacts key-only
+  errors. Capture unit checks pass after these progress/logging changes.
+
 ### Follow-up: missing playback audio fixed
 
 - User reported Chromium /watch volume control disabled. ffprobe of current
