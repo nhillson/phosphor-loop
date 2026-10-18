@@ -1,6 +1,43 @@
 # Resume: system-audio capture and FFmpeg output
 
-User is restarting the Codex session. See latest status below before older notes.
+See the latest streaming status below before older notes.
+
+## Latest: live streaming and Apple GPU fix completed
+
+- User confirmed loopback + SMSL working and requested a commit, then streaming
+  video. Committed baseline as **6335e53** (loopback UI, mirrored SMSL routing,
+  tests, and the then-WIP capture scaffold). Nothing pushed.
+- User clarified headless is optional; streaming output is the priority. No RTMP
+  destination supplied. Implemented local HTTP HLS plus RTMP support.
+- Fixed the zero-chunk capture by copying the WebGL canvas into a 2D capture
+  canvas inside the render callback, then explicitly requesting a video frame.
+  WebGL's discarded drawing buffer cannot be captured asynchronously reliably.
+- Isolated Metal failure: small WebGL draws work on M3 Max, but main feedback
+  shader caused Metal internal pipeline compiler error and lost context. Replacing
+  seedInk's two continue branches with one equivalent guarded block FIXED it.
+  No OS/driver installation or changes. GPU is the runner default again.
+- `npm run stream` opens a separate GPU Chrome workstation and serves:
+  preview http://127.0.0.1:8787/watch
+  OBS/VLC http://127.0.0.1:8787/live/stream.m3u8
+  Picture only + exact BlackHole stereo sound, H.264/AAC, target 720p30.
+  HLS has a few seconds latency. Localhost only. Preview muted to avoid feedback.
+  Rolling segments are bounded and removed on stop. Workstation controls change
+  this stream; other independent browser windows are not attached.
+- `npm run capture -- --rtmp --headed` uses PHOSPHOR_RTMP_URL (not logged).
+  `npm run capture -- --output captures/show.mp4` records without a window.
+  --renderer software is fallback; --autopilot optional. README documents commands.
+- Verified: 6 capture pipeline tests (including actual backpressure, HLS serving,
+  encoded traversal rejection); normal file:// + capture smoke; local HLS browser
+  playback with real M3 Max Metal, H.264 1280x720 and stereo AAC; local RTMP receiver
+  received >=120 video frames. SIGINT now finalizes cleanly (disabled Playwright's
+  competing browser signal handlers). Last streaming test: **148 frames, 30.3 fps**.
+- Tests: npm run capture:test; npm run capture:smoke; npm run stream:test;
+  npm run stream:rtmp-test. Stream tests use frame/media conditions, not sleep.
+- Added hls.js dependency served locally for Chrome's browser player. Prefer
+  Hls.js when supported; Chrome's native HLS capability detection was unreliable.
+- User saw slow software-rendering window earlier; GPU stream is now working.
+  Fresh recording captures/gpu-check.mp4 was visually verified nonblack.
+- Broader session filesystem and network permissions are enabled.
 
 ## Latest status — October 17, resumed session
 

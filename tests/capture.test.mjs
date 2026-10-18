@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PassThrough} from 'node:stream';
+import {PassThrough, Writable} from 'node:stream';
+import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises';
+import {join} from 'node:path';
 import {once} from 'node:events';
 import {fileURLToPath} from 'node:url';
 import {createCaptureServer, ffmpegArgs} from '../tools/capture/pipeline.mjs';
@@ -29,7 +31,7 @@ test('authenticated ordered delivery preserves exact bytes; rejects retries and 
 test('local server serves app but hides private files and traversal', async t => {
   const p = await fixture(t);
   for (const path of ['/', '/js/app.js', '/styles/app.css']) assert.equal((await fetch(p.origin + path)).status, 200);
-  for (const path of ['/.git/config', '/.capture-state/audio-route.json', '/captures/show.mp4', '/tools/audio-route.swift', '/js/../package.json']) assert.equal((await fetch(p.origin + path)).status, 404);
+  for (const path of ['/.git/config', '/.capture-state/audio-route.json', '/captures/show.mp4', '/tools/audio-route.swift', '/js/../package.json', '/js/..%2fpackage.json', '/nature/..%2f.capture-state/audio-route.json']) assert.equal((await fetch(p.origin + path)).status, 404);
   assert.equal((await fetch(p.origin + '/chunk/0', {method:'POST',headers:{'X-Capture-Token':p.token, Origin:'https://example.com'},body:'bad'})).status,403);
 });
 test('oversized chunks and encoder failure stop delivery', async t => {
@@ -47,4 +49,36 @@ test('FFmpeg requires both streams, preserves existing files, and supports fragm
   assert.ok(args.includes('+frag_keyframe+empty_moov'));
   const live = ffmpegArgs({rtmp:'rtmp://localhost/live/test',fps:30,bitrate:6000000});
   assert.deepEqual(live.slice(-3), ['-f','flv','rtmp://localhost/live/test']);
+  const hls = ffmpegArgs({liveDir:'/tmp/live',fps:30,bitrate:6000000});
+  assert.ok(hls.includes('delete_segments+independent_segments+temp_file'));
+  assert.equal(hls.at(-1),'/tmp/live/stream.m3u8');
+});
+test('encoder backpressure delays acknowledgement and rejects concurrent chunks', async t => {
+  let release, wrote;
+  const writing = new Promise(resolve => {wrote=resolve;});
+  const input = new Writable({highWaterMark:1,write(data,encoding,done){release=done;wrote();}});
+  t.after(() => input.destroy());
+  const p = await fixture(t,{input});
+  const post = seq => fetch(`${p.origin}/chunk/${seq}`,{method:'POST',headers:{'X-Capture-Token':p.token},body:'chunk'});
+  const first = post(0);
+  await writing;
+  assert.equal(p.status().sequence,0); assert.equal(p.status().busy,true);
+  assert.equal((await post(1)).status,409);
+  release(); assert.equal((await first).status,204); assert.equal(p.status().sequence,1);
+});
+test('live server exposes the manifest and segments, with correct types, while hiding other state', async t => {
+  await mkdir(join(root,'.capture-state'),{recursive:true});
+  const liveDir = await mkdtemp(join(root,'.capture-state','unit-live-'));
+  t.after(() => rm(liveDir,{recursive:true,force:true}));
+  await writeFile(join(liveDir,'stream.m3u8'),'#EXTM3U\n');
+  await writeFile(join(liveDir,'segment-000000001.ts'),'test');
+  await writeFile(join(liveDir,'private.json'),'secret');
+  const p = await fixture(t,{liveDir});
+  const manifest = await fetch(p.origin+'/live/stream.m3u8');
+  assert.equal(manifest.status,200); assert.match(manifest.headers.get('content-type'),/mpegurl/);
+  const segment = await fetch(p.origin+'/live/segment-000000001.ts');
+  assert.equal(segment.status,200); assert.equal(segment.headers.get('content-type'),'video/mp2t');
+  assert.equal((await fetch(p.origin+'/watch')).status,200);
+  assert.equal((await fetch(p.origin+'/player.js')).status,200);
+  assert.equal((await fetch(p.origin+'/live/private.json')).status,404);
 });

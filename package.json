@@ -4,6 +4,9 @@
   "type": "module",
   "scripts": {
     "capture": "node tools/capture/run.mjs",
+    "stream": "node tools/capture/run.mjs --live --headed",
+    "stream:test": "node tests/stream.mjs",
+    "stream:rtmp-test": "node tests/rtmp.mjs",
     "capture:test": "node --test tests/capture.test.mjs",
     "capture:smoke": "node tests/capture-smoke.mjs",
     "loopback:test": "node tests/loopback.mjs",
@@ -14,5 +17,8 @@
     "audio:setup": "swift -module-cache-path /tmp/phosphor-swift-cache tools/audio-route.swift setup",
     "audio:restore": "swift -module-cache-path /tmp/phosphor-swift-cache tools/audio-route.swift restore"
   },
-  "dependencies": { "playwright-core": "^1.60.0" }
+  "dependencies": {
+    "hls.js": "^1.7.3",
+    "playwright-core": "^1.60.0"
+  }
 }

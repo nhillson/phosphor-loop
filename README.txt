@@ -454,3 +454,60 @@ DEVELOPMENT: FILE LAYOUT AND STARTUP COST
   Run python3 tests/startup.py to check external assets, file:// opening,
   and compilation/reuse of optional worlds.
   New runtime files must also appear in sw.js and android/tools/bundle_site.py.
+
+LOCAL LIVE STREAM (Mac)
+  One-time setup: install Node.js, Chrome, FFmpeg and BlackHole 2ch, then run
+  npm install in this folder. Choose your speakers/headphones as macOS output
+  and run npm run audio:setup. It creates Phosphor Loop + Speakers, sending
+  the same stereo sound to your listening device and BlackHole. Leave this
+  combined device selected as macOS output; the app listens to BlackHole.
+
+  Start a stream:
+    npm run stream
+
+  A separate Chrome workstation opens. Its controls change the streamed picture.
+  It captures only the picture plus BlackHole audio, with no microphone processing.
+  The stream is H.264 video and stereo AAC audio, targeting 1280 x 720 at 30 fps.
+  GPU rendering is on. The ink shader avoids a Metal compiler issue on Apple GPUs.
+
+  Watch in a browser:
+    http://127.0.0.1:8787/watch
+  The browser preview starts muted, so it doesn't play your music twice.
+  Use this network stream URL in VLC or an OBS Media Source (Local File off):
+    http://127.0.0.1:8787/live/stream.m3u8
+  HLS playback runs a few seconds behind the workstation. The listener is local
+  to this Mac. Encoded segments use a rolling window, not an accumulating recording.
+
+  Ctrl+C stops the stream and closes its Chrome session. Closing the streaming
+  workstation also stops it. Your ordinary browser windows are untouched.
+  Restore the previous macOS output with npm run audio:restore.
+  If you chose BlackHole alone by accident, npm run audio:activate selects the
+  existing combined output again without recreating it.
+
+  Optional settings:
+    npm run stream -- --autopilot
+    npm run stream -- --width 1920 --height 1080 --fps 30
+    npm run stream -- --port 8788
+
+  Record instead of serving a live stream (Chrome runs without a window):
+    npm run capture -- --output captures/show.mp4
+  Add --seconds 10 for a short check, or --headed for the controls window.
+
+  Send to an RTMP service: set PHOSPHOR_RTMP_URL to your complete destination
+  including its stream key, then run:
+    npm run capture -- --rtmp --headed
+  RTMPS URLs are accepted too. Destination credentials are not saved in this repo
+  or printed by the runner. No remote destination is used unless you supply one.
+
+  --device "BlackHole 2ch" selects another exact input name. --renderer software
+  is a slower fallback; the normal default is --renderer gpu. CHROME_PATH and
+  FFMPEG_PATH can override executable locations. Normal double-click page opening
+  still works independently of all these tools.
+
+  Verification commands:
+    npm run capture:test     ordered delivery, backpressure, routes and file privacy
+    npm run capture:smoke    file opening, controls and fixed capture dimensions
+    npm run loopback:test   audio picker, permissions and cancellation
+    npm run audio:test      plays a quiet test tone and checks real BlackHole input
+    npm run stream:test     real GPU through live HLS to browser video playback
+    npm run stream:rtmp-test  sends to a local FFmpeg RTMP receiver (no service key)

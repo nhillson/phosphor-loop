@@ -8,9 +8,12 @@ export async function startCapture(config) {
     if (recorder?.state === 'recording') recorder.stop();
   };
   try {
-    const permission = await navigator.mediaDevices.getUserMedia({audio: true});
-    permission.getTracks().forEach(track => track.stop());
-    const devices = await navigator.mediaDevices.enumerateDevices();
+    let devices = await navigator.mediaDevices.enumerateDevices();
+    if (!devices.some(d => d.kind === 'audioinput' && d.label)) {
+      const permission = await navigator.mediaDevices.getUserMedia({audio: true});
+      permission.getTracks().forEach(track => track.stop());
+      devices = await navigator.mediaDevices.enumerateDevices();
+    }
     const inputs = devices.filter(d => d.kind === 'audioinput' && !['default', 'communications'].includes(d.deviceId));
     const matches = inputs.filter(d => d.label === config.device || d.label.startsWith(config.device + ' ('));
     if (matches.length !== 1) throw new Error(`Audio input "${config.device}" unavailable or ambiguous. Available inputs: ${inputs.map(d => d.label).join(', ')}. Run npm run audio:setup first.`);
@@ -24,7 +27,24 @@ export async function startCapture(config) {
     if (config.autopilot) hook.autopilot();
     // Wait for rendered frames before taking the canvas stream.
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    media = hook.canvas.captureStream(config.fps);
+    // Copy while WebGL's drawing buffer still contains this frame. Its buffer is
+    // discarded after compositing, so asynchronous capture can otherwise miss it.
+    const captureCanvas = document.createElement('canvas');
+    captureCanvas.width = hook.canvas.width; captureCanvas.height = hook.canvas.height;
+    const ctx = captureCanvas.getContext('2d', {alpha:false});
+    media = captureCanvas.captureStream(0);
+    const videoTrack = media.getVideoTracks()[0];
+    videoTrack.onended = () => fail('Canvas video capture ended.');
+    let next = 0, frames = 0;
+    hook.onFrame = now => {
+      if (now < next - 1) return;
+      next = Math.max(next + 1000 / config.fps, now);
+      try {
+        ctx.drawImage(hook.canvas,0,0);
+        videoTrack.requestFrame();
+        frames++;
+      } catch(error) { fail(error); }
+    };
     media.addTrack(track);
     const mimeType = 'video/webm;codecs=vp8,opus';
     if (!MediaRecorder.isTypeSupported(mimeType)) throw new Error('Chrome cannot encode VP8/Opus WebM.');
@@ -48,20 +68,30 @@ export async function startCapture(config) {
       }).catch(fail).finally(() => { queued -= event.data.size; });
     };
     track.onended = () => fail('BlackHole audio input disconnected.');
+    const started = performance.now();
     recorder.start(250);
     window.__captureSession = {
-      status: () => ({failure, queued, sequence, state: recorder.state}),
+      status: () => {
+        if (gl.isContextLost()) fail('The graphics context was lost. Restart with --renderer software to diagnose.');
+        return {failure, queued, sequence, frames, state: recorder.state, visibility:document.visibilityState,
+          tracks:media.getTracks().map(t => ({kind:t.kind,state:t.readyState,muted:t.muted,settings:t.getSettings()}))};
+      },
       async stop() {
         if (recorder.state !== 'inactive') recorder.stop();
         await done;
         await pending;
+        hook.onFrame = null;
         media.getTracks().forEach(t => t.stop());
         hook.stopSound();
         if (failure) throw new Error(failure);
+        return {frames, seconds:(performance.now()-started)/1000};
       },
     };
-    return {device: track.label, settings: track.getSettings(), width: hook.canvas.width, height: hook.canvas.height};
+    const gl = hook.canvas.getContext('webgl2'), debug = gl.getExtension('WEBGL_debug_renderer_info');
+    return {device: track.label, settings: track.getSettings(), width: hook.canvas.width, height: hook.canvas.height,
+      renderer:debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)};
   } catch (error) {
+    hook.onFrame = null;
     media?.getTracks().forEach(t => t.stop());
     audio?.getTracks().forEach(t => t.stop());
     hook.stopSound();

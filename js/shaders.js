@@ -144,17 +144,19 @@ vec3 seedInk(vec2 p) {
   vec3 c = vec3(0.0);
   for (int i = 0; i < 6; i++) {
     vec4 dr = uInk[i], am = uInkAmt[i];
-    if (am.x + am.y <= 0.0) continue;
     vec2 d = p - dr.xy;
     float r = length(d);
-    if (r > dr.z * 1.3 + 0.03) continue;
-    float ang = atan(d.y, d.x);
-    float wob = 1.0 + 0.16 * sin(ang * 3.0 + dr.w) + 0.08 * sin(ang * 7.0 - dr.w * 1.7);
-    float R = dr.z * wob + 0.006;
-    float core = smoothstep(R, R * 0.3, r);
-    float rim = exp(-sq((r - R) / (0.006 + 0.12 * R)));
-    float body = smoothstep(R * 0.85, R * 0.15, r);
-    c += uInkCol[i] * ((0.45 * core + rim) * am.x + body * am.y);
+    // Keep this as one guarded block: continue branches here trigger a Metal
+    // pipeline compiler error on Apple GPUs when this shader is first drawn.
+    if (am.x + am.y > 0.0 && r <= dr.z * 1.3 + 0.03) {
+      float ang = atan(d.y, d.x);
+      float wob = 1.0 + 0.16 * sin(ang * 3.0 + dr.w) + 0.08 * sin(ang * 7.0 - dr.w * 1.7);
+      float R = dr.z * wob + 0.006;
+      float core = smoothstep(R, R * 0.3, r);
+      float rim = exp(-sq((r - R) / (0.006 + 0.12 * R)));
+      float body = smoothstep(R * 0.85, R * 0.15, r);
+      c += uInkCol[i] * ((0.45 * core + rim) * am.x + body * am.y);
+    }
   }
   return c * 0.55;
 }

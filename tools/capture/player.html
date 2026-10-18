@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phosphor Loop live</title>
+<style>
+  :root {color-scheme:dark;font:16px system-ui;background:#0b090e;color:#e7ddee}
+  body {margin:0;max-width:1200px;padding:24px;margin-inline:auto}
+  h1 {font-size:20px;font-weight:500;letter-spacing:.12em} video {width:100%;background:#000;aspect-ratio:16/9}
+  p {color:#bdb0c7;line-height:1.6} a {color:#d8a5ff} code {color:#e7ddee}
+</style>
+<h1>PHOSPHOR LOOP · LIVE</h1>
+<video id="video" controls autoplay muted playsinline></video>
+<p id="status" role="status">Waiting for the live picture…</p>
+<p>The preview starts muted to avoid playing your computer audio twice. Allow a few seconds for the stream to begin.</p>
+<p>OBS or VLC stream URL: <a id="url" href="/live/stream.m3u8"></a></p>
+<p>Use the controls in the streaming workstation window to change the picture.</p>
+<script src="/player.js"></script>
+<script>
+const video = document.querySelector('#video'), status = document.querySelector('#status');
+const source = location.origin + '/live/stream.m3u8';
+document.querySelector('#url').textContent = source;
+async function start() {
+  // The manifest does not exist until the first complete video segment arrives.
+  try {
+    const response = await fetch(source, {cache:'no-store'});
+    if (!response.ok) throw new Error('Waiting');
+  } catch { setTimeout(start,1000); return; }
+  if (window.Hls && Hls.isSupported()) {
+    const hls = new Hls({liveSyncDurationCount:2});
+    hls.loadSource(source); hls.attachMedia(video);
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data.fatal) status.textContent = 'The stream stopped. Check the streaming terminal, then reload this page.';
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = source;
+  else status.textContent = 'Open the stream URL in VLC or OBS; this browser cannot play it.';
+}
+video.addEventListener('playing',() => {status.textContent = 'Live · preview muted by default';});
+start();
+</script></html>

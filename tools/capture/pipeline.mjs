@@ -6,11 +6,14 @@ import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {once} from 'node:events';
 
 export function ffmpegArgs(config) {
-  const args = ['-hide_banner', '-loglevel', 'warning', '-n', '-i', 'pipe:0',
+  const args = ['-hide_banner', '-loglevel', 'warning', '-n', '-analyzeduration', '1000000', '-probesize', '1000000', '-i', 'pipe:0',
     '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'libx264', '-preset', 'veryfast',
-    '-pix_fmt', 'yuv420p', '-r', String(config.fps), '-g', String(config.fps * 2),
+    '-tune', 'zerolatency', '-pix_fmt', 'yuv420p', '-r', String(config.fps), '-g', String(config.fps * 2), '-sc_threshold', '0',
     '-b:v', String(config.bitrate), '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'];
-  if (config.rtmp) args.push('-f', 'flv', config.rtmp);
+  if (config.liveDir) args.push('-f', 'hls', '-hls_time', '2', '-hls_list_size', '6',
+    '-hls_flags', 'delete_segments+independent_segments+temp_file',
+    '-hls_segment_filename', resolve(config.liveDir,'segment-%09d.ts'), resolve(config.liveDir,'stream.m3u8'));
+  else if (config.rtmp) args.push('-rw_timeout','15000000','-f', 'flv', config.rtmp);
   else {
     if (extname(config.output).toLowerCase() === '.mp4') args.push('-movflags', '+frag_keyframe+empty_moov');
     args.push(config.output);
@@ -18,10 +21,10 @@ export function ffmpegArgs(config) {
   return args;
 }
 
-export function createCaptureServer({root, input, maxChunkBytes = 8 * 1024 * 1024}) {
+export function createCaptureServer({root, input, liveDir, maxChunkBytes = 8 * 1024 * 1024}) {
   const token = randomBytes(32).toString('hex');
   let sequence = 0, busy = false, failure;
-  const types = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg'};
+  const types = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.m3u8':'application/vnd.apple.mpegurl', '.ts':'video/mp2t'};
   input.on('error', error => { failure = error; });
   const server = createServer(async (req, res) => {
     const reply = (status, body = '') => { if (!res.destroyed) res.writeHead(status).end(body); };
@@ -49,6 +52,20 @@ export function createCaptureServer({root, input, maxChunkBytes = 8 * 1024 * 102
       }
       if (req.method !== 'GET') return reply(405);
       const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+      if (pathname.split('/').some(part => part === '.' || part === '..') || pathname.includes('\0')) return reply(404);
+      let asset;
+      if (liveDir && pathname === '/watch') asset = resolve(root,'tools/capture/player.html');
+      else if (liveDir && pathname === '/player.js') asset = resolve(root,'node_modules/hls.js/dist/hls.min.js');
+      else if (liveDir && /^\/live\/(?:stream\.m3u8|segment-\d+\.ts)$/.test(pathname)) asset = resolve(liveDir,pathname.slice('/live/'.length));
+      if (asset) {
+        const file = await realpath(asset);
+        // Only the named live assets are public, never adjacent state or files.
+        if (!(file.startsWith(resolve(root) + sep))) return reply(403);
+        await stat(file);
+        res.writeHead(200,{'Content-Type':types[extname(file)] || 'application/octet-stream','Cache-Control':'no-store'});
+        createReadStream(file).on('error',() => res.destroy()).pipe(res);
+        return;
+      }
       // Serve workstation assets only; never expose local state, credentials, or captures.
       if (!/^\/(?:index\.html|phone\.html|qrcode\.js|presets\.json|icon-[\w.-]+|(?:js|styles|nature)\/[^\0]+)?$/.test(pathname)) return reply(404);
       const file = await realpath(resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname)));

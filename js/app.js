@@ -7175,6 +7175,7 @@ function frame() {
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+  if (window.__phosphorCapture?.onFrame) window.__phosphorCapture.onFrame(now);
   if (snapPending) {
     snapPending = false;
     canvas.toBlob((blob) => { if (blob) offerFile(`phosphor-loop-${stamp()}.png`, blob); }, 'image/png');
