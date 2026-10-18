@@ -360,6 +360,7 @@
 
           <div class="dev" id="row-3d" hidden>
             <div class="seg seg-3" id="worlds" role="group" aria-label="Which 3D world"></div>
+            <div class="chips" id="ribbitRow" hidden><button class="chip" id="ribbitAuto" aria-pressed="true"><span class="led"></span>Walk by itself</button></div>
             <span class="hint"><span id="hint3d"></span> Input size widens or narrows the view. For warp-speed streaks, raise Trails to about 60 and Zoom to about 30.</span>
           </div>
 
@@ -759,7 +760,7 @@
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
-            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world, Fractals</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of nine 3D worlds to fly through, circle round or drift past. Fractals opens a picker of six 3D fractals (Menger sponge, Mandelbulb, Mandelbox, Sierpinski, Julia and Kaleidoscope) with a camera that wanders on its own: it rolls and turns, sweeps round the outside, dives deep into the endless detail and climbs back out, and each loop takes its own route. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
+            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world, Fractals</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of ten 3D worlds to fly through, circle round, drift past or, in Mount Ribbit, walk on (W A S D walk, Shift runs, J jumps). Fractals opens a picker of six 3D fractals (Menger sponge, Mandelbulb, Mandelbox, Sierpinski, Julia and Kaleidoscope) with a camera that wanders on its own: it rolls and turns, sweeps round the outside, dives deep into the endless detail and climbs back out, and each loop takes its own route. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery (they work from a MIDI controller too). Your own picture… loads a file of yours.</dd>
@@ -917,6 +918,7 @@
 <script src="js/helpers.js"></script>
 <script src="js/recording-formats.js"></script>
 <script src="js/output-template.js"></script>
+<script src="js/ribbit.js"></script>
 <script src="js/app.js"></script>
 
 </body>

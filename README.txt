@@ -367,7 +367,7 @@ TIPS
   - Ink in water: Ink under "What feeds the loop" drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look.
-  - 3D worlds: 3D world under "What feeds the loop" takes you into one of nine.
+  - 3D worlds: 3D world under "What feeds the loop" takes you into one of ten.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
         glowing grid mountains on both sides.
@@ -380,6 +380,17 @@ TIPS
       Nebula: through glowing clouds of gas and dark dust.
       City: drifting sideways along a wet street at night, past shops,
         lamps and cars, with rows of buildings and a skyline behind.
+      Mount Ribbit: a hike on a frog king the size of a mountain, sitting
+        on a lily pad above the clouds. Gravity pulls towards whatever the
+        hiker stands on, so he walks up the belly, over the eyes, onto the
+        crown and upside down under the pad. W A S D walk (W forward, S
+        back, A and D turn), Shift runs, J jumps. The keys steer the loop
+        you're editing (or the other one if only it shows Mount Ribbit).
+        Walk by itself (the switch under the world buttons, on unless you
+        switch it off) tours the 14 flags round his body, following a
+        trail of gold dots, and takes over again 10 seconds after you let
+        go of the keys. Each loop has its own hiker. He hurries along with
+        the bass. The Guide's "Frog hike" recipe adds light trails.
     "3D world" under "What feeds the loop" adds any of them to any look;
     pick which one in the row of buttons that opens underneath. Input size
     widens or narrows the view. With React to sound on, the flight surges
@@ -424,6 +435,7 @@ TIPS
   - Keys: Space freeze, N neutral, R surprise,
     P autopilot, L next look, C clear, F full screen, V record (press
     again to stop and save; works in full screen too), G guide.
+    In Mount Ribbit: W A S D walk, Shift runs, J jumps.
   - Naming: before a picture or video saves, a box on the picture shows its
     usual name. Type a new one, or press Enter to keep it. "Don't save"
     throws it away, but only after a second click.

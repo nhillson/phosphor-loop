@@ -36,9 +36,9 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
@@ -83,6 +83,7 @@ const STARTERS = [
   { name: 'Fractal', A: { in1: 'fractal', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Mount Ribbit', A: { in1: 'ribbit', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Sponge', A: { in1: 'sponge', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Coral', A: { in1: 'wave', form: 3, zoom: 14, trails: 92, color: 24, warp: 6, mirror: 6, blur: 0.1, grow: 60, growSize: 1 } },
   { name: 'Ribbons', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1, time: 85, timeShape: 2 } }
@@ -108,6 +109,8 @@ const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDe
 // or builds a 3D world up. A rating stands for the look on screen until this changes, and the rating buttons stay lit.
 let lookOnScreen = 0;
 let edit = 'A';
+// Mount Ribbit's walking keys held down, a jump asked for, and Walk by itself (see ribKey)
+const rib = { held: new Set(), jump: false, auto: lsGet('phosphor-ribbit-walk') !== '0' };
 let activePresetId = null;
 let drift = !reduceMotion;
 let frozen = false;
@@ -183,6 +186,8 @@ const SCENES = {
   nebula:    { fs: FS_NEBULA,    label: 'Nebula',     speed: 2.0,   period: 400,           offB: 150, res: 0.5 },
   // A calm drift, so the kick only nudges it along a little
   city:      { fs: FS_CITY,      label: 'City',       speed: 2.2,   period: 3072,          offB: 1536, kick: 0.35 },
+  // Walking, not flying: drawn by its own renderer (js/ribbit.js) with a hiker for each loop; see drawExt
+  ribbit:    { ext: window.PhosphorRibbit || null, label: 'Mount Ribbit', speed: 1, period: 1e9, offB: 0, kick: 0.5 },
   // The fractal flights (under their own Fractals button): no set path, a wandering camera for each loop
   // instead (see makeDrone). Their speed is the camera's pace; how close it may dive (near) suits each one's detail.
   sponge:     { fs: FS_SPONGE,     label: 'Menger sponge', group: 'fractal', speed: 1, period: 1e9, offB: 0, fly: { de: FR.sponge, lure: FR.spongeLure, near: 0.0025 } },
@@ -192,6 +197,7 @@ const SCENES = {
   julia3d:    { fs: FS_JULIA,      label: 'Julia',         group: 'fractal', speed: 1, period: 1e9, offB: 0, fly: { de: FR.julia, near: 0.004 } },
   kaleido:    { fs: FS_KALEIDO,    label: 'Kaleidoscope',  group: 'fractal', speed: 1, period: 1e9, offB: 0, fly: { de: FR.kaleido, near: 0.008 } },
 };
+if (!SCENES.ribbit.ext) delete SCENES.ribbit;
 // Which button a 3D input sits under: "3D world" or "Fractals"
 const sceneGroup = (src) => (SCENES[src] ? SCENES[src].group || 'world' : null);
 // Each loop's wandering camera in a fractal, made when that loop first flies there (and again after a break,
@@ -217,6 +223,7 @@ const HINT_3D = {
   fractal: 'A flight down a hall folded out of spheres, where bubbles grow on bubbles, smaller without end.',
   nebula: 'A flight through glowing clouds of gas and dark dust, lit by a nearby star.',
   city: 'A slow drift sideways along a wet street at night, past shops, lamps and cars, with the skyline behind. The windows and lamps glow brighter with the music.',
+  ribbit: 'A hike on Mount Ribbit, a frog king the size of a mountain sitting on a lily pad above the clouds. Gravity pulls towards whatever the hiker stands on, so he walks up the belly, over the eyes, onto the crown and upside down under the pad. W A S D walk, Shift runs, J jumps. With Walk by itself on, he tours the 14 flags on his own, and carries on 10 seconds after you let go of the keys. He hurries along with the bass.',
   sponge: 'A cube with a cross-shaped hole through it, and the same hole through every smaller cube, without end. The camera threads the holes and tunnels.',
   mandelbulb: 'The Mandelbrot set worked out in 3D: a glowing coral-like bulb with buds on buds on buds.',
   mandelbox: 'Space folded inside a box over and over: a carved block full of arches, ribs and pits, with glowing seams.',
@@ -651,6 +658,11 @@ for (const [name, sc] of Object.entries(SCENES)) {
   });
   $(PICKER[g]).appendChild(b);
 }
+// Mount Ribbit's Walk by itself switch (kept in this browser)
+$('#ribbitAuto').addEventListener('click', () => { rib.auto = !rib.auto; lsSet('phosphor-ribbit-walk', rib.auto ? '1' : '0'); syncUI(); });
+// Mount Ribbit builds its frog in the background a little after the page opens, so it is ready the moment it's
+// picked (Autopilot's Check each look would otherwise see only sky while it builds)
+if (SCENES.ribbit) setTimeout(() => { if (SCENES.ribbit.ext.state === 'idle') SCENES.ribbit.ext.build(); }, 5000);
 // A world that fails its first compilation is removed from the pickers.
 function hideFailedWorlds() {
   $$('#worlds button, #fractals button').forEach((b) => { b.hidden = !worldOK(b.dataset.world); });
@@ -856,6 +868,8 @@ function syncUI() {
   $('#row-3d').hidden = !fly;
   if (fly) $('#hint3d').textContent = HINT_3D[fly];
   $$('#worlds button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.world === fly)));
+  $('#ribbitRow').hidden = fly !== 'ribbit';
+  $('#ribbitAuto').setAttribute('aria-pressed', String(rib.auto));
   const frac = [t.in1, t.in2].find((s) => sceneGroup(s) === 'fractal');
   $('#row-fractal').hidden = !frac;
   if (frac) $('#hintFractal').textContent = HINT_3D[frac];
@@ -4804,6 +4818,11 @@ const RECIPES = [
     sw: 'linear-gradient(90deg,#ffae3b 0 40%,#4fd1c5)',
     patch: { A: { in1: 'bars', size: 50, zoom: 10, spin: 0, trails: 88, color: 8 },
              B: { in1: 'loop', size: 42, zoom: 30, spin: 35, trails: 93, color: 18, mirror: 2 }, view: 50 } },
+  { name: 'Frog hike', after: 'W A S D walk the hiker, J jumps. Let go and he walks by himself.',
+    text: 'Mount Ribbit with light trails: every step smears the frog king, his crown and the clouds into soft streaks of colour.',
+    how: 'MOUNT RIBBIT · TRAILS 55 · COLOR 6',
+    sw: 'radial-gradient(circle at 50% 42%,#9bd34a 0 26%,#3c8d5a 27% 52%,#f6c38c 53%)',
+    patch: { A: { in1: 'ribbit', size: 100, zoom: 0, spin: 0, trails: 55, color: 6, blur: 0 } } },
 ];
 function recipeBlocked(r) {
   if (!r.needs) return '';
@@ -5332,6 +5351,7 @@ function onKey(e) {
   const tag = e.target && e.target.tagName;
   if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return;
   const onControl = tag === 'BUTTON' || tag === 'INPUT';
+  if (ribKey(e, true)) return;
   if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
@@ -5841,6 +5861,7 @@ function openOutput() {
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleOutFS(); e.preventDefault(); }
     else onKey(e);
   });
+  w.addEventListener('keyup', (e) => ribKey(e, false));
   doc.addEventListener('fullscreenchange', () => {
     hint.classList.toggle('gone', !!doc.fullscreenElement);
     doc.body.classList.toggle('fs', !!doc.fullscreenElement);
@@ -6632,6 +6653,7 @@ const sceneRT = [null, null];
 let sceneGlow = 1;
 function draw3D(k, name, slot, scale) {
   const sc = SCENES[name];
+  if (sc.ext) return drawExt(k, sc, scale);
   if (!sceneReady(sc, true)) return null;
   const w = Math.max(2, Math.round(simW * (sc.res || 1))), h = Math.max(2, Math.round(simH * (sc.res || 1)));
   let rt = sceneRT[slot];
@@ -6662,6 +6684,54 @@ function draw3D(k, name, slot, scale) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return rt.tex;
 }
+// Mount Ribbit draws each loop's hiker's view on a canvas of its own, which is copied in here (one picture per loop)
+const extTex = { A: null, B: null };
+function drawExt(k, sc, scale) {
+  const X = sc.ext;
+  if (X.state === 'idle') X.build();
+  const cv = X.state === 'failed' ? null : X.render(k, simW, simH, scale, sceneGlow);
+  if (!cv) {
+    if (X.state === 'failed' && sc.state !== 'failed') { sc.state = 'failed'; hideFailedWorlds(); }
+    return null;
+  }
+  gl.activeTexture(gl.TEXTURE0);
+  if (!extTex[k]) {
+    extTex[k] = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, extTex[k]);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+  gl.bindTexture(gl.TEXTURE_2D, extTex[k]);
+  const flip = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, cv); }
+  catch (_) { gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip); return null; }
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip);
+  return extTex[k];
+}
+// The keys that walk Mount Ribbit's hiker (W A S D, Shift to run, J to jump). They steer the loop being edited if it
+// shows Mount Ribbit, otherwise the other loop. Walk by itself (on unless switched off) takes over 10 seconds after.
+const RIB_KEYS = { KeyW: 'fwd', KeyS: 'back', KeyA: 'left', KeyD: 'right', ShiftLeft: 'run', ShiftRight: 'run' };
+function ribKey(e, down) {
+  if (!SCENES.ribbit) return false;
+  const c = e.code;
+  if (!down) { rib.held.delete(c); return false; }
+  if (!(c in RIB_KEYS) && c !== 'KeyJ') return false;
+  if (e.metaKey || e.ctrlKey || e.altKey || !uses('ribbit')) return false;
+  if (c === 'KeyJ') { if (!e.repeat) rib.jump = true; } else rib.held.add(c);
+  return c !== 'ShiftLeft' && c !== 'ShiftRight';
+}
+function ribDriven() { return loops[edit].tgt.in1 === 'ribbit' || loops[edit].tgt.in2 === 'ribbit' ? edit : edit === 'A' ? 'B' : 'A'; }
+function ribControls() {
+  const c = { fwd: false, back: false, left: false, right: false, run: false, jump: rib.jump };
+  for (const code of rib.held) c[RIB_KEYS[code]] = true;
+  rib.jump = false;
+  return c;
+}
+window.addEventListener('keyup', (e) => ribKey(e, false));
+window.addEventListener('blur', () => rib.held.clear());
 /* ================= the loops' probes (Chase, Breathe, Crystal) ================= */
 // Chase, Breathe and Crystal need to know what a loop's picture looks like: where it's brightest, how bright it
 // is overall and how fast it's changing. So while one of them is on, a tiny 32 x 18 map of the loop's brightness is
@@ -7129,6 +7199,11 @@ function frame() {
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
       if (sc.fly) for (const k of ['A', 'B']) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step);
+      // Mount Ribbit's hikers walk on, the same way
+      if (sc.ext) {
+        const drive = ribDriven(), ctl = ribControls();
+        for (const k of ['A', 'B']) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) sc.ext.step(k, dt, dt > 0 ? step / dt : 1, k === drive ? ctl : null, rib.auto);
+      }
     }
     sceneGlow = glow;
   }

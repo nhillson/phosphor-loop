@@ -24,6 +24,7 @@ FILES = {
     'js/helpers.js': 'application/javascript',
     'js/recording-formats.js': 'application/javascript',
     'js/output-template.js': 'application/javascript',
+    'js/ribbit.js': 'application/javascript',
     'js/app.js': 'application/javascript',
 
     'phone.html': 'text/html',
