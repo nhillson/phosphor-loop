@@ -259,6 +259,14 @@
         <li>Make sure the little box at the start of the line is <b>ticked</b>, then press <b>Import</b>, then <b>Close</b>.</li>
         <li>Click <b>Scene Collection</b> again and pick <b>Phosphor Loop on Twitch</b>. The picture appears in OBS.</li>
       </ol>
+      <div id="mirrorNote" hidden>
+        <p><b>Test version only, the first time:</b> this test copy comes through a free service that first shows a page saying <b>One more step</b>, and OBS shows it too. Click past it once and it won’t ask again:</p>
+        <ol class="steps">
+          <li>In OBS, right-click the picture and choose <b>Interact</b>.</li>
+          <li>In the window that opens, click <b>Open the page</b>, then close that window.</li>
+        </ol>
+        <figure id="figMirror"></figure>
+      </div>
       <details>
         <summary>Picture didn’t show up? Add it by hand instead</summary>
         <ol class="steps">
@@ -606,7 +614,8 @@ function showLink() {
   dot.className = 'dot wait';
   s.textContent = 'Looking for the stream picture…';
   help.innerHTML = REMOTE ? 'Open OBS on your computer. This phone finds the picture as soon as it starts.'
-    : 'Open OBS. The picture starts by itself and this page finds it (give it up to half a minute). Not set up yet? Press <b>Set up</b> above.';
+    : 'Open OBS. The picture starts by itself and this page finds it (give it up to half a minute). Not set up yet? Press <b>Set up</b> above.' +
+      (location.hostname === 'raw.githack.com' ? ' OBS showing <b>One more step</b>? Right-click it, <b>Interact</b>, click <b>Open the page</b>.' : '');
 }
 const fmtLeft = (s) => (s < 0 ? 'Autopilot off' : s <= 1 ? 'coming up' : s < 60 ? `in ${s} s` : `in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
 function showStatus() {
@@ -781,11 +790,11 @@ function figWizard() {
 function obsWindow(w, h, menuOpen, step = 7) {
   let b = WIN(0, 0, w, h, 'OBS Studio');
   const items = ['File', 'Edit', 'View', 'Docks', 'Profile', 'Scene Collection', 'Tools', 'Help'];
-  let x = 12, at = 0;
+  let x = 12, at = 0, full = false;
   b += R(0, 24, w, 24, P.panel, 'none', 0);
   items.forEach((s) => {
     const wd = s.length * step + 14;
-    if (x + wd > w) return;
+    if (full || x + wd > w) { full = true; return; }
     if (s === menuOpen) { b += R(x - 4, 26, wd, 20, '#3a3f55', 'none', 3); at = x; }
     b += T(x + 3, 41, s, 12.5);
     x += wd;
@@ -861,6 +870,21 @@ function figShare() {
   b += HI(652, 266, 90, 30, '4', 636, 250);
   return svg(w, h, b, 'Chrome’s sharing box: the Entire Screen tab, a screen, the Also share system audio switch and the Share button, circled in order');
 }
+function figMirror() {
+  const w = 760, h = 250;
+  let b = obsWindow(330, h, '');
+  b += R(10, 56, 310, 186, '#0b0b0d', 'none', 2) + T(165, 140, 'One more step', 15, P.ink, 600, 'middle');
+  // the right-click menu
+  b += R(150, 150, 160, 74, P.panel, P.line, 4) + T(162, 170, 'Properties', 12.5) + T(162, 192, 'Interact', 12.5) + T(162, 214, 'Transform  ▸', 12.5, P.dim);
+  b += HI(156, 178, 148, 20, '1', 134, 188);
+  // the Interact window
+  b += WIN(350, 20, 400, 220, 'Interact: Phosphor Loop picture');
+  b += T(550, 90, 'One more step', 17, P.ink, 600, 'middle') + T(550, 116, 'This HTML page is hosted on…', 12, P.dim, 400, 'middle');
+  b += BTN(490, 140, 120, 32, 'Open the page', P.blue, '#fff');
+  b += HI(490, 140, 120, 32, '2', 634, 156);
+  return svg(w, h, b, 'OBS: right-click the picture, choose Interact, then click Open the page');
+}
+if (location.hostname === 'raw.githack.com') { $('#mirrorNote').hidden = false; $('#figMirror').innerHTML = figMirror(); }
 $('#figWizard').innerHTML = figWizard();
 $('#figImport').innerHTML = figImport();
 $('#figGo').innerHTML = figGo();
