@@ -359,6 +359,9 @@ TIPS
     your laptop. If nothing opens, allow pop-ups for the page. In Chrome
     with two screens, "Fill my other screen" fills whichever screen isn't
     showing the controls. The help box fades when the mouse is still.
+    The picture keeps going when the controls window is hidden, minimized
+    or covered (on a Mac, full screen puts the Output window on a Space of
+    its own and hides the controls behind it).
   - Neutral (next to Surprise me, or the N key) shows just loop A's input
     with every effect off. Raise Trails first, then Zoom and Spin.
   - Ink in water: Ink under "What feeds the loop" drops colored ink that
