@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "hls.js": "^1.7.3",
+    "mp4-muxer": "^5.2.2",
     "playwright-core": "^1.60.0"
   }
 }

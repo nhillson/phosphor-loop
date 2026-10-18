@@ -51,17 +51,30 @@ try {
   assert.equal(picture.width,1920);assert.equal(picture.height,1080);assert.ok(picture.light>3,JSON.stringify(picture));
   assert.deepEqual(errors,[]);
   assert.ok(renderer && !/SwiftShader|llvmpipe/.test(renderer),'The sender must use real GPU rendering. '+logs);
+  assert.match(logs,/Feedback rendering: 1920×1080; 8 Mbps capture; H\.264\/AAC passthrough \(single encode\)\./);
   const url=`http://127.0.0.1:${port}/live/stream.m3u8`;
-  const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,channels,width,height,avg_frame_rate','-of','json',url],{timeout:15000});
+  const {stdout}=await exec('ffprobe',['-v','error','-show_entries','stream=codec_type,codec_name,channels,width,height','-of','json',url],{timeout:15000});
   const streams=JSON.parse(stdout).streams;
-  assert.ok(streams.some(s=>s.codec_type==='video'&&s.codec_name==='h264'&&s.avg_frame_rate==='60/1'));
+  assert.ok(streams.some(s=>s.codec_type==='video'&&s.codec_name==='h264'));
   assert.ok(streams.some(s=>s.codec_type==='audio'&&s.codec_name==='aac'&&s.channels===2));
+  const packetProbe=await exec('ffprobe',['-v','error','-read_intervals','%+4','-select_streams','v:0',
+    '-show_packets','-show_entries','packet=pts_time,size','-of','json',url],{timeout:15000});
+  const packets=JSON.parse(packetProbe.stdout).packets;
+  const span=Number(packets.at(-1).pts_time)-Number(packets[0].pts_time);
+  const actualFps=(packets.length-1)/span;
+  assert.ok(actualFps>=58 && actualFps<=62,`HLS packet cadence is ${actualFps.toFixed(2)} fps.`);
+  console.log(`Measured HLS packet cadence: ${actualFps.toFixed(2)} fps.`);
+
   console.log(`PASS: real GPU, 1920×1080 at 60 fps H.264, stereo AAC, live HTTP playback with a nonblack picture (brightness ${picture.light.toFixed(1)}).`);
   sender.kill('SIGINT'); assert.equal(await exited,0,logs);
   const performance = logs.match(/Captured \d+ frames \([\d.]+ fps\)/);
   assert.ok(performance,'Missing capture performance summary');
   assert.ok(+performance[0].match(/\(([\d.]+) fps\)/)[1]>=55,'Capture is not sustaining close to 60 unique frames per second: '+performance[0]);
   console.log(performance[0]);
+  const encoded = logs.match(/Encoded \d+ unique frames \(([\d.]+) fps\), \d+ duplicated, \d+ dropped\./);
+  assert.ok(encoded,'Missing encoded-frame summary');
+  assert.ok(+encoded[1]>=55,'Encoder is duplicating too many frames: '+encoded[0]);
+  console.log(encoded[0]);
   console.log('PASS: clean stream stop and FFmpeg finalization.');
 } finally {
   await browser?.close();

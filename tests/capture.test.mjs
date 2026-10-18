@@ -47,11 +47,16 @@ test('FFmpeg requires both streams, preserves existing files, and supports fragm
   assert.ok(args.includes('0:a:0'));
   assert.ok(args.includes('0:v:0'));
   assert.ok(args.includes('+frag_keyframe+empty_moov'));
+  assert.equal(args[args.indexOf('-preset')+1],'fast');
   const live = ffmpegArgs({rtmp:'rtmp://localhost/live/test',fps:30,bitrate:6000000});
   assert.equal(live[live.indexOf('-maxrate')+1],'6000000');
   assert.equal(live[live.indexOf('-bufsize')+1],'12000000');
   assert.equal(live[live.indexOf('-x264-params')+1],'nal-hrd=cbr:force-cfr=1');
   assert.deepEqual(live.slice(-3), ['-f','flv','rtmp://localhost/live/test']);
+  const copy = ffmpegArgs({liveDir:'/tmp/live',captureCodec:'h264',fps:60,bitrate:8000000});
+  assert.equal(copy[copy.indexOf('-c:v')+1],'copy');
+  assert.equal(copy[copy.indexOf('-c:a')+1],'copy');
+  assert.ok(!copy.includes('libx264'),'Single-encode capture must never be recompressed.');
   const hls = ffmpegArgs({liveDir:'/tmp/live',fps:30,bitrate:6000000});
   assert.ok(hls.includes('delete_segments+independent_segments+temp_file'));
   assert.equal(hls.at(-1),'/tmp/live/stream.m3u8');

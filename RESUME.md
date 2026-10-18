@@ -2,6 +2,135 @@
 
 See the latest streaming status below before older notes.
 
+## Handoff: quality work checkpoint (2026-10-17)
+
+User is near usage cap and explicitly requested a commit and handoff. Preserve the
+running broadcast. User wants controllable, smooth, clean visualizer video on Kick;
+quality is NOT resolved. Do not claim success based only on rendering callbacks.
+
+### Active session — leave running
+
+- Actual producer Chrome window: **STREAM CONTROLS · Phosphor Loop**. Its sliders,
+  presets, drawing and Autopilot control the broadcast. Closing it stops capture.
+  Opening / in another tab creates an independent visualizer, not a controller.
+- Producer: `npm run stream -- --port 8787` (headed), Node PID 8055, FFmpeg 8063,
+  exec session 74781. Preview http://127.0.0.1:8787/watch.
+- Relay: Node PID 8164, FFmpeg 8172, exec session 96854. Source port 8787.
+  Ingest connected. Prior port 8788 source/relay stopped.
+- Kick playback URL discovered through current browser UI:
+  https://kick.com/ornery-stepchild . User says both Kick and local /watch look
+  bad (blur and artifacts), so damage already exists before Kick.
+- Publish credential ONLY in relay environment. NEVER print full FFmpeg command
+  arguments or commit credentials. Existing authorization covers this broadcast.
+  No credential is stored in this file. Nothing pushed to remote.
+- BlackHole + SMSL mirrored output stays active. Do not change audio routing.
+
+### Committed implementation at this checkpoint
+
+- Replaced VP8 MediaRecorder -> x264 double compression with WebCodecs H.264 High
+  profile, 8 Mbps target, constant bitrate mode, **quality** latency mode,
+  hardware preferred, 2-second keyframes. Stereo AAC 192 kbps via AudioEncoder.
+  mp4-muxer streams fragmented MP4 to FFmpeg, which copies both tracks into HLS;
+  relay copies H.264/AAC into RTMPS. No second lossy encode.
+- Native 1920x1080 simulation instead of 576-line upscaling. Normal webpage stays
+  at 576 lines. Capture producer render capped at requested fps (60), avoiding
+  redundant ~110–165 fps renders on the high-refresh display competing with
+  capture/encoding. The capture callback avoids applying a second fps limiter.
+- Encoder warm-up before live timeline removes initial ~1.3s startup drop burst.
+- npm run stream opens controls by default. --headless overrides it. Header and
+  title identify the captured producer. `--encoder-latency realtime` is fallback.
+- VP8/x264 fallback remains via --capture-codec vp8; --capture-bitrate and --preset
+  tune only that fallback. --render-height 576 can lower simulation cost.
+- Separate cloned BlackHole track continues through analyzer Off/reconnect.
+- FFmpeg final counters and HLS packet cadence tests replace reliance on canvas
+  callback counts. Caveat: FFmpeg remux counters still cannot detect every source
+  duplicate or internal encoder loss; use decoded-frame comparisons as needed.
+- Dependency mp4-muxer 5.2.2 (lockfile pinned) is deprecated upstream in favor of
+  Mediabunny. It is a focused muxing dependency; migration not done this turn.
+
+### Evidence and remaining problems — read before making claims
+
+- Metal renderer reports Apple M3 Max. `ioreg -r -c AppleAVE2Driver -l -w 0`
+  showed an active hardware encoder user client owned by VTEncoderXPCServ (8081).
+  Hardware preference alone is NOT proof of selected encoder; OS session is
+  supporting evidence. FFmpeg video stage is copy, not CPU x264 in default path.
+- Controlled same-image motion benchmark, 180 frames at 1080p/8Mbps:
+  realtime: 7.47Mbps, PSNR 36.82dB, elapsed2393ms;
+  quality: 7.86Mbps, PSNR37.75dB, elapsed729ms. Both decoded all180 frames.
+  This supports quality mode, not a guarantee of artifact-free arbitrary looks.
+- Current Split Lines setting creates alternating one-pixel rows, visible in raw
+  PNG. These color patterns lose detail under H.264 compression. Did NOT disable
+  or alter user's effects. Earlier comparisons used different animation times;
+  don't present them as rigorous same-frame quality metrics.
+- Short fresh quality-mode recording:720 frames,59.9 encodedfps,0 FFmpegdup/drop.
+  Full fresh HLS test after quality mode + render cap: actual packet59.76fps,
+  encoded59.9fps, nonblack picture and decoded stereo audio. PASS.
+- Running session previously regressed to19–33 packetfps and skipped many frames.
+  Runtime update preserved scene/window/audio: quality encoder +2sec keyframes,
+  then render cap60 with replacement capture hook. Latest direct 300-frame sample
+  after cap: render60.16fps, submitted60.16fps, zero queue skips.
+- **Still unresolved:** latest rolling HLS segment measured ~30.3fps/4.14Mbps,
+  despite current capture submitting60fps. Estimated browser video timestamp
+  697.79s vs latest HLS video PTS635.19s (~62.6s difference; offset estimate1.4s
+  requires validation). Relay also logged steadily growing lag, >36s. This may
+  reflect old buffered media and/or A/V timestamp/muxing/pacing errors. Do NOT
+  claim stable end-to-end60fps or solved visual quality yet.
+
+### Running process differs from files only in how fixes were installed
+
+- To avoid resetting the user's scene, quality mode and render pacing were applied
+  in place via temporary Node inspector access. Source files contain equivalent
+  normal startup behavior; next clean restart does not require runtime patches.
+- Runtime page has __liveEncoderDiagnostic (encoder + clockOffset) and
+  __restoreCapturePacing (undo only live render/capture patch). __captureSession
+  status/stop wrappers preserve cumulative counts and original cleanup.
+- Diagnostic Node inspector was opened with SIGUSR1 and is closed at handoff.
+  /tmp/phosphor-inspect.mjs is a local helper if inspection is needed later; it
+  attaches to Node inspector, captures module-local page once at monitor breakpoint,
+  then evaluates on that existing Playwright page. Do not commit this diagnostic
+  helper or restart producer casually; it preserves current scene only in memory.
+- Other /tmp artifacts: phosphor-codec-bench.mjs, phosphor-reconfigure-test.mjs,
+  phosphor-live-pacing-expression.txt, phosphor-raw-current.png,
+  phosphor-encoder-input.png, phosphor-matched-01..03.png. Captures are gitignored.
+
+### Next steps, in order
+
+1. Instrument each stage with timestamps and *encoder output* counts: input render,
+   VideoEncoder output, AudioEncoder output, fragment emission, FFmpeg demux/HLS,
+   relay. Measure bounded latency and actual decoded frame cadence over minutes,
+   while using complex looks, changing controls and switching browser focus.
+2. Investigate growing source/HLS delay and cadence mismatch. Check per-track
+   timestamp offset/duration handling (`firstTimestampBehavior:'offset'` currently
+   resets each track independently), audio sample clock continuity, track processor
+   drops, fragment interleaving, and FFmpeg probe/buffering. This is higher priority
+   than bitrate increases. Ensure sound remains synced and present.
+3. Separately examine relay `-re` on an already live HLS source, live_start_index,
+   segment polling and catch-up; it may add pacing delay. Do not assume removing
+   -re alone fixes source HLS delay. Test local RTMP first, then replace relay only
+   after confirming a working source, keeping user controls intact.
+4. Compare exact same raw/decoded frames on demanding looks. Tune encoder quality
+   at Kick's 8Mbps target; offer intentional choices for high-frequency Split Lines
+   if needed, rather than silently removing effects or promising lossless1080p60.
+5. Add a useful live status/control bridge only if needed. User must retain full
+   live controls; root pages opened separately are still independent instances.
+
+### Verification
+
+- PASS capture:test (6 unit tests).
+- PASS stream:test after final source quality/render-cap changes: real Metal GPU,
+  native1080, actual HLS cadence59.76fps, encoded59.9fps, decoded browser audio,
+  nonblack picture, cleanstop. This is SHORT and does not resolve long-run issue.
+- PASS capture:audio-test after quality/render cap changes: actual BlackHole AAC
+  survives analyzer Off/reconnect (RMS .0203).
+- PASS stream:rtmp-test earlier single-encode implementation: >=120 frames at
+  local receiver,1080 H.264/stereoAAC, credential redaction, cleanstop.
+- Separate runtime reconfiguration test:420 frames,0 skips, valid H.264 High +AAC,
+  no muxer error switching realtime->quality without restarting capture.
+- PASS final capture:smoke: ordinary file startup and fixed-resolution capture,
+  nonblack pictures, full control workout, no page errors. Unit checks also passed.
+- No push performed. Before any future push, CLAUDE.md requires
+  `python3 tests/check.py`. Current Node smoke is not a substitute for that rule.
+
 ## Latest: live streaming and Apple GPU fix completed
 
 ### Follow-up: remote RTMPS broadcast active

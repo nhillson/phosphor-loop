@@ -13,7 +13,7 @@ const exec=promisify(execFile),root=fileURLToPath(new URL('../',import.meta.url)
 await mkdir(resolve(root,'captures'),{recursive:true});
 const output=resolve(root,`captures/audio-reconnect-${Date.now()}.mp4`),tone='/tmp/phosphor-capture-tone.wav';
 await exec('ffmpeg',['-hide_banner','-loglevel','error','-y','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=2','-af','volume=0.3','-ac','2',tone]);
-const config={width:640,height:360,fps:30,bitrate:1000000,output,device:'BlackHole 2ch',maxQueueBytes:16*1024*1024};
+const config={captureCodec:'h264',width:640,height:360,fps:30,bitrate:1000000,output,device:'BlackHole 2ch',maxQueueBytes:16*1024*1024};
 const encoder=spawn('ffmpeg',ffmpegArgs(config),{stdio:['pipe','ignore','pipe']});
 let log='';encoder.stderr.on('data',data=>log+=data);
 const encoded=new Promise(resolve=>encoder.on('close',resolve));

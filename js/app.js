@@ -6,9 +6,10 @@ const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.Phos
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
 /* ================= constants ================= */
-// The picture is always 576 lines tall; its width follows the shape of the screen.
+// The ordinary workstation uses 576 lines. Local streaming can request native
+// feedback resolution rather than enlarging this lower-resolution picture.
 const SIM_H = 576;
-let simW = 768, simH = SIM_H, simAspect = simW / simH;
+let simW = 768, simH = window.__phosphorCaptureConfig?.renderHeight || SIM_H, simAspect = simW / simH;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -5712,7 +5713,7 @@ function copyInto(dst, srcTex) {
 }
 function dropTarget(t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
 function resim(aspect) {
-  const w = clamp(Math.round(SIM_H * aspect / 4) * 4, 256, 1600);
+  const w = clamp(Math.round(simH * aspect / 4) * 4, 256, window.__phosphorCaptureConfig ? 3840 : 1600);
   if (w === simW) return;
   const oldA = loops.A.rt, oldB = loops.B.rt, oldComp = comp;
   const frontA = oldA[loops.A.front].tex, frontB = oldB[loops.B.front].tex;
@@ -7078,8 +7079,14 @@ function eyeTick(now, dt, wA, wB) {
   }
 }
 
+let captureNextAt = 0;
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
+  const captureFps = window.__phosphorCaptureConfig?.fps;
+  if (captureFps) {
+    if (now < captureNextAt - 1) { requestAnimationFrame(frame); return; }
+    captureNextAt = Math.max(captureNextAt + 1000 / captureFps, now);
+  }
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
   const k = 1 - Math.exp(-dt * 5);
@@ -7212,6 +7219,7 @@ showStart();
 // Available only in the isolated local capture session; ordinary site behavior is unchanged.
 if (window.__phosphorCaptureConfig) window.__phosphorCapture = {
   canvas,
+  get renderSize() { return {width:simW,height:simH}; },
   listen(stream) {
     ++soundRequest;
     stopSound();

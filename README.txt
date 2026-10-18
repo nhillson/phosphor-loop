@@ -465,10 +465,17 @@ LOCAL LIVE STREAM (Mac)
   Start a stream:
     npm run stream
 
-  A separate Chrome workstation opens. Its controls change the streamed picture.
+  A Chrome window titled STREAM CONTROLS opens. Its controls change the broadcast.
+  Use that window for sliders, presets, drawing, and Autopilot. Opening / in another
+  tab creates a separate visualizer; /watch previews the captured stream.
+  Add --headless only when you do not need the controls window.
   It captures only the picture plus BlackHole audio, with no microphone processing.
   The stream is H.264 video and stereo AAC audio, targeting 1920 x 1080 at 60 fps,
-  with 7 Mbps constant video bitrate, 192 Kbps audio, and two-second keyframes.
+  with an 8 Mbps video target, 192 Kbps audio, and two-second keyframes.
+  The feedback simulation renders at the output height (native 1080 lines),
+  WebCodecs requests hardware H.264 with constant rate control and quality mode. FFmpeg and the
+  RTMPS relay copy the encoded H.264/AAC without compressing either track again.
+  The hardware encoder warms up before the live timeline starts.
   GPU rendering is on. The ink shader avoids a Metal compiler issue on Apple GPUs.
 
   Watch in a browser:
@@ -509,6 +516,12 @@ LOCAL LIVE STREAM (Mac)
   is a slower fallback; the normal default is --renderer gpu. CHROME_PATH and
   FFMPEG_PATH can override executable locations. Normal double-click page opening
   still works independently of all these tools.
+
+  --encoder-latency realtime restores the lower latency encoder mode; quality
+  is the default to preserve detail. --capture-codec vp8 enables the older double-encode fallback. For that fallback,
+  --capture-bitrate 24000000 controls the local intermediate and --preset fast
+  controls final H.264 compression effort. The default H.264 path uses --bitrate. --render-height 576 restores the lighter feedback render
+  while keeping the output dimensions. Normal workstation opening stays at 576.
 
   Verification commands:
     npm run capture:test     ordered delivery, backpressure, routes and file privacy

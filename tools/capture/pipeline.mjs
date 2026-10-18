@@ -6,15 +6,19 @@ import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {once} from 'node:events';
 
 export function ffmpegArgs(config) {
-  const args = ['-hide_banner', '-loglevel', 'warning', '-n', '-analyzeduration', '1000000', '-probesize', '1000000', '-i', 'pipe:0',
-    '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'libx264', '-preset', 'veryfast',
-    '-tune', 'zerolatency', '-pix_fmt', 'yuv420p', '-r', String(config.fps), '-g', String(config.fps * 2), '-sc_threshold', '0',
-    '-b:v', String(config.bitrate), '-minrate', String(config.bitrate), '-maxrate', String(config.bitrate), '-bufsize', String(config.bitrate * 2),
-    '-profile:v', 'high', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'];
-  // Network output uses filler to maintain CBR, with a two-second VBV buffer.
-  // MP4 recordings retain capped rate control without transport filler packets.
-  if (config.liveDir || config.rtmp) args.push('-x264-params','nal-hrd=cbr:force-cfr=1');
-  if (config.rtmp) args.push('-progress','pipe:1','-stats_period','2');
+  const args = ['-hide_banner', '-loglevel', 'warning', '-n', '-analyzeduration', config.captureCodec === 'h264' ? '5000000' : '1000000', '-probesize', config.captureCodec === 'h264' ? '8000000' : '1000000', '-i', 'pipe:0',
+    '-map', '0:v:0', '-map', '0:a:0'];
+  if (config.captureCodec === 'h264') {
+    // Chrome already supplies H.264/AAC. Remux without a second lossy encode.
+    args.push('-c:v','copy','-c:a','copy');
+  } else {
+    args.push('-c:v', 'libx264', '-preset', config.preset || 'fast',
+      '-tune', 'zerolatency', '-pix_fmt', 'yuv420p', '-r', String(config.fps), '-g', String(config.fps * 2), '-sc_threshold', '0',
+      '-b:v', String(config.bitrate), '-minrate', String(config.bitrate), '-maxrate', String(config.bitrate), '-bufsize', String(config.bitrate * 2),
+      '-profile:v', 'high', '-c:a','aac','-b:a','192k','-ar','48000');
+    if (config.liveDir || config.rtmp) args.push('-x264-params','nal-hrd=cbr:force-cfr=1');
+  }
+  args.push('-progress','pipe:1','-stats_period','2');
   if (config.liveDir) args.push('-f', 'hls', '-hls_time', '2', '-hls_list_size', '6',
     '-hls_flags', 'delete_segments+independent_segments+temp_file',
     '-hls_segment_filename', resolve(config.liveDir,'segment-%09d.ts'), resolve(config.liveDir,'stream.m3u8'));
@@ -29,7 +33,7 @@ export function ffmpegArgs(config) {
 export function createCaptureServer({root, input, liveDir, maxChunkBytes = 8 * 1024 * 1024}) {
   const token = randomBytes(32).toString('hex');
   let sequence = 0, busy = false, failure;
-  const types = {'.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.m3u8':'application/vnd.apple.mpegurl', '.ts':'video/mp2t'};
+  const types = {'.html': 'text/html', '.js': 'application/javascript', '.mjs':'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.m3u8':'application/vnd.apple.mpegurl', '.ts':'video/mp2t'};
   input.on('error', error => { failure = error; });
   const server = createServer(async (req, res) => {
     const reply = (status, body = '') => { if (!res.destroyed) res.writeHead(status).end(body); };
@@ -59,7 +63,8 @@ export function createCaptureServer({root, input, liveDir, maxChunkBytes = 8 * 1
       const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
       if (pathname.split('/').some(part => part === '.' || part === '..') || pathname.includes('\0')) return reply(404);
       let asset;
-      if (liveDir && pathname === '/watch') asset = resolve(root,'tools/capture/player.html');
+      if (pathname === '/capture-muxer.js') asset = resolve(root,'node_modules/mp4-muxer/build/mp4-muxer.mjs');
+      else if (liveDir && pathname === '/watch') asset = resolve(root,'tools/capture/player.html');
       else if (liveDir && pathname === '/player.js') asset = resolve(root,'node_modules/hls.js/dist/hls.min.js');
       else if (liveDir && /^\/live\/(?:stream\.m3u8|segment-\d+\.ts)$/.test(pathname)) asset = resolve(liveDir,pathname.slice('/live/'.length));
       if (asset) {
