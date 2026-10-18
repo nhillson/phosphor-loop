@@ -1727,7 +1727,40 @@ const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: f
 // When you move a control while Autopilot runs: pin it ('pin'), just play along without pinning ('play'), or stop
 // Autopilot ('stop')
 const cleanTouch = (v) => (v === 'stop' || v === 'play' ? v : 'pin');
-const apSet = { ...AP_DEFAULTS, lim: {} };
+const apSet = { ...AP_DEFAULTS, lim: {}, weights: {} };
+// How often Autopilot brings each input in, set by right-clicking its switch: Off, Rarely, Less, Normal, More or Lots
+// (the pie on the switch shows which). 3D worlds and Fractals have one for the group, which is how often one of them
+// comes up at all, and one for each world and fractal, which decides which one it is; a world or fractal can also be
+// switched Off on its own (kept as "sc:" plus its name, since the world called Fractal shares its name with the
+// Fractals group). Only the ones that aren't Normal are kept.
+const AP_LEVELS = [
+  { w: 0, name: 'Off', pie: 0, say: 'never' },
+  { w: 0.25, name: 'Rarely', pie: 0.125, say: 'a quarter as often as normal' },
+  { w: 0.5, name: 'Less', pie: 0.25, say: 'half as often as normal' },
+  { w: 1, name: 'Normal', pie: 0.5, say: 'as often as the rest' },
+  { w: 2, name: 'More', pie: 0.75, say: 'twice as often as normal' },
+  { w: 4, name: 'Lots', pie: 1, say: 'four times as often as normal' }];
+function cleanWeights(v) {
+  const out = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const [k, w] of Object.entries(v)) {
+    const member = k.startsWith('sc:') && !!SCENES[k.slice(3)];
+    if (!(member || AP_INPUT_KEYS.includes(k)) || !AP_LEVELS.some((l) => l.w === w) || w === 1 || (w === 0 && !member)) continue;
+    out[k] = w;
+  }
+  return out;
+}
+const apW = (k) => apSet.weights[k] ?? 1;
+// One world's or fractal's own weight
+const mW = (name) => apW('sc:' + name);
+// The How often menu (see openWeights) and what it calls each input and level
+const wpop = $('#wpop');
+let wpKey = null, wpAnchor = null, wpReturn = null;
+const AP_LABEL = Object.fromEntries(AP_INPUTS);
+const isMemberKey = (k) => typeof k === 'string' && k.startsWith('sc:');
+const wName = (k) => (isMemberKey(k) ? SCENES[k.slice(3)].label : AP_LABEL[k] || k);
+const GROUP_SAY = { world: '3D worlds', fractal: 'fractals' };
+const levelOf = (w) => AP_LEVELS.find((l) => l.w === w) || AP_LEVELS[3];
 try {
   const s = JSON.parse(localStorage.getItem(AP_KEY) || 'null');
   if (s && typeof s === 'object') {
@@ -1739,11 +1772,12 @@ try {
     apSet.touch = cleanTouch(s.touch);
     apSet.off = cleanOff(s.off);
     apSet.lim = cleanLim(s.lim);
+    apSet.weights = cleanWeights(s.weights);
     if (Array.isArray(s.pins)) s.pins.forEach(addSavedPin);
   }
 } catch (_) {}
 // Whether Autopilot may bring in this input (one switched off under Autopilot settings stays out)
-const apAllowed = (src) => !apSet.off.includes(sceneGroup(src) || src);
+const apAllowed = (src) => !apSet.off.includes(sceneGroup(src) || src) && !(is3D(src) && mW(src) === 0);
 function saveAp() {
   try { localStorage.setItem(AP_KEY, JSON.stringify({ ...apSet, pins: [...ap.pins] })); } catch (_) {}
 }
@@ -2349,17 +2383,63 @@ function apPool() {
 // worlds and six fractals against eight other inputs, about 1 new look in 15 instead of 2 in 3. Fractals also come
 // up as an ordinary input, all six together having the same chance as Wave or Shape, with effects and timing like
 // any other look; then out.asInput is set, so the look gets no showcase.
+// Each input's weight (right-click its switch) scales its chances: Rarely a quarter, Lots four times. For the 3D
+// worlds and fractals, the group's weight scales how often one comes up at all (a group counts as many inputs as it
+// has members, even with some switched off) and each member's weight decides which one it is.
 const AP_WORLD_SHARE = 0.1;
+function apOddsTable(list) {
+  const rest = new Map(), members = { world: [], fractal: [] };
+  for (const x of list) {
+    if (is3D(x)) { const g = sceneGroup(x); if (mW(x) > 0 && !members[g].includes(x)) members[g].push(x); }
+    else rest.set(x, (rest.get(x) || 0) + apW(x));
+  }
+  let R = 0;
+  for (const w of rest.values()) R += w;
+  if (members.fractal.length) rest.set('fractal-as-input', apW('fractal'));
+  const show = {};
+  let S3 = 0;
+  for (const g of ['world', 'fractal']) {
+    show[g] = members[g].length ? worldsOK().filter((n) => sceneGroup(n) === g).length * apW(g) : 0;
+    S3 += show[g];
+  }
+  // The chance of a showcase: a tenth of what the 3D ones would get counted like the rest
+  const p = S3 > 0 ? AP_WORLD_SHARE * S3 / (R + S3) : 0;
+  return { rest: [...rest].filter(([, w]) => w > 0), members, show, S3, p };
+}
+function wpick(entries) {
+  let tot = 0;
+  for (const [, w] of entries) tot += w;
+  if (!(tot > 0)) return entries.length ? pick(entries)[0] : null;
+  let r = Math.random() * tot;
+  for (const [k, w] of entries) { r -= w; if (r < 0) return k; }
+  return entries[entries.length - 1][0];
+}
+const memberPick = (ms) => wpick(ms.map((x) => [x, mW(x)]));
 function apPick(list, out) {
-  const worlds = list.filter(is3D), fracs = worlds.filter((x) => sceneGroup(x) === 'fractal');
-  const rest = list.filter((x) => !is3D(x)).concat(fracs.length ? ['fractal-as-input'] : []);
-  if (!worlds.length) return pick(list);
-  let src = Math.random() < AP_WORLD_SHARE * worlds.length / list.length || !rest.length ? pick(worlds) : pick(rest);
+  const T = apOddsTable(list);
+  if (T.S3 > 0 && (!T.rest.length || Math.random() < T.p)) return memberPick(T.members[wpick(Object.entries(T.show).filter(([, w]) => w > 0))]);
+  if (!T.rest.length) return pick(list);
+  let src = wpick(T.rest);
   if (src === 'fractal-as-input') {
-    src = pick(fracs);
+    src = memberPick(T.members.fractal);
     if (out) out.asInput = true;
   }
   return src;
+}
+// Each input's share of Autopilot's picks right now (and each world's and fractal's), for the weights menu
+function apShares() {
+  const T = apOddsTable(apPool()), out = {};
+  const p = T.rest.length ? T.p : (T.S3 > 0 ? 1 : 0);
+  let RT = 0;
+  for (const [, w] of T.rest) RT += w;
+  const add = (k, v) => { out[k] = (out[k] || 0) + v; };
+  const spread = (ms, q) => { let s = 0; for (const m of ms) s += mW(m); for (const m of ms) add('sc:' + m, q * mW(m) / s); };
+  for (const [x, w] of T.rest) {
+    const q = (1 - p) * w / RT;
+    if (x === 'fractal-as-input') { add('fractal', q); spread(T.members.fractal, q); } else add(x, q);
+  }
+  for (const g of ['world', 'fractal']) if (T.show[g] > 0) { const q = p * T.show[g] / T.S3; add(g, q); spread(T.members[g], q); }
+  return out;
 }
 // A real input (not the other loop's picture), for when both loops would only feed on each other
 function apRealInput() {
@@ -3652,7 +3732,14 @@ function syncApUI() {
   $('#apFsKeep').setAttribute('aria-pressed', String(apSet.fsKeep));
   tasteSummary();
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
-  $$('#apInputs button').forEach((b) => b.setAttribute('aria-pressed', String(!apSet.off.includes(b.dataset.apsrc))));
+  $$('#apInputs button').forEach((b) => {
+    const k = b.dataset.apsrc, on = !apSet.off.includes(k), lv = levelOf(apW(k));
+    b.setAttribute('aria-pressed', String(on));
+    b.querySelector('.wpie').innerHTML = pieSVG(on ? lv.pie : 0);
+    b.setAttribute('aria-label', `${wName(k)}: ${on ? lv.name : 'Off'}`);
+    b.title = 'Click to switch it off or on. Right-click (or press and hold) to set how often Autopilot brings it in.';
+  });
+  if (!wpop.hidden) renderWeights();
   syncLimUI();
   syncPins();
   apStatus();
@@ -3694,7 +3781,9 @@ for (const [k, label] of AP_INPUTS) {
   b.type = 'button';
   b.className = 'chip';
   b.dataset.apsrc = k;
-  b.innerHTML = `<span class="led"></span>${label}`;
+  b.innerHTML = `<span class="led"></span>${label}<span class="wpie"></span>`;
+  // Right-click (or press and hold on a touchscreen): how often Autopilot brings it in
+  b.addEventListener('contextmenu', (e) => { e.preventDefault(); openWeights(k, b); });
   // Inputs this device can't offer at all (Screen in the Android app, for one) get no toggle either
   const inBtn = $(`#inputs [data-src="${k}"]`);
   if (inBtn && inBtn.hidden) b.hidden = true;
@@ -3710,6 +3799,128 @@ for (const [k, label] of AP_INPUTS) {
   });
   $('#apInputs').appendChild(b);
 }
+/* ----- How often: the menu a right-click on an input switch opens ----- */
+// A pie that fills with the weight: empty for Off, half for Normal, whole for Lots
+function pieSVG(frac) {
+  let fill = '';
+  if (frac >= 0.999) fill = '<circle cx="8" cy="8" r="6" class="pie-f"/>';
+  else if (frac > 0) {
+    const a = frac * 2 * Math.PI, x = 8 + 6 * Math.sin(a), y = 8 - 6 * Math.cos(a);
+    fill = `<path class="pie-f" d="M8 8V2A6 6 0 ${frac > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}Z"/>`;
+  }
+  return `<svg class="pie" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.9" class="pie-r"/>${fill}</svg>`;
+}
+const sharePct = (q) => (q < 0.005 ? 'under 1%' : `${Math.round(q * 100)}%`);
+const membersOf = (g) => worldsOK().filter((n) => sceneGroup(n) === g);
+// Puts a weight on an input, or on one world or fractal (Off for an input switches it off, as a click on it does)
+function setWeight(k, w) {
+  const member = isMemberKey(k);
+  if (member) {
+    const name = k.slice(3);
+    if (w === 0 && membersOf(sceneGroup(name)).every((n) => n === name || mW(n) === 0)) {
+      toast(`Leave at least one on, or switch off ${wName(sceneGroup(name))} itself.`);
+      return false;
+    }
+  } else if (w === 0) {
+    if (!apSet.off.includes(k) && apSet.off.length >= AP_INPUT_KEYS.length - 1) { toast('Leave at least one input on for Autopilot.'); return false; }
+    if (!apSet.off.includes(k)) apSet.off = [...apSet.off, k];
+  } else apSet.off = apSet.off.filter((x) => x !== k);
+  if (w !== 0 || member) { if (w === 1) delete apSet.weights[k]; else apSet.weights[k] = w; }
+  saveAp();
+  syncApUI();
+  return true;
+}
+function renderWeights() {
+  const k = wpKey, member = isMemberKey(k), g = member ? sceneGroup(k.slice(3)) : (k === 'world' || k === 'fractal' ? k : null);
+  const lv = member ? levelOf(apW(k)) : apSet.off.includes(k) ? AP_LEVELS[0] : levelOf(apW(k));
+  $('#wpopTitle').textContent = wName(k);
+  const back = $('#wpopBack');
+  back.hidden = !member;
+  if (member) back.textContent = `‹ Back to ${wName(g)}`;
+  $('#wpopQ').textContent = member ? `How often it’s the one picked among the ${GROUP_SAY[g]}` : 'How often Autopilot brings it in';
+  const box = $('#wpopLevels');
+  box.innerHTML = '';
+  for (const L of AP_LEVELS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'wlv';
+    b.dataset.w = L.w;
+    b.setAttribute('aria-pressed', String(L === lv));
+    b.title = L.w === 0 ? 'Autopilot leaves it out' : `Autopilot uses it ${L.say}`;
+    b.innerHTML = `${pieSVG(L.pie)}<span>${L.name}</span>`;
+    b.addEventListener('click', () => { if (setWeight(k, L.w)) { const f = $(`#wpopLevels [data-w="${L.w}"]`); if (f) f.focus(); } });
+    box.appendChild(b);
+  }
+  // Its share of the picks right now
+  const sh = apShares(), q = sh[k] || 0, line = $('#wpopShare');
+  if (lv.w === 0) line.textContent = member ? 'Switched off: Autopilot leaves it out.' : 'Switched off: Autopilot leaves it out from its next new look.';
+  else if (!q) line.textContent = 'Autopilot can’t bring it in right now: it isn’t running. Once it is, this weight counts.';
+  else line.textContent = member ? `About ${sharePct(q)} of all Autopilot’s input picks right now.` : `About ${sharePct(q)} of the inputs Autopilot picks right now.`;
+  // A group lists its members, each with its own switch and weight
+  const sub = $('#wpopSub');
+  sub.hidden = !g || member;
+  if (!sub.hidden) {
+    $('#wpopSubQ').textContent = g === 'world' ? 'Which 3D world' : 'Which fractal';
+    const list = $('#wpopMembers');
+    list.innerHTML = '';
+    for (const n of membersOf(g)) {
+      const on = mW(n) > 0, L = levelOf(mW(n));
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.dataset.member = n;
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', `${wName('sc:' + n)}: ${L.name}`);
+      b.title = `${on ? `About ${sharePct(sh['sc:' + n] || 0)} of Autopilot’s picks. ` : ''}Click to switch it off or on. Right-click (or press and hold) to set how often.`;
+      b.innerHTML = `<span class="led"></span>${wName('sc:' + n)}${pieSVG(L.pie)}`;
+      b.addEventListener('click', () => { if (setWeight('sc:' + n, on ? 0 : 1)) { const f = $(`#wpopMembers [data-member="${n}"]`); if (f) f.focus(); } });
+      b.addEventListener('contextmenu', (e) => { e.preventDefault(); wpKey = 'sc:' + n; renderWeights(); placeWeights(); const f = $('#wpopLevels [aria-pressed="true"]'); if (f) f.focus(); });
+      list.appendChild(b);
+    }
+  }
+}
+// Next to the switch it belongs to on a wide screen; along the bottom on a narrow one (see the CSS)
+function placeWeights() {
+  if (wpop.hidden || !wpAnchor) return;
+  if (matchMedia('(max-width: 600px)').matches) { wpop.style.left = wpop.style.top = ''; return; }
+  const r = wpAnchor.getBoundingClientRect(), w = wpop.offsetWidth, h = wpop.offsetHeight;
+  let top = r.bottom + 6;
+  if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  wpop.style.left = `${Math.round(clamp(r.left, 8, innerWidth - w - 8))}px`;
+  wpop.style.top = `${Math.round(top)}px`;
+}
+function openWeights(k, anchor) {
+  if (wpop.hidden) wpReturn = document.activeElement;
+  wpKey = k;
+  wpAnchor = anchor;
+  wpop.hidden = false;
+  renderWeights();
+  placeWeights();
+  const f = $('#wpopLevels [aria-pressed="true"]');
+  if (f) f.focus();
+}
+function closeWeights() {
+  if (wpop.hidden) return;
+  wpop.hidden = true;
+  wpKey = null;
+  if (wpReturn && wpReturn.focus && document.contains(wpReturn)) wpReturn.focus();
+  wpReturn = null;
+}
+$('#wpopClose').addEventListener('click', closeWeights);
+$('#wpopBack').addEventListener('click', () => {
+  wpKey = sceneGroup(wpKey.slice(3));
+  renderWeights();
+  placeWeights();
+  const f = $('#wpopLevels [aria-pressed="true"]');
+  if (f) f.focus();
+});
+wpop.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); closeWeights(); }
+  e.stopPropagation(); // keep the keys from firing while setting weights
+});
+document.addEventListener('pointerdown', (e) => { if (!wpop.hidden && !wpop.contains(e.target) && e.target !== wpAnchor && !(wpAnchor && wpAnchor.contains(e.target))) closeWeights(); }, true);
+window.addEventListener('resize', placeWeights);
+document.addEventListener('scroll', placeWeights, true);
 $$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
   apSet.touch = b.dataset.touch;
   saveAp();
@@ -3726,6 +3937,7 @@ $('#apReset').addEventListener('click', () => {
   for (const k of ['every', 'fade', 'wild', 'mix', 'taste', 'beat', 'check', 'hints', 'touch']) apSet[k] = AP_DEFAULTS[k];
   apSet.off = [];
   apSet.lim = {};
+  apSet.weights = {};
   saveAp();
   syncApUI();
   toast(ap.pins.size ? 'Autopilot settings and fader limits are back to normal. Your pins are still pinned.' : 'Autopilot settings and fader limits are back to normal.');
@@ -4944,7 +5156,7 @@ function snapshot() {
 function apSnapshot() {
   return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, taste: apSet.taste, beat: apSet.beat, check: apSet.check,
     hints: apSet.hints, touch: apSet.touch,
-    off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim) };
+    off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim), weights: cleanWeights(apSet.weights) };
 }
 function markPreset(id) {
   activePresetId = id;
@@ -5057,6 +5269,8 @@ function loadPreset(pr, quiet) {
     apSet.hints = a.hints !== false;
     apSet.touch = cleanTouch(a.touch);
     apSet.off = cleanOff(a.off);
+    // Presets saved before input weights existed have every input at Normal
+    apSet.weights = cleanWeights(a.weights);
     // Presets saved before fader limits existed leave the limits as they are
     if (a.lim && typeof a.lim === 'object') apSet.lim = cleanLim(a.lim);
     ap.pins.clear();

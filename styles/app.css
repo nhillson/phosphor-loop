@@ -754,3 +754,38 @@
     .osd, .tip { transition: none; }
     .rec-ind .dot { animation: none; }
   }
+
+  /* How often Autopilot uses an input: the pie on each switch, and the menu a right-click opens */
+  .pie { width: 15px; height: 15px; flex: none; }
+  .pie-r { fill: none; stroke: currentColor; stroke-width: 1.3; opacity: .55; }
+  .pie-f { fill: var(--loop-a-ink); }
+  .chip .pie { margin-left: 1px; color: var(--dim); }
+  .chip[aria-pressed="false"] .pie { opacity: .45; }
+  .wpie { display: inline-flex; }
+  .wpop {
+    position: fixed; z-index: 60; width: 300px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
+    padding: 12px 14px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+    box-shadow: 0 12px 32px rgba(0,0,0,.55); display: flex; flex-direction: column; gap: 8px;
+  }
+  .wpop[hidden] { display: none; }
+  .wpop-head { display: flex; align-items: center; gap: 8px; }
+  .wpop-title { flex: 1; font-family: var(--f-display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--loop-a-ink); }
+  .wpop-x { min-width: 32px; min-height: 32px; border-radius: 6px; border: 1px solid var(--line); background: var(--raise); color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; }
+  .wpop-back { align-self: flex-start; font-size: 13px; }
+  .wpop-q { margin: 0; font-size: 13px; color: var(--dim); }
+  .wpop-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .wlv {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; padding: 7px 4px 6px; border-radius: 7px;
+    border: 1px solid var(--line); border-bottom-color: #0b0a0c; background: linear-gradient(var(--raise-2), var(--raise));
+    color: var(--ink); font: 500 13px/1.1 var(--f-body); cursor: pointer;
+  }
+  .wlv .pie { width: 20px; height: 20px; color: var(--dim); }
+  .wlv[aria-pressed="true"] { border-color: var(--amber); background: linear-gradient(var(--press-1), var(--press-2)); color: var(--press-ink); }
+  .wlv[aria-pressed="true"] .pie { color: var(--press-ink); }
+  .wpop-share { margin: 0; font-size: 13px; color: var(--ink); min-height: 1.45em; }
+  .wpop-sub { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .wpop-sub[hidden] { display: none; }
+  .wpop-sub .hint { font-size: 12px; }
+  @media (max-width: 600px) {
+    .wpop { left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); top: auto; width: auto; max-height: 70vh; }
+  }

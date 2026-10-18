@@ -160,7 +160,7 @@
         <div class="ctl">
           <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
           <div class="chips" id="apInputs" role="group" aria-labelledby="apInputsLbl"></div>
-          <span class="hint">Switch one off and Autopilot leaves it out from its next new look. A pinned input still stays. Video, Camera, Screen and Phone only come in while they’re running.</span>
+          <span class="hint">Click one to switch it off: Autopilot leaves it out from its next new look. Right-click one (or press and hold it) to choose how often it comes in, from Rarely to Lots; the pie beside the name fills up to show it. 3D worlds and Fractals also let you set each world and fractal. A pinned input still stays. Video, Camera, Screen and Phone only come in while they’re running.</span>
         </div>
         <div class="ctl">
           <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
@@ -751,7 +751,7 @@
             <dt>Follow my taste</dt><dd>Under Taste profiles. From Surprise me (Autopilot pays your taste no attention) to Stick to what I like; in the middle it leans your way but still tries new things. It starts working after a few ratings and gets good after about 15. Learn from hints also counts a skip in a new look’s first few seconds (a little against it) and a pinned setting (for that setting).</dd>
             <dt>Next look</dt><dd>Beside Autopilot under the picture, under Autopilot settings, or the L key. Skips straight to Autopilot’s next new look, cutting in quickly, and starts Autopilot if it’s off. With Check each look on, a look that’s ready goes on at once; otherwise it takes two or three seconds to find one that passes. The wait for the look after starts over.</dd>
             <dt>Pins</dt><dd>While Autopilot runs, a small pin shows beside each setting. Tap it (or just move that slider, with Pin it, keep going chosen) and the setting stays where it is on the loop you’re changing (the A or B tab) while Autopilot keeps changing the rest. Right-click a pin (or press and hold it on a touchscreen) to hold that setting on both loops at once, the same on each; the pin then says AB. Tap a lit pin to let it go on this loop, or right-click an AB pin to let it go on both. Under Autopilot settings, When you move a control while it runs offers two other ways: Play along (your move takes effect, nothing gets pinned, and Autopilot keeps going and changes it again with its next look) or Stop Autopilot.</dd>
-            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. How wild also sets how much each new look changes: at Calm only a few settings and inputs change, in the middle about 3 in 4 of them get something new (every effect is on in about half the looks), and at Wild nearly all of them change and most effects are on at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
+            <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. How wild also sets how much each new look changes: at Calm only a few settings and inputs change, in the middle about 3 in 4 of them get something new (every effect is on in about half the looks), and at Wild nearly all of them change and most effects are on at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in, or right-click one (press and hold on a touchscreen) to choose how often it comes in: Off, Rarely, Less, Normal, More or Lots. The little pie beside each name shows its setting, and the menu says roughly what share of Autopilot’s picks it gets. For 3D worlds and Fractals the menu also lists every world and fractal, each with its own switch and setting. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Mirror is in there too, with its five stops (Off, 2, 4, 6, 8): its handles snap to them, and the stops they sit on count, so lowest 2 and highest 6 means Autopilot uses 2, 4 or 6. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
           <div class="g-card"><h3>Mix the two loops</h3><dl>
@@ -910,6 +910,22 @@
       <p class="hint">Sliders you move yourself, and pinned ones, can still go anywhere. Music under React to sound can push past a limit for a moment. Double-click a slider here to open it back up.</p>
       <button class="btn wide" id="limReset">Whole range for every slider</button>
     </div>
+  </div>
+</div>
+
+<div class="wpop" id="wpop" role="dialog" aria-labelledby="wpopTitle" hidden>
+  <div class="wpop-head">
+    <span class="wpop-title" id="wpopTitle"></span>
+    <button class="wpop-x" id="wpopClose" type="button" aria-label="Close">×</button>
+  </div>
+  <button class="linkish wpop-back" id="wpopBack" type="button" hidden></button>
+  <p class="wpop-q" id="wpopQ"></p>
+  <div class="wpop-levels" id="wpopLevels" role="group" aria-labelledby="wpopQ"></div>
+  <p class="wpop-share" id="wpopShare" aria-live="polite"></p>
+  <div class="wpop-sub" id="wpopSub" hidden>
+    <p class="wpop-q" id="wpopSubQ"></p>
+    <div class="chips" id="wpopMembers"></div>
+    <span class="hint">Click one to switch it off or on. Right-click it (or press and hold) to set how often it comes up.</span>
   </div>
 </div>
 

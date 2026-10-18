@@ -318,6 +318,17 @@ TIPS
     white-out watch lowers the peak as well. "Change on the beat" makes each new look cut in on a beat
     when music is playing. Under "Inputs Autopilot can use", switch off any
     input (Camera, 3D worlds, Fractals, Ink, Text and so on) you don't want it to bring in.
+  - How often each input comes in: right-click a switch under "Inputs
+    Autopilot can use" (or press and hold it on a touchscreen) and pick Off,
+    Rarely (a quarter as often), Less (half), Normal, More (twice) or Lots
+    (four times). The little pie beside the name fills up to show it, and
+    the menu says roughly what share of Autopilot's picks that input gets
+    right now. 3D worlds and Fractals: the group's setting is how often one
+    of them comes in at all, and the menu also lists each world and
+    fractal. Click one there to switch just that one off or on; right-click
+    it to set how often it's the one picked. Kept in this browser, saved
+    with Autopilot presets, and put back to Normal by "Put these settings
+    back to normal" under Autopilot settings.
   - Fader limits (the button under Autopilot settings): one slider with two
     handles for every slider Autopilot moves, both loops at once. Drag the
     left handle to the lowest and the right handle to the highest you want
