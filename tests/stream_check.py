@@ -1,10 +1,14 @@
-"""Stream mode check, for Claude's workspace: the Twitch version of the picture (index.html?stream=1) and the
-Go live page (stream.html) that sets it up and sends it sound.
+"""Stream mode check, for Claude's workspace: the Twitch version of the picture (index.html?stream=1), the Go live
+page (stream.html: the install view and the live view the tray icon opens), and runner mode (runner=1, what the
+hidden browser shows, recording itself for the Windows runner in headless/).
 
 Nothing here reaches Twitch or the real connection service: the test stands in for both. A pretend Twitch chat
-sends !like and !skip votes, and a pretend connection service passes messages between the two pages, so the Go
-live page and the stream picture link up for real inside the test browser, with the browser's fake microphone
-(a beep) as the sound.
+sends !like and !skip votes, and a pretend connection service passes messages between the pages, so the Go live
+page and the stream picture link up for real inside the test browser. Runner mode records the browser's fake
+microphone (a beep) and hands its pieces to the test instead of the runner.
+
+The runner itself (PowerShell) is tested separately, end to end, with PowerShell, this browser and ffmpeg writing
+a file: see CLAUDE.md.
 
 Every wait is a number of frames the stream picture has drawn, never a number of seconds; each has a ceiling.
 
@@ -128,6 +132,37 @@ def main():
         watch(st, 'stream picture')
         c = check.Check(st, a.out)
         try:
+            # 0. Runner mode (what the hidden browser shows): it records itself and hands the pieces over. In a
+            # context of its own, first, while nothing else is drawing (this workspace draws in software)
+            rctx = b.new_context(viewport={'width': 480, 'height': 270})
+            rctx.grant_permissions(['microphone'])
+            rctx.route_web_socket(IRC, PretendTwitch().handle)
+            rctx.route(lambda u: not u.startswith(base), lambda r: r.abort())
+            rctx.route(lambda u: u.split('?')[0].endswith('/index.html'),
+                       lambda r: r.fulfill(status=200, content_type='text/html; charset=utf-8', body=html))
+            pieces, reports = [], []
+            rn = rctx.new_page()
+            watch(rn, 'runner page')
+            rn.route('**/push?*', lambda r: (pieces.append(len(r.request.post_data_buffer or b'')), r.fulfill(status=200, body='ok')))
+            rn.route('**/status', lambda r: (reports.append(r.request.post_data or ''), r.fulfill(status=200, body='ok')))
+            rn.goto(base + f'index.html?stream=1&runner=1&sound=mic&twitch=testchannel&irc={IRC}', timeout=check.START_CEILING_S * 1000)
+            rc = check.Check(rn, a.out)
+            rc.wait_frames(20, 'runner page starting', ceiling=check.START_CEILING_S)
+            sound = rn.evaluate('window.__plRunnerSound()')
+            for _ in range(30):
+                rc.wait_frames(5, 'recording pieces arriving', ceiling=30)
+                if len(pieces) >= 4:
+                    break
+            last = json.loads(reports[-1]) if reports else {}
+            if not str(sound).startswith('ok'):
+                problems.append(f'runner page sound: {sound}')
+            if len(pieces) < 4 or not all(n > 0 for n in pieces):
+                problems.append(f'runner page sent {len(pieces)} recording pieces ({pieces[:6]})')
+            if not last.get('recording'):
+                problems.append(f'runner page says it is not recording: {last}')
+            step(f'runner page: sound {sound}, {len(pieces)} pieces handed over ({last.get("mime")}), reports {len(reports)}')
+            rctx.close()
+
             # 1. The stream picture: only the canvas, Autopilot on, joined to the chat
             st.goto(base + f'index.html?stream=1&twitch=TestChannel&skip=2&taste=chat&every=20&link={LINK}'
                     f'&irc={IRC}&signal={SIGNAL}&at=1000', timeout=check.START_CEILING_S * 1000)
@@ -185,57 +220,50 @@ def main():
                 st.screenshot(path=os.path.join(a.out, 'stream-votes-page.png'))
                 step(f'pictures: {path} and the whole page with the counter: {os.path.join(a.out, "stream-votes-page.png")}')
 
-            # 3. The Go live page: settings, the OBS file, and the link with sound
+            # 3. The Go live page, as the tray icon opens it: linked to the stream, its buttons and settings reach it
             gl = ctx.new_page()
             gl.set_viewport_size({'width': 1100, 'height': 900})
             watch(gl, 'Go live page')
-            gl.goto(base + f'stream.html?signal={SIGNAL}&link={LINK}', timeout=15000)
-            gl.fill('#twName', 'TestChannel')
-            gl.dispatch_event('#twName', 'change')
-            with gl.expect_download(timeout=check.FAIL_FAST_MS) as dl:
-                gl.click('#obsFile')
-            path = os.path.join(a.out, 'obs-scene.json')
-            dl.value.save_as(path)
-            scene = json.load(open(path, encoding='utf-8'))
-            src = next((s for s in scene.get('sources', []) if s.get('id') == 'browser_source'), None)
-            for key in ('name', 'current_scene', 'sources'):
-                if key not in scene:
-                    problems.append(f'the OBS file has no "{key}" (OBS refuses files without it)')
-            if not src or 'stream=1' not in src['settings']['url'] or 'twitch=testchannel' not in src['settings']['url']:
-                problems.append(f'the OBS file\'s browser source address is wrong: {src and src["settings"]["url"]}')
-            elif f'link={LINK}' not in src['settings']['url']:
-                problems.append('the OBS file\'s address does not carry the link code')
-            step(f'OBS file: {os.path.basename(path)}, {src and src["settings"]["width"]} x {src and src["settings"]["height"]}')
-
-            # Link up and send the (fake) microphone
-            gl.click('#tabLive')
-            gl.click('#sndMic')
-            c.wait_frames(5, 'link starting', ceiling=20)
-            ok = False
+            gl.goto(base + f'stream.html?signal={SIGNAL}&link={LINK}&runner=1', timeout=15000)
+            ok, ui = False, ''
             for _ in range(40):
-                c.wait_frames(4, 'waiting for the link and the sound', ceiling=20)
+                c.wait_frames(4, 'waiting for the Go live page to link up', ceiling=20)
                 ui = gl.evaluate("document.getElementById('linkState').textContent")
-                if 'Connected' in ui and gl.evaluate("document.body.dataset.heard === '1'"):
+                if 'running' in ui:
                     ok = True
                     break
             if not ok:
-                problems.append(f'the Go live page never showed the stream hearing the sound (status: "{ui}")')
+                problems.append(f'the Go live page never linked up with the stream (status: "{ui}")')
             else:
-                step(f'link: "{ui.strip()}", the stream picture hears the Go live page\'s sound')
-            # The streamer's buttons
+                step(f'Go live page: "{ui.strip()}"')
+            if gl.evaluate("document.getElementById('twName').value") != 'testchannel':
+                problems.append('the Go live page did not show the stream\'s own settings')
             gl.click('#rNext')
             c.wait_frames(3, 'Next look from the Go live page')
             if not st.evaluate("document.querySelector('.sv-flash').textContent.includes('New look')"):
                 problems.append('Next look on the Go live page did nothing on the stream')
-            # Settings changed on the Go live page reach the stream
-            gl.click('#tabSetup')
-            gl.evaluate("document.querySelector('#st1 details').open = true")
             gl.select_option('#skipN', '3')
             c.wait_frames(6, 'settings reaching the stream')
             need = st.evaluate("document.querySelector('.sv-v.dn i').textContent")
             if '3' not in need:
                 problems.append(f'changing votes-to-skip on the Go live page did not reach the stream ("{need}")')
             step('Go live page buttons and settings reach the stream')
+
+            # 4. The install view (opened from the web): the download gives the one-file installer
+            gi = ctx.new_page()
+            watch(gi, 'install page')
+            gi.goto(base + 'stream.html', timeout=15000)
+            with gi.expect_download(timeout=check.FAIL_FAST_MS) as dl:
+                gi.click('#getRunner')
+            got = os.path.join(a.out, 'installer.cmd')
+            dl.value.save_as(got)
+            raw = open(got, 'rb').read()
+            if dl.value.suggested_filename != 'Phosphor Loop on Twitch.cmd' or not raw.startswith(b'<# :') or b'\r\n' not in raw:
+                problems.append(f'the installer download is wrong ({dl.value.suggested_filename}, {raw[:20]!r})')
+            if any(ch > 127 for ch in raw):
+                problems.append('the installer has non-ASCII characters (Windows PowerShell 5.1 would misread them)')
+            step(f'install page: downloads {dl.value.suggested_filename} ({len(raw) // 1024} KB)')
+
         except check.Stalled as e:
             problems.append(str(e))
         banner = st.evaluate(check.BANNER_JS)

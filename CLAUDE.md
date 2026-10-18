@@ -34,14 +34,29 @@ file don't rebuild the app.
 The workspace browser has no graphics chip (software drawing, about 5–9 frames a second at the test size), so
 its pictures show fewer, more separate echoes than Nick sees at 60 frames a second.
 
-## Twitch stream mode
+## Twitch: headless streaming
 
-`index.html?stream=1&twitch=…&link=…` is the picture alone for OBS (section "stream mode" near the end of
-index.html); `stream.html` is the Go live page that makes that address and the OBS scene file, and links to the
-stream picture over the phone link's PeerJS service to send sound, ratings and settings. Check changes to either
-with `python3 tests/stream_check.py` (about 35 s): it stands in for Twitch chat and the connection service, so it
-works offline. While the work lives on a branch, its pages are reachable at
-`https://raw.githack.com/nhillson/phosphor-loop/<branch>/stream.html` (GitHub Pages only serves `main`).
+Nick wants it truly headless: nothing on screen, no OBS. `headless/Phosphor Loop on Twitch.cmd` is one file that is
+both the installer (as a .cmd it reruns itself in PowerShell with `-Install`: copies itself to
+`%LOCALAPPDATA%\PhosphorLoopStream\PhosphorLoopStream.ps1` and makes a desktop icon that runs it through
+`conhost --headless`) and the runner (tray icon; double-click again = stop). It downloads the branch's files and
+ffmpeg, serves the files from `http://localhost:47810`, opens Chrome/Edge `--headless=new --enable-gpu
+--use-angle=d3d11`, sizes and "clicks" the page over the debugging port (CDP) so it may capture system audio, and
+relays the page's MediaRecorder pieces into ffmpeg (QuickSync or x264, keyframe every 2 s) to
+`rtmp://ingest.global-contribute.live-video.net/app/<key>`. Keep the .cmd plain ASCII with CRLF (`.gitattributes`
+stores it as-is): Windows PowerShell 5.1 reads files without a BOM as ANSI.
+
+The page side is runner mode, `index.html?stream=1&runner=1` (section "the hidden runner" in stream mode). The
+stream page reads Twitch chat (!like / !skip, vote counter) and links to `stream.html?link=…` (the live view the tray
+icon opens) over the phone link's PeerJS service.
+
+Checks: `python3 tests/stream_check.py` (about 35 s; stands in for Twitch chat and PeerJS, and checks runner mode
+and the installer download). The runner itself: run the .cmd copied to `runner.ps1` under PowerShell 7 for Linux
+(download the tarball from GitHub releases into the scratchpad) with `-Console -Out test.flv -StopAfterPieces 24
+-Browser /opt/pw-browsers/chromium-*/chrome-linux/chrome -BrowserArgs '--no-sandbox --use-angle=swiftshader
+--enable-unsafe-swiftshader --use-fake-device-for-media-stream' -Ffmpeg /usr/bin/ffmpeg -Site <repo> -Sound mic
+-Channel test -HomeDir <scratch>`, then ffprobe the file. While on a branch, the web pages are reachable at
+`https://raw.githack.com/nhillson/phosphor-loop/<branch>/stream.html` (one "One more step" notice per browser).
 
 ## Working with Nick
 
