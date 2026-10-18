@@ -1,7 +1,7 @@
 // Injected by the local runner, never loaded by the public workstation.
 export async function startCapture(config) {
   const hook = window.__phosphorCapture;
-  let audio, media, recorder;
+  let audio, media, recorder, recordingTrack;
   let pending = Promise.resolve(), queued = 0, sequence = 0, failure;
   const fail = error => {
     failure ||= String(error?.message || error);
@@ -23,6 +23,9 @@ export async function startCapture(config) {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false,
     }});
     const track = audio.getAudioTracks()[0];
+    // The workstation owns/stops its analyzer track when the sound controls
+    // change. Keep an independent clone alive for the continuous recording.
+    recordingTrack = track.clone();
     hook.listen(audio);
     if (config.autopilot) hook.autopilot();
     // Wait for rendered frames before taking the canvas stream.
@@ -45,7 +48,7 @@ export async function startCapture(config) {
         frames++;
       } catch(error) { fail(error); }
     };
-    media.addTrack(track);
+    media.addTrack(recordingTrack);
     const mimeType = 'video/webm;codecs=vp8,opus';
     if (!MediaRecorder.isTypeSupported(mimeType)) throw new Error('Chrome cannot encode VP8/Opus WebM.');
     recorder = new MediaRecorder(media, {mimeType, videoBitsPerSecond: config.bitrate, audioBitsPerSecond: 192000});
@@ -67,12 +70,13 @@ export async function startCapture(config) {
         if (!response.ok) throw new Error(`FFmpeg delivery failed (${response.status}).`);
       }).catch(fail).finally(() => { queued -= event.data.size; });
     };
-    track.onended = () => fail('BlackHole audio input disconnected.');
+    recordingTrack.onended = () => fail('BlackHole audio input disconnected.');
     const started = performance.now();
     recorder.start(250);
     window.__captureSession = {
       status: () => {
         if (gl.isContextLost()) fail('The graphics context was lost. Restart with --renderer software to diagnose.');
+        if (recordingTrack.readyState !== 'live') fail('The recording audio track stopped.');
         return {failure, queued, sequence, frames, state: recorder.state, visibility:document.visibilityState,
           tracks:media.getTracks().map(t => ({kind:t.kind,state:t.readyState,muted:t.muted,settings:t.getSettings()}))};
       },
@@ -94,6 +98,7 @@ export async function startCapture(config) {
     hook.onFrame = null;
     media?.getTracks().forEach(t => t.stop());
     audio?.getTracks().forEach(t => t.stop());
+    recordingTrack?.stop();
     hook.stopSound();
     throw error;
   }

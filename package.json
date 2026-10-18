@@ -9,6 +9,7 @@
     "stream:rtmp-test": "node tests/rtmp.mjs",
     "capture:test": "node --test tests/capture.test.mjs",
     "capture:smoke": "node tests/capture-smoke.mjs",
+    "capture:audio-test": "node tests/capture-audio.mjs",
     "loopback:test": "node tests/loopback.mjs",
     "audio:list": "swift -module-cache-path /tmp/phosphor-swift-cache tools/audio-route.swift list",
     "audio:test": "node tests/audio-route.mjs",

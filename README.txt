@@ -510,5 +510,6 @@ LOCAL LIVE STREAM (Mac)
     npm run capture:smoke    file opening, controls and fixed capture dimensions
     npm run loopback:test   audio picker, permissions and cancellation
     npm run audio:test      plays a quiet test tone and checks real BlackHole input
+    npm run capture:audio-test  verifies audio survives analyzer Off/reconnect
     npm run stream:test     real GPU through live HLS to browser video playback
     npm run stream:rtmp-test  sends to a local FFmpeg RTMP receiver (no service key)

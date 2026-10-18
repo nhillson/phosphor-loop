@@ -41,6 +41,13 @@ try {
     return light>3 ? {width:v.videoWidth,height:v.videoHeight,light} : false;
   },null,{polling:'raf',timeout:20000});
   const picture = await pictureHandle.jsonValue();
+  const playableAudio = await page.evaluate(() => {
+    const stream=document.querySelector('video').captureStream();
+    const count=stream.getAudioTracks().length;
+    stream.getTracks().forEach(track=>track.stop());
+    return count;
+  });
+  assert.ok(playableAudio>0,'Chromium player has no decoded audio track; volume control would be disabled.');
   assert.equal(picture.width,1920);assert.equal(picture.height,1080);assert.ok(picture.light>3,JSON.stringify(picture));
   assert.deepEqual(errors,[]);
   assert.ok(renderer && !/SwiftShader|llvmpipe/.test(renderer),'The sender must use real GPU rendering. '+logs);

@@ -4,6 +4,22 @@ See the latest streaming status below before older notes.
 
 ## Latest: live streaming and Apple GPU fix completed
 
+### Follow-up: missing playback audio fixed
+
+- User reported Chromium /watch volume control disabled. ffprobe of current
+  rolling stream showed an AAC declaration but sample_rate=0/channels=0: no
+  usable audio packets. Hardware loopback tone test still passed.
+- Recorder was sharing the exact audio track owned by the workstation analyzer;
+  Off/reconnect stopped that recording track without firing track.onended.
+  Recorder now holds an independent clone, and status checks its readyState.
+- Capture hook now correctly selects/displays Loopback adapter and the actual
+  BlackHole device rather than marking it as Microphone.
+- Added npm run capture:audio-test: actual encoded AAC retains nonzero BlackHole
+  samples after analyzer Off/reconnect (RMS 0.0932 in latest run). PASS.
+- stream:test now also asserts Chromium's playing video has an audio track via
+  video.captureStream(), catching the disabled-volume issue. PASS, 59.8 fps.
+- Restart stream after code updates and reload /watch to rebuild its media buffers.
+
 ### Follow-up: 1080p60 defaults
 
 - User requested 1080p60 at about 7 Mbps. Runner defaults now 1920x1080, 60 fps,

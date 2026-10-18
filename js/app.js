@@ -7212,7 +7212,18 @@ showStart();
 // Available only in the isolated local capture session; ordinary site behavior is unchanged.
 if (window.__phosphorCaptureConfig) window.__phosphorCapture = {
   canvas,
-  listen(stream) { stopSound(); snd.src = 'mic'; listen(stream); syncSoundUI(); },
+  listen(stream) {
+    ++soundRequest;
+    stopSound();
+    const track = stream.getAudioTracks()[0], settings = track.getSettings();
+    snd.src = LOOPBACK.test(track.label) ? 'loopback' : 'mic';
+    if (snd.src === 'loopback') loopbackDeviceId = settings.deviceId || '';
+    else micDeviceId = settings.deviceId || '';
+    listen(stream);
+    syncSoundUI();
+    sndSay(`<span class="live"></span><b>Listening for the stream</b> through ${escapeHTML(track.label)}.`);
+    listMics();
+  },
   stopSound,
   autopilot() { setAutopilot(true); },
 };
