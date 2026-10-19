@@ -137,6 +137,10 @@ $cfg = [ordered]@{ channel = ''; key = ''; quality = '720'; sound = 'system'; li
 if (Test-Path $SettingsFile) {
   try { $saved = Get-Content -Raw $SettingsFile | ConvertFrom-Json; foreach ($k in @($cfg.Keys)) { if ($saved.PSObject.Properties[$k]) { $cfg[$k] = [string]$saved.$k } } } catch {}
 }
+# An NVIDIA graphics card encodes 1080p sharply without loading the processor, so a new setup starts at 1080p there
+$script:HasNvidia = $false
+if ($OnWindows) { try { $script:HasNvidia = [bool](@(Get-CimInstance Win32_VideoController -ErrorAction Stop | Where-Object { $_.Name -match 'NVIDIA' }).Count) } catch {} }
+if ($script:HasNvidia -and -not (Test-Path $SettingsFile)) { $cfg.quality = '1080' }
 if (-not $cfg.link) {
   $chars = 'abcdefghijkmnpqrstuvwxyz23456789'
   $cfg.link = -join (1..10 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
@@ -179,7 +183,8 @@ function Show-Setup {
   $script:y += 4
   $l3 = New-Object System.Windows.Forms.Label; $l3.Text = 'Picture size:'; & $add $l3 22
   $q = New-Object System.Windows.Forms.ComboBox; $q.DropDownStyle = 'DropDownList'
-  [void]$q.Items.Add('720p - smooth (recommended)'); [void]$q.Items.Add('1080p - sharper; needs a strong computer and fast internet')
+  if ($script:HasNvidia) { [void]$q.Items.Add('720p - smooth'); [void]$q.Items.Add('1080p - sharpest (recommended: this PC has an NVIDIA card)') }
+  else { [void]$q.Items.Add('720p - smooth (recommended)'); [void]$q.Items.Add('1080p - sharper; needs a strong computer and fast internet') }
   $q.SelectedIndex = if ($cfg.quality -eq '1080') { 1 } else { 0 }; & $add $q 0
   $msgL = New-Object System.Windows.Forms.Label; $msgL.ForeColor = [System.Drawing.Color]::Firebrick; & $add $msgL 40
   $ok = New-Object System.Windows.Forms.Button; $ok.Text = 'Go live'; $ok.Width = 140; $ok.Height = 34
@@ -366,7 +371,7 @@ public class PLRelay {
     StringBuilder a = new StringBuilder("-y -hide_banner -loglevel warning -thread_queue_size 1024 -f matroska -i pipe:0 ");
     if (!audio) a.Append("-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 ");
     a.Append("-map 0:v:0 -map ").Append(audio ? "0:a:0 " : "1:a:0 ");
-    a.Append("-vf scale=" + Width + ":" + Height + ":force_original_aspect_ratio=decrease,pad=" + Width + ":" + Height + ":(ow-iw)/2:(oh-ih)/2,fps=30 ");
+    a.Append("-vf scale=" + Width + ":" + Height + ":force_original_aspect_ratio=decrease:flags=lanczos,pad=" + Width + ":" + Height + ":(ow-iw)/2:(oh-ih)/2,fps=30 ");
     a.Append(VideoArgs).Append(" -c:a aac -b:a 160k -ar 48000 -ac 2 ");
     if (!audio) a.Append("-shortest ");
     a.Append(OutputArgs);
@@ -565,22 +570,44 @@ try {
     }
   }
 
-  # The video encoder: Intel's QuickSync chip if it works here (it spares the processor), otherwise x264
+  # The video encoder, best first: the NVIDIA card's encoder (NVENC: the sharpest, and it spares the processor),
+  # Intel's QuickSync chip, then x264 on the processor. Each is tried on a short test picture with the exact settings
+  # it would stream with, so one this computer can't run is skipped.
   $h = if ($cfg.quality -eq '1080') { 1080 } else { 720 }
   $w = [int]($h * 16 / 9)
-  $rate = if ($h -eq 1080) { '6000k' } else { '4500k' }
-  $buf = if ($h -eq 1080) { '12000k' } else { '9000k' }
-  $enc = 'libx264'
-  try {
-    $probe = Start-Process -FilePath $Ffmpeg -ArgumentList @('-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=30:d=1', '-c:v', 'h264_qsv', '-f', 'null', '-') -NoNewWindow -Wait -PassThru -RedirectStandardError (Join-Path $HomeDir 'probe.txt')
-    if ($probe.ExitCode -eq 0) { $enc = 'h264_qsv' }
-  } catch {}
-  $videoArgs = if ($enc -eq 'h264_qsv') {
-    "-c:v h264_qsv -preset veryfast -b:v $rate -maxrate $rate -bufsize $buf -g 60 -bf 0 -pix_fmt nv12"
-  } else {
-    "-c:v libx264 -preset veryfast -b:v $rate -maxrate $rate -bufsize $buf -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p -profile:v high"
+  # 1080p gets 8000 kbps: above Twitch's long-standing 6000 suggestion, sharper on busy pictures, and still under
+  # the 8500 kbps that Twitch takes in
+  $rate = if ($h -eq 1080) { '8000k' } else { '4500k' }
+  $buf = if ($h -eq 1080) { '16000k' } else { '9000k' }
+  # NVENC at its slowest, sharpest preset: two passes over each frame, a look-ahead of 20 frames, and adaptive
+  # quantisation in space and time (more of the bits go where the eye notices). Constant bitrate with a one-second
+  # buffer and a keyframe every 2 s, as Twitch wants.
+  $nvBest = "-c:v h264_nvenc -preset p7 -tune hq -rc cbr -multipass fullres -b:v $rate -maxrate $rate -bufsize $rate -g 60 -no-scenecut 1 -bf 2 -rc-lookahead 20 -spatial-aq 1 -aq-strength 8 -temporal-aq 1 -profile:v high -pix_fmt yuv420p"
+  # The same card with plainer settings, for older NVIDIA cards that can't do all of the above
+  $nvPlain = "-c:v h264_nvenc -preset p5 -tune hq -rc cbr -b:v $rate -maxrate $rate -bufsize $rate -g 60 -bf 0 -profile:v high -pix_fmt yuv420p"
+  $qsvArgs = "-c:v h264_qsv -preset veryfast -b:v $rate -maxrate $rate -bufsize $buf -g 60 -bf 0 -pix_fmt nv12"
+  $x264Args = "-c:v libx264 -preset veryfast -b:v $rate -maxrate $rate -bufsize $buf -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p -profile:v high"
+  $probeFile = Join-Path $HomeDir 'probe.txt'
+  function Test-Encoder([string]$encArgs) {
+    try {
+      $pa = '-hide_banner -loglevel error -f lavfi -i testsrc2=s=' + $w + 'x' + $h + ':r=30:d=2 ' + $encArgs + ' -f null -'
+      $p = Start-Process -FilePath $Ffmpeg -ArgumentList $pa -NoNewWindow -Wait -PassThru -RedirectStandardError $probeFile
+      return ($p.ExitCode -eq 0)
+    } catch { return $false }
   }
-  Write-Log ("encoder: $enc, ${w}x$h")
+  $enc = 'x264'
+  $videoArgs = $x264Args
+  foreach ($c in @(@('NVIDIA', $nvBest), @('NVIDIA', $nvPlain), @('QuickSync', $qsvArgs))) {
+    if (Test-Encoder $c[1]) { $enc = $c[0]; $videoArgs = $c[1]; break }
+    $why = ''
+    try { $why = ([string](Get-Content -Raw $probeFile) -replace '\s+', ' ').Trim() } catch {}
+    if ($why.Length -gt 200) { $why = $why.Substring(0, 200) }
+    Write-Log ('encoder not usable here: ' + ($c[1] -split ' ')[1] + ' ' + ($c[1] -split ' ')[3] + ': ' + $why)
+  }
+  $script:EncShort = switch ($enc) { 'NVIDIA' { 'NVIDIA' } 'QuickSync' { 'Intel' } default { 'CPU' } }
+  $script:EncLong = switch ($enc) { 'NVIDIA' { 'the NVIDIA card' } 'QuickSync' { 'the Intel graphics chip' } default { 'the processor' } }
+  $script:SizeText = [string]$h + 'p'
+  Write-Log ("encoder: $enc, ${w}x$h at $rate (" + $videoArgs + ')')
 
   # Where it goes: Twitch, or a file for a test
   if ($Out) { $outputArgs = '-f flv "' + $Out + '"' }
@@ -769,8 +796,10 @@ try {
     $state = if ($relay.FfmpegLive) { if ($Out) { 'recording a test' } else { 'LIVE on Twitch' } } else { 'starting' }
     $fps = if ($st) { [string]$st.fps + ' fps' } else { '' }
     $sd = if ($st -and ([string]$st.sound).StartsWith('ok')) { 'sound on' } else { 'no sound' }
-    Set-TrayText ("Phosphor Loop: $state, $fps, $sd")
-    if ($script:MenuState) { $script:MenuState.Text = "Phosphor Loop is $state ($fps, $sd)" }
+    $parts = @($state, $fps, $sd, ($script:SizeText + ' ' + $script:EncShort)) | Where-Object { $_ -and $_.Trim() }
+    Set-TrayText ('Phosphor Loop: ' + ($parts -join ', '))
+    $inner = @($fps, $sd) | Where-Object { $_ }
+    if ($script:MenuState) { $script:MenuState.Text = "Phosphor Loop is $state (" + ($inner -join ', ') + ") - $($script:SizeText), encoded by $($script:EncLong)" }
   }
 
   if ($UseTray) {

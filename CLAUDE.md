@@ -42,7 +42,8 @@ both the installer (as a .cmd it reruns itself in PowerShell with `-Install`: co
 `conhost --headless`) and the runner (tray icon; double-click again = stop). It downloads the branch's files and
 ffmpeg, serves the files from `http://localhost:47810`, opens Chrome/Edge `--headless=new --enable-gpu
 --use-angle=d3d11`, sizes and "clicks" the page over the debugging port (CDP) so it may capture system audio, and
-relays the page's MediaRecorder pieces into ffmpeg (QuickSync or x264, keyframe every 2 s) to
+relays the page's MediaRecorder pieces (40 Mbps at 1080p) into ffmpeg (NVENC p7 at 8000 kbps on an NVIDIA card, else
+QuickSync, else x264; each probed with its exact settings; keyframe every 2 s) to
 `rtmp://ingest.global-contribute.live-video.net/app/<key>`. Keep the .cmd plain ASCII with CRLF (`.gitattributes`
 stores it as-is): Windows PowerShell 5.1 reads files without a BOM as ANSI.
 

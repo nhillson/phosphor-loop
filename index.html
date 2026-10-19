@@ -12034,9 +12034,11 @@ function runnerRecord() {
     ? ['video/webm;codecs=h264,opus', 'video/webm;codecs=avc1,opus', 'video/x-matroska;codecs=avc1,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
     : ['video/webm;codecs=h264', 'video/webm;codecs=avc1', 'video/x-matroska;codecs=avc1', 'video/webm;codecs=vp8', 'video/webm'];
   run.mime = kinds.find((k) => window.MediaRecorder && MediaRecorder.isTypeSupported(k)) || '';
+  // This recording only travels inside the computer before ffmpeg encodes it again for Twitch, so it gets a high
+  // bitrate: what it loses can't be won back by the second encode
   let rec;
   try {
-    rec = new MediaRecorder(new MediaStream(tracks), { mimeType: run.mime, videoBitsPerSecond: canvas.height > 800 ? 16e6 : 10e6, audioBitsPerSecond: 192000 });
+    rec = new MediaRecorder(new MediaStream(tracks), { mimeType: run.mime, videoBitsPerSecond: canvas.height > 800 ? 40e6 : 20e6, audioBitsPerSecond: 192000 });
   } catch (e) { run.sound += ' (recording failed: ' + ((e && e.name) || e) + ')'; return; }
   const ep = ++run.ep;
   let first = true;
