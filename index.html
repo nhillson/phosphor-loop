@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <script>
-// Stream mode (index.html?stream=1, what goes out on Twitch or Kick): only the picture, from the very first paint,
+// Stream mode (index.html?stream=1, what OBS sends to Twitch or Kick): only the picture, from the very first paint,
 // so the controls never flash up on the stream while the page loads
 if (/[?&]stream(=(?!0(&|$))|&|$)/.test(location.search)) document.documentElement.className += ' stream';
 </script>
@@ -1702,8 +1702,8 @@ function onApp(type, fn) {
 }
 let params;
 try { params = new URLSearchParams(location.search); } catch (_) { params = new URLSearchParams(); }
-// Stream mode: index.html?stream=1 is the picture alone, to send to Twitch or Kick, with Autopilot running (see
-// "stream mode" near the end, and stream.html, the page that sets it up)
+// Stream mode: index.html?stream=1 is the picture alone, for OBS to send to Twitch or Kick, with Autopilot running
+// (see "stream mode" near the end, and stream.html, the page that sets it up)
 const STREAM = !inArtifact && params.has('stream') && params.get('stream') !== '0';
 // Keep a copy in the browser so Phosphor Loop opens without internet after one visit (see sw.js)
 const swOK = !inArtifact && 'serviceWorker' in navigator &&
@@ -11616,9 +11616,9 @@ function tickOut() {
 document.addEventListener('visibilitychange', scheduleFrame);
 
 /* ================= stream mode ================= */
-// index.html?stream=1 is the picture alone, filling its window (OBS's browser source, or the hidden browser of the
-// Windows streamer in headless/), with Autopilot running by itself. stream.html (the Go live page) sets it up. The
-// address says:
+// index.html?stream=1 is the picture alone, filling OBS's browser source (1920 x 1080 in the file stream.html makes),
+// with Autopilot running by itself. stream.html (the Go live page) makes the address and the OBS file. The address
+// says:
 //   taste=  none (the default) or the name of a shared taste profile for Autopilot to follow
 //   every=  seconds between Autopilot's new looks         text=  words for the Text input
 //   link=   the code that pairs it with the Go live page
@@ -11791,145 +11791,15 @@ function linkStatus() {
   linkSend({ t: 'status', fps: Math.round(sfps.fps), w: canvas.width, h: canvas.height, ap: ap.on, nexts: streamNexts,
     left: ap.on ? Math.max(0, Math.ceil((ap.due - performance.now()) / 1000)) : -1,
     taste: src.name || '', rated: tasteCount(src.votes || []),
-    sound: !!snd.analyser, soundFrom: snd.src, runner: RUNNER, amount: snd.amount, cfg: streamCfg });
+    sound: !!snd.analyser, soundFrom: snd.src, amount: snd.amount, cfg: streamCfg });
 }
 
-// ---- the hidden runner (headless/PhosphorLoopStream.ps1) ----
-// On the streamer's computer a small program serves this page from localhost to a hidden browser (no window at all)
-// and adds runner=1. The page then records itself, picture and the computer's sound together, and hands the
-// recording to the program in quarter-second pieces; the program passes them to ffmpeg, which sends them to Twitch
-// or Kick.
-// The sound comes from screen sharing with system audio (only the sound is kept). A browser asks for that only
-// after a click, so the program "clicks" by calling runnerSound() through the browser's debugging connection.
-// Reports go to /status: what draws the picture (the graphics chip, or the slow software stand-in), the sound,
-// the frames per second and how the recording is going.
-const RUNNER = STREAM && params.get('runner') === '1' && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const RUN_SOUND = params.get('sound') || 'system';   // system (screen sharing's system audio), mic (a microphone or Stereo Mix), or none
-const run = { vtrack: null, atrack: null, rec: null, ep: 0, queue: [], sending: false, sound: 'waiting', soundTried: false,
-  mime: '', sent: 0, failed: 0, statT: 0, startAt: 0, renderer: '' };
-function runnerRenderer() {
-  try {
-    const ext = gl.getExtension('WEBGL_debug_renderer_info');
-    return String(gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || '');
-  } catch (_) { return ''; }
-}
-async function runnerSound() {
-  if (run.soundTried) return run.sound;
-  run.soundTried = true;
-  let stream = null;
-  try {
-    if (RUN_SOUND === 'none') { run.sound = 'none'; }
-    else if (RUN_SOUND === 'mic') {
-      const ins = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
-      const loop = ins.find((d) => LOOPBACK.test(d.label));
-      const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
-      if (loop) audio.deviceId = { exact: loop.deviceId };
-      stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-    } else {
-      const s = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'monitor' },
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
-        systemAudio: 'include', selfBrowserSurface: 'exclude', monitorTypeSurfaces: 'include',
-      });
-      s.getVideoTracks().forEach((t) => t.stop());   // only the sound is used
-      stream = s.getAudioTracks().length ? new MediaStream(s.getAudioTracks()) : null;
-      if (!stream) run.sound = 'no sound came with the screen';
-    }
-  } catch (e) { run.sound = 'failed: ' + ((e && e.name) || e) + (e && e.message ? ' (' + e.message + ')' : ''); }
-  if (stream) {
-    run.atrack = stream.getAudioTracks()[0];
-    run.sound = 'ok: ' + (run.atrack.label || 'sound');
-    // The picture reacts to a copy, so React to sound can stop or switch without cutting the stream's sound
-    stopSound();
-    snd.src = 'system';
-    listen(new MediaStream([run.atrack.clone()]));
-    run.atrack.addEventListener('ended', () => { run.sound = 'ended'; run.atrack = null; runnerRecord(); runnerStatus(true); });
-  }
-  runnerRecord();
-  runnerStatus(true);
-  return run.sound;
-}
-window.__plRunnerSound = runnerSound;
-// (Re)starts the recording. Each start is a new "epoch": the program starts ffmpeg afresh for it, since a recording
-// only makes sense from its own beginning.
-function runnerRecord() {
-  if (run.rec && run.rec.state !== 'inactive') { try { run.rec.ondataavailable = null; run.rec.stop(); } catch (_) {} }
-  run.rec = null;
-  if (!run.vtrack || run.vtrack.readyState !== 'live') {
-    try { run.vtrack = canvas.captureStream(30).getVideoTracks()[0]; } catch (_) { run.vtrack = null; }
-  }
-  if (!run.vtrack) { run.sound += ' (no picture to record)'; return; }
-  const audio = !!(run.atrack && run.atrack.readyState === 'live');
-  const tracks = audio ? [run.vtrack, run.atrack] : [run.vtrack];
-  const kinds = audio
-    ? ['video/webm;codecs=h264,opus', 'video/webm;codecs=avc1,opus', 'video/x-matroska;codecs=avc1,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-    : ['video/webm;codecs=h264', 'video/webm;codecs=avc1', 'video/x-matroska;codecs=avc1', 'video/webm;codecs=vp8', 'video/webm'];
-  run.mime = kinds.find((k) => window.MediaRecorder && MediaRecorder.isTypeSupported(k)) || '';
-  // This recording only travels inside the computer before ffmpeg encodes it again for the stream, so it gets a high
-  // bitrate: what it loses can't be won back by the second encode
-  let rec;
-  try {
-    rec = new MediaRecorder(new MediaStream(tracks), { mimeType: run.mime, videoBitsPerSecond: canvas.height > 800 ? 40e6 : 20e6, audioBitsPerSecond: 192000 });
-  } catch (e) { run.sound += ' (recording failed: ' + ((e && e.name) || e) + ')'; return; }
-  const ep = ++run.ep;
-  let first = true;
-  run.queue = [];
-  rec.ondataavailable = (e) => {
-    if (!e.data || !e.data.size || ep !== run.ep) return;
-    run.queue.push({ blob: e.data, ep, first, audio });
-    first = false;
-    runnerSend();
-  };
-  rec.onerror = () => { if (ep === run.ep) setTimeout(runnerRecord, 1000); };
-  run.rec = rec;
-  run.startAt = performance.now();
-  rec.start(250);
-}
-// The pieces go to the program one at a time, in order. If the program asks for a fresh start (ffmpeg restarted
-// after the connection to Twitch or Kick dropped), the recording starts over.
-async function runnerSend() {
-  if (run.sending) return;
-  run.sending = true;
-  while (run.queue.length) {
-    const c = run.queue[0];
-    if (c.ep !== run.ep) { run.queue.shift(); continue; }
-    let answer = '';
-    try {
-      const r = await fetch(`/push?ep=${c.ep}&first=${c.first ? 1 : 0}&audio=${c.audio ? 1 : 0}&mime=${encodeURIComponent(run.mime)}`, { method: 'POST', body: c.blob });
-      answer = r.ok ? await r.text() : 'error';
-    } catch (_) { answer = 'error'; }
-    if (answer === 'error') { run.failed++; await new Promise((res) => setTimeout(res, 500)); continue; }
-    run.queue.shift();
-    run.sent++;
-    if (answer === 'restart') { run.queue = []; runnerRecord(); break; }
-  }
-  run.sending = false;
-}
-function runnerStatus(now) {
-  const t = performance.now();
-  if (!now && t - run.statT < 2000) return;
-  run.statT = t;
-  if (!run.renderer) run.renderer = runnerRenderer();
-  const body = JSON.stringify({ renderer: run.renderer, w: canvas.width, h: canvas.height, fps: Math.round(sfps.fps),
-    sound: run.sound, recording: !!(run.rec && run.rec.state === 'recording'), mime: run.mime, sent: run.sent, failed: run.failed,
-    queue: run.queue.length, link: streamLink, ap: ap.on });
-  fetch('/status', { method: 'POST', body }).catch(() => {});
-}
-// If the program never "clicks" (it couldn't reach the browser's debugging connection), the stream still starts,
-// without sound, once the picture has drawn 300 frames (about ten seconds)
-let runnerFrames = 0;
-function runnerTick() {
-  runnerFrames++;
-  if (!run.soundTried && runnerFrames === 300) { run.soundTried = true; run.sound = 'not asked for'; runnerRecord(); }
-  runnerStatus(false);
-}
 
 // ---- every frame ----
 const sfps = { t: 0, n: 0, fps: 0 };
 function streamTick(now) {
   sfps.n++;
   if (now - sfps.t >= 1000) { sfps.fps = sfps.t ? sfps.n * 1000 / (now - sfps.t) : 0; sfps.n = 0; sfps.t = now; }
-  if (RUNNER) runnerTick();
   if (link.peers.size) {
     if (now - link.statT > 1000) { link.statT = now; linkStatus(); }
     // The sound meters on the Go live page show what this page hears
@@ -11945,7 +11815,6 @@ function streamStart() {
   streamApply();
   setAutopilot(true, true);
   linkStart();
-  if (RUNNER) runnerStatus(true);
 }
 
 /* ================= start ================= */

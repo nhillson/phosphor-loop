@@ -34,34 +34,27 @@ file don't rebuild the app.
 The workspace browser has no graphics chip (software drawing, about 5–9 frames a second at the test size), so
 its pictures show fewer, more separate echoes than Nick sees at 60 frames a second.
 
-## Twitch: headless streaming
+## Streaming to Twitch or Kick (with OBS)
 
-Nick wants it truly headless: nothing on screen, no OBS. `headless/Phosphor Loop on Twitch.cmd` is one file that is
-both the installer (as a .cmd it reruns itself in PowerShell with `-Install`: copies itself to
-`%LOCALAPPDATA%\PhosphorLoopStream\PhosphorLoopStream.ps1` and makes a desktop icon that runs it through
-`conhost --headless`) and the runner (tray icon; double-click again = stop). It downloads the branch's files and
-ffmpeg, serves the files from `http://localhost:47810`, opens Chrome/Edge `--headless=new --enable-gpu
---use-angle=d3d11`, sizes and "clicks" the page over the debugging port (CDP) so it may capture system audio, and
-relays the page's MediaRecorder pieces (40 Mbps at 1080p) into ffmpeg (NVENC p7 at 8000 kbps on an NVIDIA card, else
-QuickSync, else x264; each probed with its exact settings; keyframe every 2 s) to
-`rtmp://ingest.global-contribute.live-video.net/app/<key>` for Twitch, or for Kick to the Stream URL the streamer pasted
-(rtmps, `/app` added when only the server is given) plus `/<key>`; Kick's 1080p is 7500 kbps (Kick's limit is 8000
-with the sound). The setup box asks Twitch or Kick, the key, and for Kick the Stream URL; there is no channel name.
-Keep the .cmd plain ASCII with CRLF (`.gitattributes`
-stores it as-is): Windows PowerShell 5.1 reads files without a BOM as ANSI.
+Nick tried a headless streamer (hidden browser + ffmpeg, no OBS) and dropped it: he wants to see and control
+things, so streaming goes through OBS Studio on screen. Don't bring the headless runner back (it's in git history,
+commit cf2d781 and later).
 
-The page side is runner mode, `index.html?stream=1&runner=1` (section "the hidden runner" in stream mode). The
-stream page links to `stream.html?link=…` (the live view the tray icon opens: Next look and settings) over the phone
-link's PeerJS service. Nick had chat voting (!like / !skip, a vote counter, a "Twitch chat" taste) removed entirely;
-don't bring it back.
+`index.html?stream=1&taste=…&every=…&text=…&link=…` is the picture alone for OBS's browser source (section "stream
+mode" near the end of index.html). `stream.html` is the Go live page: its Set up tab picks Twitch or Kick, walks
+through installing OBS, connecting it (Twitch: Connect Account; Kick: Service Kick or Custom, its Stream URL and
+Stream Key), the OBS settings for a sharp 1080p picture on the NVIDIA card (NVENC H.264, CBR, 8000 Kbps Twitch /
+7500 Kick since Kick's limit is 8000 with the sound, keyframe 2 s, P7, High Quality, two passes full resolution,
+look-ahead, psycho visual tuning, 2 B-frames, 1920x1080 at 30 fps) and makes the OBS scene collection file. Its Go
+live tab links to the stream picture over the phone link's PeerJS service to send the computer's sound (screen
+sharing with system audio, or a microphone), Next look and settings; OBS itself captures the computer's sound for
+the stream. Nick had chat voting (!like / !skip, a vote counter, a "Twitch chat" taste) removed entirely; don't
+bring it back.
 
-Checks: `python3 tests/stream_check.py` (about 35 s; stands in for PeerJS, and checks runner mode
-and the installer download). The runner itself: run the .cmd copied to `runner.ps1` under PowerShell 7 for Linux
-(download the tarball from GitHub releases into the scratchpad) with `-Console -Out test.flv -StopAfterPieces 24
--Browser /opt/pw-browsers/chromium-*/chrome-linux/chrome -BrowserArgs '--no-sandbox --use-angle=swiftshader
---enable-unsafe-swiftshader --use-fake-device-for-media-stream' -Ffmpeg /usr/bin/ffmpeg -Site <repo> -Sound mic
--HomeDir <scratch>`, then ffprobe the file. While on a branch, the web pages are reachable at
-`https://raw.githack.com/nhillson/phosphor-loop/<branch>/stream.html` (one "One more step" notice per browser).
+Check changes to either with `python3 tests/stream_check.py` (about 25 s): it stands in for the connection service
+and uses the browser's fake microphone, so it works offline, and it fails on any chat connection. While the work
+lives on a branch, its pages are reachable at `https://raw.githack.com/nhillson/phosphor-loop/<branch>/stream.html`
+(GitHub Pages only serves `main`; OBS shows the mirror's "One more step" notice once, the Set up tab covers it).
 
 ## Working with Nick
 
