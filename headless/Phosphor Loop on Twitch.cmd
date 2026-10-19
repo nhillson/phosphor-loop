@@ -403,7 +403,8 @@ public class PLRelay {
 
   bool StartFfmpeg(bool audio) {
     StopFfmpeg(false);
-    StringBuilder a = new StringBuilder("-y -hide_banner -loglevel warning -thread_queue_size 1024 -f matroska -i pipe:0 ");
+    // (No -thread_queue_size on the input: ffmpeg 8 and newer refuse it there and stop at once)
+    StringBuilder a = new StringBuilder("-y -hide_banner -loglevel warning -f matroska -i pipe:0 ");
     if (!audio) a.Append("-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 ");
     a.Append("-map 0:v:0 -map ").Append(audio ? "0:a:0 " : "1:a:0 ");
     a.Append("-vf scale=" + Width + ":" + Height + ":force_original_aspect_ratio=decrease:flags=lanczos,pad=" + Width + ":" + Height + ":(ow-iw)/2:(oh-ih)/2,fps=30 ");
