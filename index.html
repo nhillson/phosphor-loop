@@ -25,7 +25,7 @@
     </div>
     <div class="top-right">
       <div class="readout" aria-hidden="true">
-        <span class="tc-label">TC</span><span id="tc">00:00:00:00</span><span class="lines">· 576 lines</span>
+        <span class="tc-label">TC</span><span id="tc">00:00:00:00</span><span class="lines" id="linesOut">· 576 lines</span>
       </div>
       <button class="btn guide-btn" id="guideBtn" aria-haspopup="dialog" aria-controls="guide"><span class="q" aria-hidden="true">?</span>Guide</button>
     </div>
@@ -367,6 +367,16 @@
           <div class="dev" id="row-fractal" hidden>
             <div class="seg seg-3" id="fractals" role="group" aria-label="Which fractal"></div>
             <span class="hint"><span id="hintFractal"></span> The camera wanders on its own, rolling as it goes: it sweeps round the outside, dives deep into the detail and climbs back out. Each loop takes its own route. Input size widens or narrows the view.</span>
+            <div class="ctl">
+              <div class="ctl-head"><span class="lbl" id="camLbl">Camera style</span></div>
+              <div class="seg seg-4" id="cam" role="group" aria-labelledby="camLbl">
+                <button data-cam="glide" aria-pressed="true" title="Sails through, as it always has">Glide</button>
+                <button data-cam="runner" aria-pressed="false" title="Quicker and lower; dips to the surface on each beat and springs away">Runner</button>
+                <button data-cam="crawler" aria-pressed="false" title="Creeps right along the surface in small, quick steps">Crawler</button>
+                <button data-cam="mix" aria-pressed="false" title="Takes each style in turn: every 16 beats, or about every 8 seconds without music">Mix it up</button>
+              </div>
+              <span class="hint">Glide sails through. Runner goes quicker and lower, dipping to the surface on each beat and springing away. Crawler creeps right along the surface. Mix it up takes each in turn.</span>
+            </div>
           </div>
 
           <div class="dev" id="row-spectro" hidden>
@@ -667,6 +677,16 @@
           </div>
           <span class="hint" id="shapeNote" hidden>While the output window is open, its size sets the shape.</span>
         </div>
+        <div class="ctl">
+          <span class="lbl" id="sharpLbl">Picture sharpness</span>
+          <div class="seg seg-4" id="sharp" role="group" aria-labelledby="sharpLbl">
+            <button data-sharp="auto" aria-pressed="true">Auto</button>
+            <button data-sharp="standard" aria-pressed="false">Standard</button>
+            <button data-sharp="high" aria-pressed="false">High</button>
+            <button data-sharp="full" aria-pressed="false">Full</button>
+          </div>
+          <span class="hint" id="sharpNote"></span>
+        </div>
       </section>
 
       <section class="group" id="showGroup" aria-labelledby="h-show">
@@ -760,7 +780,7 @@
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
           <div class="g-card"><h3>What feeds the loop</h3><dl>
-            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world, Fractals</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of ten 3D worlds to fly through, circle round, drift past or, in Mount Ribbit, walk on (W A S D walk, Shift runs, J jumps). Fractals opens a picker of six 3D fractals (Menger sponge, Mandelbulb, Mandelbox, Sierpinski, Julia and Kaleidoscope) with a camera that wanders on its own: it rolls and turns, sweeps round the outside, dives deep into the endless detail and climbs back out, and each loop takes its own route. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat.</dd>
+            <dt>Wave, Shape, Bars, Sparks, Ink, 3D world, Fractals</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. 3D world opens a picker of ten 3D worlds to fly through, circle round, drift past or, in Mount Ribbit, walk on (W A S D walk, Shift runs, J jumps). Fractals opens a picker of six 3D fractals (Menger sponge, Mandelbulb, Mandelbox, Sierpinski, Julia and Kaleidoscope) with a camera that wanders on its own: it rolls and turns, sweeps round the outside, dives deep into the endless detail and climbs back out, and each loop takes its own route. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat. Camera style picks how a fractal's camera moves: Glide sails through, Runner goes quicker and lower, dipping to the surface on each beat and springing away, Crawler creeps right along the surface in small, quick steps, and Mix it up takes each in turn (every 16 beats, or about every 8 seconds without music). Each loop has its own, and Autopilot picks one with every new look.</dd>
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery (they work from a MIDI controller too). Your own picture… loads a file of yours.</dd>
@@ -808,6 +828,7 @@
           </dl></div>
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
+            <dt>Picture sharpness</dt><dd>How many lines the picture is drawn with; the number shows at the top right. Standard is the 576 lines Phosphor Loop has always used and is the lightest on the computer. High goes up to 1080, like HD video. Full draws as many lines as the screen (or the Output window) shows. Auto, the usual setting, starts where it last settled on this computer, sharpens while the picture stays smooth and steps back if it slows down. Effects keep their size at every setting; only the detail gets finer. Each computer or phone keeps its own choice.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>

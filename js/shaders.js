@@ -21,6 +21,7 @@ const FS_FEEDBACK = `#version 300 es
 precision highp float;
 uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev, uScene1, uScene2, uText;
 uniform vec2 uSim;
+uniform float uPxK;   // how many pixels make one Standard-size step (more at a sharper picture), so effects keep their size
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
@@ -237,7 +238,7 @@ vec3 dyeBy(vec3 c, vec2 p, float asp) {
 // stripes, spots and coral-like mazes about two ring-widths apart. They start at outlines and spread through
 // anything lit, while zoom, spin and the rest keep moving them, so they keep growing and re-forming.
 vec3 growAt(vec3 c, vec3 near, vec2 st) {
-  vec2 px = 1.0 / uSim;
+  vec2 px = uPxK / uSim;
   float lc = luma(c);
   float la = luma(mix(c, near, 0.8));
   // The ring: two circles of samples, turned a different way every frame so no direction is favoured
@@ -463,7 +464,7 @@ void main() {
   if (uPush > 0.0) q += pushAt(q, asp);
   if (uLook > 0.0) q = lookAt(q, asp);
   // Split lines: every other line of pixels slides left, the lines between slide right
-  float side = mod(floor(gl_FragCoord.y), 2.0) < 0.5 ? 1.0 : -1.0;
+  float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
   q.x += uSplit * side;
   vec2 st = q / vec2(asp, 1.0) + 0.5;
   float inside = 1.0;
@@ -474,7 +475,7 @@ void main() {
     vec2 b = step(vec2(0.0), st) * step(st, vec2(1.0));
     inside = b.x * b.y;
   }
-  vec2 px = 1.0 / uSim;
+  vec2 px = uPxK / uSim;
   vec3 c0 = uChroma > 0.0 ? chromaAt(st, asp) : texture(uPrev, st).rgb;
   vec3 cb = 0.25 * (texture(uPrev, st + vec2(px.x, 0.0)).rgb + texture(uPrev, st - vec2(px.x, 0.0)).rgb +
                     texture(uPrev, st + vec2(0.0, px.y)).rgb + texture(uPrev, st - vec2(0.0, px.y)).rgb);

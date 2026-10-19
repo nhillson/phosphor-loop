@@ -6,8 +6,9 @@ const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.Phos
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
 /* ================= constants ================= */
-// The ordinary workstation uses 576 lines. Local streaming can request native
-// feedback resolution rather than enlarging this lower-resolution picture.
+// Standard sharpness: the loops are drawn 576 lines high, as Phosphor Loop always has been. Picture sharpness
+// (under Screen) can draw more lines, up to the screen's own (see wantLines). Local streaming can request a
+// fixed number of lines instead.
 const SIM_H = 576;
 let simW = 768, simH = window.__phosphorCaptureConfig?.renderHeight || SIM_H, simAspect = simW / simH;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -46,7 +47,7 @@ const DEVICE = ['camera', 'screen', 'phone'];
 function loopDefaults() {
   return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
            zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
-           grow: 0, growSize: 1, time: 0, timeShape: 0,
+           grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
 // The sliders under "Loop A feeds on itself"
@@ -725,6 +726,28 @@ $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`GROW ${edit}`, GROW_SIZE_NAME[t.growSize]);
 }));
+// How a fractal's camera moves (see makeDrone): the loop being edited gets the style picked
+const CAM_STYLES = ['glide', 'runner', 'crawler', 'mix'];
+const CAM_NAME = { glide: 'GLIDE', runner: 'RUNNER', crawler: 'CRAWLER', mix: 'MIX IT UP' };
+$$('#cam button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('cam');
+  loops[edit].tgt.cam = b.dataset.cam;
+  syncUI();
+  showOSD(`CAMERA ${edit}`, CAM_NAME[b.dataset.cam]);
+}));
+// Mix it up takes each style in turn: every 16 beats while music plays, otherwise about every 8 seconds.
+// Loop B is one style ahead of loop A, so two fractals on screen at once move differently.
+const camMix = { n: 0, beats: 0 };
+function camMixTick(dt) {
+  const music = snd.analyser && snd.amount > 0 && performance.now() - snd.lastBeat < 2000;
+  camMix.n += music ? Math.max(0, snd.beats - camMix.beats) : dt * 2;
+  camMix.beats = snd.beats;
+}
+function camStyleOf(k) {
+  const c = loops[k].tgt.cam;
+  if (c !== 'mix') return CAM_STYLES.includes(c) ? c : 'glide';
+  return ['glide', 'runner', 'crawler'][(Math.floor(camMix.n / 16) + (k === 'B' ? 1 : 0)) % 3];
+}
 const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE'];
 $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
   takeOver('time');
@@ -874,6 +897,7 @@ function syncUI() {
   $('#row-fractal').hidden = !frac;
   if (frac) $('#hintFractal').textContent = HINT_3D[frac];
   $$('#fractals button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.world === frac)));
+  $$('#cam button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cam === (t.cam || 'glide'))));
   const otherK = edit === 'A' ? 'B' : 'A';
   $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
   $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
@@ -954,6 +978,7 @@ function randomLoop() {
     dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
     grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, growSize: Math.floor(Math.random() * 3),
     time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * 3),
+    cam: pick(CAM_STYLES),
     ...surpriseSelf(),
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
@@ -1630,6 +1655,7 @@ const PINS = {
   split: { name: 'Split lines', fields: ['split'] },
   grow: { name: 'Grow', fields: ['grow', 'growSize'] },
   time: { name: 'Time warp', fields: ['time', 'timeShape'] },
+  cam: { name: 'Camera style', fields: ['cam'] },
   lookup: { name: 'Look-up', fields: ['lookup'] },
   chase: { name: 'Chase', fields: ['chase'] },
   breathe: { name: 'Breathe', fields: ['breathe'] },
@@ -2521,6 +2547,8 @@ function apSceneRaw(k) {
   }
   // Each effect, and a second input, on its own roll (see apOdds), on starter looks and new ones alike
   apFx(sc, w);
+  // A new camera style with every new look (it only shows when a fractal is on)
+  sc.cam = pick(CAM_STYLES);
   if ((!sc.in2 || sc.in2 === 'none') && Math.random() < apOdds(w)) {
     const two = pool.filter((x) => x !== sc.in1);
     if (two.length) { sc.in2 = apPick(two); sc.blend = Math.round(rnd(30, 70)); }
@@ -2983,6 +3011,7 @@ function tasteFeats(L) {
   if (L.in1 === 'wave' || L.in1 === 'shape') f.push(`form:${src}:${L.form}`);
   if (b.fx.includes('grow')) f.push('growsize:' + (L.growSize ?? 1));
   if (b.fx.includes('time')) f.push('timeshape:' + (L.timeShape ?? 0));
+  if (sceneGroup(L.in1) === 'fractal' || sceneGroup(L.in2) === 'fractal') f.push('cam:' + (L.cam || 'glide'), `lk:${src}&cam:${L.cam || 'glide'}`);
   if (L.motion && LIVE.includes(L.in1)) f.push('motion:on');
   if (b.zoom === 'out') f.push('edge:' + (L.edge ? 'fold' : 'dark'));
   if (L.in1 === 'spectro' || L.in2 === 'spectro') f.push('spec:' + (L.specRound ? 'round' : 'scroll'));
@@ -5946,12 +5975,52 @@ function copyInto(dst, srcTex) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 function dropTarget(t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+// Picture sharpness: how many lines the loops are drawn with. Standard is the 576 lines Phosphor Loop has always
+// used. High goes up to 1080 (like HD video), Full to the screen's own lines, so fine detail stays crisp on big
+// screens and projectors. Auto starts where it last settled on this computer, steps up while the picture stays
+// smooth and back down if frames drop (sharpTick). Effects keep their size whatever the lines: the loop shader
+// measures its blur, Grow, Restless and Split lines in Standard-size steps (uPxK).
+const SHARP_KEY = 'phosphor-sharp', SHARP_AUTO_KEY = 'phosphor-sharp-auto';
+const SHARP_MODES = ['auto', 'standard', 'high', 'full'];
+const SHARP_LEVELS = [SIM_H, 720, 900, 1080, 1440];
+const SHARP_MAX_PX = 3.7e6;   // never more than about a 2560 x 1440 picture, so memory stays in hand
+const sharpLowMem = !!APP || (navigator.deviceMemory > 0 && navigator.deviceMemory <= 4);
+let sharp = 'auto';
+try { const v = localStorage.getItem(SHARP_KEY); if (SHARP_MODES.includes(v)) sharp = v; } catch (_) {}
+const sharpAuto = { level: 0, top: sharpLowMem ? 3 : SHARP_LEVELS.length - 1, ceiling: 0, ceilingAt: 0,
+                    t0: 0, frames: 0, fast: 0, slow: 0, justUp: false, settle: 0 };
+sharpAuto.ceiling = sharpAuto.top;
+try { const v = +localStorage.getItem(SHARP_AUTO_KEY); if (v > 0 && v <= sharpAuto.top) sharpAuto.level = Math.round(v); } catch (_) {}
+let fitLines = SIM_H, fitAspect = 4 / 3;
+// How many lines to draw, for the setting and the size the picture is shown at (never fewer than Standard)
+function wantLines() {
+  const cap = window.__phosphorCaptureConfig;
+  if (cap) return cap.renderHeight || SIM_H;
+  const top = Math.max(SIM_H, fitLines);
+  if (sharp === 'standard') return SIM_H;
+  if (sharp === 'high') return Math.min(1080, top);
+  if (sharp === 'full') return top;
+  return Math.min(SHARP_LEVELS[sharpAuto.level], top);
+}
 function resim(aspect) {
-  const w = clamp(Math.round(simH * aspect / 4) * 4, 256, window.__phosphorCaptureConfig ? 3840 : 1600);
-  if (w === simW) return;
+  fitAspect = aspect;
+  const cap = window.__phosphorCaptureConfig;
+  let h = Math.max(SIM_H, Math.round(wantLines()));
+  const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
+  let w = clamp(Math.round(h * aspect / 4) * 4, 256, Math.min(maxTex, cap ? 3840 : Math.round(1600 * h / SIM_H)));
+  if (!cap && h > SIM_H && w * h > SHARP_MAX_PX) {
+    const k = Math.sqrt(SHARP_MAX_PX / (w * h));
+    h = Math.max(SIM_H, Math.round(h * k)); w = Math.max(256, Math.round(w * k / 4) * 4);
+  }
+  h = Math.min(h, maxTex);
+  if (w === simW && h === simH) { sharpSay(); return; }
   const oldA = loops.A.rt, oldB = loops.B.rt, oldComp = comp;
   const frontA = oldA[loops.A.front].tex, frontB = oldB[loops.B.front].tex;
-  simW = w; simAspect = simW / simH;
+  const sized = h !== simH;
+  simW = w; simH = h; simAspect = simW / simH;
+  // Time warp's memory belongs to the old size; it starts again at the new one
+  if (sized) for (const L of [loops.A, loops.B]) if (L.tw) twDrop(L);
+  sharpAuto.settle = 30;
   loops.A.rt = [makeTarget(), makeTarget()];
   loops.B.rt = [makeTarget(), makeTarget()];
   comp = makeTarget();
@@ -5959,6 +6028,60 @@ function resim(aspect) {
   copyInto(loops.B.rt[0], frontB);
   loops.A.front = 0; loops.B.front = 0;
   [...oldA, ...oldB, oldComp].forEach(dropTarget);
+  sharpSay();
+}
+// The Picture sharpness buttons, its note and the line count at the top of the page
+function sharpSay() {
+  $$('#sharp button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sharp === sharp)));
+  const lines = $('#linesOut');
+  if (lines) lines.textContent = `· ${simH} lines`;
+  const note = $('#sharpNote');
+  if (!note) return;
+  note.textContent = sharp === 'auto' ? `Auto: ${simH} lines right now. It sharpens the picture while this computer keeps it smooth, and steps back if it starts to slow down.`
+    : sharp === 'standard' ? `${SIM_H} lines, as Phosphor Loop has always drawn it. The lightest on the computer.`
+    : sharp === 'high' ? `Up to 1080 lines, like HD video (${simH} at this size). Needs a capable computer, or the picture slows down.`
+    : `As many lines as the screen shows (${simH} at this size). The sharpest, and the hardest on the computer.`;
+}
+$$('#sharp button').forEach((b) => b.addEventListener('click', () => {
+  sharp = b.dataset.sharp;
+  try { localStorage.setItem(SHARP_KEY, sharp); } catch (_) {}
+  // Auto measures afresh from where it last settled
+  Object.assign(sharpAuto, { ceiling: sharpAuto.top, t0: 0, fast: 0, slow: 0, justUp: false });
+  clearTimeout(resimTimer);
+  resim(fitAspect);
+  showOSD('SHARPNESS', `${sharp.toUpperCase()} · ${simH} LINES`);
+}));
+// Auto: every 120 frames it looks at how smoothly they came. Two smooth stretches in a row (55 or more frames a
+// second) step it up a level; two slow ones (under 45), or one right after a step up, step it back down, and it
+// stays below that level for five minutes before trying again. A paused page (hidden panel, sleeping laptop)
+// doesn't count. It never goes below Standard.
+function sharpTick(now) {
+  const A = sharpAuto;
+  if (sharp !== 'auto' || window.__phosphorCaptureConfig || document.hidden) { A.t0 = 0; return; }
+  if (A.settle > 0) { A.settle--; A.t0 = 0; return; }
+  if (!A.t0) { A.t0 = now; A.frames = 0; return; }
+  if (++A.frames < 120) return;
+  const sec = (now - A.t0) / 1000;
+  A.t0 = 0;
+  if (sec > 8) { A.fast = A.slow = 0; return; }
+  const fps = A.frames / sec;
+  if (A.ceiling < A.top && now - A.ceilingAt > 300000) A.ceiling = A.top;
+  let to = A.level;
+  if (fps >= 55) {
+    A.slow = 0; A.justUp = false;
+    if (++A.fast >= 2 && A.level < A.ceiling && SHARP_LEVELS[A.level] < Math.max(SIM_H, fitLines)) { to = A.level + 1; A.justUp = true; }
+  } else if (fps < 45) {
+    A.fast = 0;
+    if ((A.justUp || ++A.slow >= 2) && A.level > 0) {
+      to = A.level - 1;
+      if (A.justUp) { A.ceiling = to; A.ceilingAt = now; }
+    }
+    A.justUp = false;
+  } else { A.fast = A.slow = 0; A.justUp = false; }
+  if (to === A.level) return;
+  A.level = to; A.fast = A.slow = 0;
+  try { localStorage.setItem(SHARP_AUTO_KEY, String(to)); } catch (_) {}
+  resim(fitAspect);
 }
 
 let resimTimer = null, firstFit = true;
@@ -6000,6 +6123,7 @@ function fit() {
     aspect = w / h;
   }
   if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+  fitLines = ch;
   clearTimeout(resimTimer);
   if (firstFit) { firstFit = false; resim(aspect); }
   else resimTimer = setTimeout(() => resim(aspect), 180);
@@ -6391,7 +6515,7 @@ function midiIn(e) {
 // What a slider or button stands for, stored so a mapping survives page reloads
 const LOOP_KEYS = LOOP_SLIDERS;
 const GROUP_NAMES = { inputs: 'Input', apInputs: 'Autopilot uses', mirror: 'Mirror', shape: 'Screen shape', soundSrc: 'Listen to', sndMap: 'Music moves', vidSpeed: 'Video speed',
-                      specShape: 'Spectrograph', specListen: 'Spectrograph hears', textStyle: 'Text style', growSize: 'Grow size', timeShape: 'Time warp' };
+                      specShape: 'Spectrograph', specListen: 'Spectrograph hears', textStyle: 'Text style', growSize: 'Grow size', timeShape: 'Time warp', cam: 'Camera style' };
 const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-ren, #adminBox *, #adminLogin *, .pre-confirm button, #presetForm button, #presetSave, ' +
   '.tp-ic, #tasteRenForm *, #sessionForm *, #tasteOpen, ' +
   '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen';
@@ -6722,7 +6846,9 @@ const GROW_R = [2.6, 5, 9];   // Grow's ring for Fine, Medium and Big patterns, 
 // is let go a minute after Time warp is turned off, to save memory; a computer keeps it, so turning Time warp
 // on again (or Autopilot bringing it in) never makes the picture hitch while the memory is found.
 function twMake() {
-  const w = Math.max(16, Math.round(simW * TW_SCALE)), h = Math.max(16, Math.round(simH * TW_SCALE));
+  // At a sharper picture the stack is kept smaller than TW_SCALE, so it never needs more than 64 MB (32 on phones)
+  const twK = Math.min(TW_SCALE, Math.sqrt((twLowMem ? 32 : 64) * 1048576 / (4 * TW_LAYERS * simW * simH)));
+  const w = Math.max(16, Math.round(simW * twK)), h = Math.max(16, Math.round(simH * twK));
   for (let i = 0; i < 8 && gl.getError() !== gl.NO_ERROR; i++) {}
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
@@ -7168,6 +7294,7 @@ function runLoop(k, xf, brush, f) {
   }
 
   set2f(fbProg, 'uSim', simW, simH);
+  set1f(fbProg, 'uPxK', simH / SIM_H);
   set1f(fbProg, 'uTime', simT + (k === 'B' ? 11.0 : 0));
   set1f(fbProg, 'uZoom', (z / 100) * 0.03 * f);
   set1f(fbProg, 'uSpin', -(s / 100) * 0.045 * f);
@@ -7373,6 +7500,7 @@ function frame() {
   }
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
+  sharpTick(now);
   const k = 1 - Math.exp(-dt * 5);
   // Autopilot glides over its Fade time (about 10 seconds unless changed), or fast when a look cuts in on a beat.
   // Pinned settings answer their sliders straight away.
@@ -7398,6 +7526,7 @@ function frame() {
   drawMeter();
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
+  camMixTick(frozen ? 0 : dt);
   if (Object.keys(SCENES).some(uses)) {
     const pace = reduceMotion ? 0.45 : 1;
     let surge = 1, glow = 1;
@@ -7412,7 +7541,11 @@ function frame() {
       const step = dt * sc.speed * pace * (1 + (surge - 1) * (sc.kick ?? 1));
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
-      if (sc.fly) for (const k of ['A', 'B']) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step);
+      // Runner dips and springs with the beat while React to sound is on
+      if (sc.fly) for (const k of ['A', 'B']) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) {
+        const style = camStyleOf(k);
+        droneOf(sc, k).fly(step, { style, drive: style === 'runner' && snd.analyser ? sndPower() * snd.env.beat : 0 });
+      }
       // Mount Ribbit's hikers walk on, the same way
       if (sc.ext) {
         const drive = ribDriven(), ctl = ribControls();

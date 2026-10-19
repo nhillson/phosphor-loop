@@ -159,12 +159,29 @@ function makeDrone(de, seed, o) {
     const c = 0.5 - 0.5 * Math.cos(phase * 6.2832);
     return c * (0.78 + 0.22 * Math.sin(phase * 2.3 + ph[11]));
   };
-  function step(dt) {
+  // Camera styles: how fast it goes, how close it keeps to the surface and how much it bobs as it goes.
+  // Glide is the camera as it always was. Runner is quicker and lower, and dips towards the surface on each
+  // beat, then springs away as the beat fades. Crawler creeps along right by the surface in small, quick steps.
+  // A new style eases in over a second or so, so switching (and Mix it up) never jumps.
+  const STYLE = { glide: [1, 1, 0, 0], runner: [1.9, 0.5, 1, 12], crawler: [0.65, 0.16, 0.55, 22] };
+  let stSpeed = 1, stNear = 1, stGait = 0, gaitF = 12, gaitPh = 0, drive = 0, lastDrive = 0, launch = 0;
+  function step(dt, m) {
+    const style = STYLE[m.style] ? m.style : 'glide', [ts, tn, tg, tf] = STYLE[style];
+    const ease = 1 - Math.exp(-dt / 0.65);
+    stSpeed += (ts - stSpeed) * ease; stNear += (tn - stNear) * ease; stGait += (tg - stGait) * ease;
+    if (tf) gaitF += (tf - gaitF) * ease;
+    gaitPh += dt * gaitF;
+    const beat = Math.max(0, Math.min(1, Number.isFinite(m.drive) ? m.drive : 0));
+    if (lastDrive > beat) launch = Math.min(1, launch + (lastDrive - beat) * 1.8);
+    lastDrive = beat;
+    launch *= Math.exp(-dt / 0.24);
+    drive += (beat - drive) * (1 - Math.exp(-dt / 0.09));
     s.tau += dt;
     s.phase += dt / o.dive;
     const depth = depthAt(s.phase);
     const diving = depthAt(s.phase + 0.01) > depth;
-    const want = o.far * Math.pow(o.near / o.far, depth);   // the distance it wants to keep from the surface
+    // The distance it wants to keep from the surface (never closer than the fractal's finest detail can show)
+    const want = Math.max(o.far * Math.pow(o.near / o.far, depth) * stNear * Math.exp(-0.8 * drive), o.near * 0.5);
     const p = s.p, t = s.tau;
     let d = D(p);
     const g = grad(p, d);
@@ -211,8 +228,10 @@ function makeDrone(de, seed, o) {
     s.bank += (Math.max(-0.7, Math.min(0.7, -yaw * 1.6)) - s.bank) * Math.min(1, 1.5 * dt);
     s.f = fNew;
     // Moves a share of the distance to the surface, so it can never reach it
-    let mv = Math.min(o.speed * d * dt, 0.4 * d);
-    const np = [p[0] + s.f[0] * mv, p[1] + s.f[1] * mv, p[2] + s.f[2] * mv];
+    let mv = Math.min(o.speed * d * dt * stSpeed * (1 + drive), 0.4 * d);
+    // Runner's spring off the surface and the bob of its steps, straight out from the surface (none for Glide)
+    const lift = o.speed * d * dt * (launch * 1.0 - drive * 0.35 + Math.sin(gaitPh) * stGait * 0.16);
+    const np = [p[0] + s.f[0] * mv + g[0] * lift, p[1] + s.f[1] * mv + g[1] * lift, p[2] + s.f[2] * mv + g[2] * lift];
     const nd = D(np);
     if (nd > 0.25 * Math.min(d, want)) { s.p = np; d = nd; }
     else {
@@ -234,7 +253,17 @@ function makeDrone(de, seed, o) {
     }
     s.empty += ((seen ? 0 : 1) - s.empty) * Math.min(1, 1.2 * dt);
     const lean = 0.3 + 1.2 * s.empty;
-    const lt = nrm([s.f[0] - lean * gl[0] - 2.5 * outside * s.p[0] / rr, s.f[1] - lean * gl[1] - 2.5 * outside * s.p[1] / rr, s.f[2] - lean * gl[2] - 2.5 * outside * s.p[2] / rr]);
+    let lt = nrm([s.f[0] - lean * gl[0] - 2.5 * outside * s.p[0] / rr, s.f[1] - lean * gl[1] - 2.5 * outside * s.p[1] / rr, s.f[2] - lean * gl[2] - 2.5 * outside * s.p[2] / rr]);
+    // Runner and Crawler, down by the surface, look along it (skimming over it) rather than into it
+    const grounded = (1 - outside) * Math.max(1 - stNear, drive);
+    if (grounded > 0.001) {
+      const np0 = dot(s.f, gl);
+      let along = [s.f[0] - gl[0] * np0, s.f[1] - gl[1] * np0, s.f[2] - gl[2] * np0];
+      if (len(along) < 0.05) along = cross(gl, Math.abs(gl[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]);
+      along = nrm(along);
+      const skim = nrm([along[0] - gl[0] * 0.12, along[1] - gl[1] * 0.12, along[2] - gl[2] * 0.12]);
+      lt = nrm([lt[0] * (1 - grounded) + skim[0] * grounded, lt[1] * (1 - grounded) + skim[1] * grounded, lt[2] * (1 - grounded) + skim[2] * grounded]);
+    }
     const kl = Math.min(1, 1.6 * dt);
     s.look = nrm([s.look[0] + (lt[0] - s.look[0]) * kl, s.look[1] + (lt[1] - s.look[1]) * kl, s.look[2] + (lt[2] - s.look[2]) * kl]);
     // Carry "up" along with the view, then roll it: a slow twist that sometimes goes all the way round, plus the bank
@@ -246,7 +275,8 @@ function makeDrone(de, seed, o) {
     s.scale = Math.exp(Math.log(s.scale) + (Math.log(Math.max(d, o.near * 0.5)) - Math.log(s.scale)) * Math.min(1, 2 * dt));
   }
   // Long steps (a slow computer, or a big kick of the bass) are split into short ones
-  s.fly = (dt) => { let left = dt; while (left > 1e-6) { const h = Math.min(left, 1 / 30); step(h); left -= h; } };
+  // m: { style: 'glide' | 'runner' | 'crawler', drive: Runner's beat, 0 to 1 }
+  s.fly = (dt, m = {}) => { let left = Number.isFinite(dt) ? Math.max(0, dt) : 0; while (left > 1e-6) { const h = Math.min(left, 1 / 30); step(h, m); left -= h; } };
   return s;
 }
 
