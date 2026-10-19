@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#181618">
-<title>Phosphor Loop on Twitch</title>
+<title>Phosphor Loop on Twitch or Kick</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -82,8 +82,7 @@
   .meter .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform-origin: bottom; transform: scaleY(0);
     background: linear-gradient(to top, var(--amber), var(--amber-ink)); transition: transform .08s linear; }
   .meter span { font-size: 11px; color: var(--faint); font-family: var(--f-display); letter-spacing: .1em; }
-  .rate-row .btn { flex: 1; min-width: 150px; }
-  .thumb-dn svg { transform: rotate(180deg); }
+  .rate-row .btn { flex: 1; min-width: 150px; max-width: 320px; }
   input[type=range] { width: 100%; max-width: 420px; accent-color: var(--amber); }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #2d1838; border: 1px solid var(--amber); color: #f6ecfa;
     padding: 12px 18px; border-radius: 12px; font-weight: 500; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
@@ -94,17 +93,17 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="brand"><span class="guns" aria-hidden="true"><i></i><i></i><i></i></span><span class="wordmark">PHOSPHOR LOOP <em>ON TWITCH</em></span></div>
+    <div class="brand"><span class="guns" aria-hidden="true"><i></i><i></i><i></i></span><span class="wordmark">PHOSPHOR LOOP <em>ON TWITCH OR KICK</em></span></div>
   </header>
 
   <!-- ================= INSTALL (opened from the web) ================= -->
   <section id="install">
-    <p class="lede">Phosphor Loop streams to Twitch <b>hidden in the background</b>: no OBS, no windows. You get one icon on your desktop. Double-click it to go live; double-click it again to stop.</p>
+    <p class="lede">Phosphor Loop streams to Twitch or Kick <b>hidden in the background</b>: no OBS, no windows. You get one icon on your desktop. Double-click it to go live; double-click it again to stop.</p>
 
     <div class="card">
       <h2><span class="num">1</span>Download it</h2>
       <p>One small file for Windows. If Chrome asks whether to keep it, choose <b>Keep</b>.</p>
-      <div class="row"><button class="btn go big" id="getRunner">Download Phosphor Loop on Twitch</button><span class="note" id="getNote"></span></div>
+      <div class="row"><button class="btn go big" id="getRunner">Download the Phosphor Loop streamer</button><span class="note" id="getNote"></span></div>
     </div>
 
     <div class="card">
@@ -116,16 +115,17 @@
     </div>
 
     <div class="card">
-      <h2><span class="num">3</span>Tell it your Twitch details (first time only)</h2>
-      <p>A small box asks for two things. They stay on your computer; the stream key is stored encrypted.</p>
+      <h2><span class="num">3</span>Tell it where you stream (first time only)</h2>
+      <p>A small box asks a few things. They stay on your computer; the stream key is stored encrypted.</p>
       <figure id="figSetup"></figure>
       <ol class="steps">
-        <li>Type your <b>Twitch channel name</b> (the end of twitch.tv/<i>yourname</i>).</li>
-        <li>Paste your <b>stream key</b>. To get it, click the blue <b>Where is it?</b> link in the box: Twitch opens your stream settings. Press <b>Copy</b> next to <b>Primary Stream key</b>, then click in the box and press <b>Ctrl+V</b>.</li>
+        <li>Under <b>Where do you stream?</b>, pick <b>Twitch</b> or <b>Kick</b>.</li>
+        <li><b>Twitch:</b> paste your <b>stream key</b>. To get it, click the blue <b>Where is it?</b> link in the box: Twitch opens your stream settings. Press <b>Copy</b> next to <b>Primary Stream key</b>, then click in the box and press <b>Ctrl+V</b>.</li>
+        <li><b>Kick:</b> the box also asks for your <b>Stream URL</b>. Click the blue <b>Where are they?</b> link: on Kick, open <b>Settings</b>, then <b>Stream Key</b>, and copy the <b>Stream URL</b> and the <b>Stream Key</b> into their boxes.</li>
         <li>Press <b>Go live</b>.</li>
       </ol>
       <figure id="figKey"></figure>
-      <p class="note">The first start downloads Phosphor Loop and ffmpeg (the part that sends video to Twitch), so it takes a few minutes. After that it starts in about half a minute.</p>
+      <p class="note">The first start downloads Phosphor Loop and ffmpeg (the part that sends video to Twitch or Kick), so it takes a few minutes. After that it starts in about half a minute.</p>
     </div>
 
     <div class="card">
@@ -135,7 +135,7 @@
       <ol class="steps">
         <li><b>To stop:</b> double-click the desktop icon again (or right-click the tray icon, <b>Stop streaming</b>).</li>
         <li><b>Next time:</b> just double-click the desktop icon.</li>
-        <li><b>While live:</b> right-click the tray icon, <b>Open the Go live page</b>, to see the chat’s votes, skip looks and change settings.</li>
+        <li><b>While live:</b> right-click the tray icon, <b>Open the Go live page</b>, to skip to a new look and change settings.</li>
       </ol>
     </div>
 
@@ -143,8 +143,7 @@
       <h2>Good to know</h2>
       <ol class="steps">
         <li>It streams <b>everything your computer plays</b>, including notification sounds. Mute those (or turn on Do not disturb) while you’re live.</li>
-        <li>Twitch mutes or removes streams with copyrighted songs (most of what’s on Spotify), so play music you’re allowed to stream.</li>
-        <li>Viewers type <b>!like</b> or <b>!skip</b> in your chat. A small counter on the stream shows the votes, and Autopilot learns what your chat likes.</li>
+        <li>Twitch and Kick mute or remove streams with copyrighted songs (most of what’s on Spotify), so play music you’re allowed to stream.</li>
         <li>Your computer stays awake while it streams. Keep it plugged in.</li>
       </ol>
     </div>
@@ -157,8 +156,7 @@
       <p class="note" id="linkHelp"></p>
       <div class="stats">
         <div class="stat"><div class="k">NEXT LOOK</div><div class="v" id="sLeft">–</div></div>
-        <div class="stat"><div class="k">CHAT</div><div class="v" id="sChat">–</div></div>
-        <div class="stat"><div class="k">VOTES ON THIS LOOK</div><div class="v" id="sVotes">–</div></div>
+        <div class="stat"><div class="k">PICTURE</div><div class="v" id="sPic">–</div></div>
         <div class="stat"><div class="k">AUTOPILOT FOLLOWS</div><div class="v" id="sTaste">–</div></div>
       </div>
       <div class="meters" aria-label="What the stream hears">
@@ -172,10 +170,8 @@
 
     <div class="card">
       <h2>Your buttons</h2>
-      <p>Viewers type <b>!like</b> or <b>!skip</b> in your chat. You can vote here too.</p>
+      <p>Skip to a new look whenever you like.</p>
       <div class="row rate-row">
-        <button class="btn" id="rUp"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>More like this</button>
-        <button class="btn thumb-dn" id="rDown"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg>Not this</button>
         <button class="btn" id="rNext"><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
       </div>
       <label class="field"><span>How strongly the picture reacts to sound: <b id="amtOut">60</b></span><input type="range" id="amt" min="0" max="100" value="60"></label>
@@ -186,27 +182,15 @@
       <h2>Settings</h2>
       <p>Changes reach the stream straight away and are kept for next time.</p>
       <div class="grid2">
-        <label class="field"><span>Twitch chat to read</span><input type="text" id="twName" autocomplete="off" spellcheck="false" placeholder="yourname"></label>
         <label class="field"><span>Autopilot follows</span><select id="tasteSel">
-          <option value="chat">What my chat likes (it learns as they vote)</option>
           <option value="none">Nothing, just surprise everyone</option>
-        </select></label>
-        <label class="field"><span>Votes needed to skip a look</span><select id="skipN">
-          <option value="1">1 vote</option><option value="2">2 votes</option><option value="3">3 votes</option>
-          <option value="5">5 votes</option><option value="10">10 votes</option>
         </select></label>
         <label class="field"><span>A new look every</span><select id="everyN">
           <option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option>
           <option value="60">1 minute</option><option value="90">1½ minutes</option>
         </select></label>
-        <label class="field"><span>Vote counter on the stream</span><select id="votesOn"><option value="1">Show it (bottom left)</option><option value="0">Hide it</option></select></label>
         <label class="field"><span>Words for the Text input</span><input type="text" id="textIn" maxlength="60" placeholder="PHOSPHOR LOOP"></label>
       </div>
-      <details id="tasteBox">
-        <summary>Keep what your chat likes</summary>
-        <p class="note">Autopilot learns from the votes in a taste profile called <b>Twitch chat</b>. Save it as a file to open in the full Phosphor Loop (under <b>Taste profiles</b>, <b>Open a taste file…</b>).</p>
-        <button class="btn" id="tasteSave">Save the chat’s taste as a file</button>
-      </details>
     </div>
   </section>
 </div>
@@ -288,20 +272,20 @@ function figSmart() {
   return svg(760, 270, b, 'Windows SmartScreen: click More info, then Run anyway');
 }
 function figSetup() {
-  let b = WIN(90, 8, 580, 330, 'Phosphor Loop on Twitch', '#f3f3f3');
+  let b = WIN(90, 8, 580, 330, 'Phosphor Loop on Twitch or Kick', '#f3f3f3');
   const dk = '#1b1b1b', gr = '#5b5b5b';
-  b += T(116, 52, 'Two things from Twitch, once. They stay on this computer.', 14, dk, 700);
-  b += T(116, 82, '1. Your Twitch channel name (twitch.tv/your-name):', 13, dk);
-  b += R(116, 90, 530, 26, '#fff', '#9a9a9a', 2) + T(124, 108, 'yourname', 13, dk);
+  b += T(116, 52, 'A few things from your streaming site, once. They stay on this computer.', 13.5, dk, 700);
+  b += T(116, 82, '1. Where do you stream?', 13, dk);
+  b += R(116, 90, 530, 26, '#fff', '#9a9a9a', 2) + T(124, 108, 'Twitch', 13, dk) + T(632, 108, '▾', 12, gr);
   b += HI(116, 90, 530, 26, '1', 104, 103);
   b += T(116, 140, '2. Your Twitch stream key (it starts with live_):', 13, dk);
   b += R(116, 148, 530, 26, '#fff', '#9a9a9a', 2) + T(124, 166, '●'.repeat(16), 12, dk);
   b += HI(116, 148, 530, 26, '2', 104, 161);
   b += '<text x="116" y="196" font-family="Segoe UI, Arial" font-size="13" fill="#0a58ca" text-decoration="underline">Where is it? Open my Twitch stream settings</text>';
-  b += T(116, 232, 'Picture size:', 13, dk) + R(116, 240, 530, 26, '#fff', '#9a9a9a', 2) + T(124, 258, '720p - smooth (recommended)', 13, dk) + T(632, 258, '▾', 12, gr);
+  b += T(116, 232, 'Picture size:', 13, dk) + R(116, 240, 530, 26, '#fff', '#9a9a9a', 2) + T(124, 258, '1080p - sharpest (recommended: this PC has an NVIDIA card)', 13, dk) + T(632, 258, '▾', 12, gr);
   b += BTN(468, 292, 80, 30, 'Cancel', '#e1e1e1', dk) + BTN(556, 292, 90, 30, 'Go live', '#e1e1e1', dk);
   b += HI(556, 292, 90, 30, '3', 664, 307);
-  return svg(760, 346, b, 'The first-time box: your channel name, your stream key, then Go live');
+  return svg(760, 346, b, 'The first-time box: pick Twitch or Kick, paste your stream key, then Go live (Kick also asks for its Stream URL)');
 }
 function figKey() {
   let b = WIN(10, 8, 740, 200, 'Twitch: Creator Dashboard');
@@ -320,18 +304,18 @@ function figTray() {
   b += HI(36, 38, 68, 102, '', 0, 0) + T(70, 160, 'double-click: go live / stop', 11, '#cfe0f5', 400, 'middle');
   b += R(0, 262, 760, 38, '#1b1d22', 'none', 0) + T(700, 285, '7:30 PM', 11.5, '#e6e6e6', 400, 'middle') + ICON(630, 281, 9);
   b += HI(619, 270, 22, 22, '', 0, 0);
-  const items = ['Phosphor Loop is LIVE on Twitch (30 fps, sound on)', '-', 'Open the Go live page (votes and settings)', 'Change channel, stream key or picture size...', 'Show the log', '-', 'Stop streaming'];
-  const mx = 340, my = 40;
-  b += R(mx, my, 330, items.length * 24 + 10, '#2b2b2b', '#454545', 6);
+  const items = ['Phosphor Loop is LIVE on Twitch (30 fps, sound on)', '-', 'Open the Go live page (settings and Next look)', 'Change Twitch or Kick, stream key or picture size...', 'Show the log', '-', 'Stop streaming'];
+  const mx = 320, my = 40, mw = 400;
+  b += R(mx, my, mw, items.length * 24 + 10, '#2b2b2b', '#454545', 6);
   items.forEach((s, i) => {
     const y = my + 22 + i * 24;
-    if (s === '-') b += R(mx + 10, y - 8, 310, 1, '#454545', 'none', 0);
+    if (s === '-') b += R(mx + 10, y - 8, mw - 20, 1, '#454545', 'none', 0);
     else b += T(mx + 14, y, s, 12.5, i === 0 ? '#9a9a9a' : '#f0f0f0');
   });
-  b += HI(mx + 8, my + 22 + 2 * 24 - 15, 314, 21, '', 0, 0);
-  b += HI(mx + 8, my + 22 + 6 * 24 - 15, 314, 21, '', 0, 0);
+  b += HI(mx + 8, my + 22 + 2 * 24 - 15, mw - 16, 21, '', 0, 0);
+  b += HI(mx + 8, my + 22 + 6 * 24 - 15, mw - 16, 21, '', 0, 0);
   b += `<path d="M626 266 L590 ${my + items.length * 24 + 16}" stroke="${P.hi}" stroke-width="2" stroke-dasharray="4 4" fill="none"/>`;
-  b += T(mx + 165, my + items.length * 24 + 32, 'right-click the tray icon for this menu', 11, '#cfe0f5', 400, 'middle');
+  b += T(mx + mw / 2, my + items.length * 24 + 32, 'right-click the tray icon for this menu', 11, '#cfe0f5', 400, 'middle');
   return svg(760, 300, b, 'The desktop icon, the tray icon by the clock, and its menu with Open the Go live page and Stop streaming');
 }
 if (!LIVE) {
@@ -343,35 +327,36 @@ if (!LIVE) {
 
 // ================= LIVE: linked to the hidden stream =================
 const KEY = 'phosphor-golive-v2';
-const st = { cfg: { twitch: '', taste: 'chat', skip: 2, votes: true, every: 30, text: '', at: 0 } };
-try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && s.cfg) Object.assign(st.cfg, s.cfg); } catch (_) {}
+const st = { cfg: { taste: 'none', every: 30, text: '', at: 0 } };
+// Only the settings that still exist ("chat", the taste learned from chat votes, is gone: it means none now)
+function cleanCfg(c, into) {
+  if (!c || typeof c !== 'object') return;
+  if (typeof c.taste === 'string') into.taste = !c.taste.trim() || c.taste.trim().toLowerCase() === 'chat' ? 'none' : c.taste.trim().slice(0, 40);
+  if (Number.isFinite(+c.every) && c.every !== '') into.every = clamp(Math.round(+c.every), 10, 120);
+  if (typeof c.text === 'string') into.text = c.text.slice(0, 60);
+  if (Number.isFinite(+c.at)) into.at = +c.at;
+}
+try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && s.cfg) cleanCfg(s.cfg, st.cfg); } catch (_) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} }
-const cleanName = (v) => String(v || '').trim().toLowerCase().replace(/^.*twitch\.tv\//, '').replace(/^[@#]/, '').replace(/[^a-z0-9_]/g, '').slice(0, 25);
 let formFilled = false;
 // The form shows the stream's own settings the first time it reports them
 function fillForm(c) {
-  $('#twName').value = c.twitch || '';
-  $('#skipN').value = String(c.skip);
   $('#everyN').value = String(c.every);
-  $('#votesOn').value = c.votes ? '1' : '0';
   $('#textIn').value = c.text || '';
   const sel = $('#tasteSel');
   if (![...sel.options].some((o) => o.value === c.taste)) sel.add(new Option(c.taste + ' (shared)', c.taste));
   sel.value = c.taste;
 }
 function readForm() {
-  st.cfg.twitch = cleanName($('#twName').value);
-  st.cfg.skip = clamp(+$('#skipN').value || 2, 1, 20);
   st.cfg.every = clamp(+$('#everyN').value || 30, 10, 120);
-  st.cfg.votes = $('#votesOn').value === '1';
   st.cfg.text = $('#textIn').value.slice(0, 60);
-  st.cfg.taste = $('#tasteSel').value || 'chat';
+  st.cfg.taste = $('#tasteSel').value || 'none';
   st.cfg.at = Date.now();
   save();
   if (send({ t: 'cfg', cfg: st.cfg })) toast('Saved. The stream has it.');
   else toast('Saved here; it reaches the stream when it’s connected.');
 }
-['#skipN', '#everyN', '#votesOn', '#tasteSel', '#textIn', '#twName'].forEach((s) => $(s).addEventListener('change', readForm));
+['#everyN', '#tasteSel', '#textIn'].forEach((s) => $(s).addEventListener('change', readForm));
 if (LIVE) {
   (async () => {
     for (const url of [LIVE_SHARED, 'presets.json']) {
@@ -450,29 +435,14 @@ async function onSignal(m) {
 }
 const linked = () => !!(L.dc && L.dc.readyState === 'open' && Date.now() - L.statusAt < 5000);
 function send(o) { if (L.dc && L.dc.readyState === 'open') { try { L.dc.send(JSON.stringify(o)); return true; } catch (_) {} } return false; }
-const taste = { parts: null, id: '' };
 function onMsg(data) {
   let d;
   try { d = JSON.parse(data); } catch (_) { return; }
   if (d.t === 'status') {
     L.status = d; L.statusAt = Date.now();
-    if (!formFilled && d.cfg) { formFilled = true; if (!st.cfg.at || (d.cfg.at || 0) >= st.cfg.at) Object.assign(st.cfg, d.cfg); fillForm(st.cfg); }
+    if (!formFilled && d.cfg) { formFilled = true; if (!st.cfg.at || (d.cfg.at || 0) >= st.cfg.at) cleanCfg(d.cfg, st.cfg); fillForm(st.cfg); }
     showLink(); showStatus();
   } else if (d.t === 'lvl') showLevels(d);
-  else if (d.t === 'tastefile') {
-    if (taste.id !== d.id) { taste.id = d.id; taste.parts = new Array(d.n); }
-    taste.parts[d.i] = d.part;
-    if (taste.parts.every((x) => typeof x === 'string')) {
-      const text = taste.parts.join('');
-      taste.parts = null;
-      if (text === 'null') { toast('The chat hasn’t voted yet, so there’s nothing to save.'); return; }
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-      a.download = 'taste-twitch-chat.json';
-      document.body.appendChild(a); a.click(); a.remove();
-      toast('Saved taste-twitch-chat.json in your Downloads folder.');
-    }
-  }
 }
 function showLink() {
   const dot = $('#linkDot'), s = $('#linkState'), help = $('#linkHelp');
@@ -492,11 +462,8 @@ function showStatus() {
   const x = L.status;
   if (!x) return;
   $('#sLeft').textContent = fmtLeft(x.left);
-  $('#sChat').innerHTML = !x.ch ? '<small>No channel set</small>' : x.chat === 'joined' ? `<span class="ok">● </span>#${esc(x.ch)}` : `<small>Connecting to #${esc(x.ch)}…</small>`;
-  $('#sVotes').innerHTML = `${x.likes} like · ${x.skips} skip <small>of ${x.need}</small>`;
+  $('#sPic').innerHTML = x.w ? `${x.w} × ${x.h} <small>${x.fps || 0} fps</small>` : '–';
   $('#sTaste').innerHTML = x.taste ? `${esc(x.taste)} <small>${x.rated} rating${x.rated === 1 ? '' : 's'}</small>` : '<small>Nothing (surprises)</small>';
-  $('#rUp').hidden = $('#rDown').hidden = !x.learn;
-  $('#tasteBox').hidden = !x.learn;
   $('#sndState').innerHTML = x.sound ? '<span class="ok">●</span> <b>The stream hears your computer.</b> The bars move with the music.'
     : 'The stream isn’t hearing any sound. Check the log (right-click the tray icon, <b>Show the log</b>).';
   if (x.amount !== undefined && document.activeElement !== $('#amt')) { $('#amt').value = x.amount; $('#amtOut').textContent = x.amount; }
@@ -507,11 +474,8 @@ function showLevels(d) {
   $('#mHigh').style.transform = `scaleY(${clamp(d.h, 0, 1)})`;
   $('#mBeat').style.transform = `scaleY(${clamp(d.b, 0, 1)})`;
 }
-$('#rUp').addEventListener('click', () => { if (send({ t: 'rate', dir: 1 })) toast('Noted: more looks like this.'); else toast('Not connected to the stream yet.'); });
-$('#rDown').addEventListener('click', () => { if (send({ t: 'rate', dir: -1 })) toast('Noted. A new look is on its way.'); else toast('Not connected to the stream yet.'); });
 $('#rNext').addEventListener('click', () => { if (send({ t: 'next' })) toast('A new look is on its way.'); else toast('Not connected to the stream yet.'); });
 $('#amt').addEventListener('input', () => { $('#amtOut').textContent = $('#amt').value; send({ t: 'amount', v: +$('#amt').value }); });
-$('#tasteSave').addEventListener('click', () => { if (!send({ t: 'taste' })) toast('Not connected to the stream yet.'); });
 if (LIVE) {
   showLink();
   sigStart();

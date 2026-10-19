@@ -4,9 +4,10 @@ A video feedback synthesizer that runs in your web browser.
 WHAT'S IN THIS FOLDER
   index.html   The workstation. Open this on your computer.
   phone.html   The page your phone opens when you scan the QR code.
-  stream.html  Go live on Twitch: installs the hidden streamer, and (opened from its
-               tray icon) shows the chat's votes and settings.
-  headless/    The hidden streamer for Windows (see STREAMING ON TWITCH below).
+  stream.html  Go live on Twitch or Kick: installs the hidden streamer, and (opened
+               from its tray icon) shows how it's running, Next look and settings.
+  headless/    The hidden streamer for Windows (see STREAMING ON TWITCH OR KICK
+               below).
   qrcode.js    Draws the QR code (MIT license, Kazuhiko Arase).
   sw.js        Keeps a copy in the browser so it opens without internet.
   nature/      About 500 nature photos for the Picture input, with their credits
@@ -113,26 +114,27 @@ SHOW MODE (a computer that plays at gigs)
      shortcut there with this target (one line, with your address):
        "C:\Program Files\Google\Chrome\Application\chrome.exe" --start-fullscreen https://YOUR-GITHUB-NAME.github.io/phosphor-loop/?show=1
 
-STREAMING ON TWITCH (Windows, hidden in the background)
-  Open stream.html and press "Download Phosphor Loop on Twitch", or use
+STREAMING ON TWITCH OR KICK (Windows, hidden in the background)
+  Open stream.html and press "Download the Phosphor Loop streamer", or use
   headless/Phosphor Loop on Twitch.cmd directly. Double-click it once: Windows
   warns about an unknown app (More info, Run anyway), then it puts a
-  "Phosphor Loop on Twitch" icon on the desktop and asks for your Twitch
-  channel name and stream key (kept encrypted on this computer).
+  "Phosphor Loop on Twitch" icon on the desktop and asks where you stream:
+  Twitch (paste your stream key) or Kick (paste its Stream URL and Stream
+  Key, from Settings, Stream Key on Kick). The key is kept encrypted on this
+  computer.
   After that:
   - Double-click the desktop icon to go live. Nothing opens: Phosphor Loop
     runs in a hidden browser on the graphics chip, records itself with the
-    computer's sound, and ffmpeg sends it straight to Twitch. A purple icon
-    by the clock shows it's live.
+    computer's sound, and ffmpeg sends it straight to Twitch or Kick. A
+    purple icon by the clock shows it's live. On a PC with an NVIDIA card it
+    encodes 1080p on the card (8000 kbps on Twitch, 7500 on Kick).
   - Double-click the icon again to stop (or right-click the tray icon,
     Stop streaming).
-  - Right-click the tray icon, "Open the Go live page", for the chat's
-    votes, skipping looks and settings.
-  Viewers type !like or !skip in the chat. Each viewer counts once per look;
-  enough skips (2 by default, and more skips than likes) bring a new look.
-  With "What my chat likes" picked, the votes also teach Autopilot, in a
-  taste profile called "Twitch chat". The chat is only read, the way anyone
-  can watch it without logging in; nothing is ever written in it.
+  - Right-click the tray icon, "Open the Go live page", for Next look and
+    settings (how often a new look comes, a shared taste for Autopilot to
+    follow, words for the Text input).
+  - To switch between Twitch and Kick, right-click the tray icon, "Change
+    Twitch or Kick, stream key or picture size...".
   Everything it keeps (settings, ffmpeg, its copy of Phosphor Loop, a log)
   is in %LOCALAPPDATA%\PhosphorLoopStream. Each start fetches the newest
   Phosphor Loop from the twitch-stream branch.

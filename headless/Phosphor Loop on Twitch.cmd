@@ -1,31 +1,32 @@
-<# : Phosphor Loop on Twitch. Double-click this file to install it (a desktop icon), then use the icon.
+<# : Phosphor Loop on Twitch or Kick. Double-click this file to install it (a desktop icon), then use the icon.
 @echo off
 set "PL_SELF=%~f0"
 powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "& ([ScriptBlock]::Create([IO.File]::ReadAllText($env:PL_SELF))) -Install"
 exit /b
 #>
 # ---------------------------------------------------------------------------------------------------------------
-# PHOSPHOR LOOP ON TWITCH, the hidden streamer for Windows
+# PHOSPHOR LOOP ON TWITCH OR KICK, the hidden streamer for Windows
 #
 # Double-click the "Phosphor Loop on Twitch" icon on the desktop to go live; double-click it again to stop.
 # Nothing opens on screen: Phosphor Loop runs in a hidden browser on the graphics chip, records itself with the
-# computer's sound, and ffmpeg sends that to Twitch. A tray icon by the clock says it's live (right-click it for
+# computer's sound, and ffmpeg sends that to Twitch or Kick. A tray icon by the clock says it's live (right-click it for
 # Stop, Settings and the Go live page).
 #
-# The first time it asks for the Twitch channel name and stream key (kept encrypted for this Windows user), then
+# The first time it asks where you stream (Twitch or Kick) and for the stream key (kept encrypted for this Windows
+# user; Kick also needs its Stream URL), then
 # downloads Phosphor Loop (the twitch-stream branch) and ffmpeg into %LOCALAPPDATA%\PhosphorLoopStream.
 # Each start checks GitHub for a newer Phosphor Loop and fetches it.
 #
 # This file is three things: the installer (as a .cmd it runs itself with -Install), the program (installed as
 # PhosphorLoopStream.ps1) and, for Claude, its own test bed: on any computer it can run with -Console and test
-# switches (see the param block), sending the stream to a file instead of Twitch.
+# switches (see the param block), sending the stream to a file instead of Twitch or Kick.
 # Plain ASCII only: Windows PowerShell 5.1 reads files without a byte-order mark as ANSI.
 # ---------------------------------------------------------------------------------------------------------------
 param(
   [switch]$Install,                 # copy this file to its home, make the desktop icon, then start
   [switch]$Console,                 # no tray icon or dialogs: report in this window (testing)
-  [string]$Out = '',                # send the stream to this file instead of Twitch (testing)
-  [switch]$BandwidthTest,           # send to Twitch as a bandwidth test (viewers don't see it)
+  [string]$Out = '',                # send the stream to this file instead of Twitch or Kick (testing)
+  [switch]$BandwidthTest,           # Twitch only: send as a bandwidth test (viewers don't see it)
   [int]$StopAfterPieces = 0,        # stop after this many quarter-second pieces have gone out (testing)
   [string]$Browser = '',            # Chrome or Edge (found by itself)
   [string]$BrowserArgs = '',        # extra browser switches (testing)
@@ -33,7 +34,6 @@ param(
   [string]$Ffmpeg = '',             # ffmpeg (downloaded by itself)
   [string]$Site = '',               # a folder with Phosphor Loop's files (downloaded by itself)
   [string]$Sound = '',              # system (default), mic, or none
-  [string]$Channel = '',            # Twitch channel (normally from the settings)
   [string]$HomeDir = ''             # where everything is kept (testing)
 )
 
@@ -45,7 +45,7 @@ $OnWindows = [Environment]::OSVersion.Platform -eq 'Win32NT'
 $Branch = 'twitch-stream'
 $Repo = 'nhillson/phosphor-loop'
 $FfmpegZip = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
-$Ingest = 'rtmp://ingest.global-contribute.live-video.net/app/'
+$TwitchIngest = 'rtmp://ingest.global-contribute.live-video.net/app/'
 if (-not $HomeDir) { $HomeDir = if ($OnWindows) { Join-Path $env:LOCALAPPDATA 'PhosphorLoopStream' } else { Join-Path $HOME '.phosphorloopstream' } }
 New-Item -ItemType Directory -Force -Path $HomeDir | Out-Null
 $LogFile = Join-Path $HomeDir 'log.txt'
@@ -71,7 +71,7 @@ if ($UseTray) {
 }
 function Show-Message([string]$text, [string]$kind = 'Information') {
   Write-Log ('message: ' + $text)
-  if ($UseTray) { [void][System.Windows.Forms.MessageBox]::Show($text, 'Phosphor Loop on Twitch', 'OK', $kind) }
+  if ($UseTray) { [void][System.Windows.Forms.MessageBox]::Show($text, 'Phosphor Loop on Twitch or Kick', 'OK', $kind) }
 }
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ if ($Install) {
   $lnk.TargetPath = Join-Path $env:WINDIR 'System32\conhost.exe'
   $lnk.Arguments = '--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $target + '"'
   $lnk.IconLocation = $ico
-  $lnk.Description = 'Double-click to go live on Twitch; double-click again to stop'
+  $lnk.Description = 'Double-click to go live on Twitch or Kick; double-click again to stop'
   $lnk.WorkingDirectory = $HomeDir
   $lnk.Save()
   Write-Log 'installed'
@@ -130,10 +130,11 @@ if (-not $created) {
 Remove-Item -Force -ErrorAction SilentlyContinue $StopFile
 
 # ---------------------------------------------------------------------------------------------------------------
-# Settings: the channel, the stream key (encrypted for this Windows user), the picture size, the link code that
+# Settings: where it streams (Twitch or Kick, and Kick's Stream URL), the stream key (encrypted for this Windows
+# user), the picture size, the link code that
 # pairs the stream with the Go live page, and which Phosphor Loop is downloaded
 # ---------------------------------------------------------------------------------------------------------------
-$cfg = [ordered]@{ channel = ''; key = ''; quality = '720'; sound = 'system'; link = ''; site = '' }
+$cfg = [ordered]@{ platform = 'twitch'; server = ''; key = ''; quality = '720'; sound = 'system'; link = ''; site = '' }
 if (Test-Path $SettingsFile) {
   try { $saved = Get-Content -Raw $SettingsFile | ConvertFrom-Json; foreach ($k in @($cfg.Keys)) { if ($saved.PSObject.Properties[$k]) { $cfg[$k] = [string]$saved.$k } } } catch {}
 }
@@ -154,50 +155,84 @@ function Get-Key {
   } catch { return '' }
 }
 function Set-Key([string]$plain) { $cfg.key = (ConvertTo-SecureString $plain -AsPlainText -Force | ConvertFrom-SecureString) }
+function Get-PlatformName { if ($cfg.platform -eq 'kick') { 'Kick' } else { 'Twitch' } }
+# Kick's Stream URL as pasted: tidied, rtmps:// added if it's missing, and /app added when only the server is given.
+# Empty when it isn't a stream address at all.
+function Get-KickServer([string]$text) {
+  $u = ([string]$text) -replace '\s', ''
+  if (-not $u) { return '' }
+  if ($u -notmatch '^[A-Za-z]+://') { $u = 'rtmps://' + $u }
+  $u = $u.TrimEnd('/')
+  if ($u -notmatch '^rtmps?://[A-Za-z0-9.-]+(:[0-9]+)?(/[^?#]*)?$') { return '' }
+  if ($u -match '^rtmps?://[^/]+$') { $u += '/app' }
+  return $u
+}
 
 function Show-Setup {
   $f = New-Object System.Windows.Forms.Form
-  $f.Text = 'Phosphor Loop on Twitch'
+  $f.Text = 'Phosphor Loop on Twitch or Kick'
   $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.MinimizeBox = $false
-  $f.ClientSize = New-Object System.Drawing.Size 470, 380
+  $f.ClientSize = New-Object System.Drawing.Size 470, 420
   $f.Font = New-Object System.Drawing.Font 'Segoe UI', 10
   $f.TopMost = $true
-  $y = 18
-  $add = {
-    param($ctl, $h)
-    $ctl.Location = New-Object System.Drawing.Point 22, $script:y
-    $ctl.Width = 426
+  # The rows top to bottom; the Kick-only ones (its Stream URL) show only when Kick is picked
+  $rows = New-Object System.Collections.ArrayList
+  $mk = {
+    param($ctl, $h, $kickOnly, $after)
+    $ctl.Left = 22; $ctl.Width = 426
     if ($h) { $ctl.Height = $h }
     $f.Controls.Add($ctl)
-    $script:y += $ctl.Height + 6
+    [void]$rows.Add(@{ c = $ctl; kick = [bool]$kickOnly; after = [int]$after })
   }
-  $script:y = $y
-  $t = New-Object System.Windows.Forms.Label; $t.Text = 'Two things from Twitch, once. They stay on this computer.'; $t.Font = New-Object System.Drawing.Font 'Segoe UI', 10.5, ([System.Drawing.FontStyle]::Bold); & $add $t 26
-  $l1 = New-Object System.Windows.Forms.Label; $l1.Text = '1. Your Twitch channel name (twitch.tv/your-name):'; & $add $l1 22
-  $ch = New-Object System.Windows.Forms.TextBox; $ch.Text = $cfg.channel; & $add $ch 0
-  $script:y += 8
-  $l2 = New-Object System.Windows.Forms.Label; $l2.Text = '2. Your Twitch stream key (it starts with live_):'; & $add $l2 22
-  $kb = New-Object System.Windows.Forms.TextBox; $kb.UseSystemPasswordChar = $true; if ($cfg.key) { $kb.Text = Get-Key }; & $add $kb 0
-  $ln = New-Object System.Windows.Forms.LinkLabel; $ln.Text = 'Where is it? Open my Twitch stream settings (then press Copy next to Primary Stream key)'; & $add $ln 40
-  $ln.Add_LinkClicked({ Start-Process 'https://dashboard.twitch.tv/settings/stream' })
-  $script:y += 4
-  $l3 = New-Object System.Windows.Forms.Label; $l3.Text = 'Picture size:'; & $add $l3 22
+  $t = New-Object System.Windows.Forms.Label; $t.Text = 'A few things from your streaming site, once. They stay on this computer.'; $t.Font = New-Object System.Drawing.Font 'Segoe UI', 10.5, ([System.Drawing.FontStyle]::Bold); & $mk $t 42 $false 6
+  $l0 = New-Object System.Windows.Forms.Label; $l0.Text = '1. Where do you stream?'; & $mk $l0 22 $false 2
+  $pf = New-Object System.Windows.Forms.ComboBox; $pf.DropDownStyle = 'DropDownList'; [void]$pf.Items.Add('Twitch'); [void]$pf.Items.Add('Kick'); & $mk $pf 0 $false 14
+  $lu = New-Object System.Windows.Forms.Label; $lu.Text = '2. Your Kick Stream URL (it starts with rtmps://):'; & $mk $lu 22 $true 2
+  $ub = New-Object System.Windows.Forms.TextBox; $ub.Text = $cfg.server; & $mk $ub 0 $true 14
+  $l2 = New-Object System.Windows.Forms.Label; & $mk $l2 22 $false 2
+  $kb = New-Object System.Windows.Forms.TextBox; $kb.UseSystemPasswordChar = $true; if ($cfg.key) { $kb.Text = Get-Key }; & $mk $kb 0 $false 4
+  $ln = New-Object System.Windows.Forms.LinkLabel; & $mk $ln 40 $false 10
+  $l3 = New-Object System.Windows.Forms.Label; $l3.Text = 'Picture size:'; & $mk $l3 22 $false 2
   $q = New-Object System.Windows.Forms.ComboBox; $q.DropDownStyle = 'DropDownList'
   if ($script:HasNvidia) { [void]$q.Items.Add('720p - smooth'); [void]$q.Items.Add('1080p - sharpest (recommended: this PC has an NVIDIA card)') }
   else { [void]$q.Items.Add('720p - smooth (recommended)'); [void]$q.Items.Add('1080p - sharper; needs a strong computer and fast internet') }
-  $q.SelectedIndex = if ($cfg.quality -eq '1080') { 1 } else { 0 }; & $add $q 0
-  $msgL = New-Object System.Windows.Forms.Label; $msgL.ForeColor = [System.Drawing.Color]::Firebrick; & $add $msgL 40
-  $ok = New-Object System.Windows.Forms.Button; $ok.Text = 'Go live'; $ok.Width = 140; $ok.Height = 34
-  $ok.Location = New-Object System.Drawing.Point 308, 332
-  $cancel = New-Object System.Windows.Forms.Button; $cancel.Text = 'Cancel'; $cancel.Width = 100; $cancel.Height = 34
-  $cancel.Location = New-Object System.Drawing.Point 200, 332; $cancel.DialogResult = 'Cancel'
+  $q.SelectedIndex = if ($cfg.quality -eq '1080') { 1 } else { 0 }; & $mk $q 0 $false 6
+  $msgL = New-Object System.Windows.Forms.Label; $msgL.ForeColor = [System.Drawing.Color]::Firebrick; & $mk $msgL 40 $false 6
+  $ok = New-Object System.Windows.Forms.Button; $ok.Text = 'Go live'; $ok.Width = 140; $ok.Height = 34; $ok.Left = 308
+  $cancel = New-Object System.Windows.Forms.Button; $cancel.Text = 'Cancel'; $cancel.Width = 100; $cancel.Height = 34; $cancel.Left = 200; $cancel.DialogResult = 'Cancel'
   $f.Controls.Add($ok); $f.Controls.Add($cancel); $f.AcceptButton = $ok; $f.CancelButton = $cancel
+  $layout = {
+    $kick = ($pf.SelectedIndex -eq 1)
+    $l2.Text = if ($kick) { '3. Your Kick stream key:' } else { '2. Your Twitch stream key (it starts with live_):' }
+    $ln.Text = if ($kick) { 'Where are they? Open my Kick dashboard (Settings, then Stream Key: copy the Stream URL and the Stream Key)' }
+               else { 'Where is it? Open my Twitch stream settings (then press Copy next to Primary Stream key)' }
+    $yy = 16
+    foreach ($row in $rows) {
+      $show = (-not $row.kick) -or $kick
+      $row.c.Visible = $show
+      if ($show) { $row.c.Top = $yy; $yy += $row.c.Height + $row.after }
+    }
+    $ok.Top = $yy + 4; $cancel.Top = $yy + 4
+    $f.ClientSize = New-Object System.Drawing.Size 470, ($yy + 54)
+  }
+  $pf.SelectedIndex = if ($cfg.platform -eq 'kick') { 1 } else { 0 }
+  & $layout
+  $pf.Add_SelectedIndexChanged({ $msgL.Text = ''; & $layout })
+  $ln.Add_LinkClicked({ if ($pf.SelectedIndex -eq 1) { Start-Process 'https://kick.com/dashboard' } else { Start-Process 'https://dashboard.twitch.tv/settings/stream' } })
   $ok.Add_Click({
-    $name = ($ch.Text.Trim().ToLower() -replace '^.*twitch\.tv/', '' -replace '[^a-z0-9_]', '')
-    $key = $kb.Text.Trim()
-    if ($name.Length -lt 3) { $msgL.Text = 'Type your Twitch channel name.'; return }
-    if (-not $key.StartsWith('live_')) { $msgL.Text = 'That does not look like a stream key. On Twitch, press Copy next to Primary Stream key, then paste it here (Ctrl+V).'; return }
-    $cfg.channel = $name
+    $kick = ($pf.SelectedIndex -eq 1)
+    $key = $kb.Text -replace '\s', ''
+    if ($kick) {
+      $server = Get-KickServer $ub.Text
+      if (-not $server) { $msgL.Text = 'Paste your Kick Stream URL (it starts with rtmps://). On Kick it is under Settings, Stream Key.'; return }
+      if ($key -match '^rtmps?://') { $msgL.Text = 'That is the Stream URL. Paste it in the box above, and the Stream Key in this one.'; return }
+      if ($key.Length -lt 8) { $msgL.Text = 'Paste your Kick Stream Key (on the same Kick page, press Copy next to Stream Key).'; return }
+      $cfg.server = $server
+    } elseif (-not $key.StartsWith('live_')) {
+      $msgL.Text = 'That does not look like a Twitch stream key. On Twitch, press Copy next to Primary Stream key, then paste it here (Ctrl+V).'
+      return
+    }
+    $cfg.platform = if ($kick) { 'kick' } else { 'twitch' }
     Set-Key $key
     $cfg.quality = if ($q.SelectedIndex -eq 1) { '1080' } else { '720' }
     Save-Settings
@@ -210,7 +245,7 @@ function Show-Setup {
 
 # ---------------------------------------------------------------------------------------------------------------
 # The relay: a tiny web server for the hidden browser (it serves Phosphor Loop's files and takes the recording in
-# pieces), and ffmpeg, which turns the pieces into a Twitch stream. Written in C# so it runs on its own threads
+# pieces), and ffmpeg, which turns the pieces into a Twitch or Kick stream. Written in C# so it runs on its own threads
 # while the tray icon stays responsive.
 # ---------------------------------------------------------------------------------------------------------------
 $relaySource = @'
@@ -444,7 +479,7 @@ $script:Port = 0
 function Say([string]$text, [switch]$Problem) {
   Write-Log $text
   if ($script:Tray) {
-    $script:Tray.BalloonTipTitle = 'Phosphor Loop on Twitch'
+    $script:Tray.BalloonTipTitle = 'Phosphor Loop on ' + (Get-PlatformName)
     $script:Tray.BalloonTipText = $text
     $script:Tray.BalloonTipIcon = if ($Problem) { 'Warning' } else { 'Info' }
     $script:Tray.ShowBalloonTip(6000)
@@ -460,8 +495,8 @@ if ($UseTray) {
   $menu = New-Object System.Windows.Forms.ContextMenuStrip
   $miState = $menu.Items.Add('Getting ready...'); $miState.Enabled = $false
   [void]$menu.Items.Add('-')
-  $miPage = $menu.Items.Add('Open the Go live page (votes and settings)')
-  $miSettings = $menu.Items.Add('Change channel, stream key or picture size...')
+  $miPage = $menu.Items.Add('Open the Go live page (settings and Next look)')
+  $miSettings = $menu.Items.Add('Change Twitch or Kick, stream key or picture size...')
   $miLog = $menu.Items.Add('Show the log')
   [void]$menu.Items.Add('-')
   $miStop = $menu.Items.Add('Stop streaming')
@@ -498,12 +533,11 @@ function Stop-All([string]$why) {
 }
 
 try {
-  if ($Channel) { $cfg.channel = $Channel }
   $streamKey = ''
   if (-not $Out) {
     $streamKey = Get-Key
-    if (-not $cfg.channel -or -not $streamKey) {
-      if (-not $UseTray) { throw 'No Twitch channel or stream key saved; run it once on Windows to set them up.' }
+    if (-not $streamKey -or ($cfg.platform -eq 'kick' -and -not $cfg.server)) {
+      if (-not $UseTray) { throw 'No stream key saved; run it once on Windows to set it up.' }
       if (-not (Show-Setup)) { Stop-All 'setup cancelled'; exit 0 }
       $streamKey = Get-Key
     }
@@ -556,7 +590,7 @@ try {
   if (-not $Ffmpeg) {
     $Ffmpeg = Join-Path $HomeDir 'ffmpeg.exe'
     if (-not (Test-Path $Ffmpeg)) {
-      Say 'Getting ffmpeg, the part that sends video to Twitch (first time only, a few minutes)...'
+      Say ('Getting ffmpeg, the part that sends video to ' + (Get-PlatformName) + ' (first time only, a few minutes)...')
       Set-TrayText 'Phosphor Loop: downloading ffmpeg'
       $zip = Join-Path $HomeDir 'ffmpeg.zip'
       Invoke-WebRequest -Uri $FfmpegZip -OutFile $zip -UseBasicParsing
@@ -575,13 +609,13 @@ try {
   # it would stream with, so one this computer can't run is skipped.
   $h = if ($cfg.quality -eq '1080') { 1080 } else { 720 }
   $w = [int]($h * 16 / 9)
-  # 1080p gets 8000 kbps: above Twitch's long-standing 6000 suggestion, sharper on busy pictures, and still under
-  # the 8500 kbps that Twitch takes in
-  $rate = if ($h -eq 1080) { '8000k' } else { '4500k' }
-  $buf = if ($h -eq 1080) { '16000k' } else { '9000k' }
+  # 1080p on Twitch gets 8000 kbps: above Twitch's long-standing 6000 suggestion, sharper on busy pictures, and
+  # still under the 8500 kbps that Twitch takes in. Kick takes at most 8000 kbps with the sound, so 7500 there.
+  $rate = if ($h -eq 1080) { if ($cfg.platform -eq 'kick') { '7500k' } else { '8000k' } } else { '4500k' }
+  $buf = if ($h -eq 1080) { if ($cfg.platform -eq 'kick') { '15000k' } else { '16000k' } } else { '9000k' }
   # NVENC at its slowest, sharpest preset: two passes over each frame, a look-ahead of 20 frames, and adaptive
   # quantisation in space and time (more of the bits go where the eye notices). Constant bitrate with a one-second
-  # buffer and a keyframe every 2 s, as Twitch wants.
+  # buffer and a keyframe every 2 s, as Twitch and Kick want.
   $nvBest = "-c:v h264_nvenc -preset p7 -tune hq -rc cbr -multipass fullres -b:v $rate -maxrate $rate -bufsize $rate -g 60 -no-scenecut 1 -bf 2 -rc-lookahead 20 -spatial-aq 1 -aq-strength 8 -temporal-aq 1 -profile:v high -pix_fmt yuv420p"
   # The same card with plainer settings, for older NVIDIA cards that can't do all of the above
   $nvPlain = "-c:v h264_nvenc -preset p5 -tune hq -rc cbr -b:v $rate -maxrate $rate -bufsize $rate -g 60 -bf 0 -profile:v high -pix_fmt yuv420p"
@@ -609,11 +643,15 @@ try {
   $script:SizeText = [string]$h + 'p'
   Write-Log ("encoder: $enc, ${w}x$h at $rate (" + $videoArgs + ')')
 
-  # Where it goes: Twitch, or a file for a test
+  # Where it goes: Twitch, Kick (its own Stream URL, over rtmps), or a file for a test
   if ($Out) { $outputArgs = '-f flv "' + $Out + '"' }
   else {
-    $url = $Ingest + $streamKey
-    if ($BandwidthTest) { $url += '?bandwidthtest=true' }
+    if ($cfg.platform -eq 'kick') { $url = $cfg.server + '/' + $streamKey }
+    else {
+      $url = $TwitchIngest + $streamKey
+      if ($BandwidthTest) { $url += '?bandwidthtest=true' }
+    }
+    Write-Log ('streaming to ' + (Get-PlatformName) + ' at ' + $url.Replace($streamKey, '<stream key>'))
     $outputArgs = '-f flv -flvflags no_duration_filesize "' + $url + '"'
   }
 
@@ -646,7 +684,7 @@ try {
   $screens = 1
   if ($UseTray) { $screens = [System.Windows.Forms.Screen]::AllScreens.Count }
   $pick = if ($screens -gt 1) { 'Screen 1' } else { 'Entire screen' }
-  $pageUrl = 'http://localhost:' + $script:Port + '/index.html?stream=1&runner=1&twitch=' + $cfg.channel + '&link=' + $cfg.link + '&sound=' + $cfg.sound + '&at=0'
+  $pageUrl = 'http://localhost:' + $script:Port + '/index.html?stream=1&runner=1&link=' + $cfg.link + '&sound=' + $cfg.sound + '&at=0'
 
   function Start-Browser([bool]$windowed) {
     $profileDir = Join-Path $HomeDir 'browser'
@@ -772,13 +810,15 @@ try {
       $script:LastRuns = $relay.Runs
       $sw = if ($st -and ([string]$st.sound).StartsWith('ok')) { 'with your computer''s sound' } else { 'but without sound (see the log)' }
       if ($Out) { Say ('Recording to ' + $Out + ' ' + $sw + '.') }
-      elseif ($BandwidthTest) { Say ('Practice run on Twitch (viewers cannot see it), ' + $sw + '.') }
-      else { Say ('You are live on Twitch, ' + $sw + '. Double-click the desktop icon again to stop.') }
+      elseif ($BandwidthTest -and $cfg.platform -ne 'kick') { Say ('Practice run on Twitch (viewers cannot see it), ' + $sw + '.') }
+      else { Say ('You are live on ' + (Get-PlatformName) + ', ' + $sw + '. Double-click the desktop icon again to stop.') }
     }
     if ($relay.GaveUp) {
       $why = $relay.LastError
-      $plain = if ($why -match '401|403|Unauthorized|Forbidden|denied') { 'Twitch did not accept the stream key. Right-click the tray icon, choose Change channel, stream key..., and paste the key again.' }
-               elseif ($why -match 'resolve|Network|Connection|timed out|I/O error|refused') { 'Could not reach Twitch. Check the internet connection, then double-click the icon again.' }
+      $pn = Get-PlatformName
+      $what = if ($cfg.platform -eq 'kick') { 'the Stream URL and Stream Key' } else { 'the stream key' }
+      $plain = if ($why -match '401|403|Unauthorized|Forbidden|denied') { $pn + ' did not accept ' + $what + '. Right-click the tray icon, choose Change Twitch or Kick, stream key..., and paste ' + $what + ' again.' }
+               elseif ($why -match 'resolve|Network|Connection|timed out|I/O error|refused') { 'Could not reach ' + $pn + '. Check the internet connection, then double-click the icon again.' }
                else { 'The stream stopped working: ' + $why }
       Say $plain -Problem
       Show-Message $plain 'Warning'
@@ -793,7 +833,7 @@ try {
       Start-Browser $script:UseWindow
       [void](Invoke-BrowserSetup)
     }
-    $state = if ($relay.FfmpegLive) { if ($Out) { 'recording a test' } else { 'LIVE on Twitch' } } else { 'starting' }
+    $state = if ($relay.FfmpegLive) { if ($Out) { 'recording a test' } else { 'LIVE on ' + (Get-PlatformName) } } else { 'starting' }
     $fps = if ($st) { [string]$st.fps + ' fps' } else { '' }
     $sd = if ($st -and ([string]$st.sound).StartsWith('ok')) { 'sound on' } else { 'no sound' }
     $parts = @($state, $fps, $sd, ($script:SizeText + ' ' + $script:EncShort)) | Where-Object { $_ -and $_.Trim() }

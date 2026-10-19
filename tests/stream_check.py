@@ -1,11 +1,11 @@
-"""Stream mode check, for Claude's workspace: the Twitch version of the picture (index.html?stream=1), the Go live
-page (stream.html: the install view and the live view the tray icon opens), and runner mode (runner=1, what the
-hidden browser shows, recording itself for the Windows runner in headless/).
+"""Stream mode check, for Claude's workspace: the stream picture (index.html?stream=1, what goes out on Twitch or
+Kick), the Go live page (stream.html: the install view and the live view the tray icon opens), and runner mode
+(runner=1, what the hidden browser shows, recording itself for the Windows runner in headless/).
 
-Nothing here reaches Twitch or the real connection service: the test stands in for both. A pretend Twitch chat
-sends !like and !skip votes, and a pretend connection service passes messages between the pages, so the Go live
-page and the stream picture link up for real inside the test browser. Runner mode records the browser's fake
-microphone (a beep) and hands its pieces to the test instead of the runner.
+Nothing here reaches Twitch, Kick or the real connection service: a pretend connection service passes messages
+between the pages, so the Go live page and the stream picture link up for real inside the test browser. Chat voting
+was removed on purpose; the test fails if a page tries to reach a chat or shows a vote counter. Runner mode records
+the browser's fake microphone (a beep) and hands its pieces to the test instead of the runner.
 
 The runner itself (PowerShell) is tested separately, end to end, with PowerShell, this browser and ffmpeg writing
 a file: see CLAUDE.md.
@@ -13,7 +13,7 @@ a file: see CLAUDE.md.
 Every wait is a number of frames the stream picture has drawn, never a number of seconds; each has a ceiling.
 
   python3 tests/stream_check.py           all of it (about a minute)
-  python3 tests/stream_check.py --shot    also saves a picture of the stream with its vote counter
+  python3 tests/stream_check.py --shot    also saves a picture of the stream
 
 Exit code 0 = passed. Needs Python Playwright and Pillow (both pre-installed in Claude's workspace).
 """
@@ -27,32 +27,14 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check  # noqa: E402  (the safety check's server, page patching and frame waits)
 
-IRC = 'ws://irc.test/'
 SIGNAL = 'ws://signal.test/peerjs'
 LINK = 'testlink42'
 
 
-class PretendTwitch:
-    """Answers like Twitch chat does for someone watching without logging in, and lets the test type in it."""
-
-    def __init__(self):
-        self.ws = None
-        self.joined = None
-
-    def handle(self, ws):
-        self.ws = ws
-
-        def on(msg):
-            for line in str(msg).split('\r\n'):
-                if line.startswith('JOIN #'):
-                    self.joined = line[6:]
-                    ws.send(f':justinfan1!justinfan1@justinfan1.tmi.twitch.tv JOIN #{self.joined}\r\n'
-                            f'@room-id=1 :tmi.twitch.tv ROOMSTATE #{self.joined}')
-        ws.on_message(on)
-
-    def say(self, user, text):
-        self.ws.send(f'@display-name={user};user-id=id-{user.lower()} :{user.lower()}!{user.lower()}@x.tmi.twitch.tv '
-                     f'PRIVMSG #{self.joined} :{text}')
+def is_chat(url):
+    """A chat connection of any kind: there should never be one now."""
+    u = url.lower()
+    return 'irc' in u or 'twitch' in u or 'kick' in u or 'pusher' in u
 
 
 class PretendSignal:
@@ -90,6 +72,24 @@ class PretendSignal:
         ws.send(json.dumps({'type': 'OPEN'}))
 
 
+STREAM_STATE_JS = """() => ({
+  ui: [...document.body.children].filter(e => e.id !== 'streamLayer' && getComputedStyle(e).display !== 'none').map(e => e.className || e.tagName),
+  canvas: document.getElementById('screen').parentElement.id,
+  size: [document.getElementById('screen').width, document.getElementById('screen').height],
+  ap: document.documentElement.classList.contains('ap-on'),
+  counter: !!document.querySelector('.sv, .sv-flash'),
+  taste: window.__plStream().taste,
+})"""
+
+GOLIVE_FORM_JS = """() => ({
+  every: document.getElementById('everyN').value,
+  taste: document.getElementById('tasteSel').value,
+  gone: ['twName', 'skipN', 'votesOn', 'rUp', 'rDown', 'tasteBox', 'sChat', 'sVotes'].filter(id => document.getElementById(id)),
+  chatText: /!like|!skip|\\bchat\\b|vote/i.test(document.getElementById('live').textContent),
+  pic: document.getElementById('sPic').textContent,
+})"""
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--res', type=int, default=216)
@@ -104,7 +104,8 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     problems, errors = [], []
     t0 = time.time()
-    tw, sig = PretendTwitch(), PretendSignal()
+    sig = PretendSignal()
+    chat_tries = []
 
     def step(text):
         print(f'  {text}')
@@ -115,7 +116,7 @@ def main():
                                     '--autoplay-policy=no-user-gesture-required'])
         ctx = b.new_context(viewport={'width': 480, 'height': 270})
         ctx.grant_permissions(['microphone'])
-        ctx.route_web_socket(IRC, tw.handle)
+        ctx.route_web_socket(is_chat, lambda ws: chat_tries.append(ws.url))
         ctx.route_web_socket(lambda u: u.startswith(SIGNAL), sig.handle)
         # Outside files (fonts, the live site's shared profiles) aren't reachable here; that's not the app's fault
         ctx.route(lambda u: not u.startswith(base), lambda r: r.abort())
@@ -136,7 +137,7 @@ def main():
             # context of its own, first, while nothing else is drawing (this workspace draws in software)
             rctx = b.new_context(viewport={'width': 480, 'height': 270})
             rctx.grant_permissions(['microphone'])
-            rctx.route_web_socket(IRC, PretendTwitch().handle)
+            rctx.route_web_socket(is_chat, lambda ws: chat_tries.append(ws.url))
             rctx.route(lambda u: not u.startswith(base), lambda r: r.abort())
             rctx.route(lambda u: u.split('?')[0].endswith('/index.html'),
                        lambda r: r.fulfill(status=200, content_type='text/html; charset=utf-8', body=html))
@@ -145,7 +146,7 @@ def main():
             watch(rn, 'runner page')
             rn.route('**/push?*', lambda r: (pieces.append(len(r.request.post_data_buffer or b'')), r.fulfill(status=200, body='ok')))
             rn.route('**/status', lambda r: (reports.append(r.request.post_data or ''), r.fulfill(status=200, body='ok')))
-            rn.goto(base + f'index.html?stream=1&runner=1&sound=mic&twitch=testchannel&irc={IRC}', timeout=check.START_CEILING_S * 1000)
+            rn.goto(base + 'index.html?stream=1&runner=1&sound=mic', timeout=check.START_CEILING_S * 1000)
             rc = check.Check(rn, a.out)
             rc.wait_frames(20, 'runner page starting', ceiling=check.START_CEILING_S)
             sound = rn.evaluate('window.__plRunnerSound()')
@@ -160,19 +161,17 @@ def main():
                 problems.append(f'runner page sent {len(pieces)} recording pieces ({pieces[:6]})')
             if not last.get('recording'):
                 problems.append(f'runner page says it is not recording: {last}')
+            if 'chat' in last or 'ch' in last:
+                problems.append(f'runner page still reports on a chat: {last}')
             step(f'runner page: sound {sound}, {len(pieces)} pieces handed over ({last.get("mime")}), reports {len(reports)}')
             rctx.close()
 
-            # 1. The stream picture: only the canvas, Autopilot on, joined to the chat
-            st.goto(base + f'index.html?stream=1&twitch=TestChannel&skip=2&taste=chat&every=20&link={LINK}'
-                    f'&irc={IRC}&signal={SIGNAL}&at=1000', timeout=check.START_CEILING_S * 1000)
+            # 1. The stream picture: only the canvas, Autopilot on, no chat and no vote counter. taste=chat is what
+            # older Go live pages saved; it now means no taste
+            st.goto(base + f'index.html?stream=1&taste=chat&every=20&link={LINK}&signal={SIGNAL}&at=1000',
+                    timeout=check.START_CEILING_S * 1000)
             c.wait_frames(30, 'stream picture starting', ceiling=check.START_CEILING_S)
-            state = st.evaluate("""() => ({
-              ui: [...document.body.children].filter(e => e.id !== 'streamLayer' && getComputedStyle(e).display !== 'none').map(e => e.className || e.tagName),
-              canvas: document.getElementById('screen').parentElement.id,
-              size: [document.getElementById('screen').width, document.getElementById('screen').height],
-              ap: document.documentElement.classList.contains('ap-on'),
-            })""")
+            state = st.evaluate(STREAM_STATE_JS)
             if state['ui']:
                 problems.append(f'controls showing on the stream: {state["ui"]}')
             if state['canvas'] != 'streamLayer':
@@ -181,46 +180,19 @@ def main():
                 problems.append(f'picture is {state["size"]}, not the window size 480 x 270')
             if not state['ap']:
                 problems.append('Autopilot did not start by itself')
-            if tw.joined != 'testchannel':
-                problems.append(f'joined chat #{tw.joined}, not #testchannel')
-            step(f'stream picture: controls hidden, {state["size"][0]} x {state["size"][1]}, Autopilot on, chat #{tw.joined}')
-            c.wait_frames(10, 'counter showing')
-            if st.evaluate("document.querySelector('.sv').classList.contains('off')"):
-                problems.append('the vote counter did not show after joining the chat')
-            _, lit = c.picture('stream-start')
+            if state['counter']:
+                problems.append('a vote counter is on the stream picture')
+            if state['taste'] != 'none':
+                problems.append(f'taste=chat (from an older Go live page) became "{state["taste"]}", not none')
+            step(f'stream picture: controls hidden, {state["size"][0]} x {state["size"][1]}, Autopilot on, '
+                 f'no vote counter, taste {state["taste"]}')
+            path, lit = c.picture('stream-start')
             if lit < 3:
                 problems.append(f'the stream picture is black (brightness {lit:.1f})')
-
-            # 2. Chat votes: a like counts once per viewer, two skips (more than likes) bring a new look
-            tw.say('Ana', '!like this one')
-            tw.say('Ana', '!like')
-            tw.say('Bo', 'hello')
-            c.wait_frames(3, 'first votes')
-            counts = st.evaluate("[...document.querySelectorAll('.sv-v b')].map(b => +b.textContent)")
-            if counts != [1, 0]:
-                problems.append(f'after one viewer liked twice, the counter shows {counts}, not [1, 0]')
-            line = st.evaluate("document.querySelector('.sv-line').textContent")
-            if 'Ana' not in line:
-                problems.append(f'the counter did not name the voter: "{line}"')
-            rated = st.evaluate("JSON.parse(localStorage.getItem('phosphor-taste-v2')).profiles.find(p => p.id === 'twitchchat').votes.length")
-            if rated != 1:
-                problems.append(f'the Twitch chat taste profile has {rated} ratings after a like, not 1')
-            tw.say('Cy', '!skip')
-            c.wait_frames(3, 'one skip')
-            if st.evaluate("document.querySelector('.sv-flash').classList.contains('on')"):
-                problems.append('one skip (of 2 needed) already skipped the look')
-            tw.say('Dee', '!SKIP please')
-            c.wait_frames(3, 'second skip')
-            # Two skips vs one like: the look goes
-            if not st.evaluate("document.querySelector('.sv-flash').classList.contains('on')"):
-                problems.append('two skips against one like did not skip the look')
-            step(f'chat votes: like counted once, named "{line.strip()}", 2 skips skipped the look')
             if a.shot:
-                path, _ = c.picture('stream-votes')
-                st.screenshot(path=os.path.join(a.out, 'stream-votes-page.png'))
-                step(f'pictures: {path} and the whole page with the counter: {os.path.join(a.out, "stream-votes-page.png")}')
+                step(f'picture: {path}')
 
-            # 3. The Go live page, as the tray icon opens it: linked to the stream, its buttons and settings reach it
+            # 2. The Go live page, as the tray icon opens it: linked to the stream, Next look and settings reach it
             gl = ctx.new_page()
             gl.set_viewport_size({'width': 1100, 'height': 900})
             watch(gl, 'Go live page')
@@ -236,20 +208,35 @@ def main():
                 problems.append(f'the Go live page never linked up with the stream (status: "{ui}")')
             else:
                 step(f'Go live page: "{ui.strip()}"')
-            if gl.evaluate("document.getElementById('twName').value") != 'testchannel':
-                problems.append('the Go live page did not show the stream\'s own settings')
+            form = gl.evaluate(GOLIVE_FORM_JS)
+            if form['every'] != '20' or form['taste'] != 'none':
+                problems.append(f"the Go live page did not show the stream's own settings ({form})")
+            if form['gone'] or form['chatText']:
+                problems.append(f'chat voting is still on the Go live page: {form["gone"]}, chat words: {form["chatText"]}')
+            if '480' not in form['pic']:
+                problems.append(f'the Go live page does not show the picture size: "{form["pic"]}"')
             gl.click('#rNext')
-            c.wait_frames(3, 'Next look from the Go live page')
-            if not st.evaluate("document.querySelector('.sv-flash').textContent.includes('New look')"):
-                problems.append('Next look on the Go live page did nothing on the stream')
-            gl.select_option('#skipN', '3')
-            c.wait_frames(6, 'settings reaching the stream')
-            need = st.evaluate("document.querySelector('.sv-v.dn i').textContent")
-            if '3' not in need:
-                problems.append(f'changing votes-to-skip on the Go live page did not reach the stream ("{need}")')
-            step('Go live page buttons and settings reach the stream')
+            nexts = 0
+            for _ in range(10):
+                c.wait_frames(3, 'Next look from the Go live page')
+                nexts = st.evaluate('window.__plStream().nexts')
+                if nexts:
+                    break
+            if nexts != 1:
+                problems.append(f'Next look on the Go live page reached the stream {nexts} times, not once')
+            gl.select_option('#everyN', '45')
+            every = None
+            for _ in range(10):
+                c.wait_frames(3, 'settings reaching the stream')
+                every = st.evaluate('window.__plStream().every')
+                if every == 45:
+                    break
+            if every != 45:
+                problems.append(f'changing "A new look every" on the Go live page did not reach the stream ({every})')
+            step(f'Go live page: shows {form["pic"].strip()}; Next look and settings reach the stream; no chat voting')
 
-            # 4. The install view (opened from the web): the download gives the one-file installer
+            # 3. The install view (opened from the web): the download gives the one-file installer, which asks
+            # Twitch or Kick
             gi = ctx.new_page()
             watch(gi, 'install page')
             gi.goto(base + 'stream.html', timeout=15000)
@@ -262,10 +249,17 @@ def main():
                 problems.append(f'the installer download is wrong ({dl.value.suggested_filename}, {raw[:20]!r})')
             if any(ch > 127 for ch in raw):
                 problems.append('the installer has non-ASCII characters (Windows PowerShell 5.1 would misread them)')
-            step(f'install page: downloads {dl.value.suggested_filename} ({len(raw) // 1024} KB)')
+            if b"Items.Add('Kick')" not in raw or b'channel name' in raw.lower():
+                problems.append('the installer does not offer Twitch or Kick (or still asks for a channel name)')
+            fig = gi.evaluate("document.getElementById('figSetup').textContent")
+            if 'Where do you stream?' not in fig:
+                problems.append('the picture of the first-time box does not show the Twitch or Kick choice')
+            step(f'install page: downloads {dl.value.suggested_filename} ({len(raw) // 1024} KB), which asks Twitch or Kick')
 
         except check.Stalled as e:
             problems.append(str(e))
+        if chat_tries:
+            problems.append(f'a page tried to connect to a chat: {chat_tries[:3]}')
         banner = st.evaluate(check.BANNER_JS)
         if banner:
             problems.insert(0, f'error message on the stream picture: {banner}')

@@ -44,19 +44,23 @@ ffmpeg, serves the files from `http://localhost:47810`, opens Chrome/Edge `--hea
 --use-angle=d3d11`, sizes and "clicks" the page over the debugging port (CDP) so it may capture system audio, and
 relays the page's MediaRecorder pieces (40 Mbps at 1080p) into ffmpeg (NVENC p7 at 8000 kbps on an NVIDIA card, else
 QuickSync, else x264; each probed with its exact settings; keyframe every 2 s) to
-`rtmp://ingest.global-contribute.live-video.net/app/<key>`. Keep the .cmd plain ASCII with CRLF (`.gitattributes`
+`rtmp://ingest.global-contribute.live-video.net/app/<key>` for Twitch, or for Kick to the Stream URL the streamer pasted
+(rtmps, `/app` added when only the server is given) plus `/<key>`; Kick's 1080p is 7500 kbps (Kick's limit is 8000
+with the sound). The setup box asks Twitch or Kick, the key, and for Kick the Stream URL; there is no channel name.
+Keep the .cmd plain ASCII with CRLF (`.gitattributes`
 stores it as-is): Windows PowerShell 5.1 reads files without a BOM as ANSI.
 
 The page side is runner mode, `index.html?stream=1&runner=1` (section "the hidden runner" in stream mode). The
-stream page reads Twitch chat (!like / !skip, vote counter) and links to `stream.html?link=…` (the live view the tray
-icon opens) over the phone link's PeerJS service.
+stream page links to `stream.html?link=…` (the live view the tray icon opens: Next look and settings) over the phone
+link's PeerJS service. Nick had chat voting (!like / !skip, a vote counter, a "Twitch chat" taste) removed entirely;
+don't bring it back.
 
-Checks: `python3 tests/stream_check.py` (about 35 s; stands in for Twitch chat and PeerJS, and checks runner mode
+Checks: `python3 tests/stream_check.py` (about 35 s; stands in for PeerJS, and checks runner mode
 and the installer download). The runner itself: run the .cmd copied to `runner.ps1` under PowerShell 7 for Linux
 (download the tarball from GitHub releases into the scratchpad) with `-Console -Out test.flv -StopAfterPieces 24
 -Browser /opt/pw-browsers/chromium-*/chrome-linux/chrome -BrowserArgs '--no-sandbox --use-angle=swiftshader
 --enable-unsafe-swiftshader --use-fake-device-for-media-stream' -Ffmpeg /usr/bin/ffmpeg -Site <repo> -Sound mic
--Channel test -HomeDir <scratch>`, then ffprobe the file. While on a branch, the web pages are reachable at
+-HomeDir <scratch>`, then ffprobe the file. While on a branch, the web pages are reachable at
 `https://raw.githack.com/nhillson/phosphor-loop/<branch>/stream.html` (one "One more step" notice per browser).
 
 ## Working with Nick
