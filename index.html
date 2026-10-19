@@ -11835,7 +11835,7 @@ async function runnerSound() {
       stream = s.getAudioTracks().length ? new MediaStream(s.getAudioTracks()) : null;
       if (!stream) run.sound = 'no sound came with the screen';
     }
-  } catch (e) { run.sound = 'failed: ' + ((e && e.name) || e); }
+  } catch (e) { run.sound = 'failed: ' + ((e && e.name) || e) + (e && e.message ? ' (' + e.message + ')' : ''); }
   if (stream) {
     run.atrack = stream.getAudioTracks()[0];
     run.sound = 'ok: ' + (run.atrack.label || 'sound');

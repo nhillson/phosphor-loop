@@ -379,7 +379,8 @@ public class PLRelay {
     lock (ffLock) {
       if (GaveUp || !running) { Drain(req); return "stop"; }
       if (ff != null && ff.HasExited) Ended();
-      if (e != ep || ff == null) {
+      // A first piece always gets a fresh ffmpeg: a browser started again begins its own recording from the top
+      if (e != ep || ff == null || first) {
         if (!first) { Drain(req); return "restart"; }
         if (QuickFails > 0) Thread.Sleep(Math.Min(10000, 2000 * QuickFails));
         if (!StartFfmpeg(audio)) { Drain(req); return "error"; }
@@ -780,6 +781,27 @@ try {
   Start-Browser $script:UseWindow
   $soundResult = Invoke-BrowserSetup
   Write-Log ('sound: ' + $soundResult)
+  # The computer's sound comes from screen sharing, which a hidden browser on Windows can be refused (NotReadableError).
+  # Then try once as a browser window placed off screen; if that gets no sound either, go back to the hidden browser
+  # and stream without sound.
+  if ($OnWindows -and -not $script:UseWindow -and $cfg.sound -eq 'system' -and ([string]$soundResult).StartsWith('failed')) {
+    Write-Log 'no sound in the hidden browser; trying a browser window placed off screen'
+    Stop-Browser
+    $relay.StatusJson = ''
+    $script:UseWindow = $true
+    Start-Browser $true
+    $soundResult = Invoke-BrowserSetup
+    Write-Log ('sound (off-screen window): ' + $soundResult)
+    if (-not ([string]$soundResult).StartsWith('ok')) {
+      Write-Log 'no sound that way either; back to the hidden browser, without sound'
+      Stop-Browser
+      $relay.StatusJson = ''
+      $script:UseWindow = $false
+      Start-Browser $false
+      $soundResult = Invoke-BrowserSetup
+      Write-Log ('sound: ' + $soundResult)
+    }
+  }
 
   # -----------------------------------------------------------------------------------------------------------
   # Running: every second, look at how it's going
