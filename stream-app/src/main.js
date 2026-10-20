@@ -42,7 +42,7 @@ const settingsFile = () => path.join(dataDir(), 'settings.json');
 const DEFAULTS = {
   twitch: { enabled: true, key: '' },
   kick: { enabled: false, server: '', key: '' },
-  quality: 'good', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
+  quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
 };
 function lock(text) {
   if (!text) return '';

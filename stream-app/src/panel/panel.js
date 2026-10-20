@@ -5,8 +5,8 @@ let S = null, status = { live: false, destinations: {} }, quality = {};
 
 const QHINT = {
   good: '720p at 30 frames a second. Works on most home internet (about 6 Mbps upload).',
-  better: '1080p at 30 frames a second. The sharpest picture for video feedback (about 10 Mbps upload for Kick).',
-  best: '1080p at 60 frames a second. Smoothest motion, but each frame gets half the detail (about 10 Mbps upload for Kick).',
+  better: '1080p at 30 frames a second. Recommended: keeps the most fine detail (about 10 Mbps upload for Kick).',
+  best: '1080p at 60 frames a second. Smoothest motion, but fine detail suffers: each frame gets half the data.',
 };
 
 function fmtTime(ms) {

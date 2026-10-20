@@ -23,13 +23,16 @@ function encoderArgs(id, { fps, bitrate }, tier = 'best') {
   const cbr = ['-b:v', b, '-maxrate', b, '-bufsize', buf, '-g', g];
   switch (id) {
     case 'h264_nvenc':
-      // Video feedback is fine detail that changes every frame, the hardest kind of picture to squeeze. These
-      // settings trade a little graphics-card time and about half a second of delay for a much cleaner picture.
-      if (tier === 'best') return ['-c:v', 'h264_nvenc', '-preset', 'p6', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'qres',
-        '-spatial-aq', '1', '-temporal-aq', '1', '-aq-strength', '8', '-rc-lookahead', '20', '-bf', '2', '-b_ref_mode', 'middle',
+      // Tested on real Phosphor Loop footage: adaptive quantisation (spatial/temporal AQ) moves bits away from busy,
+      // detailed areas towards flat ones, which smears exactly the fine detail Phosphor Loop is made of. So AQ is
+      // off. Scene-cut keyframes are off too (chaotic feedback looks like a scene change all the time and every
+      // extra keyframe starves the frames around it); keyframes come every 2 s, as Kick and Twitch ask.
+      if (tier === 'best') return ['-c:v', 'h264_nvenc', '-preset', 'p7', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'fullres',
+        '-spatial-aq', '0', '-temporal-aq', '0', '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle',
         ...cbr, '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'high'];
-      if (tier === 'good') return ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'cbr', '-spatial-aq', '1',
-        '-rc-lookahead', '10', '-bf', '2', ...cbr, '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'high'];
+      if (tier === 'good') return ['-c:v', 'h264_nvenc', '-preset', 'p6', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'qres',
+        '-spatial-aq', '0', '-temporal-aq', '0', '-rc-lookahead', '8', '-bf', '2', ...cbr, '-no-scenecut', '1', '-forced-idr', '1',
+        '-profile:v', 'high'];
       return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'cbr', '-bf', '0', ...cbr, '-forced-idr', '1', '-profile:v', 'high'];
     case 'h264_amf':
       if (tier === 'best') return ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'quality', '-rc', 'cbr',
@@ -39,8 +42,9 @@ function encoderArgs(id, { fps, bitrate }, tier = 'best') {
       if (tier === 'best') return ['-c:v', 'h264_qsv', '-preset', 'slower', ...cbr, '-bf', '2', '-profile:v', 'high'];
       return ['-c:v', 'h264_qsv', '-preset', 'faster', ...cbr, '-bf', '0', '-profile:v', 'high'];
     default:
+      // Same lesson on the processor: AQ and psychovisual tuning off keep the most real fine detail
       return ['-c:v', 'libx264', '-preset', 'faster', ...cbr, '-keyint_min', g, '-sc_threshold', '0', '-bf', '2',
-        '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr'];
+        '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr:aq-mode=0:psy-rd=0.0,0.0'];
   }
 }
 
@@ -122,7 +126,11 @@ class Streamer extends EventEmitter {
     const q = this.quality;
     const args = ['-hide_banner', '-loglevel', 'warning', '-stats_period', '5', '-progress', 'pipe:2',
       '-fflags', '+genpts', '-thread_queue_size', '1024', '-i', 'pipe:0', '-map', '0:v:0', '-map', '0:a:0?',
-      '-r', String(q.fps), '-fps_mode', 'cfr', '-pix_fmt', this.encoder.id === 'h264_qsv' ? 'nv12' : 'yuv420p',
+      '-r', String(q.fps), '-fps_mode', 'cfr',
+      // The browser turns the picture into video colours with the older BT.601 formula; convert to BT.709 (what
+      // the tags say and what players expect) so Phosphor Loop's colours come out right. The flags keep colour
+      // edges sharp (FFmpeg's defaults blur them).
+      '-vf', `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=${this.encoder.id === 'h264_qsv' ? 'nv12' : 'yuv420p'}`,
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
       ...encoderArgs(this.encoder.id, q, this.encoder.tier), '-bsf:v', 'dump_extra=freq=keyframe',
       '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
