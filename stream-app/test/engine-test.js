@@ -14,7 +14,12 @@ const FRAMES = +(process.env.FRAMES || 360);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pstest-'));
 const logs = [];
 const ann = (kind, title, text) => { if (process.env.GITHUB_ACTIONS) console.log(`::${kind} title=engine ${title}::` + String(text).slice(-3500).replace(/%/g, '%25').replace(/\r?\n/g, '%0A')); };
-const fail = (m) => { console.error('FAIL: ' + m); ann('error', 'failed', m + '\n' + (typeof logs !== 'undefined' ? logs.join('\n') : '') + (global.extraLog || '')); process.exit(1); };
+const fail = (m) => {
+  console.error('FAIL: ' + m);
+  const all = m + '\n' + (typeof logs !== 'undefined' ? logs.join('\n') : '');
+  for (let i = 0, n = 0; i < all.length && n < 9; i += 3000, n++) ann(n ? 'notice' : 'error', `log ${n + 1}`, all.slice(i, i + 3000));
+  process.exit(1);
+};
 
 function listener(port, out) {
   const p = spawn(FF, ['-hide_banner', '-loglevel', 'error', '-y', '-listen', '1', '-f', 'flv', '-i', `rtmp://127.0.0.1:${port}/app/x`, '-c', 'copy', '-f', 'flv', out]);
@@ -85,10 +90,10 @@ function worstWindowMbps(windowMs) {
     '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000', '-frames:v', String(FRAMES),
     '-c:v', 'libx264', '-preset', 'ultrafast', '-c:a', 'libopus', '-f', 'matroska', 'pipe:1']);
   src.stdout.on('data', (d) => s.write(gen, d));
-  let frame = 0;
+  let frame = 0; const t0 = Date.now();
   src.stderr.on('data', (d) => {
     const m = String(d).match(/frame=(\d+)/g);
-    if (m) frame = +m[m.length - 1].slice(6);
+    if (m) { const f = +m[m.length - 1].slice(6); if (Math.floor(f / 90) !== Math.floor(frame / 90)) logs.push(`t=${Date.now() - t0} ms source frame ${f}; status ${JSON.stringify(s.status())}`); frame = f; }
     if (!lb && frame >= 330) { lb = listener(19351, B); logs.push('second server opened at frame ' + frame); }
   });
   await new Promise((r) => src.on('exit', r));
