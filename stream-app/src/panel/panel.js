@@ -3,11 +3,32 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 let S = null, status = { live: false, destinations: {} }, quality = {};
 
+const PLATFORMS = ['twitch', 'kick', 'youtube'];
+const NAMES = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' };
+const MAX_H = { twitch: 1080, kick: 1080, youtube: 2160 };
 const QHINT = {
-  good: '720p at 30 frames a second. Works on most home internet (about 6 Mbps upload).',
-  better: '1080p at 30 frames a second. Recommended: keeps the most fine detail (about 10 Mbps upload for Kick).',
-  best: '1080p at 60 frames a second. Smoothest motion, but fine detail suffers: each frame gets half the data.',
+  good: '720p at 30 frames a second. Works on most home internet.',
+  better: '1080p at 30 frames a second. Recommended for Kick and Twitch: keeps the most fine detail.',
+  best: '1080p at 60 frames a second. Smoothest motion, but on Kick and Twitch fine detail suffers (each frame gets half the data).',
+  ultra: '1440p at 30 frames a second. YouTube gets the full 1440p; Kick and Twitch get a sharp 1080p copy. Needs a strong graphics card.',
+  max: '4K at 30 frames a second. YouTube gets full 4K; Kick and Twitch get a sharp 1080p copy. Needs a very strong graphics card and fast internet.',
 };
+// What each switched-on platform gets at this quality, and the upload that needs (with 20% to spare)
+function uploadLine() {
+  const q = quality[S.quality];
+  if (!q) return '';
+  const on = PLATFORMS.filter((p) => S[p].enabled);
+  if (!on.length) return '';
+  let total = 0;
+  const parts = on.map((p) => {
+    const h = Math.min(q.height, MAX_H[p]);
+    const table = h === q.height ? q : (q.fps > 30 ? quality.best : quality.better);
+    const mbps = (table.bitrate[p] || table.bitrate.twitch) / 1e6;
+    total += mbps + 0.16;
+    return `${NAMES[p]} ${h === 2160 ? '4K' : h + 'p'} at ${mbps.toFixed(1)} Mbps`;
+  });
+  return `${parts.join(', ')}. Upload needed: about ${Math.ceil(total * 1.2)} Mbps.`;
+}
 
 function fmtTime(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -15,7 +36,7 @@ function fmtTime(ms) {
 }
 
 function renderSettings() {
-  for (const p of ['twitch', 'kick']) {
+  for (const p of PLATFORMS) {
     const d = S[p];
     $(`#on-${p}`).checked = d.enabled;
     $(`#dest-${p}`).classList.toggle('disabled', !d.enabled);
@@ -25,8 +46,12 @@ function renderSettings() {
   }
   if (S.kick.server && !$('#server-kick').value) $('#server-kick').value = S.kick.server;
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) $(`#opt-${k}`).checked = S[k];
-  $$('#quality button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
-  $('#qualityHint').textContent = QHINT[S.quality] + (status.live ? ' Stop the stream to change this.' : '');
+  $('#opt-yt-hevc').checked = !!S.youtube.hevc;
+  $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
+  $('#qualityHint').innerHTML = '';
+  $('#qualityHint').append(QHINT[S.quality] + (status.live ? ' Stop the stream to change this.' : ''));
+  const need = uploadLine();
+  if (need) { const el = document.createElement('span'); el.className = 'need'; el.textContent = need; $('#qualityHint').append(el); }
   $('#panel').hidden = S.collapsed; $('#strip').hidden = !S.collapsed;
 }
 
@@ -44,7 +69,7 @@ function renderStatus() {
   const title = { off: 'Off air', starting: 'Going live…', live: 'Live', retrying: 'Reconnecting…' }[state];
   $('#airTitle').textContent = state === 'live' ? `Live · ${fmtTime(Date.now() - status.since)}` : title;
   let sub = 'Ready when you are.';
-  if (state === 'starting') sub = 'Connecting to ' + (Object.keys(dests).map((k) => k === 'kick' ? 'Kick' : 'Twitch').join(' and ') || 'the platforms') + '…';
+  if (state === 'starting') sub = 'Connecting to ' + (Object.keys(dests).map((k) => NAMES[k] || k).join(' and ') || 'the platforms') + '…';
   if (state === 'live') {
     sub = status.kbps ? `Sending · ${(status.kbps / 1000).toFixed(1)} Mbps` : 'Sending…';
     if (status.pictureFps) sub += ` · ${status.pictureFps} frames a second`;
@@ -56,7 +81,7 @@ function renderStatus() {
   if (!btn.classList.contains('confirm')) btn.textContent = status.live ? 'Stop stream' : (status.starting ? 'Going live…' : 'Go live');
   btn.disabled = !!status.starting;
 
-  for (const p of ['twitch', 'kick']) {
+  for (const p of PLATFORMS) {
     const d = dests[p];
     const card = $(`#dest-${p}`);
     card.dataset.s = d ? d.state : (S && S[p].enabled ? 'idle' : 'off');
@@ -65,10 +90,14 @@ function renderStatus() {
   }
   if (status.encoder) $('#encoder').textContent = 'Using: ' + status.encoder + (status.setting ? ` · ${status.setting}` : '');
   $('#tuneRun').disabled = !!tune.running || !!status.live || !!status.starting;
-  $$('#quality button').forEach((b) => { b.disabled = !!status.live || !!tune.running; });
+  $$('[data-q]').forEach((b) => { b.disabled = !!status.live || !!tune.running; });
   // Phosphor Loop can't draw as fast as the stream asks: say so plainly and suggest the fix
-  const slow = state === 'live' && status.wantFps > 30 && status.pictureFps && status.pictureFps < status.wantFps * 0.85;
-  showNotice(status.notice || (slow ? { kind: 'warn', text: `This computer is drawing about ${status.pictureFps} frames a second, short of the ${status.wantFps} that Best sends, so the stream repeats frames. Better (30 frames a second) will look smoother and sharper.` } : null));
+  // Phosphor Loop can't draw as fast as the stream asks: say so plainly and suggest the fix
+  const slow = state === 'live' && status.pictureFps && status.pictureFps < status.wantFps * 0.85 && Date.now() - status.since > 20000;
+  const slowText = status.wantFps > 30
+    ? `This computer is drawing about ${status.pictureFps} frames a second, short of the ${status.wantFps} that Best sends, so the stream repeats frames. Better (30 frames a second) will look smoother and sharper.`
+    : `This computer is drawing about ${status.pictureFps} frames a second, short of ${status.wantFps}, so the stream repeats frames. A smaller picture quality (like 1080p instead of 4K) will look smoother.`;
+  showNotice(status.notice || (slow ? { kind: 'warn', text: slowText } : null));
 }
 
 function showNotice(n) {
@@ -134,9 +163,10 @@ $('#golive').addEventListener('click', async () => {
   await window.app.goLive();
 });
 
-for (const p of ['twitch', 'kick']) {
+for (const p of PLATFORMS) {
   $(`#on-${p}`).addEventListener('change', (e) => save({ [p]: { enabled: e.target.checked } }));
 }
+$('#opt-yt-hevc').addEventListener('change', (e) => save({ youtube: { hevc: e.target.checked } }));
 $$('[data-save]').forEach((b) => b.addEventListener('click', async () => {
   const p = b.dataset.save;
   const key = $(`#key-${p}`).value.trim();
@@ -166,7 +196,7 @@ $$('[data-show]').forEach((b) => b.addEventListener('click', () => {
   input.type = input.type === 'password' ? 'text' : 'password';
   b.textContent = input.type === 'password' ? 'Show' : 'Hide';
 }));
-$$('#quality button').forEach((b) => b.addEventListener('click', () => { if (!status.live) save({ quality: b.dataset.q }); }));
+$$('[data-q]').forEach((b) => b.addEventListener('click', () => { if (!status.live) save({ quality: b.dataset.q }); }));
 for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) {
   $(`#opt-${k}`).addEventListener('change', (e) => save({ [k]: e.target.checked }));
 }

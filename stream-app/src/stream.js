@@ -68,7 +68,24 @@ const VARIANTS = {
   'x264-faster': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, fast', args: x264('faster', 'aq-mode=0:psy-rd=0.0,0.0') },
   'x264-medium': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, careful', args: x264('medium', 'aq-mode=0:psy-rd=0.0,0.0') },
   'x264-slow': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, very careful', args: x264('slow', 'aq-mode=0:psy-rd=0.0,0.0') },
+  // HEVC (H.265), for YouTube: more picture per Mbps than H.264. Kick and Twitch (without Enhanced Broadcasting)
+  // only take H.264. family = the H.264 encoder that tells us which graphics card this is.
+  'nvh-p7': { codec: 'hevc_nvenc', family: 'h264_nvenc', hevc: true, auto: false, label: 'HEVC, max quality',
+    args: (q) => ['-c:v', 'hevc_nvenc', '-preset', 'p7', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'fullres', ...AQ0, '-rc-lookahead', '16',
+      '-bf', '3', '-b_ref_mode', 'middle', ...rules(q), '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'main'] },
+  'nvh-p5': { codec: 'hevc_nvenc', family: 'h264_nvenc', hevc: true, auto: false, label: 'HEVC (older cards)',
+    args: (q) => ['-c:v', 'hevc_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'qres', ...AQ0, '-rc-lookahead', '8',
+      '-bf', '0', ...rules(q), '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'main'] },
+  'amfh': { codec: 'hevc_amf', family: 'h264_amf', hevc: true, auto: false, label: 'HEVC, AMD',
+    args: (q) => ['-c:v', 'hevc_amf', '-usage', 'transcoding', '-quality', 'quality', '-rc', 'cbr', ...rules(q), '-profile:v', 'main'] },
+  'qsvh': { codec: 'hevc_qsv', family: 'h264_qsv', hevc: true, auto: false, label: 'HEVC, Intel',
+    args: (q) => ['-c:v', 'hevc_qsv', '-preset', 'slower', ...rules(q), '-profile:v', 'main'] },
+  'x265-fast': { codec: 'libx265', family: 'libx264', hevc: true, cpu: true, auto: false, label: 'HEVC, processor',
+    args: (q) => ['-c:v', 'libx265', '-preset', 'veryfast', ...rules(q), '-x265-params',
+      `scenecut=0:aq-mode=0:psy-rd=0:keyint=${q.fps * 2}:min-keyint=${q.fps * 2}:log-level=error`] },
 };
+// HEVC settings per graphics card, best first
+const HEVC_TIERS = { h264_nvenc: ['nvh-p7', 'nvh-p5'], h264_amf: ['amfh'], h264_qsv: ['qsvh'], libx264: ['x265-fast'] };
 // Each encoder has settings tiers, best first. The first tier the computer's graphics card accepts is used, so an
 // older card still gets the best settings it can do instead of falling all the way back to the processor.
 const TIERS = { h264_nvenc: ['nv-p7-full', 'nv-p6-qres', 'nv-p4'], h264_amf: ['amf-best', 'amf-basic'],
@@ -82,6 +99,16 @@ function encoderArgs(idOrVariant, q, tier = 'best') {
   return VARIANTS[list[Math.min(list.length - 1, Math.max(0, TIER_NAMES.indexOf(tier)))]].args(q);
 }
 
+// The same settings for the n-th video stream of a stream with several encodes: "-b:v 6M" becomes "-b:v:1 6M"
+function forStream(args, n) {
+  const out = [];
+  for (let i = 0; i < args.length; i += 2) {
+    const k = args[i];
+    out.push(/:v$/.test(k) ? `${k}:${n}` : k.includes(':') ? k : `${k}:v:${n}`, args[i + 1]);
+  }
+  return out;
+}
+
 // Stream keys must never show up in anything the app displays or writes to its log.
 function redactor(secrets) {
   const list = secrets.filter((s) => s && s.length >= 4);
@@ -92,6 +119,8 @@ function buildUrl(platform, { server, key }) {
   key = String(key || '').trim();
   if (!key) return null;
   if (platform === 'twitch') return `rtmp://live.twitch.tv/app/${key}`;
+  // YouTube's secure server (its recommended one)
+  if (platform === 'youtube') return `rtmps://a.rtmps.youtube.com:443/live2/${key}`;
   if (platform === 'custom') return String(server || '').trim().replace(/\/+$/, '') + '/' + key;
   // Kick shows its own server address (Amazon IVS). It may come with or without :443 and /app.
   let s = String(server || '').trim().replace(/\/+$/, '');
@@ -120,10 +149,10 @@ class Streamer extends EventEmitter {
   }
 
   // Can this computer use these encoder settings? Tried on a short test picture. '' = yes, otherwise FFmpeg's reason.
-  tryVariant(variant) {
+  tryVariant(variant, { width = 1280, height = 720, bitrate = 4000000 } = {}) {
     return new Promise((res) => {
-      execFile(this.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=1280x720:r=30',
-        '-frames:v', '30', '-pix_fmt', 'yuv420p', ...encoderArgs(variant, { fps: 30, bitrate: 4000000 }), '-f', 'null', '-'],
+      execFile(this.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', `testsrc2=s=${width}x${height}:r=30`,
+        '-frames:v', '30', '-pix_fmt', 'yuv420p', ...encoderArgs(variant, { fps: 30, bitrate }), '-f', 'null', '-'],
         { timeout: 20000, windowsHide: true }, (err, _o, stderr) => res(err ? String(stderr || err.message).trim().split('\n').pop() || 'failed' : ''));
     });
   }
@@ -152,12 +181,29 @@ class Streamer extends EventEmitter {
     return this.encoder;
   }
 
-  // dests: [{id, name, url}], quality: {fps, bitrate}
-  start(dests, quality) {
+  // The best HEVC settings this computer can make at this size (null if none)
+  async probeHevc(size) {
+    const family = this.encoder ? this.encoder.id : 'libx264';
+    for (const v of HEVC_TIERS[family] || []) {
+      if (VARIANTS[v].cpu && size.height > 1080) continue; // the processor can't make big HEVC in real time
+      const problem = await this.tryVariant(v, size);
+      if (!problem) return v;
+      this.log(`HEVC ${v} at ${size.width}x${size.height} not usable: ${problem.slice(0, 200)}`);
+    }
+    return null;
+  }
+
+  // dests: [{id, name, url, secret, stream}], plan: {fps, input: {width, height}, encodes: [{width, height, bitrate,
+  // variant}]}. Each destination gets the encode numbered by its "stream" (encodes are shared when identical).
+  // Older form: plan = {fps, bitrate}: one encode for every destination.
+  start(dests, plan) {
     if (this.live) return;
     if (!this.encoder) this.encoder = { ...ENCODERS[ENCODERS.length - 1], tier: 'best', variant: 'x264-faster' };
+    if (!plan.encodes) plan = { ...plan, encodes: [{ bitrate: plan.bitrate, variant: this.encoder.variant }] };
+    dests = dests.map((d) => ({ ...d, stream: d.stream || 0 }));
     this.live = true;
-    this.quality = quality;
+    this.quality = plan;
+    this.plan = plan;
     this.redact = redactor(dests.map((d) => d.secret));
     this.startedAt = Date.now();
     for (const d of dests) this.senders.set(d.id, { def: d, proc: null, state: 'connecting', message: 'Connecting…', retry: 0, timer: null });
@@ -169,16 +215,32 @@ class Streamer extends EventEmitter {
 
   startEncoder() {
     this.gen++;
-    const q = this.quality;
+    const plan = this.plan, q = plan;
+    const input = plan.input || {};
+    // The browser turns the picture into video colours with the older BT.601 formula; convert to BT.709 (what the
+    // tags say and what players expect) so Phosphor Loop's colours come out right. The flags keep colour edges
+    // sharp (FFmpeg's defaults blur them). An encode smaller than the picture (Kick's 1080p copy of a 4K picture)
+    // is scaled down in the same step, with a sharp filter.
+    const conv = 'in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv';
+    const n = plan.encodes.length;
+    const branches = plan.encodes.map((e, i) => {
+      const resize = e.width && e.height && (e.width !== input.width || e.height !== input.height);
+      const fmt = /_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p';
+      return `[s${i}]scale=${resize ? `w=${e.width}:h=${e.height}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}[v${i}]`;
+    });
+    const graph = `[0:v:0]split=${n}${plan.encodes.map((_, i) => `[s${i}]`).join('')};` + branches.join(';');
+    const encArgs = [];
+    plan.encodes.forEach((e, i) => {
+      encArgs.push('-map', `[v${i}]`, ...forStream(encoderArgs(e.variant || this.encoder.variant, { fps: q.fps, bitrate: e.bitrate }), i));
+    });
     const args = ['-hide_banner', '-loglevel', 'warning', '-stats_period', '5', '-progress', 'pipe:2',
-      '-fflags', '+genpts', '-thread_queue_size', '1024', '-i', 'pipe:0', '-map', '0:v:0', '-map', '0:a:0?',
+      // A picture bigger than 1080p is unpacked on the graphics card when it can (much less work for the processor)
+      ...((input.height || 0) > 1080 ? ['-hwaccel', 'auto'] : []),
+      '-fflags', '+genpts', '-thread_queue_size', '1024', '-i', 'pipe:0',
+      '-filter_complex', graph, ...encArgs, '-map', '0:a:0?',
       '-r', String(q.fps), '-fps_mode', 'cfr',
-      // The browser turns the picture into video colours with the older BT.601 formula; convert to BT.709 (what
-      // the tags say and what players expect) so Phosphor Loop's colours come out right. The flags keep colour
-      // edges sharp (FFmpeg's defaults blur them).
-      '-vf', `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=${this.encoder.id === 'h264_qsv' ? 'nv12' : 'yuv420p'}`,
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-      ...encoderArgs(this.encoder.variant || this.encoder.id, q, this.encoder.tier), '-bsf:v', 'dump_extra=freq=keyframe',
+      '-bsf:v', 'dump_extra=freq=keyframe',
       '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
       '-f', 'mpegts', '-mpegts_flags', '+resend_headers', '-muxdelay', '0', 'pipe:1'];
     this.prog = { frame: 0, dup: 0, drop: 0, at: Date.now(), lastLog: Date.now(), lastFrame: 0, lastDup: 0, lastDrop: 0, partial: '' };
@@ -221,9 +283,16 @@ class Streamer extends EventEmitter {
     // Send at the stream's own pace from the very first second. Without the pace limit, the few seconds FFmpeg
     // gathers while it starts up go out in one burst, and Kick (Amazon IVS) hangs up on anything over its limit.
     // It looks for up to 3 s for a full picture (one comes every 2 s), which it needs when joining mid-stream.
-    const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-probesize', '10000000', '-analyzeduration', '3000000',
+    // It takes only its own encode out of the shared stream (which may hold several).
+    const total = this.plan.encodes.reduce((a, e) => a + e.bitrate, 0) + 160000;
+    const enc = this.plan.encodes[s.def.stream] || this.plan.encodes[0];
+    const hevc = VARIANTS[enc.variant] && VARIANTS[enc.variant].hevc;
+    const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-probesize', String(Math.max(10000000, Math.round(total / 8 * 4))),
+      '-analyzeduration', '3000000',
       '-readrate', '1', '-readrate_initial_burst', '0.5', '-f', 'mpegts', '-i', 'pipe:0',
-      '-map', '0', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-flvflags', 'no_duration_filesize', '-rw_timeout', '15000000',
+      '-map', `0:v:${s.def.stream}`, '-map', '0:a:0?', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-flvflags', 'no_duration_filesize', '-rw_timeout', '15000000',
+      // HEVC goes out as "enhanced RTMP", which YouTube understands
+      ...(hevc ? ['-rtmp_enhanced_codecs', 'hvc1'] : []),
       '-f', 'flv', s.def.url];
     const p = spawn(this.ffmpeg, args, { windowsHide: true });
     s.proc = p; s.state = s.retry ? 'retrying' : 'connecting'; s.message = s.retry ? 'Reconnecting…' : 'Connecting…';
@@ -256,6 +325,15 @@ class Streamer extends EventEmitter {
   tick() {
     this.kbps = Math.round(this.bytesOut * 8 / 1000);
     this.bytesOut = 0;
+    // An upload that can't keep up: the sender's waiting pile keeps growing. Say so plainly (once per stretch).
+    for (const s of this.senders.values()) {
+      const waiting = s.proc && s.proc.stdin ? s.proc.stdin.writableLength : 0;
+      s.slow = waiting > 6 * 1024 * 1024 ? (s.slow || 0) + 1 : 0;
+      if (s.slow === 10) {
+        this.log(`${s.def.name}: the internet upload isn't keeping up (${(waiting / 1e6).toFixed(0)} MB waiting)`);
+        this.emit('slow-upload', s.def);
+      }
+    }
     // No pictures arriving from Phosphor Loop for a while: ask for the capture to be restarted
     if (this.live && this.lastIn && Date.now() - this.lastIn > 6000) {
       this.log('No picture for 6 s; restarting capture');
@@ -281,11 +359,17 @@ class Streamer extends EventEmitter {
     pr.partial = lines.pop();
     const other = [];
     for (const line of lines) {
-      const m = line.match(/^(frame|dup_frames|drop_frames|progress)=(\S+)/);
+      const m = line.match(/^(frame|dup_frames|drop_frames|speed|progress)=\s*(\S+)/);
       if (!m) { if (line.trim()) other.push(line.trim()); continue; }
       if (m[1] === 'frame') pr.frame = +m[2];
       else if (m[1] === 'dup_frames') pr.dup = +m[2];
       else if (m[1] === 'drop_frames') pr.drop = +m[2];
+      else if (m[1] === 'speed') {
+        // The squeezer can't keep up with real time (too big a picture or too many streams for this computer)
+        const sp = parseFloat(m[2]);
+        pr.slowSpeed = Number.isFinite(sp) && sp > 0 && sp < 0.93 && Date.now() - this.startedAt > 30000 ? (pr.slowSpeed || 0) + 1 : 0;
+        if (pr.slowSpeed === 4) { this.log(`Squeezing is behind real time (speed ${sp}x)`); this.emit('slow-encode', sp); }
+      }
       else if (m[1] === 'progress') {
         const now = Date.now(), secs = (now - pr.at) / 1000;
         if (secs > 1 && pr.lastFrame) {
@@ -342,4 +426,4 @@ function explain(tail, def, wasLive) {
   return `${def.name} stopped.`;
 }
 
-module.exports = { Streamer, buildUrl, encoderArgs, redactor, ENCODERS, TIERS, VARIANTS };
+module.exports = { Streamer, buildUrl, encoderArgs, forStream, redactor, ENCODERS, TIERS, VARIANTS, HEVC_TIERS };

@@ -66,6 +66,25 @@
         </div>
       </div>
     </div>
+
+    <div class="dest" id="dest-youtube" data-platform="youtube">
+      <div class="dest-head">
+        <span class="light" aria-hidden="true"></span>
+        <div class="dest-name">YouTube<span class="dest-state" id="state-youtube"></span></div>
+        <label class="switch"><input type="checkbox" id="on-youtube"><span></span><b class="sr">Stream to YouTube</b></label>
+      </div>
+      <div class="dest-body">
+        <div class="saved" id="saved-youtube" hidden>Stream key saved <button class="link" data-change="youtube">Change</button></div>
+        <div class="fields" id="fields-youtube">
+          <label>Stream key
+            <span class="keybox"><input type="password" id="key-youtube" autocomplete="off" spellcheck="false" placeholder="Paste it here"><button class="link show" data-show="key-youtube">Show</button></span>
+          </label>
+          <div class="row"><button class="small primary" data-save="youtube">Save</button><button class="link" data-help="youtube">Where do I find it?</button></div>
+          <p class="how" id="how-youtube" hidden>YouTube’s live page just opened in your web browser. If it asks, choose <b>Streaming software</b> (or <b>Stream</b>). Next to <b>Stream key</b>, click <b>Copy</b>, then paste it in the box above and click Save. The very first time, YouTube can take up to 24 hours to switch live streaming on for a channel.</p>
+        </div>
+        <label class="mini-toggle"><span>Sharper format (HEVC) when this PC can make it</span><span class="switch"><input type="checkbox" id="opt-yt-hevc"><span></span></span></label>
+      </div>
+    </div>
   </section>
 
   <section class="block">
@@ -74,6 +93,10 @@
       <button role="radio" data-q="good"><b>Good</b><small>720p</small></button>
       <button role="radio" data-q="better"><b>Better</b><small>1080p</small></button>
       <button role="radio" data-q="best"><b>Best</b><small>1080p smooth</small></button>
+    </div>
+    <div class="seg seg2" id="quality2" role="radiogroup" aria-label="Picture quality for YouTube">
+      <button role="radio" data-q="ultra"><b>1440p</b><small>for YouTube</small></button>
+      <button role="radio" data-q="max"><b>4K</b><small>for YouTube</small></button>
     </div>
     <p class="hint" id="qualityHint"></p>
   </section>

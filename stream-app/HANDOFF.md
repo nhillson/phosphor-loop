@@ -1,6 +1,7 @@
 # Phosphor Stream — handoff
 
-Written 2026-10-20 at version **1.2.0**, for the next agent picking this up cold. Read this file, then
+Written 2026-10-20 at version **1.2.0**, updated for **1.4.0** (sharpness test, YouTube, several encodes at once),
+for the next agent picking this up cold. Read this file, then
 `/CLAUDE.md` at the repo root (Nick's standing testing rules), then the code (about 900 lines in `src/`).
 
 ## 1. What this is, and for whom
@@ -8,7 +9,7 @@ Written 2026-10-20 at version **1.2.0**, for the next agent picking this up cold
 **Nick** (GitHub `nhillson`, Minnesota, US Central time) built **Phosphor Loop**, a WebGL video-feedback
 synthesizer at https://nhillson.github.io/phosphor-loop/ (repo root: `index.html`, `js/app.js`, `js/shaders.js`).
 He wants to stream it 24/7 from a dedicated Windows PC ("stream-pc", NVIDIA GPU, model unknown) to **Kick**
-(his main platform) and **Twitch**, **without OBS**.
+(his main platform), **Twitch** and (since 1.4) **YouTube**, **without OBS**.
 
 **Phosphor Stream** is that app: a Windows Electron program showing Phosphor Loop on the left and a control panel
 on the right (connect Twitch/Kick by pasting stream keys, Go live, status lights, quality Good/Better/Best,
@@ -46,15 +47,17 @@ before every push.
 ## 3. How it works
 
 ```
- Phosphor Loop page (WebContentsView, capture mode 1920x1080 or 1280x720, 30/60 fps)
+ Phosphor Loop page (WebContentsView, capture mode 720p/1080p/1440p/2160p, 30/60 fps)
    │  canvas.captureStream(fps) + computer sound (WASAPI loopback, no picker)
    │  MediaRecorder  video/x-matroska;codecs=avc1,opus  @ 60 Mbps (90 at 60 fps), 200 ms chunks
    ▼  IPC 'chunk' (src/capture-page.js → src/preload-site.js → src/main.js)
  FFmpeg #1 "squeezer" (src/stream.js startEncoder)
-   decode → -r fps cfr → BT.601→BT.709 colour convert → NVENC/AMF/QSV/x264 CBR → MPEG-TS on stdout
+   decode (-hwaccel auto above 1080p) → split → per encode: BT.601→BT.709 convert (+ lanczos downscale if smaller)
+   → its own encoder (H.264 NVENC/AMF/QSV/x264, or HEVC for YouTube) → all encodes + one AAC in ONE MPEG-TS on stdout
    ▼  fan-out in Node (per-destination backpressure guard: 32 MB → restart that sender)
  FFmpeg #2..n "senders" (src/stream.js startSender), one per platform
-   -readrate 1 (steady pace) -c copy → FLV → rtmp://live.twitch.tv/app/KEY  |  rtmps://<kick ingest>:443/app/KEY
+   -map 0:v:<its encode> -map 0:a -readrate 1 (steady pace) -c copy → FLV → rtmp://live.twitch.tv/app/KEY  |
+   rtmps://<kick ingest>:443/app/KEY  |  rtmps://a.rtmps.youtube.com:443/live2/KEY (HEVC: -rtmp_enhanced_codecs hvc1)
 ```
 
 - **Capture mode** is a hook already in Phosphor Loop: if `window.__phosphorCaptureConfig = {width,height,fps,renderHeight}`
@@ -73,9 +76,25 @@ before every push.
   chunks arrive for 6 s, or the squeezer dies, the capture restarts (`gen` counter drops stale chunks). Page
   crash → reload; page reload while live → capture re-attached.
 - **Stream keys** are never shown or logged (`redactor`), and are stored encrypted.
-- **Quality table** (`QUALITY` in main.js): Good 720p30 4.5 Mbps; Better 1080p30 and Best 1080p60 at
-  Kick 7.5 / Twitch 6 Mbps. When both platforms are on, one encode at the lower rate goes to both. Default is
-  **Better**.
+- **Quality table** (`QUALITY` in main.js): Good 720p30; Better 1080p30; Best 1080p60; **1440p** (`ultra`) and
+  **4K** (`max`) at 30 fps. Kick 7.5 / Twitch 6 Mbps (4.5 at 720p), always ≤1080p (a lanczos-downscaled copy at
+  1440p/4K). YouTube gets YouTube's own recommended H.264 rates (help answer 2853702, 2026): 8 / 14 / 17 / 21 / 42
+  Mbps, at the full size. **Every platform gets its own encode** (`makePlan` in main.js; identical ones are shared).
+  YouTube gets **HEVC** when `settings.youtube.hevc` (default on) and `probeHevc()` finds a working HEVC encoder at
+  that size (nvh-p7 → nvh-p5 → amfh/qsvh; x265 only ≤1080p); otherwise H.264. Big H.264 sizes are probed too; if
+  one fails, that platform gets 1080p and Nick is told. Default quality is **Better**.
+- **Warnings**: `slow-upload` (a sender's waiting pile >6 MB for 10 s) and `slow-encode` (squeezer speed <0.93x
+  for 4 reports after 30 s) show plain notices in the panel. The panel also shows the upload each quality needs.
+- **Sharpness test** (1.3+, `src/tune.js`, panel section "Sharpness test", or `"Phosphor Stream.exe" --sharpness-test`
+  which also works on the already-open app): records 5 s of the real picture losslessly (readPixels inside the
+  site's `onFrame`, RGBA over IPC, FFmpeg → yuv420p BT.709 in `%TEMP%\Phosphor Stream sharpness test\sample.yuv`, kept
+  for later experiments), records the same frames through the page's MediaRecorder and reports its loss (lined-up
+  PSNR Y/U/V, missing/extra frames), then encodes the sample with every variant (`VARIANTS` in stream.js) at the
+  real bitrate and scores fine detail (high-pass detail SNR via gblur+grainextract+psnr, plus PSNR/SSIM), speed
+  and peak 1 s bitrate. `pick()` keeps the sharpest that runs ≥1.6× real time (2.5× for CPU) and doesn't burst;
+  ties (<0.1 dB) keep the usual tier. Saved as `settings.tuned`, used by `probe(preferred)`. Results:
+  `sharpness-test.json` in the app data folder plus log lines. `sharpness-extra.json` there adds measured-only
+  variants (`{"variants":{"id":{"label","args":[… "{BITRATE}" … "{GOP}"]}}}`) for remote A/B without a release.
 
 ## 4. History: what went wrong and what we learned
 
@@ -85,6 +104,8 @@ before every push.
 | 1.1 | Nearly lossless first recording; NVENC "quality" tiers; Kick 8 Mbps; frames-per-second readout | Nick: Kick picture "crap". Log showed NVENC p4 `-tune ll` at 6 Mbps, two lossy encodes, dropped frames at 60 fps |
 | 1.1.1 | Sender paced with `-readrate 1`; Kick 7.5 Mbps; bufsize = bitrate; probe 3 s; quality change resizes in place | Nick: "keeps losing connection to Kick". Log: Kick (Amazon IVS) hung up at ~10 s every time, because FFmpeg sent its start-up buffer in a burst (≈1.5× rate) over IVS's 8.5 Mbps cap. The 3 s probe fixes a mid-stream rejoin bug (GOP is 2 s, 1 s probe missed the SPS → "Invalid argument") |
 | 1.2 | AQ off, p7 + multipass fullres, B-frames, no scene-cut; x264 `aq-mode=0:psy-rd=0`; BT.601→709 colour fix; default Better | Nick: "all of the fine detail is being lost". Four parallel investigations (§7) |
+| 1.3 | Sharpness test (never released on its own: CI app test hit the slow runner) | "Burn tokens on sharper video": NVENC was never measured on his real GPU |
+| 1.4 | YouTube (RTMPS, HEVC via enhanced RTMP), 1440p/4K qualities, one encode per platform in one FFmpeg, upload/speed warnings | Nick: "stream to YouTube, taking advantage of its high bitrate limit" |
 
 Lessons:
 - **Kick = Amazon IVS standard channel**: H.264 + AAC only, CBR, ≤ 8.5 Mbps at 1080p, 2 s keyframes, buffer ≤ bitrate,
@@ -179,8 +200,20 @@ Key log lines:
 9. Small: the CI app test's sound sometimes reports "Timeout starting video source" (runner has no display);
    harmless there.
 
+## 8b. Status at 1.4.0 (2026-10-20)
+- Nick's stream PC had only ever run **1.1.1** (log ends 2026-10-20 03:48Z; Kick only, quality good; NVENC worked;
+  page drew 29–30 fps). 1.1.0 at Kick 8.0 Mbps got TLS write failures ~10–16 s in (before sender pacing existed).
+- CI's full-app test was slow in the 1.3 runs (page ~0.8 fps under SwiftShader, too few frames at the test server).
+  1.4 switched `getGPUInfo('complete')`→`'basic'` and logs the page's drawing speed at the start of the self-test
+  (`pageFpsStart`) to tell a slow runner from a slowdown we cause.
+- Research agents (platforms, NVENC knobs, encoder lab, capture pipeline, stream-friendly rendering) were cut off by
+  the usage limit; partial work is in `/home/claude/research/` of that session only (not in the repo).
+- YouTube HEVC: works end to end with FFmpeg's enhanced RTMP against FFmpeg's own RTMP server (multi-test.js);
+  not yet verified against YouTube itself. If YouTube Studio shows "no data" with HEVC, switch it off in the panel.
+
 ## 9. Things not to break
 
-- Waits by frames in every test. Engine test's burst check (Kick disconnects). The quality-change-keeps-the-look
+- Waits by frames in every test. Engine test's and multi-test's burst checks (Kick disconnects).
+- One encode per platform: Kick must never get more than 1080p or more than its own bitrate. The quality-change-keeps-the-look
   check. The key redaction. The 2 s GOP, `bufsize = bitrate`, and CBR (IVS rules). The `-readrate 1` pacing on senders.
 - Don't commit `stream-app/vendor/` (FFmpeg) or `node_modules/` (both are in `.gitignore`).

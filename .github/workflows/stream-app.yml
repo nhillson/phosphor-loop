@@ -1,6 +1,6 @@
 name: Windows stream app
 
-# Builds Phosphor Stream (the Windows app that streams Phosphor Loop to Twitch and Kick), tests it end to end,
+# Builds Phosphor Stream (the Windows app that streams Phosphor Loop to Twitch, Kick and YouTube), tests it end to end,
 # and puts the installer on the repository's Releases page. Runs whenever stream-app/ changes on this branch,
 # or by hand from the Actions tab ("Run workflow").
 on:
@@ -55,6 +55,11 @@ jobs:
         env:
           FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
           FRAMES: '900'
+
+      - name: Test several streams at once (YouTube HEVC next to Kick)
+        run: node test/multi-test.js
+        env:
+          FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
 
       - name: Test the sharpness test's engine
         run: node test/tune-test.js

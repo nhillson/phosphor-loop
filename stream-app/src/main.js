@@ -5,7 +5,7 @@ const { app, BrowserWindow, WebContentsView, ipcMain, session, desktopCapturer, 
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFile } = require('node:child_process');
-const { Streamer, buildUrl, VARIANTS, TIERS } = require('./stream.js');
+const { Streamer, buildUrl, VARIANTS } = require('./stream.js');
 const { Tuner, candidates, pick } = require('./tune.js');
 const capturePageSource = require('./capture-page.js');
 
@@ -13,19 +13,26 @@ const TEST = process.env.PHOSPHOR_TEST === '1';
 const SITE = process.env.PHOSPHOR_SITE || 'https://nhillson.github.io/phosphor-loop/';
 const PANEL_W = 360, PANEL_COLLAPSED_W = 48;
 
-// Upload speed per platform: Twitch takes up to 6 Mbps; Kick (Amazon IVS) takes up to 8.5 Mbps at 1080p60 and hangs
-// up when a stream goes over, so Kick gets 7.5 to leave room for sound and the odd busy moment.
-// When both are on, one stream goes to both, so it uses the lower of the two.
+// Upload speed per platform. Twitch takes up to 6 Mbps; Kick (Amazon IVS) takes up to 8.5 Mbps at 1080p and hangs up
+// when a stream goes over, so Kick gets 7.5 to leave room for sound and the odd busy moment. Both take at most 1080p,
+// so at 1440p and 4K they get a sharp 1080p copy.
+// YouTube takes far more: these are YouTube's own recommended rates (its live encoder settings page, 2026), and it
+// takes 1440p and 4K. Every platform gets its own squeeze at its own rate, so YouTube's big stream never holds
+// Kick back and Kick's limit never holds YouTube back.
 const QUALITY = {
-  good: { width: 1280, height: 720, fps: 30, bitrate: { twitch: 4500000, kick: 4500000 } },
-  better: { width: 1920, height: 1080, fps: 30, bitrate: { twitch: 6000000, kick: 7500000 } },
-  best: { width: 1920, height: 1080, fps: 60, bitrate: { twitch: 6000000, kick: 7500000 } },
+  good: { width: 1280, height: 720, fps: 30, bitrate: { twitch: 4500000, kick: 4500000, youtube: 8000000 } },
+  better: { width: 1920, height: 1080, fps: 30, bitrate: { twitch: 6000000, kick: 7500000, youtube: 14000000 } },
+  best: { width: 1920, height: 1080, fps: 60, bitrate: { twitch: 6000000, kick: 7500000, youtube: 17000000 } },
+  ultra: { width: 2560, height: 1440, fps: 30, bitrate: { twitch: 6000000, kick: 7500000, youtube: 21000000 } },
+  max: { width: 3840, height: 2160, fps: 30, bitrate: { twitch: 6000000, kick: 7500000, youtube: 42000000 } },
 };
+const MAX_HEIGHT = { twitch: 1080, kick: 1080, youtube: 2160 };
 // The picture is first recorded inside Phosphor Loop, then squeezed for the platforms. That first recording is
 // kept nearly lossless (very high quality, it never leaves the computer), so the picture is only really
 // squeezed once.
-const recordBitrate = (q) => (q.height >= 1080 ? 60000000 : 35000000) * (q.fps > 30 ? 1.5 : 1);
+const recordBitrate = (q) => ({ 720: 35000000, 1080: 60000000, 1440: 90000000, 2160: 140000000 }[q.height] || 60000000) * (q.fps > 30 ? 1.5 : 1);
 const streamQuality = (q, dests) => ({ ...q, bitrate: Math.min(...dests.map((d) => q.bitrate[d.id] || q.bitrate.twitch)) });
+const PLATFORMS = ['twitch', 'kick', 'youtube'];
 
 // Software drawing for the test computer, which has no graphics card
 if (TEST) app.commandLine.appendSwitch('enable-unsafe-swiftshader');
@@ -44,6 +51,7 @@ const settingsFile = () => path.join(dataDir(), 'settings.json');
 const DEFAULTS = {
   twitch: { enabled: true, key: '' },
   kick: { enabled: false, server: '', key: '' },
+  youtube: { enabled: false, key: '', hevc: true }, // hevc: send YouTube the sharper HEVC format when the card can make it
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
   tuned: null, // what the sharpness test picked: { variant, label, at, quality, detail, usual, usualDetail, gpu }
 };
@@ -64,7 +72,8 @@ let settings;
 function loadSettings() {
   let s = {};
   try { s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch (_) {}
-  settings = { ...DEFAULTS, ...s, twitch: { ...DEFAULTS.twitch, ...s.twitch }, kick: { ...DEFAULTS.kick, ...s.kick } };
+  settings = { ...DEFAULTS, ...s, twitch: { ...DEFAULTS.twitch, ...s.twitch }, kick: { ...DEFAULTS.kick, ...s.kick },
+    youtube: { ...DEFAULTS.youtube, ...s.youtube } };
   if (!QUALITY[settings.quality]) settings.quality = 'good';
 }
 function saveSettings() {
@@ -75,6 +84,7 @@ function publicSettings() {
   return {
     twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key },
     kick: { enabled: settings.kick.enabled, server: settings.kick.server, hasKey: !!settings.kick.key },
+    youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
     quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
     autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed,
   };
@@ -115,6 +125,8 @@ function sendStatus() {
   win.webContents.send('status', fullStatus());
 }
 streamer.on('status', sendStatus);
+streamer.on('slow-encode', () => tell('This computer can’t squeeze the picture fast enough at this quality, so the stream stutters. Pick a smaller picture quality (for example 1440p instead of 4K), or switch off a platform.', 'warn'));
+streamer.on('slow-upload', (d) => tell(`Your internet upload can’t keep up with ${d.name} at this quality, so ${d.name} keeps reconnecting. Pick a lower picture quality, or switch off one of the platforms.`, 'warn'));
 function tell(text, kind = 'info') {
   notice = text ? { text, kind, at: Date.now() } : null;
   if (win && !win.isDestroyed()) win.webContents.send('notice', notice);
@@ -161,12 +173,52 @@ function destinations() {
   const list = [];
   if (TEST && process.env.PHOSPHOR_TEST_RTMP) {
     list.push({ id: 'twitch', name: 'Test server', url: process.env.PHOSPHOR_TEST_RTMP, secret: 'test-key-secret' });
+    if (process.env.PHOSPHOR_TEST_RTMP2) list.push({ id: 'youtube', name: 'Test YouTube', url: process.env.PHOSPHOR_TEST_RTMP2, secret: 'test-key-secret2' });
     return list;
   }
   const t = settings.twitch, k = settings.kick;
   if (t.enabled && t.key) { const key = unlock(t.key); list.push({ id: 'twitch', name: 'Twitch', url: buildUrl('twitch', { key }), secret: key }); }
   if (k.enabled && k.key && k.server) { const key = unlock(k.key); list.push({ id: 'kick', name: 'Kick', url: buildUrl('kick', { server: k.server, key }), secret: key }); }
+  const y = settings.youtube;
+  if (y.enabled && y.key) { const key = unlock(y.key); list.push({ id: 'youtube', name: 'YouTube', url: buildUrl('youtube', { key }), secret: key }); }
   return list.filter((d) => d.url && d.secret);
+}
+
+// Who gets what: each platform gets the picture at the biggest size it takes (Kick and Twitch: 1080p at most), at its
+// own rate, in H.264, except YouTube, which gets HEVC when this graphics card can make it at that size. Platforms
+// that would get exactly the same stream share one squeeze.
+async function makePlan(dests) {
+  const q = QUALITY[settings.quality];
+  const encodes = [], routed = [];
+  const checked = new Map();
+  const works = async (variant, size) => {
+    const k = `${variant}@${size.width}x${size.height}`;
+    if (!checked.has(k)) checked.set(k, size.height <= 1080 || VARIANTS[variant].cpu ? '' : await streamer.tryVariant(variant, { ...size, bitrate: 20000000 }));
+    return checked.get(k);
+  };
+  for (const d of dests) {
+    let height = Math.min(q.height, MAX_HEIGHT[d.id] || 1080);
+    let width = Math.round(height * 16 / 9 / 2) * 2;
+    let variant = streamer.encoder.variant;
+    if (d.id === 'youtube' && settings.youtube.hevc) {
+      const k = `hevc@${width}x${height}`;
+      if (!checked.has(k)) checked.set(k, await streamer.probeHevc({ width, height }));
+      if (checked.get(k)) variant = checked.get(k);
+      else log(`YouTube: this computer can't make HEVC at ${height}p, so YouTube gets H.264`);
+    }
+    const problem = await works(variant, { width, height });
+    if (problem) {
+      log(`${d.name}: ${height}p not possible with ${variant} (${problem.slice(0, 160)}); sending 1080p instead`);
+      tell(`This graphics card can’t make a ${height}p stream for ${d.name}, so ${d.name} gets 1080p.`, 'warn');
+      height = 1080; width = 1920; variant = streamer.encoder.variant;
+    }
+    const bitrate = (height === q.height ? q.bitrate : (QUALITY.better.fps === q.fps ? QUALITY.better : QUALITY.best).bitrate)[d.id] || q.bitrate.twitch;
+    const key = `${width}x${height}|${variant}|${bitrate}`;
+    let i = encodes.findIndex((e) => e.key === key);
+    if (i < 0) { encodes.push({ key, width, height, bitrate, variant }); i = encodes.length - 1; }
+    routed.push({ ...d, stream: i });
+  }
+  return { plan: { fps: q.fps, input: { width: q.width, height: q.height }, encodes }, dests: routed };
 }
 
 let startingLive = false;
@@ -175,8 +227,7 @@ async function goLive() {
   if (tune.running) { tell('The sharpness test is still running. Go live once it finishes (a minute or two).', 'warn'); return { ok: false }; }
   const dests = destinations();
   if (!dests.length) {
-    const t = settings.twitch, k = settings.kick;
-    const msg = !t.enabled && !k.enabled ? 'Switch on Twitch or Kick first.'
+    const msg = !PLATFORMS.some((p) => settings[p].enabled) ? 'Switch on Twitch, Kick or YouTube first.'
       : 'Add your stream key first (and the server address for Kick).';
     tell(msg, 'warn');
     return { ok: false, message: msg };
@@ -185,11 +236,14 @@ async function goLive() {
   try {
     if (probing) await probing;
     if (!(await waitForSite())) { tell('Phosphor Loop didn’t finish loading. Check the internet connection, then try again.', 'warn'); return { ok: false }; }
-    const sq = streamQuality(QUALITY[settings.quality], dests);
-    streamer.start(dests, sq);
+    const { plan, dests: routed } = await makePlan(dests);
+    streamer.start(routed, plan);
     if (settings.autopilotOnLive) siteCall('autopilot').catch(() => {});
     if (sleepBlock === null) sleepBlock = powerSaveBlocker.start('prevent-display-sleep');
-    log(`Going live to ${dests.map((d) => d.name).join(' + ')} at ${settings.quality} (${sq.height}p${sq.fps}, ${(sq.bitrate / 1e6).toFixed(1)} Mbps)`);
+    log(`Going live at ${settings.quality} (${plan.input.height}p${plan.fps}): ` + routed.map((d) => {
+      const e = plan.encodes[d.stream];
+      return `${d.name} ${e.height}p ${VARIANTS[e.variant] && VARIANTS[e.variant].hevc ? 'HEVC' : 'H.264'} ${(e.bitrate / 1e6).toFixed(1)} Mbps (${e.variant})`;
+    }).join(', '));
     return { ok: true };
   } finally { startingLive = false; sendStatus(); }
 }
@@ -279,7 +333,8 @@ function permissions() {
 /* ---------- the computer (for the log) ---------- */
 let gpuName = '';
 function logMachine() {
-  app.getGPUInfo('complete').then((info) => {
+  // 'basic' (the full report makes Windows gather DirectX diagnostics, which can slow the page while it runs)
+  app.getGPUInfo('basic').then((info) => {
     const list = (info.gpuDevice || []).map((d) => `${d.deviceString || ''} [${(d.vendorId || 0).toString(16)}:${(d.deviceId || 0).toString(16)}]${d.active ? ' active' : ''} driver ${d.driverVersion || '?'}`);
     log('Graphics: ' + (list.join('; ') || 'unknown'));
   }).catch(() => {});
@@ -394,14 +449,16 @@ ipcMain.handle('sharpness-test', () => sharpnessTest());
 const HELP = {
   twitch: 'https://dashboard.twitch.tv/settings/stream',
   kick: 'https://kick.com/dashboard/settings/stream',
+  youtube: 'https://www.youtube.com/live_dashboard',
 };
 ipcMain.handle('state', () => ({ settings: publicSettings(), status: fullStatus(), quality: QUALITY, tune: publicTune() }));
 ipcMain.handle('save', (_e, patch) => {
   const before = settings.quality;
-  for (const p of ['twitch', 'kick']) {
+  for (const p of PLATFORMS) {
     if (!patch[p]) continue;
     const cur = settings[p];
     if ('enabled' in patch[p]) cur.enabled = !!patch[p].enabled;
+    if ('hevc' in patch[p] && p === 'youtube') cur.hevc = !!patch[p].hevc;
     if ('server' in patch[p]) cur.server = String(patch[p].server || '').trim();
     if ('key' in patch[p]) cur.key = lock(String(patch[p].key || '').trim());
   }
@@ -486,6 +543,8 @@ async function runTest() {
   try {
     if (!(await waitForSite())) throw new Error('site never became ready');
     await waitFrames(60);
+    result.pageFpsStart = await pageFps();
+    log(`Self-test: page drawing ${result.pageFpsStart} frames a second at the start`);
     // Changing quality must keep the page (and so the look) instead of reloading it
     await site.webContents.executeJavaScript('window.__keepMarker = 42', true);
     const sizeNow = () => site.webContents.executeJavaScript('[window.__phosphorCapture.canvas.width, window.__phosphorCapture.canvas.height, window.__keepMarker || 0]', true);
