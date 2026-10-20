@@ -56,6 +56,12 @@ jobs:
           FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
           FRAMES: '900'
 
+      - name: Test the sharpness test's engine
+        run: node test/tune-test.js
+        env:
+          FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
+          SLOW_OK: '1'
+
       - name: Test the whole app (Phosphor Loop to a local test server)
         run: node test/app-test.js
         env:

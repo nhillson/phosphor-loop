@@ -78,6 +78,18 @@
     <p class="hint" id="qualityHint"></p>
   </section>
 
+  <section class="block" id="tune">
+    <h2>Sharpness test</h2>
+    <p class="hint" id="tuneHint">Tries each encoder setting on 5 seconds of your picture, on this PC’s own graphics card, and keeps the sharpest one this PC can keep up with. Takes a few minutes. Works best on a busy, detailed look.</p>
+    <button class="small primary wide" id="tuneRun">Run the sharpness test</button>
+    <div class="tune-run" id="tuneRunning" hidden>
+      <div class="meter" aria-hidden="true"><span id="tuneBar"></span></div>
+      <small id="tuneStep"></small>
+    </div>
+    <ol class="bars" id="tuneBars" aria-label="Sharpness of each setting (longer bar = sharper)"></ol>
+    <p class="hint" id="tuneSummary"></p>
+  </section>
+
   <section class="block">
     <h2>For a computer that streams all day</h2>
     <label class="toggle"><span>Start when Windows starts</span><span class="switch"><input type="checkbox" id="opt-startWithWindows"><span></span></span></label>

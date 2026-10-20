@@ -14,38 +14,72 @@ const ENCODERS = [
   { id: 'h264_qsv', label: 'Intel graphics' },
   { id: 'libx264', label: 'Processor (no graphics card help)' },
 ];
+// Encoder settings ("variants"). Every variant keeps the platform rules: constant bitrate (CBR), a buffer no bigger
+// than one second of stream (Kick hangs up on bursts), and a keyframe every 2 s with no extra ones.
+// Tested on real Phosphor Loop footage: adaptive quantisation (spatial/temporal AQ) moves bits away from busy,
+// detailed areas towards flat ones, which smears exactly the fine detail Phosphor Loop is made of. So AQ is off in
+// the default settings. Scene-cut keyframes are off too (chaotic feedback looks like a scene change all the time and
+// every extra keyframe starves the frames around it).
+// The sharpness test (tune.js) tries these on the real graphics card and keeps whichever comes out sharpest.
+//   auto: may be picked by the sharpness test; false = measured for comparison only (never streamed with)
+const rules = ({ fps, bitrate }) => ['-b:v', String(bitrate), '-maxrate', String(bitrate), '-bufsize', String(bitrate), '-g', String(fps * 2)];
+const nv = (preset, extra, { idr = true } = {}) => (q) => ['-c:v', 'h264_nvenc', '-preset', preset, '-tune', 'hq', '-rc', 'cbr',
+  ...extra, ...rules(q), '-no-scenecut', '1', ...(idr ? ['-forced-idr', '1'] : []), '-profile:v', 'high'];
+const AQ0 = ['-spatial-aq', '0', '-temporal-aq', '0'];
+const x264 = (preset, params) => (q) => ['-c:v', 'libx264', '-preset', preset, ...rules(q), '-keyint_min', String(q.fps * 2),
+  '-sc_threshold', '0', '-bf', '2', '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr:' + params];
+const VARIANTS = {
+  // NVIDIA
+  'nv-p7-full': { codec: 'h264_nvenc', auto: true, label: 'Max quality, full look-over',
+    args: nv('p7', ['-multipass', 'fullres', ...AQ0, '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle']) },
+  'nv-p7-qres': { codec: 'h264_nvenc', auto: true, label: 'Max quality, quick look-over',
+    args: nv('p7', ['-multipass', 'qres', ...AQ0, '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle']) },
+  'nv-p7-1pass': { codec: 'h264_nvenc', auto: true, label: 'Max quality, single pass',
+    args: nv('p7', ['-multipass', 'disabled', ...AQ0, '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle']) },
+  'nv-p7-full-la32': { codec: 'h264_nvenc', auto: true, label: 'Max quality, looks further ahead',
+    args: nv('p7', ['-multipass', 'fullres', ...AQ0, '-rc-lookahead', '32', '-bf', '3', '-b_ref_mode', 'middle']) },
+  'nv-p7-full-bf0': { codec: 'h264_nvenc', auto: true, label: 'Max quality, no in-between frames',
+    args: nv('p7', ['-multipass', 'fullres', ...AQ0, '-rc-lookahead', '16', '-bf', '0']) },
+  'nv-p7-full-bf2': { codec: 'h264_nvenc', auto: true, label: 'Max quality, 2 in-between frames',
+    args: nv('p7', ['-multipass', 'fullres', ...AQ0, '-rc-lookahead', '16', '-bf', '2', '-b_ref_mode', 'disabled']) },
+  'nv-p7-full-chroma': { codec: 'h264_nvenc', auto: true, label: 'Max quality, extra colour detail',
+    args: nv('p7', ['-multipass', 'fullres', ...AQ0, '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle', '-qp_cb_offset', '-2', '-qp_cr_offset', '-2']) },
+  'nv-p7-full-saq2': { codec: 'h264_nvenc', auto: true, label: 'Max quality, gentle flat-area help',
+    args: nv('p7', ['-multipass', 'fullres', '-spatial-aq', '1', '-aq-strength', '2', '-temporal-aq', '0', '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle']) },
+  'nv-p7-full-saq8': { codec: 'h264_nvenc', auto: true, label: 'Max quality, strong flat-area help',
+    args: nv('p7', ['-multipass', 'fullres', '-spatial-aq', '1', '-aq-strength', '8', '-temporal-aq', '0', '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle']) },
+  'nv-p6-qres': { codec: 'h264_nvenc', auto: true, label: 'High quality (lighter)',
+    args: nv('p6', ['-multipass', 'qres', ...AQ0, '-rc-lookahead', '8', '-bf', '2']) },
+  'nv-obs': { codec: 'h264_nvenc', auto: false, label: 'What OBS uses (for comparison)',
+    args: nv('p5', ['-multipass', 'qres', '-spatial-aq', '1', '-aq-strength', '8', '-temporal-aq', '1', '-rc-lookahead', '8', '-bf', '2'], { idr: true }) },
+  'nv-p4': { codec: 'h264_nvenc', auto: true, label: 'Basic (older cards)',
+    args: (q) => ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'cbr', '-bf', '0', ...rules(q), '-forced-idr', '1', '-profile:v', 'high'] },
+  // AMD and Intel
+  'amf-best': { codec: 'h264_amf', auto: true, label: 'AMD, quality',
+    args: (q) => ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'quality', '-rc', 'cbr', '-preanalysis', '1', ...rules(q), '-bf', '0', '-profile:v', 'high'] },
+  'amf-basic': { codec: 'h264_amf', auto: true, label: 'AMD, balanced',
+    args: (q) => ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'balanced', '-rc', 'cbr', ...rules(q), '-bf', '0', '-profile:v', 'high'] },
+  'qsv-best': { codec: 'h264_qsv', auto: true, label: 'Intel, slower',
+    args: (q) => ['-c:v', 'h264_qsv', '-preset', 'slower', ...rules(q), '-bf', '2', '-profile:v', 'high'] },
+  'qsv-basic': { codec: 'h264_qsv', auto: true, label: 'Intel, faster',
+    args: (q) => ['-c:v', 'h264_qsv', '-preset', 'faster', ...rules(q), '-bf', '0', '-profile:v', 'high'] },
+  // The processor (no graphics card help). Same lesson: AQ and psychovisual tuning off keep the most real detail.
+  'x264-veryfast': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, very fast', args: x264('veryfast', 'aq-mode=0:psy-rd=0.0,0.0') },
+  'x264-faster': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, fast', args: x264('faster', 'aq-mode=0:psy-rd=0.0,0.0') },
+  'x264-medium': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, careful', args: x264('medium', 'aq-mode=0:psy-rd=0.0,0.0') },
+  'x264-slow': { codec: 'libx264', auto: true, cpu: true, label: 'Processor, very careful', args: x264('slow', 'aq-mode=0:psy-rd=0.0,0.0') },
+};
 // Each encoder has settings tiers, best first. The first tier the computer's graphics card accepts is used, so an
 // older card still gets the best settings it can do instead of falling all the way back to the processor.
-const TIERS = { h264_nvenc: ['best', 'good', 'basic'], h264_amf: ['best', 'basic'], h264_qsv: ['best', 'basic'], libx264: ['best'] };
+const TIERS = { h264_nvenc: ['nv-p7-full', 'nv-p6-qres', 'nv-p4'], h264_amf: ['amf-best', 'amf-basic'],
+  h264_qsv: ['qsv-best', 'qsv-basic'], libx264: ['x264-faster'] };
+const TIER_NAMES = ['best', 'good', 'basic'];
 
-function encoderArgs(id, { fps, bitrate }, tier = 'best') {
-  const b = String(bitrate), buf = String(bitrate), g = String(fps * 2);
-  const cbr = ['-b:v', b, '-maxrate', b, '-bufsize', buf, '-g', g];
-  switch (id) {
-    case 'h264_nvenc':
-      // Tested on real Phosphor Loop footage: adaptive quantisation (spatial/temporal AQ) moves bits away from busy,
-      // detailed areas towards flat ones, which smears exactly the fine detail Phosphor Loop is made of. So AQ is
-      // off. Scene-cut keyframes are off too (chaotic feedback looks like a scene change all the time and every
-      // extra keyframe starves the frames around it); keyframes come every 2 s, as Kick and Twitch ask.
-      if (tier === 'best') return ['-c:v', 'h264_nvenc', '-preset', 'p7', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'fullres',
-        '-spatial-aq', '0', '-temporal-aq', '0', '-rc-lookahead', '16', '-bf', '3', '-b_ref_mode', 'middle',
-        ...cbr, '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'high'];
-      if (tier === 'good') return ['-c:v', 'h264_nvenc', '-preset', 'p6', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'qres',
-        '-spatial-aq', '0', '-temporal-aq', '0', '-rc-lookahead', '8', '-bf', '2', ...cbr, '-no-scenecut', '1', '-forced-idr', '1',
-        '-profile:v', 'high'];
-      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'cbr', '-bf', '0', ...cbr, '-forced-idr', '1', '-profile:v', 'high'];
-    case 'h264_amf':
-      if (tier === 'best') return ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'quality', '-rc', 'cbr',
-        '-preanalysis', '1', ...cbr, '-bf', '0', '-profile:v', 'high'];
-      return ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'balanced', '-rc', 'cbr', ...cbr, '-bf', '0', '-profile:v', 'high'];
-    case 'h264_qsv':
-      if (tier === 'best') return ['-c:v', 'h264_qsv', '-preset', 'slower', ...cbr, '-bf', '2', '-profile:v', 'high'];
-      return ['-c:v', 'h264_qsv', '-preset', 'faster', ...cbr, '-bf', '0', '-profile:v', 'high'];
-    default:
-      // Same lesson on the processor: AQ and psychovisual tuning off keep the most real fine detail
-      return ['-c:v', 'libx264', '-preset', 'faster', ...cbr, '-keyint_min', g, '-sc_threshold', '0', '-bf', '2',
-        '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr:aq-mode=0:psy-rd=0.0,0.0'];
-  }
+// The FFmpeg settings for one variant (or, for older callers, an encoder and tier name)
+function encoderArgs(idOrVariant, q, tier = 'best') {
+  if (VARIANTS[idOrVariant]) return VARIANTS[idOrVariant].args(q);
+  const list = TIERS[idOrVariant] || TIERS.libx264;
+  return VARIANTS[list[Math.min(list.length - 1, Math.max(0, TIER_NAMES.indexOf(tier)))]].args(q);
 }
 
 // Stream keys must never show up in anything the app displays or writes to its log.
@@ -85,31 +119,43 @@ class Streamer extends EventEmitter {
     this.redact = (t) => t;
   }
 
-  // Try each graphics-card encoder (and its settings tiers, best first) with a short test picture; keep the
-  // first that works.
-  async probe() {
-    const tryArgs = (args) => new Promise((res) => {
+  // Can this computer use these encoder settings? Tried on a short test picture. '' = yes, otherwise FFmpeg's reason.
+  tryVariant(variant) {
+    return new Promise((res) => {
       execFile(this.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=1280x720:r=30',
-        '-frames:v', '30', '-pix_fmt', 'yuv420p', ...args, '-f', 'null', '-'],
-        { timeout: 20000, windowsHide: true }, (err, _o, stderr) => res(err ? String(stderr || err.message).trim().split('\n').pop() : ''));
+        '-frames:v', '30', '-pix_fmt', 'yuv420p', ...encoderArgs(variant, { fps: 30, bitrate: 4000000 }), '-f', 'null', '-'],
+        { timeout: 20000, windowsHide: true }, (err, _o, stderr) => res(err ? String(stderr || err.message).trim().split('\n').pop() || 'failed' : ''));
     });
-    for (const e of ENCODERS) {
-      for (const tier of TIERS[e.id]) {
-        if (e.id === 'libx264') { this.encoder = { ...e, tier }; break; }
-        const problem = await tryArgs(encoderArgs(e.id, { fps: 30, bitrate: 4000000 }, tier));
-        if (!problem) { this.encoder = { ...e, tier }; break; }
-        if (e.id === 'h264_nvenc' || tier !== 'best') this.log(`Encoder ${e.id} (${tier}) not usable: ${problem.slice(0, 200)}`);
-      }
-      if (this.encoder) break;
+  }
+
+  // Try each graphics-card encoder (and its settings tiers, best first) with a short test picture; keep the
+  // first that works. Settings picked by the sharpness test ("preferred") are tried first.
+  async probe(preferred) {
+    this.encoder = null;
+    if (preferred && VARIANTS[preferred]) {
+      const v = VARIANTS[preferred];
+      const problem = v.cpu ? '' : await this.tryVariant(preferred);
+      if (!problem) this.encoder = { ...ENCODERS.find((e) => e.id === v.codec), tier: 'tuned', variant: preferred };
+      else this.log(`Settings picked by the sharpness test (${preferred}) not usable now: ${problem.slice(0, 200)}`);
     }
-    this.log(`Encoder: ${this.encoder.id}, ${this.encoder.tier} settings`);
+    for (const e of ENCODERS) {
+      if (this.encoder) break;
+      for (const [i, variant] of TIERS[e.id].entries()) {
+        const tier = TIER_NAMES[i];
+        if (e.id === 'libx264') { this.encoder = { ...e, tier, variant }; break; }
+        const problem = await this.tryVariant(variant);
+        if (!problem) { this.encoder = { ...e, tier, variant }; break; }
+        if (e.id === 'h264_nvenc' || i > 0) this.log(`Encoder ${e.id} (${tier}) not usable: ${problem.slice(0, 200)}`);
+      }
+    }
+    this.log(`Encoder: ${this.encoder.id}, ${this.encoder.tier} settings (${this.encoder.variant})`);
     return this.encoder;
   }
 
   // dests: [{id, name, url}], quality: {fps, bitrate}
   start(dests, quality) {
     if (this.live) return;
-    if (!this.encoder) this.encoder = { ...ENCODERS[ENCODERS.length - 1], tier: 'best' };
+    if (!this.encoder) this.encoder = { ...ENCODERS[ENCODERS.length - 1], tier: 'best', variant: 'x264-faster' };
     this.live = true;
     this.quality = quality;
     this.redact = redactor(dests.map((d) => d.secret));
@@ -132,7 +178,7 @@ class Streamer extends EventEmitter {
       // edges sharp (FFmpeg's defaults blur them).
       '-vf', `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=${this.encoder.id === 'h264_qsv' ? 'nv12' : 'yuv420p'}`,
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-      ...encoderArgs(this.encoder.id, q, this.encoder.tier), '-bsf:v', 'dump_extra=freq=keyframe',
+      ...encoderArgs(this.encoder.variant || this.encoder.id, q, this.encoder.tier), '-bsf:v', 'dump_extra=freq=keyframe',
       '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
       '-f', 'mpegts', '-mpegts_flags', '+resend_headers', '-muxdelay', '0', 'pipe:1'];
     this.prog = { frame: 0, dup: 0, drop: 0, at: Date.now(), lastLog: Date.now(), lastFrame: 0, lastDup: 0, lastDrop: 0, partial: '' };
@@ -296,4 +342,4 @@ function explain(tail, def, wasLive) {
   return `${def.name} stopped.`;
 }
 
-module.exports = { Streamer, buildUrl, encoderArgs, redactor, ENCODERS, TIERS };
+module.exports = { Streamer, buildUrl, encoderArgs, redactor, ENCODERS, TIERS, VARIANTS };

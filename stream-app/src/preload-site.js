@@ -17,4 +17,5 @@ if (!placed) contextBridge.exposeInMainWorld('__phosphorCaptureConfig', config);
 contextBridge.exposeInMainWorld('phosphorStream', {
   chunk: (gen, buf) => ipcRenderer.send('chunk', gen, buf),
   problem: (text) => ipcRenderer.send('capture-problem', String(text).slice(0, 300)),
+  sample: (w, h, buf) => ipcRenderer.send('sample', w, h, buf),
 });

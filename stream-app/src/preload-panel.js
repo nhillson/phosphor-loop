@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('app', {
   help: (which) => ipcRenderer.invoke('help', which),
   collapse: (on) => ipcRenderer.invoke('collapse', on),
   openLog: () => ipcRenderer.invoke('open-log'),
+  sharpnessTest: () => ipcRenderer.invoke('sharpness-test'),
+  onTune: (fn) => ipcRenderer.on('tune', (_e, t) => fn(t)),
   onStatus: (fn) => ipcRenderer.on('status', (_e, s) => fn(s)),
   onNotice: (fn) => ipcRenderer.on('notice', (_e, n) => fn(n)),
 });

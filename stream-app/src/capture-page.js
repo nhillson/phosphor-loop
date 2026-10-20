@@ -40,11 +40,39 @@ module.exports = function capturePageSource() {
     S.rec = null; S.video = null;
   }
 
+  // For the sharpness test: hand over the next N drawn frames exactly as drawn (raw pixels, no compression).
+  // It has to read each one right after Phosphor Loop draws it, before the browser shows it and clears it.
+  function sample(n) {
+    const hook = window.__phosphorCapture;
+    const c = hook.canvas, g = c.getContext('webgl2');
+    if (!g) throw new Error('no WebGL');
+    const prev = hook.onFrame;
+    let left = n;
+    S.sampleStop = () => { left = 0; hook.onFrame = prev; };
+    hook.onFrame = (now) => {
+      if (prev) { try { prev(now); } catch (_) {} }
+      if (left <= 0) return;
+      const w = c.width, h = c.height;
+      const fb = g.getParameter(g.READ_FRAMEBUFFER_BINDING), pb = g.getParameter(g.PIXEL_PACK_BUFFER_BINDING), al = g.getParameter(g.PACK_ALIGNMENT);
+      g.bindFramebuffer(g.READ_FRAMEBUFFER, null); g.bindBuffer(g.PIXEL_PACK_BUFFER, null); g.pixelStorei(g.PACK_ALIGNMENT, 4);
+      const px = new Uint8Array(w * h * 4);
+      g.readPixels(0, 0, w, h, g.RGBA, g.UNSIGNED_BYTE, px);
+      g.bindFramebuffer(g.READ_FRAMEBUFFER, fb); g.bindBuffer(g.PIXEL_PACK_BUFFER, pb); g.pixelStorei(g.PACK_ALIGNMENT, al);
+      left--;
+      if (left <= 0) hook.onFrame = prev;
+      window.phosphorStream.sample(w, h, px.buffer);
+    };
+    return { width: c.width, height: c.height };
+  }
+
   window.phosphorStreamCapture = async (cmd, opts = {}) => {
     if (cmd === 'frames') return S.frames;
     if (cmd === 'ready') return !!(window.__phosphorCapture && window.__phosphorCapture.canvas);
     if (cmd === 'autopilot') { try { window.__phosphorCapture.autopilot(); return true; } catch (_) { return false; } }
     if (cmd === 'stop') { stop(); return true; }
+    if (cmd === 'size') { const c = window.__phosphorCapture && window.__phosphorCapture.canvas; return c ? { width: c.width, height: c.height } : null; }
+    if (cmd === 'sample') return sample(opts.frames || 150);
+    if (cmd === 'sample-stop') { if (S.sampleStop) S.sampleStop(); return true; }
     if (cmd !== 'start') return null;
     stop();
     const hook = window.__phosphorCapture;

@@ -4,7 +4,9 @@ const { app, BrowserWindow, WebContentsView, ipcMain, session, desktopCapturer, 
   powerSaveBlocker } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { Streamer, buildUrl } = require('./stream.js');
+const { execFile } = require('node:child_process');
+const { Streamer, buildUrl, VARIANTS, TIERS } = require('./stream.js');
+const { Tuner, candidates, pick } = require('./tune.js');
 const capturePageSource = require('./capture-page.js');
 
 const TEST = process.env.PHOSPHOR_TEST === '1';
@@ -43,6 +45,7 @@ const DEFAULTS = {
   twitch: { enabled: true, key: '' },
   kick: { enabled: false, server: '', key: '' },
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
+  tuned: null, // what the sharpness test picked: { variant, label, at, quality, detail, usual, usualDetail, gpu }
 };
 function lock(text) {
   if (!text) return '';
@@ -76,6 +79,10 @@ function publicSettings() {
     autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed,
   };
 }
+function publicTune() {
+  const t = settings.tuned;
+  return { ...tune, last: t ? { label: t.label, at: t.at, detail: t.detail, usualDetail: t.usualDetail, gain: t.gain, results: t.results || [] } : null };
+}
 
 /* ---------- log ---------- */
 let logPath;
@@ -99,9 +106,13 @@ function ffmpegPath() {
 const streamer = new Streamer({ ffmpeg: ffmpegPath(), log });
 let win, site, sleepBlock = null, notice = null, captureInfo = null, probing = null;
 
+function fullStatus() {
+  const v = streamer.encoder && VARIANTS[streamer.encoder.variant];
+  return { ...streamer.status(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
+}
 function sendStatus() {
   if (!win || win.isDestroyed()) return;
-  win.webContents.send('status', { ...streamer.status(), notice, starting: !!startingLive });
+  win.webContents.send('status', fullStatus());
 }
 streamer.on('status', sendStatus);
 function tell(text, kind = 'info') {
@@ -161,6 +172,7 @@ function destinations() {
 let startingLive = false;
 async function goLive() {
   if (streamer.live || startingLive) return { ok: true };
+  if (tune.running) { tell('The sharpness test is still running. Go live once it finishes (a minute or two).', 'warn'); return { ok: false }; }
   const dests = destinations();
   if (!dests.length) {
     const t = settings.twitch, k = settings.kick;
@@ -264,12 +276,101 @@ function permissions() {
   });
 }
 
+/* ---------- the computer (for the log) ---------- */
+let gpuName = '';
+function logMachine() {
+  app.getGPUInfo('complete').then((info) => {
+    const list = (info.gpuDevice || []).map((d) => `${d.deviceString || ''} [${(d.vendorId || 0).toString(16)}:${(d.deviceId || 0).toString(16)}]${d.active ? ' active' : ''} driver ${d.driverVersion || '?'}`);
+    log('Graphics: ' + (list.join('; ') || 'unknown'));
+  }).catch(() => {});
+  execFile('nvidia-smi', ['--query-gpu=name,driver_version,memory.total,encoder.stats.sessionCount', '--format=csv,noheader'], { timeout: 8000, windowsHide: true }, (err, out) => {
+    if (!err && out) { gpuName = String(out).split(',')[0].trim(); log('NVIDIA card: ' + String(out).trim()); }
+  });
+  execFile(ffmpegPath(), ['-hide_banner', '-version'], { timeout: 8000, windowsHide: true }, (err, out) => { if (!err) log(String(out).split('\n')[0]); });
+  log(`Processor: ${require('node:os').cpus()[0]?.model || '?'} x${require('node:os').cpus().length}; memory ${Math.round(require('node:os').totalmem() / 1e9)} GB`);
+}
+
+/* ---------- sharpness test (tune.js) ---------- */
+let tune = { running: false, step: '', i: 0, n: 0, results: [], summary: '' };
+let tuner = null;
+function sendTune() { if (win && !win.isDestroyed()) win.webContents.send('tune', publicTune()); }
+ipcMain.on('sample', (_e, w, h, buf) => { if (tuner) tuner.addFrame(w, h, buf); });
+
+async function sharpnessTest({ ids, frames, apply = true } = {}) {
+  if (tune.running) return { ok: false };
+  if (streamer.live || startingLive) { tell('Stop the stream first, then run the sharpness test.', 'warn'); return { ok: false }; }
+  tune = { running: true, step: 'Getting ready…', i: 0, n: 0, results: [], summary: '' };
+  sendTune(); sendStatus();
+  tuner = tuner || new Tuner({ ffmpeg: ffmpegPath(), log, dir: path.join(app.getPath('temp'), 'Phosphor Stream sharpness test') });
+  const q = QUALITY[settings.quality];
+  const dests = destinations();
+  const bitrate = dests.length ? streamQuality(q, dests).bitrate : q.bitrate.kick;
+  let result = { ok: false };
+  try {
+    // Plain probing first, without the earlier pick, so "usual" is this computer's normal best setting
+    if (probing) await probing;
+    await streamer.probe();
+    const codec = streamer.encoder.id;
+    const usual = streamer.encoder.variant;
+    if (!(await waitForSite())) throw new Error('Phosphor Loop didn’t finish loading');
+    const size = await siteCall('size');
+    if (!size) throw new Error('Phosphor Loop is still starting');
+    const count = frames || Math.round(q.fps * 5);
+    tune.step = `Recording ${Math.round(count / q.fps)} seconds of your picture…`; sendTune();
+    log(`Sharpness test: recording ${count} frames at ${size.width}x${size.height}, ${q.fps} fps; testing at ${(bitrate / 1e6).toFixed(1)} Mbps`);
+    tuner.startRecording({ width: size.width, height: size.height, fps: q.fps, frames: count });
+    await siteCall('sample', { frames: count });
+    const info = await tuner.waitRecording();
+    const sig = await tuner.detailEnergy(info);
+    const list = (ids || candidates(codec)).filter((id) => VARIANTS[id]);
+    tune.n = list.length;
+    for (const [i, id] of list.entries()) {
+      tune.i = i; tune.step = `Trying setting ${i + 1} of ${list.length}: ${VARIANTS[id].label}`; sendTune();
+      const r = await tuner.measure(id, info, bitrate, sig);
+      r.usual = id === usual;
+      tune.results.push(r); sendTune();
+      log(`Sharpness test: ${id.padEnd(18)} ` + (r.ok ? `detail ${r.detail} dB, PSNR ${r.psnr}, SSIM ${r.ssim}, ${r.speed} fps, peak ${r.peakMbps} Mbps (start ${r.startMbps}), avg ${r.avgMbps}` : `not usable: ${r.error}`));
+    }
+    const best = pick(tune.results, { fps: q.fps, bitrate, usual });
+    const base = tune.results.find((r) => r.id === usual && r.ok);
+    for (const r of tune.results) r.chosen = !!best && r.id === best.id;
+    const gain = best && base ? +(best.detail - base.detail).toFixed(2) : 0;
+    if (best && apply) {
+      settings.tuned = { variant: best.id, label: best.label, at: new Date().toISOString(), quality: settings.quality, detail: best.detail,
+        usual, usualDetail: base ? base.detail : null, gain, gpu: gpuName, codec,
+        results: tune.results.map(({ id, label, ok, detail, speed, chosen, usual: u, error }) => ({ id, label, ok, detail, speed, chosen, usual: u, error: error ? error.slice(0, 80) : undefined })) };
+      saveSettings();
+    }
+    tune.summary = !best ? 'None of the settings could keep up on this computer, so nothing was changed.'
+      : best.id === usual ? `Your current setting was already the sharpest this computer can do (${best.label}). Nothing changed.`
+        : `Now using “${best.label}”: ${gain} dB sharper than before on this picture. It applies the next time you go live.`;
+    log('Sharpness test: picked ' + (best ? `${best.id} (${best.detail} dB; usual ${usual} ${base ? base.detail : '?'} dB)` : 'nothing'));
+    try {
+      fs.writeFileSync(path.join(dataDir(), 'sharpness-test.json'), JSON.stringify({ at: new Date().toISOString(), info, bitrate, sigPsnr: sig,
+        codec, usual, picked: best && best.id, gpu: gpuName, results: tune.results }, null, 2));
+    } catch (_) {}
+    result = { ok: true, picked: best && best.id, results: tune.results };
+  } catch (e) {
+    log('Sharpness test failed: ' + e.message);
+    tune.summary = 'The test couldn’t finish: ' + e.message;
+    try { await siteCall('sample-stop'); } catch (_) {}
+  } finally {
+    // Back to the settings the stream should use (the test's pick, or the earlier one)
+    probing = streamer.probe(settings.tuned && settings.tuned.variant).catch((e) => log('Probe failed: ' + e.message));
+    await probing;
+    tune.running = false; tune.step = '';
+    sendTune(); sendStatus();
+  }
+  return result;
+}
+ipcMain.handle('sharpness-test', () => sharpnessTest());
+
 /* ---------- controls panel ---------- */
 const HELP = {
   twitch: 'https://dashboard.twitch.tv/settings/stream',
   kick: 'https://kick.com/dashboard/settings/stream',
 };
-ipcMain.handle('state', () => ({ settings: publicSettings(), status: { ...streamer.status(), notice }, quality: QUALITY }));
+ipcMain.handle('state', () => ({ settings: publicSettings(), status: fullStatus(), quality: QUALITY, tune: publicTune() }));
 ipcMain.handle('save', (_e, patch) => {
   const before = settings.quality;
   for (const p of ['twitch', 'kick']) {
@@ -280,7 +381,7 @@ ipcMain.handle('save', (_e, patch) => {
     if ('key' in patch[p]) cur.key = lock(String(patch[p].key || '').trim());
   }
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) if (k in patch) settings[k] = !!patch[k];
-  if (patch.quality && QUALITY[patch.quality] && !streamer.live) settings.quality = patch.quality;
+  if (patch.quality && QUALITY[patch.quality] && !streamer.live && !tune.running) settings.quality = patch.quality;
   if ('startWithWindows' in patch && app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.startWithWindows });
   saveSettings();
   // A new size: tell Phosphor Loop to draw at it. It carries the current picture and every setting across, the
@@ -316,7 +417,11 @@ ipcMain.handle('open-log', () => { if (logPath) shell.showItemInFolder(logPath);
 ipcMain.on('capture-config', (e) => { e.returnValue = captureConfig(); });
 
 /* ---------- start-up ---------- */
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('second-instance', (_e, argv) => {
+  if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+  // "Phosphor Stream.exe --sharpness-test" while the app is open runs the test in the open app
+  if (argv.includes('--sharpness-test')) sharpnessTest();
+});
 app.on('window-all-closed', async () => { await stopLive(); setTimeout(() => app.quit(), 4000); });
 app.on('before-quit', () => { if (streamer.live) streamer.stop(); });
 
@@ -324,9 +429,11 @@ app.whenReady().then(async () => {
   loadSettings();
   log(`Phosphor Stream ${app.getVersion()} starting; FFmpeg at ${ffmpegPath()}`);
   permissions();
-  probing = streamer.probe().then(() => sendStatus()).catch((e) => log('Probe failed: ' + e.message));
+  probing = streamer.probe(settings.tuned && settings.tuned.variant).then(() => sendStatus()).catch((e) => log('Probe failed: ' + e.message));
+  logMachine();
   createWindow();
   if (TEST) return runTest();
+  if (process.argv.includes('--sharpness-test')) { if (await waitForSite()) { await waitFrames(120); sharpnessTest(); } return; }
   if (settings.goLiveOnOpen) {
     // Give Phosphor Loop a moment to build its picture (counted in frames), then go live
     if (await waitForSite()) { await waitFrames(120); goLive(); }
@@ -357,6 +464,18 @@ async function runTest() {
     result.qualitySwitch = { better: big, good: small };
     if (big[2] !== 42 || small[2] !== 42) throw new Error('changing quality reloaded the page');
     if (big[1] !== 1080 || small[1] !== 720) throw new Error('changing quality did not change the picture size: ' + JSON.stringify(result.qualitySwitch));
+    // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
+    const t = await sharpnessTest({ ids: ['x264-veryfast', 'x264-faster', 'nv-p7-full'], frames: 45 });
+    result.sharpness = { ok: t.ok, picked: t.picked, results: t.results, summary: tune.summary };
+    if (!t.ok) throw new Error('sharpness test failed: ' + tune.summary);
+    if (t.results.filter((r) => r.ok && Number.isFinite(r.detail)).length < 2) throw new Error('sharpness test scored too few settings');
+    if (await site.webContents.executeJavaScript('window.__keepMarker || 0', true) !== 42) throw new Error('the sharpness test reloaded the page');
+    if (process.env.PHOSPHOR_TEST_SHOTS) {
+      fs.mkdirSync(process.env.PHOSPHOR_TEST_SHOTS, { recursive: true });
+      await win.webContents.executeJavaScript("document.getElementById('tune').scrollIntoView()", true);
+      fs.writeFileSync(path.join(process.env.PHOSPHOR_TEST_SHOTS, 'panel-sharpness.png'), (await win.webContents.capturePage()).toPNG());
+      await win.webContents.executeJavaScript("document.getElementById('onair').scrollIntoView()", true);
+    }
     const r = await goLive();
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
     const drawn = await waitFrames(frames);

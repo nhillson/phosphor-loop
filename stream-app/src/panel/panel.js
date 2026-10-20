@@ -63,8 +63,9 @@ function renderStatus() {
     $(`#state-${p}`).textContent = d ? (d.state === 'retrying' ? d.message : STATE_WORDS[d.state] || '') : '';
     $(`#on-${p}`).disabled = !!status.live;
   }
-  $$('#quality button').forEach((b) => { b.disabled = !!status.live; });
-  if (status.encoder) $('#encoder').textContent = 'Using: ' + status.encoder;
+  if (status.encoder) $('#encoder').textContent = 'Using: ' + status.encoder + (status.setting ? ` · ${status.setting}` : '');
+  $('#tuneRun').disabled = !!tune.running || !!status.live || !!status.starting;
+  $$('#quality button').forEach((b) => { b.disabled = !!status.live || !!tune.running; });
   // Phosphor Loop can't draw as fast as the stream asks: say so plainly and suggest the fix
   const slow = state === 'live' && status.wantFps > 30 && status.pictureFps && status.pictureFps < status.wantFps * 0.85;
   showNotice(status.notice || (slow ? { kind: 'warn', text: `This computer is drawing about ${status.pictureFps} frames a second, short of the ${status.wantFps} that Best sends, so the stream repeats frames. Better (30 frames a second) will look smoother and sharper.` } : null));
@@ -75,6 +76,43 @@ function showNotice(n) {
   el.hidden = !n || !n.text;
   if (n && n.text) { el.textContent = n.text; el.className = 'notice ' + (n.kind || 'info'); }
 }
+
+/* ---- sharpness test ---- */
+let tune = { running: false, results: [] };
+function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function renderTune() {
+  const running = !!tune.running;
+  $('#tuneRun').disabled = running || !!status.live || !!status.starting;
+  $('#tuneRun').textContent = running ? 'Testing…' : (tune.last ? 'Run the sharpness test again' : 'Run the sharpness test');
+  $('#tuneRunning').hidden = !running;
+  if (running) {
+    const n = tune.n || 1, done = tune.results.length;
+    $('#tuneBar').style.width = (tune.n ? 8 + 92 * done / n : 4) + '%';
+    $('#tuneStep').textContent = tune.step || '';
+  }
+  // The bars: this run's results while it runs or right after it, otherwise the last saved run
+  const rows = (tune.results && tune.results.length) ? tune.results : (tune.last && tune.last.results) || [];
+  const ok = rows.filter((r) => r.ok);
+  const lo = Math.min(...ok.map((r) => r.detail)), hi = Math.max(...ok.map((r) => r.detail));
+  const width = (d) => (hi > lo ? 18 + 82 * (d - lo) / (hi - lo) : 100);
+  const sorted = [...rows].sort((a, b) => (b.ok - a.ok) || ((b.detail || 0) - (a.detail || 0)));
+  $('#tuneBars').innerHTML = sorted.map((r) => {
+    const note = !r.ok ? 'not on this PC' : r.chosen ? 'picked' : r.usual ? 'before' : '';
+    return `<li class="${r.ok ? '' : 'off'} ${r.chosen ? 'chosen' : ''} ${r.usual ? 'usual' : ''}" title="${esc(r.id)}${r.ok ? ` · ${r.speed} frames a second` : ' · ' + esc(r.error || '')}">` +
+      `<span class="name">${esc(r.label)}${note ? `<em>${note}</em>` : ''}</span>` +
+      `<span class="bar"><i style="width:${r.ok ? width(r.detail) : 100}%"></i></span>` +
+      `<span class="val">${r.ok ? r.detail.toFixed(1) : '–'}</span></li>`;
+  }).join('');
+  let summary = tune.summary || '';
+  if (!summary && tune.last) {
+    const when = new Date(tune.last.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    summary = `Last test (${when}) picked “${tune.last.label}”.` + (tune.last.gain > 0 ? ` ${tune.last.gain} dB sharper than before.` : '');
+  }
+  if (rows.length && !running) summary += ' Longer bar = sharper (scores in dB; 1 dB is easy to see on fine detail).';
+  $('#tuneSummary').textContent = summary;
+}
+$('#tuneRun').addEventListener('click', () => { if (!tune.running && !status.live) window.app.sharpnessTest(); });
+window.app.onTune((t) => { tune = t; renderTune(); renderStatus(); });
 
 async function save(patch) { S = await window.app.save(patch); renderSettings(); renderStatus(); }
 
@@ -142,6 +180,6 @@ setInterval(() => { if (status.live) renderStatus(); }, 1000);
 
 (async () => {
   const st = await window.app.state();
-  S = st.settings; status = st.status; quality = st.quality;
-  renderSettings(); renderStatus();
+  S = st.settings; status = st.status; quality = st.quality; tune = st.tune || tune;
+  renderSettings(); renderStatus(); renderTune();
 })();
