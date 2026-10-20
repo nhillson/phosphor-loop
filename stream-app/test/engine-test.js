@@ -1,7 +1,7 @@
 'use strict';
 // Checks the streaming engine without Electron: a fake "Phosphor Loop recording" (FFmpeg test picture and tone)
 // goes through the squeezer and two senders into two local stand-in servers. Waits are counted in frames of
-// the fake recording, never in seconds. The second server only opens once 200 frames have been sent, so the
+// the fake recording, never in seconds. The second server only opens once 330 frames have been sent, so the
 // "reconnect by itself" path is exercised too.
 const { spawn, execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -63,7 +63,7 @@ function hasAudio(file) {
   src.stderr.on('data', (d) => {
     const m = String(d).match(/frame=(\d+)/g);
     if (m) frame = +m[m.length - 1].slice(6);
-    if (!lb && frame >= 200) { lb = listener(19351, B); logs.push('second server opened at frame ' + frame); }
+    if (!lb && frame >= 330) { lb = listener(19351, B); logs.push('second server opened at frame ' + frame); }
   });
   await new Promise((r) => src.on('exit', r));
   console.log('Fake recording sent', frame, 'frames');
