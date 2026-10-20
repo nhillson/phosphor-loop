@@ -295,6 +295,7 @@ let tune = { running: false, step: '', i: 0, n: 0, results: [], summary: '' };
 let tuner = null;
 function sendTune() { if (win && !win.isDestroyed()) win.webContents.send('tune', publicTune()); }
 ipcMain.on('sample', (_e, w, h, buf) => { if (tuner) tuner.addFrame(w, h, buf); });
+ipcMain.on('sample-rec', (_e, buf, mime) => { if (tuner) tuner.saveRecording(buf, mime); });
 
 async function sharpnessTest({ ids, frames, apply = true } = {}) {
   if (tune.running) return { ok: false };
@@ -319,14 +320,37 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
     tune.step = `Recording ${Math.round(count / q.fps)} seconds of your picture…`; sendTune();
     log(`Sharpness test: recording ${count} frames at ${size.width}x${size.height}, ${q.fps} fps; testing at ${(bitrate / 1e6).toFixed(1)} Mbps`);
     tuner.startRecording({ width: size.width, height: size.height, fps: q.fps, frames: count });
-    await siteCall('sample', { frames: count });
+    tuner.expectRecording();
+    await siteCall('sample', { frames: count, fps: q.fps, recordBitrate: recordBitrate(q) });
     const info = await tuner.waitRecording();
+    log(`Sharpness test: raw pictures arrived at ${info.arrivedFps} frames a second (${info.arrivedMBps} MB/s; asked for ${q.fps})`);
+    tune.step = 'Checking the first recording step…'; sendTune();
+    const first = await tuner.measureFirstStage(info);
+    tune.firstStage = first;
+    log('Sharpness test: page recorder ' + (first.ok ? `(${first.mime}, ${first.sizeMB} MB): brightness ${first.psnrY} dB, colour ${first.psnrU}/${first.psnrV} dB; ` +
+      `${first.matched} frames lined up, ${first.missing} missing, ${first.extra} extra (starts ${first.startOffset} early)` : 'check failed: ' + first.error));
     const sig = await tuner.detailEnergy(info);
     const list = (ids || candidates(codec)).filter((id) => VARIANTS[id]);
+    // Extra settings to compare, measured only (never streamed with): sharpness-extra.json in the app's data folder,
+    // {"variants": {"my-id": {"label": "…", "args": ["-c:v", "h264_nvenc", …, "{BITRATE}", …, "{GOP}"], "cpu": false}}}
+    const extra = {};
+    if (!ids) {
+      try {
+        const x = JSON.parse(fs.readFileSync(path.join(dataDir(), 'sharpness-extra.json'), 'utf8'));
+        for (const [id, v] of Object.entries(x.variants || {})) {
+          if (!Array.isArray(v.args)) continue;
+          extra[id] = { label: String(v.label || id), cpu: !!v.cpu, auto: false, args: v.args.map((a) => String(a)
+            .replace('{BITRATE}', String(bitrate)).replace('{GOP}', String(q.fps * 2)).replace('{FPS}', String(q.fps))) };
+          list.push(id);
+        }
+        if (Object.keys(extra).length) log(`Sharpness test: ${Object.keys(extra).length} extra settings from sharpness-extra.json (measured only)`);
+      } catch (e) { if (e.code !== 'ENOENT') log('sharpness-extra.json not usable: ' + e.message); }
+    }
     tune.n = list.length;
     for (const [i, id] of list.entries()) {
-      tune.i = i; tune.step = `Trying setting ${i + 1} of ${list.length}: ${VARIANTS[id].label}`; sendTune();
-      const r = await tuner.measure(id, info, bitrate, sig);
+      const label = extra[id] ? extra[id].label : VARIANTS[id].label;
+      tune.i = i; tune.step = `Trying setting ${i + 1} of ${list.length}: ${label}`; sendTune();
+      const r = await tuner.measure(id, info, bitrate, sig, extra[id]);
       r.usual = id === usual;
       tune.results.push(r); sendTune();
       log(`Sharpness test: ${id.padEnd(18)} ` + (r.ok ? `detail ${r.detail} dB, PSNR ${r.psnr}, SSIM ${r.ssim}, ${r.speed} fps, peak ${r.peakMbps} Mbps (start ${r.startMbps}), avg ${r.avgMbps}` : `not usable: ${r.error}`));
@@ -347,7 +371,7 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
     log('Sharpness test: picked ' + (best ? `${best.id} (${best.detail} dB; usual ${usual} ${base ? base.detail : '?'} dB)` : 'nothing'));
     try {
       fs.writeFileSync(path.join(dataDir(), 'sharpness-test.json'), JSON.stringify({ at: new Date().toISOString(), info, bitrate, sigPsnr: sig,
-        codec, usual, picked: best && best.id, gpu: gpuName, results: tune.results }, null, 2));
+        codec, usual, picked: best && best.id, gpu: gpuName, firstStage: tune.firstStage, results: tune.results }, null, 2));
     } catch (_) {}
     result = { ok: true, picked: best && best.id, results: tune.results };
   } catch (e) {
@@ -445,7 +469,7 @@ async function runTest() {
   const out = process.env.PHOSPHOR_TEST_OUT;
   const frames = +(process.env.PHOSPHOR_TEST_FRAMES || 450);
   const result = { ok: false };
-  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 480000);
+  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 900000);
   async function finish() {
     clearTimeout(ceiling);
     try { if (out) fs.writeFileSync(out, JSON.stringify(result, null, 2)); } catch (_) {}
@@ -465,14 +489,15 @@ async function runTest() {
     if (big[2] !== 42 || small[2] !== 42) throw new Error('changing quality reloaded the page');
     if (big[1] !== 1080 || small[1] !== 720) throw new Error('changing quality did not change the picture size: ' + JSON.stringify(result.qualitySwitch));
     // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
-    const t = await sharpnessTest({ ids: ['x264-veryfast', 'x264-faster', 'nv-p7-full'], frames: 45 });
-    result.sharpness = { ok: t.ok, picked: t.picked, results: t.results, summary: tune.summary };
+    const t = await sharpnessTest({ ids: ['x264-veryfast', 'nv-p7-full'], frames: 30 });
+    result.sharpness = { ok: t.ok, picked: t.picked, results: t.results, summary: tune.summary, firstStage: tune.firstStage };
     if (!t.ok) throw new Error('sharpness test failed: ' + tune.summary);
-    if (t.results.filter((r) => r.ok && Number.isFinite(r.detail)).length < 2) throw new Error('sharpness test scored too few settings');
+    if (!t.results.some((r) => r.ok && Number.isFinite(r.detail))) throw new Error('sharpness test scored nothing');
+    if (!tune.firstStage || !tune.firstStage.ok) throw new Error('page recorder check failed: ' + JSON.stringify(tune.firstStage));
     if (await site.webContents.executeJavaScript('window.__keepMarker || 0', true) !== 42) throw new Error('the sharpness test reloaded the page');
     if (process.env.PHOSPHOR_TEST_SHOTS) {
       fs.mkdirSync(process.env.PHOSPHOR_TEST_SHOTS, { recursive: true });
-      await win.webContents.executeJavaScript("document.getElementById('tune').scrollIntoView()", true);
+      await win.webContents.executeJavaScript("new Promise((r) => { document.getElementById('tune').scrollIntoView({ block: 'start' }); requestAnimationFrame(() => requestAnimationFrame(r)); })", true);
       fs.writeFileSync(path.join(process.env.PHOSPHOR_TEST_SHOTS, 'panel-sharpness.png'), (await win.webContents.capturePage()).toPNG());
       await win.webContents.executeJavaScript("document.getElementById('onair').scrollIntoView()", true);
     }

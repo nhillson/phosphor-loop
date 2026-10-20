@@ -32,7 +32,12 @@ function runFF(ffmpeg, args, { onLine, timeout = 300000 } = {}) {
     p.on('close', (code) => { clearTimeout(t); if (partial) err += partial; resolve({ code, err }); });
   });
 }
-const lastError = (text) => String(text).trim().split('\n').filter((l) => !/^(frame|fps|stream_|bitrate|total_size|out_time|dup_frames|drop_frames|speed|progress)=/.test(l)).pop() || 'failed';
+// FFmpeg's most useful complaint: the encoder's own words if it said anything, otherwise its last line
+const lastError = (text) => {
+  const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^[a-z0-9_]+=\S*$/.test(l));
+  const own = lines.filter((l) => /^\[(h264|hevc|av1|lib)\w*\s@/.test(l) || /Unrecognized option|Option not found|not supported|No capable devices|Cannot load|InitializeEncoder failed/i.test(l));
+  return (own.length ? own.slice(0, 2).join(' | ') : lines.pop()) || 'failed';
+};
 
 class Tuner {
   constructor({ ffmpeg, log = () => {}, dir }) {
@@ -55,7 +60,7 @@ class Tuner {
     let err = '';
     p.stderr.on('data', (d) => { err = (err + d).slice(-2000); });
     p.stdin.on('error', () => {});
-    const rec = { width, height, fps, frames, got: 0, proc: p, lastAt: Date.now() };
+    const rec = { width, height, fps, frames, got: 0, proc: p, lastAt: Date.now(), firstAt: 0 };
     rec.done = new Promise((resolve, reject) => {
       rec.finish = resolve; rec.fail = reject;
       p.on('close', (code) => {
@@ -71,7 +76,7 @@ class Tuner {
     const r = this.rec;
     if (!r || r.got >= r.frames) return;
     if (width !== r.width || height !== r.height) { r.proc.kill(); return; }
-    r.got++; r.lastAt = Date.now();
+    r.got++; r.lastAt = Date.now(); if (!r.firstAt) r.firstAt = r.lastAt;
     r.proc.stdin.write(Buffer.from(buf));
     if (r.got >= r.frames) r.proc.stdin.end();
   }
@@ -81,7 +86,11 @@ class Tuner {
     const r = this.rec;
     const watch = setInterval(() => { if (r.got < r.frames && Date.now() - r.lastAt > stallMs) r.proc.kill(); }, 1000);
     try { await r.done; } finally { clearInterval(watch); this.rec = null; }
-    const info = { width: r.width, height: r.height, fps: r.fps, frames: r.frames, at: new Date().toISOString() };
+    // How fast the raw pictures came across from the page (useful for a future no-compression stream path)
+    const secs = (r.lastAt - r.firstAt) / 1000;
+    const rate = secs > 0 ? (r.got - 1) / secs : 0;
+    const info = { width: r.width, height: r.height, fps: r.fps, frames: r.frames, at: new Date().toISOString(),
+      arrivedFps: +rate.toFixed(1), arrivedMBps: +(rate * r.width * r.height * 4 / 1e6).toFixed(1) };
     fs.writeFileSync(this.meta, JSON.stringify(info, null, 2));
     return info;
   }
@@ -169,9 +178,69 @@ class Tuner {
     try { fs.unlinkSync(out); } catch (_) {}
     if (!Number.isFinite(detail)) return { id, label: v.label, ok: false, error: 'could not score: ' + lastError(met.err).slice(0, 160) };
     return { id, label: v.label, ok: true, detail: +detail.toFixed(2), psnr: +psnr.toFixed(2), ssim: +ssim.toFixed(4),
-      speed: Math.round(speed), peakMbps: +peak.toFixed(2), startMbps: +startMbps.toFixed(2), avgMbps: +avgMbps.toFixed(2), cpu: !!v.cpu, auto: v.auto !== false };
+      extra: !!custom, speed: Math.round(speed), peakMbps: +peak.toFixed(2), startMbps: +startMbps.toFixed(2), avgMbps: +avgMbps.toFixed(2), cpu: !!v.cpu, auto: !custom && v.auto !== false };
   }
 }
+
+// The first step of the real stream is the page's own recorder (Chromium's MediaRecorder, which on Windows uses the
+// graphics card through Media Foundation). It recorded the same frames during the sample. This lines its frames up
+// with the exact ones and reports what that step loses: match scores for brightness (Y) and colour (U, V), and how
+// many frames it dropped or repeated. Colour is converted the same way as the stream (BT.601 in, BT.709 out), so a
+// wrong conversion would show up as poor colour scores.
+Tuner.prototype.saveRecording = function (buf, mime) {
+  try {
+    fs.mkdirSync(this.dir, { recursive: true });
+    this.recFile = path.join(this.dir, /webm/.test(mime) ? 'recorder.webm' : 'recorder.mkv');
+    fs.writeFileSync(this.recFile, Buffer.from(buf));
+    this.recMime = mime;
+    if (this.recWaiter) this.recWaiter();
+  } catch (e) { this.log('Could not keep the recorder sample: ' + e.message); }
+};
+Tuner.prototype.expectRecording = function () {
+  this.recFile = null;
+  this.recReady = new Promise((r) => { this.recWaiter = r; });
+};
+Tuner.prototype.measureFirstStage = async function (info, ceilingMs = 30000) {
+  const got = await Promise.race([this.recReady, new Promise((r) => setTimeout(() => r('late'), ceilingMs))]);
+  if (got === 'late' || !this.recFile) return { ok: false, error: 'the page recorder sample never arrived' };
+  const { width: W, height: H, frames: N } = info;
+  const recYuv = path.join(this.dir, 'recorder.yuv');
+  const dec = await runFF(this.ffmpeg, ['-hide_banner', '-nostats', '-loglevel', 'error', '-y', '-i', this.recFile, '-map', '0:v:0',
+    '-vf', `scale=${W}:${H}:in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=yuv420p`,
+    '-fps_mode', 'passthrough', '-frames:v', String(N + 60), '-f', 'rawvideo', recYuv]);
+  if (dec.code !== 0) return { ok: false, error: 'could not read the recorder sample: ' + lastError(dec.err).slice(0, 160) };
+  const fs1 = W * H * 3 / 2;
+  const M = Math.floor(fs.statSync(recYuv).size / fs1);
+  const fa = fs.openSync(this.sample, 'r'), fb = fs.openSync(recYuv, 'r');
+  const A = Buffer.alloc(fs1), B = Buffer.alloc(fs1);
+  const readA = (i) => fs.readSync(fa, A, 0, fs1, i * fs1), readB = (j) => fs.readSync(fb, B, 0, fs1, j * fs1);
+  // quick brightness difference on a sparse grid, to line frames up
+  const quick = () => { let s = 0, n = 0; for (let y = 2; y < H; y += 8) for (let x = 3, o = y * W; x < W; x += 8) { const d = A[o + x] - B[o + x]; s += d * d; n++; } return s / n; };
+  const sq = (o, len) => { let s = 0; for (let k = o; k < o + len; k++) { const d = A[k] - B[k]; s += d * d; } return s / len; };
+  try {
+    // where the recorder's frames start: the best match for the sample's first frame
+    readA(0);
+    let start = 0, bestErr = Infinity;
+    for (let j = 0; j < Math.min(M, 45); j++) { readB(j); const e = quick(); if (e < bestErr) { bestErr = e; start = j; } }
+    // Walk both in step. A sample frame with no close match in the recording was dropped by the recorder; a
+    // recording frame skipped over was an extra (repeated) one.
+    let cur = start, typical = Math.max(1, bestErr), matched = 0, missing = 0, extra = 0, sy = 0, su = 0, sv = 0;
+    for (let i = 0; i < N && cur < M; i++) {
+      readA(i);
+      let best = cur, be = Infinity;
+      for (let k = Math.max(0, cur - 1); k <= Math.min(M - 1, cur + 2); k++) { readB(k); const e = quick(); if (e < be) { be = e; best = k; } }
+      if (be > 3 * typical + 2) { missing++; continue; }
+      if (best > cur) extra += best - cur;
+      readB(best);
+      sy += sq(0, W * H); su += sq(W * H, W * H / 4); sv += sq(W * H * 5 / 4, W * H / 4);
+      matched++; typical = 0.8 * typical + 0.2 * Math.max(1, be); cur = best + 1;
+    }
+    if (!matched) return { ok: false, error: 'the recording did not line up with the sample' };
+    const p = (mse) => +(10 * Math.log10(255 * 255 / Math.max(1e-9, mse / matched))).toFixed(2);
+    return { ok: true, mime: this.recMime, recFrames: M, startOffset: start, matched, missing, extra,
+      psnrY: p(sy), psnrU: p(su), psnrV: p(sv), sizeMB: +(fs.statSync(this.recFile).size / 1e6).toFixed(1) };
+  } finally { fs.closeSync(fa); fs.closeSync(fb); try { fs.unlinkSync(recYuv); } catch (_) {} }
+};
 
 // Which settings to compare on this computer: every setting for the graphics card the app found, plus the
 // processor's (which only win if this computer's processor is fast enough).
