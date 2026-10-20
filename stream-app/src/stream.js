@@ -19,7 +19,7 @@ const ENCODERS = [
 const TIERS = { h264_nvenc: ['best', 'good', 'basic'], h264_amf: ['best', 'basic'], h264_qsv: ['best', 'basic'], libx264: ['best'] };
 
 function encoderArgs(id, { fps, bitrate }, tier = 'best') {
-  const b = String(bitrate), buf = String(bitrate * 2), g = String(fps * 2);
+  const b = String(bitrate), buf = String(bitrate), g = String(fps * 2);
   const cbr = ['-b:v', b, '-maxrate', b, '-bufsize', buf, '-g', g];
   switch (id) {
     case 'h264_nvenc':
@@ -164,7 +164,10 @@ class Streamer extends EventEmitter {
     const s = this.senders.get(id);
     if (!s || !this.live) return;
     clearTimeout(s.timer);
-    const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-f', 'mpegts', '-i', 'pipe:0',
+    // Send at the stream's own pace from the very first second. Without the pace limit, the few seconds FFmpeg
+    // gathers while it starts up go out in one burst, and Kick (Amazon IVS) hangs up on anything over its limit.
+    const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-probesize', '2000000', '-analyzeduration', '1000000',
+      '-readrate', '1', '-readrate_initial_burst', '0.5', '-f', 'mpegts', '-i', 'pipe:0',
       '-map', '0', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-flvflags', 'no_duration_filesize', '-rw_timeout', '15000000',
       '-f', 'flv', s.def.url];
     const p = spawn(this.ffmpeg, args, { windowsHide: true });

@@ -11,12 +11,13 @@ const TEST = process.env.PHOSPHOR_TEST === '1';
 const SITE = process.env.PHOSPHOR_SITE || 'https://nhillson.github.io/phosphor-loop/';
 const PANEL_W = 360, PANEL_COLLAPSED_W = 48;
 
-// Upload speed per platform: Twitch takes up to 6 Mbps; Kick (Amazon IVS) takes up to 8.5 Mbps at 1080p60.
+// Upload speed per platform: Twitch takes up to 6 Mbps; Kick (Amazon IVS) takes up to 8.5 Mbps at 1080p60 and hangs
+// up when a stream goes over, so Kick gets 7.5 to leave room for sound and the odd busy moment.
 // When both are on, one stream goes to both, so it uses the lower of the two.
 const QUALITY = {
   good: { width: 1280, height: 720, fps: 30, bitrate: { twitch: 4500000, kick: 4500000 } },
-  better: { width: 1920, height: 1080, fps: 30, bitrate: { twitch: 6000000, kick: 8000000 } },
-  best: { width: 1920, height: 1080, fps: 60, bitrate: { twitch: 6000000, kick: 8000000 } },
+  better: { width: 1920, height: 1080, fps: 30, bitrate: { twitch: 6000000, kick: 7500000 } },
+  best: { width: 1920, height: 1080, fps: 60, bitrate: { twitch: 6000000, kick: 7500000 } },
 };
 // The picture is first recorded inside Phosphor Loop, then squeezed for the platforms. That first recording is
 // kept nearly lossless (very high quality, it never leaves the computer), so the picture is only really
@@ -282,19 +283,37 @@ ipcMain.handle('save', (_e, patch) => {
   if (patch.quality && QUALITY[patch.quality] && !streamer.live) settings.quality = patch.quality;
   if ('startWithWindows' in patch && app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.startWithWindows });
   saveSettings();
-  // A new size means Phosphor Loop has to start drawing at that size
-  if (settings.quality !== before) site.webContents.reload();
+  // A new size: tell Phosphor Loop to draw at it. It carries the current picture and every setting across, the
+  // same way it does when its window is resized. Only if that isn't possible is the page reloaded.
+  if (settings.quality !== before) resizeSite();
   return publicSettings();
 });
+function captureConfig() {
+  const q = QUALITY[settings.quality];
+  return { width: q.width, height: q.height, fps: q.fps, renderHeight: q.height };
+}
+async function resizeSite() {
+  const cfg = captureConfig();
+  let ok = false;
+  try {
+    ok = await site.webContents.executeJavaScript(`(() => {
+      const c = window.__phosphorCaptureConfig;
+      if (!c) return false;
+      try { Object.assign(c, ${JSON.stringify(cfg)}); } catch (_) { return false; }
+      if (c.height !== ${cfg.height} || c.fps !== ${cfg.fps}) return false;
+      window.dispatchEvent(new Event('resize'));
+      return true;
+    })()`, true);
+  } catch (_) {}
+  log(`Quality now ${settings.quality}: ${ok ? 'resized in place' : 'reloading the page'}`);
+  if (!ok) site.webContents.reload();
+}
 ipcMain.handle('go-live', () => goLive());
 ipcMain.handle('stop', () => stopLive());
 ipcMain.handle('help', (_e, which) => { if (HELP[which]) shell.openExternal(HELP[which]); });
 ipcMain.handle('collapse', (_e, on) => { settings.collapsed = !!on; saveSettings(); layout(); });
 ipcMain.handle('open-log', () => { if (logPath) shell.showItemInFolder(logPath); });
-ipcMain.on('capture-config', (e) => {
-  const q = QUALITY[settings.quality];
-  e.returnValue = { width: q.width, height: q.height, fps: q.fps, renderHeight: q.height };
-});
+ipcMain.on('capture-config', (e) => { e.returnValue = captureConfig(); });
 
 /* ---------- start-up ---------- */
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
@@ -328,6 +347,16 @@ async function runTest() {
   try {
     if (!(await waitForSite())) throw new Error('site never became ready');
     await waitFrames(60);
+    // Changing quality must keep the page (and so the look) instead of reloading it
+    await site.webContents.executeJavaScript('window.__keepMarker = 42', true);
+    const sizeNow = () => site.webContents.executeJavaScript('[window.__phosphorCapture.canvas.width, window.__phosphorCapture.canvas.height, window.__keepMarker || 0]', true);
+    settings.quality = 'better'; await resizeSite(); await waitFrames(30);
+    const big = await sizeNow();
+    settings.quality = 'good'; await resizeSite(); await waitFrames(30);
+    const small = await sizeNow();
+    result.qualitySwitch = { better: big, good: small };
+    if (big[2] !== 42 || small[2] !== 42) throw new Error('changing quality reloaded the page');
+    if (big[1] !== 1080 || small[1] !== 720) throw new Error('changing quality did not change the picture size: ' + JSON.stringify(result.qualitySwitch));
     const r = await goLive();
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
     const drawn = await waitFrames(frames);

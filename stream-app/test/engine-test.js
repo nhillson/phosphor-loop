@@ -31,6 +31,30 @@ function hasAudio(file) {
   try { return /audio/.test(execFileSync(FF.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1'), ['-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file]).toString()); } catch (_) { return false; }
 }
 
+// A pass-through between the sender and the first test server that notes when each byte arrives, to check the
+// stream goes out at a steady pace (platforms like Kick hang up on a burst above their speed limit).
+const net = require('node:net');
+const arrivals = [];
+function meter(listenPort, targetPort) {
+  return net.createServer((client) => {
+    const up = net.connect(targetPort, '127.0.0.1');
+    client.on('data', (d) => { arrivals.push([Date.now(), d.length]); up.write(d); });
+    up.on('data', (d) => client.write(d));
+    const end = () => { client.destroy(); up.destroy(); };
+    client.on('close', end); up.on('close', end); client.on('error', end); up.on('error', end);
+  }).listen(listenPort, '127.0.0.1');
+}
+function worstWindowMbps(windowMs) {
+  if (!arrivals.length) return 0;
+  let worst = 0, j = 0, sum = 0;
+  for (let i = 0; i < arrivals.length; i++) {
+    sum += arrivals[i][1];
+    while (arrivals[i][0] - arrivals[j][0] > windowMs) { sum -= arrivals[j][1]; j++; }
+    if (arrivals[i][0] - arrivals[0][0] >= windowMs) worst = Math.max(worst, sum * 8 / (windowMs / 1000) / 1e6);
+  }
+  return worst;
+}
+
 (async () => {
   const keyA = 'live_secretKEYaaaa', keyB = 'sk_us-west-2_secretKEYbbbb';
   const A = path.join(dir, 'a.flv'), B = path.join(dir, 'b.flv');
@@ -41,7 +65,8 @@ function hasAudio(file) {
   console.log('Encoder picked:', s.encoder.id);
   const statuses = [];
   s.on('status', (st) => statuses.push(JSON.stringify(st)));
-  const urlA = 'rtmp://127.0.0.1:19350/app/' + keyA;
+  const proxy = meter(19349, 19350);
+  const urlA = 'rtmp://127.0.0.1:19349/app/' + keyA;
   const urlB = buildUrl('custom', { server: 'rtmp://127.0.0.1:19351/app', key: keyB });
   // check address building
   const kick = buildUrl('kick', { server: 'rtmps://fa723fc1b171.global-contribute.live-video.net', key: 'sk_1' });
@@ -51,6 +76,7 @@ function hasAudio(file) {
 
   await new Promise((r) => setTimeout(r, 300)); // let the first stand-in server open its port (setup, not a picture wait)
   s.start([{ id: 'a', name: 'Twitch', url: urlA, secret: keyA }, { id: 'b', name: 'Kick', url: urlB, secret: keyB }], { fps: 30, bitrate: 2500000 });
+  const TARGET_MBPS = 2.5 + 0.16;
 
   // The fake recording: what MediaRecorder hands over inside the app (Matroska, H.264 + Opus), in real time
   let gen = s.gen;
@@ -67,6 +93,9 @@ function hasAudio(file) {
   });
   await new Promise((r) => src.on('exit', r));
   console.log('Fake recording sent', frame, 'frames');
+  const worst = worstWindowMbps(5000);
+  console.log(`Fastest 5-second stretch at the first server: ${worst.toFixed(2)} Mbps (stream is ${TARGET_MBPS} Mbps)`);
+  proxy.close();
   s.stop();
   await Promise.all([la, lb].filter(Boolean).map((p) => new Promise((r) => { p.on('exit', r); setTimeout(() => { p.kill(); r(); }, 8000); })));
 
@@ -76,6 +105,7 @@ function hasAudio(file) {
   if (all.includes(keyA) || all.includes(keyB)) fail('a stream key showed up in the log or status');
   if (fa < FRAMES * 0.85) { console.log(logs.join('\n')); fail('first server got too few frames'); }
   if (!hasAudio(A)) fail('no sound on first server');
+  if (worst > TARGET_MBPS * 1.3) fail(`sent in a burst: ${worst.toFixed(2)} Mbps over 5 s for a ${TARGET_MBPS} Mbps stream`);
   if (!(fb > 30)) { console.log(logs.join('\n')); fail('second server never recovered'); }
   if (!statuses.some((x) => /"b":\{"state":"retrying"/.test(x))) fail('second destination never showed as retrying');
   if (!statuses.some((x) => /"b":\{"state":"live"/.test(x))) fail('second destination never showed as live');
