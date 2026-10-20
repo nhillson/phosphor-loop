@@ -71,6 +71,16 @@ jobs:
             exit 1
           }
 
+      - name: Put the test logs where they can be read
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not (Test-Path test-output)) { exit 0 }
+          gh release view ci-logs 2>$null
+          if ($LASTEXITCODE -ne 0) { gh release create ci-logs --target $env:GITHUB_SHA --prerelease --title 'Stream app test logs' --notes 'Logs from the latest Windows test run.' }
+          $files = Get-ChildItem test-output -File | Where-Object { $_.Extension -in '.txt', '.json', '.png' } | ForEach-Object { $_.FullName }
+          if ($files) { gh release upload ci-logs @files --clobber }
+
       - name: Keep the test pictures
         if: always()
         uses: actions/upload-artifact@v4

@@ -14,7 +14,9 @@ const FRAMES = +(process.env.FRAMES || 360);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pstest-'));
 const logs = [];
 const ann = (kind, title, text) => { if (process.env.GITHUB_ACTIONS) console.log(`::${kind} title=engine ${title}::` + String(text).slice(-3500).replace(/%/g, '%25').replace(/\r?\n/g, '%0A')); };
+const saveLog = (extra) => { try { fs.mkdirSync(path.join(__dirname, '..', 'test-output'), { recursive: true }); fs.writeFileSync(path.join(__dirname, '..', 'test-output', 'engine-log.txt'), extra + '\n' + logs.join('\n')); } catch (_) {} };
 const fail = (m) => {
+  saveLog('FAIL: ' + m);
   console.error('FAIL: ' + m);
   const all = m + '\n' + (typeof logs !== 'undefined' ? logs.join('\n') : '');
   for (let i = 0, n = 0; i < all.length && n < 9; i += 3000, n++) ann(n ? 'notice' : 'error', `log ${n + 1}`, all.slice(i, i + 3000));
@@ -116,6 +118,7 @@ function worstWindowMbps(windowMs) {
   if (!statuses.some((x) => /"b":\{"state":"live"/.test(x))) fail('second destination never showed as live');
   console.log('Sample retry message:', (statuses.map((x) => JSON.parse(x).destinations.b).find((d) => d && d.state === 'retrying') || {}).message);
   ann('notice', 'passed', `encoder ${s.encoder.id}; first ${fa} frames, second ${fb} frames`);
+  saveLog('PASS');
   console.log('PASS');
   process.exit(0);
 })().catch((e) => fail(e.stack));

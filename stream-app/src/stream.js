@@ -166,7 +166,8 @@ class Streamer extends EventEmitter {
     clearTimeout(s.timer);
     // Send at the stream's own pace from the very first second. Without the pace limit, the few seconds FFmpeg
     // gathers while it starts up go out in one burst, and Kick (Amazon IVS) hangs up on anything over its limit.
-    const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-probesize', '2000000', '-analyzeduration', '1000000',
+    // It looks for up to 3 s for a full picture (one comes every 2 s), which it needs when joining mid-stream.
+    const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-probesize', '10000000', '-analyzeduration', '3000000',
       '-readrate', '1', '-readrate_initial_burst', '0.5', '-f', 'mpegts', '-i', 'pipe:0',
       '-map', '0', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-flvflags', 'no_duration_filesize', '-rw_timeout', '15000000',
       '-f', 'flv', s.def.url];
