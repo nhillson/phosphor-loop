@@ -54,7 +54,7 @@ jobs:
         run: node test/engine-test.js
         env:
           FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
-          FRAMES: '600'
+          FRAMES: '900'
 
       - name: Test the whole app (Phosphor Loop to a local test server)
         run: node test/app-test.js
