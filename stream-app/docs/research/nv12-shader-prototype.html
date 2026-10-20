@@ -1,0 +1,37 @@
+<!doctype html><canvas id=c width=320 height=240></canvas><script>
+const c=document.getElementById('c');const gl=c.getContext('webgl2',{antialias:false,alpha:false,preserveDrawingBuffer:false});
+gl.enable(gl.SCISSOR_TEST);
+const cols=[[1,0,0],[0,1,0],[0,0,1],[0x8b/255,0x1a/255,0xb8/255],[1,1,1],[0,0,0],[0.5,0.5,0.5],[1,1,0]];
+// top row of the picture = first 4 colours (scissor y is from bottom)
+function paint(){cols.forEach((k,i)=>{gl.scissor((i%4)*80,(1-Math.floor(i/4))*120,80,120);gl.clearColor(...k,1);gl.clear(gl.COLOR_BUFFER_BIT);});}
+const W=320,H=240,OUT_H=H*3/2;
+const oc=new OffscreenCanvas(W,OUT_H),g=oc.getContext('webgl2',{antialias:false});
+function sh(t,s){const x=g.createShader(t);g.shaderSource(x,s);g.compileShader(x);if(!g.getShaderParameter(x,g.COMPILE_STATUS))throw g.getShaderInfoLog(x);return x;}
+const VS=`#version 300 es
+void main(){vec2 p=vec2(gl_VertexID==1?3.:-1.,gl_VertexID==2?3.:-1.);gl_Position=vec4(p,0,1);}`;
+const FS=`#version 300 es
+precision highp float; uniform sampler2D s; out vec4 o;
+const vec3 KY = vec3(0.2126, 0.7152, 0.0722);
+vec3 px(ivec2 p){ return texelFetch(s, clamp(p, ivec2(0), ivec2(${W-1},${H-1})), 0).rgb; }
+float lim(float y){ return (16.0 + 219.0*y) / 255.0; }
+float limc(float c){ return (128.0 + 224.0*c) / 255.0; }
+void main(){
+  ivec2 f = ivec2(gl_FragCoord.xy);
+  if (f.y < ${H}) { o = vec4(lim(dot(KY, px(f))), 0,0,1); return; }
+  int cx = (f.x / 2) * 2, cy = (f.y - ${H}) * 2; bool isV = (f.x & 1) == 1;
+  vec3 a = vec3(0);
+  for (int dy = 0; dy < 2; dy++) a += 0.25*px(ivec2(cx-1,cy+dy)) + 0.5*px(ivec2(cx,cy+dy)) + 0.25*px(ivec2(cx+1,cy+dy));
+  a *= 0.5; float y = dot(KY, a);
+  float cc = isV ? (a.r - y) / 1.5748 : (a.b - y) / 1.8556;
+  o = vec4(limc(cc), 0,0,1);
+}`;
+const pr=g.createProgram();g.attachShader(pr,sh(g.VERTEX_SHADER,VS));g.attachShader(pr,sh(g.FRAGMENT_SHADER,FS));g.linkProgram(pr);g.useProgram(pr);
+const src=g.createTexture();g.bindTexture(g.TEXTURE_2D,src);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.NEAREST);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.NEAREST);
+const tgt=g.createTexture();g.bindTexture(g.TEXTURE_2D,tgt);g.texStorage2D(g.TEXTURE_2D,1,g.R8,W,OUT_H);
+const fbo=g.createFramebuffer();g.bindFramebuffer(g.FRAMEBUFFER,fbo);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,tgt,0);
+window.go=(same)=>{if(same)paint();g.bindTexture(g.TEXTURE_2D,src);g.texImage2D(g.TEXTURE_2D,0,g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,c);
+ g.viewport(0,0,W,OUT_H);g.drawArrays(g.TRIANGLES,0,3);
+ const fmt=[g.getParameter(g.IMPLEMENTATION_COLOR_READ_FORMAT)===g.RED,g.getParameter(g.IMPLEMENTATION_COLOR_READ_TYPE)===g.UNSIGNED_BYTE];
+ const out=new Uint8Array(W*OUT_H);g.readPixels(0,0,W,OUT_H,g.RED,g.UNSIGNED_BYTE,out);
+ let s='';for(let i=0;i<out.length;i+=8192)s+=String.fromCharCode.apply(null,out.subarray(i,i+8192));return [fmt,g.getError(),btoa(s)];};
+paint();</script>
