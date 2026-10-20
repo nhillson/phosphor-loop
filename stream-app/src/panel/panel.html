@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Phosphor Stream</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<aside id="panel" aria-label="Streaming controls">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>Phosphor Stream</div>
+    <button class="icon" id="collapse" title="Hide controls" aria-label="Hide controls">&#x203A;</button>
+  </header>
+
+  <section class="onair" id="onair" data-state="off">
+    <div class="air-row">
+      <span class="dot" aria-hidden="true"></span>
+      <div>
+        <div class="air-title" id="airTitle">Off air</div>
+        <div class="air-sub" id="airSub">Ready when you are.</div>
+      </div>
+    </div>
+    <button class="golive" id="golive">Go live</button>
+    <p class="notice" id="notice" hidden></p>
+  </section>
+
+  <section class="block">
+    <h2>Where to stream</h2>
+
+    <div class="dest" id="dest-twitch" data-platform="twitch">
+      <div class="dest-head">
+        <span class="light" aria-hidden="true"></span>
+        <div class="dest-name">Twitch<span class="dest-state" id="state-twitch"></span></div>
+        <label class="switch"><input type="checkbox" id="on-twitch"><span></span><b class="sr">Stream to Twitch</b></label>
+      </div>
+      <div class="dest-body">
+        <div class="saved" id="saved-twitch" hidden>Stream key saved <button class="link" data-change="twitch">Change</button></div>
+        <div class="fields" id="fields-twitch">
+          <label>Stream key
+            <span class="keybox"><input type="password" id="key-twitch" autocomplete="off" spellcheck="false" placeholder="Paste it here"><button class="link show" data-show="key-twitch">Show</button></span>
+          </label>
+          <div class="row"><button class="small primary" data-save="twitch">Save</button><button class="link" data-help="twitch">Where do I find it?</button></div>
+          <p class="how" id="how-twitch" hidden>Your Twitch dashboard just opened in your web browser. Next to <b>Primary Stream key</b>, click <b>Copy</b>, then paste it in the box above and click Save.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dest" id="dest-kick" data-platform="kick">
+      <div class="dest-head">
+        <span class="light" aria-hidden="true"></span>
+        <div class="dest-name">Kick<span class="dest-state" id="state-kick"></span></div>
+        <label class="switch"><input type="checkbox" id="on-kick"><span></span><b class="sr">Stream to Kick</b></label>
+      </div>
+      <div class="dest-body">
+        <div class="saved" id="saved-kick" hidden>Stream key saved <button class="link" data-change="kick">Change</button></div>
+        <div class="fields" id="fields-kick">
+          <label>Server address (Stream URL)
+            <input type="text" id="server-kick" autocomplete="off" spellcheck="false" placeholder="rtmps://…">
+          </label>
+          <label>Stream key
+            <span class="keybox"><input type="password" id="key-kick" autocomplete="off" spellcheck="false" placeholder="Paste it here"><button class="link show" data-show="key-kick">Show</button></span>
+          </label>
+          <div class="row"><button class="small primary" data-save="kick">Save</button><button class="link" data-help="kick">Where do I find these?</button></div>
+          <p class="how" id="how-kick" hidden>Kick’s stream settings just opened in your web browser. Copy the <b>Stream URL</b> into the first box and the <b>Stream Key</b> into the second, then click Save.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Picture quality</h2>
+    <div class="seg" id="quality" role="radiogroup" aria-label="Picture quality">
+      <button role="radio" data-q="good"><b>Good</b><small>720p</small></button>
+      <button role="radio" data-q="better"><b>Better</b><small>1080p</small></button>
+      <button role="radio" data-q="best"><b>Best</b><small>1080p smooth</small></button>
+    </div>
+    <p class="hint" id="qualityHint"></p>
+  </section>
+
+  <section class="block">
+    <h2>For a computer that streams all day</h2>
+    <label class="toggle"><span>Start when Windows starts</span><span class="switch"><input type="checkbox" id="opt-startWithWindows"><span></span></span></label>
+    <label class="toggle"><span>Go live as soon as the app opens</span><span class="switch"><input type="checkbox" id="opt-goLiveOnOpen"><span></span></span></label>
+    <label class="toggle"><span>Turn on Autopilot when going live</span><span class="switch"><input type="checkbox" id="opt-autopilotOnLive"><span></span></span></label>
+  </section>
+
+  <footer class="foot">
+    <span id="encoder">Checking your graphics card…</span>
+    <button class="link" id="openLog">Log</button>
+  </footer>
+</aside>
+
+<aside id="strip" hidden aria-label="Streaming controls (hidden)">
+  <button class="icon" id="expand" title="Show controls" aria-label="Show controls">&#x2039;</button>
+  <span class="dot" id="stripDot" aria-hidden="true"></span>
+</aside>
+<script src="panel.js"></script>
+</body>
+</html>

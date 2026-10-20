@@ -1,0 +1,88 @@
+name: Windows stream app
+
+# Builds Phosphor Stream (the Windows app that streams Phosphor Loop to Twitch and Kick), tests it end to end,
+# and puts the installer on the repository's Releases page. Runs whenever stream-app/ changes on this branch,
+# or by hand from the Actions tab ("Run workflow").
+on:
+  push:
+    branches: [stream-app]
+    paths:
+      - 'stream-app/**'
+      - '.github/workflows/stream-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stream-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: stream-app
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Get FFmpeg (the hidden streaming engine)
+        shell: pwsh
+        run: |
+          $assets = gh release view latest -R BtbN/FFmpeg-Builds --json assets --jq '.assets[].name'
+          $name = $assets | Where-Object { $_ -match '^ffmpeg-n\d+\.\d+-latest-win64-gpl-\d+\.\d+\.zip$' } | Sort-Object | Select-Object -Last 1
+          if (-not $name) { $name = 'ffmpeg-master-latest-win64-gpl.zip' }
+          Write-Host "Using $name"
+          gh release download latest -R BtbN/FFmpeg-Builds -p $name -O ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffx
+          New-Item -ItemType Directory -Force vendor | Out-Null
+          Copy-Item (Get-ChildItem ffx -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName vendor/ffmpeg.exe
+          Copy-Item (Get-ChildItem ffx -Recurse -Filter ffprobe.exe | Select-Object -First 1).FullName vendor/ffprobe.exe
+          vendor/ffmpeg.exe -hide_banner -version | Select-Object -First 1
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Test the streaming engine
+        run: node test/engine-test.js
+        env:
+          FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
+          FRAMES: '450'
+
+      - name: Test the whole app (Phosphor Loop to a local test server)
+        run: node test/app-test.js
+        env:
+          FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
+
+      - name: Build the installer
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Keep the test pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: stream-app/test-output
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: stream-app/dist/Phosphor-Stream-Setup.exe
+
+      - name: Put the installer on the Releases page
+        shell: pwsh
+        run: |
+          $tag = 'stream-app-latest'
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:GITHUB_SHA --prerelease --title 'Phosphor Stream for Windows' --notes 'Download Phosphor-Stream-Setup.exe below and double-click it to install.'
+          }
+          gh release upload $tag dist/Phosphor-Stream-Setup.exe --clobber

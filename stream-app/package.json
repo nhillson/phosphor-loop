@@ -1,0 +1,37 @@
+{
+  "name": "phosphor-stream",
+  "productName": "Phosphor Stream",
+  "version": "1.0.0",
+  "description": "Stream Phosphor Loop to Twitch and Kick",
+  "author": "Nick Hillson",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test:engine": "node test/engine-test.js",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "io.github.nhillson.phosphorstream",
+    "productName": "Phosphor Stream",
+    "files": ["src/**/*", "package.json"],
+    "extraResources": [{ "from": "vendor/ffmpeg.exe", "to": "ffmpeg.exe" }],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": { "target": "nsis", "icon": "build/icon.ico", "artifactName": "Phosphor-Stream-Setup.${ext}" },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Phosphor Stream",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
