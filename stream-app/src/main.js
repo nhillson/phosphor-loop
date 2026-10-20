@@ -316,6 +316,7 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
     if (!(await waitForSite())) throw new Error('Phosphor Loop didn’t finish loading');
     const size = await siteCall('size');
     if (!size) throw new Error('Phosphor Loop is still starting');
+    const fpsBefore = await pageFps();
     const count = frames || Math.round(q.fps * 5);
     tune.step = `Recording ${Math.round(count / q.fps)} seconds of your picture…`; sendTune();
     log(`Sharpness test: recording ${count} frames at ${size.width}x${size.height}, ${q.fps} fps; testing at ${(bitrate / 1e6).toFixed(1)} Mbps`);
@@ -323,7 +324,7 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
     tuner.expectRecording();
     await siteCall('sample', { frames: count, fps: q.fps, recordBitrate: recordBitrate(q) });
     const info = await tuner.waitRecording();
-    log(`Sharpness test: raw pictures arrived at ${info.arrivedFps} frames a second (${info.arrivedMBps} MB/s; asked for ${q.fps})`);
+    log(`Sharpness test: raw pictures arrived at ${info.arrivedFps} frames a second (${info.arrivedMBps} MB/s; asked for ${q.fps}; page was drawing ${fpsBefore} a second before)`);
     tune.step = 'Checking the first recording step…'; sendTune();
     const first = await tuner.measureFirstStage(info);
     tune.firstStage = first;
@@ -464,6 +465,13 @@ app.whenReady().then(async () => {
   }
 });
 
+// How fast the page is drawing: the time it takes to draw a set number of frames
+async function pageFps(n = 30) {
+  const t0 = Date.now();
+  if (!(await waitFrames(n, 60000))) return 0;
+  return +(n / ((Date.now() - t0) / 1000)).toFixed(1);
+}
+
 /* ---------- self-test used by the build (never runs for Nick) ---------- */
 async function runTest() {
   const out = process.env.PHOSPHOR_TEST_OUT;
@@ -488,19 +496,6 @@ async function runTest() {
     result.qualitySwitch = { better: big, good: small };
     if (big[2] !== 42 || small[2] !== 42) throw new Error('changing quality reloaded the page');
     if (big[1] !== 1080 || small[1] !== 720) throw new Error('changing quality did not change the picture size: ' + JSON.stringify(result.qualitySwitch));
-    // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
-    const t = await sharpnessTest({ ids: ['x264-veryfast', 'nv-p7-full'], frames: 30 });
-    result.sharpness = { ok: t.ok, picked: t.picked, results: t.results, summary: tune.summary, firstStage: tune.firstStage };
-    if (!t.ok) throw new Error('sharpness test failed: ' + tune.summary);
-    if (!t.results.some((r) => r.ok && Number.isFinite(r.detail))) throw new Error('sharpness test scored nothing');
-    if (!tune.firstStage || !tune.firstStage.ok) throw new Error('page recorder check failed: ' + JSON.stringify(tune.firstStage));
-    if (await site.webContents.executeJavaScript('window.__keepMarker || 0', true) !== 42) throw new Error('the sharpness test reloaded the page');
-    if (process.env.PHOSPHOR_TEST_SHOTS) {
-      fs.mkdirSync(process.env.PHOSPHOR_TEST_SHOTS, { recursive: true });
-      await win.webContents.executeJavaScript("new Promise((r) => { document.getElementById('tune').scrollIntoView({ block: 'start' }); requestAnimationFrame(() => requestAnimationFrame(r)); })", true);
-      fs.writeFileSync(path.join(process.env.PHOSPHOR_TEST_SHOTS, 'panel-sharpness.png'), (await win.webContents.capturePage()).toPNG());
-      await win.webContents.executeJavaScript("document.getElementById('onair').scrollIntoView()", true);
-    }
     const r = await goLive();
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
     const drawn = await waitFrames(frames);
@@ -517,6 +512,22 @@ async function runTest() {
     await stopLive();
     await new Promise((res) => setTimeout(res, 6000)); // let the last pieces reach the test server (shutdown, not a picture wait)
     if (dir) fs.writeFileSync(path.join(dir, 'panel-off.png'), (await win.webContents.capturePage()).toPNG());
+    result.pageFpsBefore = await pageFps();
+    // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
+    const t = await sharpnessTest({ ids: ['x264-veryfast', 'nv-p7-full'], frames: 30 });
+    result.sharpness = { ok: t.ok, picked: t.picked, results: t.results, summary: tune.summary, firstStage: tune.firstStage };
+    if (!t.ok) throw new Error('sharpness test failed: ' + tune.summary);
+    if (!t.results.some((r) => r.ok && Number.isFinite(r.detail))) throw new Error('sharpness test scored nothing');
+    if (!tune.firstStage || !tune.firstStage.ok) throw new Error('page recorder check failed: ' + JSON.stringify(tune.firstStage));
+    if (await site.webContents.executeJavaScript('window.__keepMarker || 0', true) !== 42) throw new Error('the sharpness test reloaded the page');
+    if (process.env.PHOSPHOR_TEST_SHOTS) {
+      fs.mkdirSync(process.env.PHOSPHOR_TEST_SHOTS, { recursive: true });
+      await win.webContents.executeJavaScript("new Promise((r) => { document.getElementById('tune').scrollIntoView({ block: 'start' }); requestAnimationFrame(() => requestAnimationFrame(r)); })", true);
+      fs.writeFileSync(path.join(process.env.PHOSPHOR_TEST_SHOTS, 'panel-sharpness.png'), (await win.webContents.capturePage()).toPNG());
+      await win.webContents.executeJavaScript("document.getElementById('onair').scrollIntoView()", true);
+    }
+    result.pageFpsAfter = await pageFps();
+    log(`Self-test: page drew ${result.pageFpsBefore} frames a second before the sharpness test, ${result.pageFpsAfter} after`);
     result.ok = result.chunks > 0;
   } catch (e) { result.error = e.message; }
   finish();
