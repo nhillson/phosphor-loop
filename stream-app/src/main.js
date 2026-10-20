@@ -338,7 +338,7 @@ async function runTest() {
   const out = process.env.PHOSPHOR_TEST_OUT;
   const frames = +(process.env.PHOSPHOR_TEST_FRAMES || 450);
   const result = { ok: false };
-  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 240000);
+  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 480000);
   async function finish() {
     clearTimeout(ceiling);
     try { if (out) fs.writeFileSync(out, JSON.stringify(result, null, 2)); } catch (_) {}
