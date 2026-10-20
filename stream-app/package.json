@@ -20,10 +20,25 @@
   "build": {
     "appId": "io.github.nhillson.phosphorstream",
     "productName": "Phosphor Stream",
-    "files": ["src/**/*", "package.json"],
-    "extraResources": [{ "from": "vendor/ffmpeg.exe", "to": "ffmpeg.exe" }],
-    "directories": { "output": "dist", "buildResources": "build" },
-    "win": { "target": "nsis", "icon": "build/icon.ico", "artifactName": "Phosphor-Stream-Setup.${ext}" },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/ffmpeg.exe",
+        "to": "ffmpeg.exe"
+      }
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "Phosphor-Stream-Setup.${ext}"
+    },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
@@ -32,6 +47,11 @@
       "shortcutName": "Phosphor Stream",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "publish": null
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nhillson/phosphor-loop.git"
   }
 }
