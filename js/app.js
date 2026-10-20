@@ -7016,7 +7016,8 @@ function draw3D(k, name, slot, scale) {
   if (sc.fly) {
     // The fractals: where this loop's wandering camera is, which way it looks and how it is rolled
     const dr = droneOf(sc, k);
-    set3f(sc.prog, 'uCam', dr.p[0], dr.p[1], dr.p[2]);
+    const cp = dr.view || dr.p;   // the camera, with its steps' bob (Camera style)
+    set3f(sc.prog, 'uCam', cp[0], cp[1], cp[2]);
     set3f(sc.prog, 'uFwd', dr.look[0], dr.look[1], dr.look[2]);
     set3f(sc.prog, 'uUp', dr.up[0], dr.up[1], dr.up[2]);
     set1f(sc.prog, 'uScale', dr.scale);
