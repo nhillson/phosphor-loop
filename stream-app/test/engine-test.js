@@ -13,7 +13,8 @@ const FF = process.env.FFMPEG || 'ffmpeg';
 const FRAMES = +(process.env.FRAMES || 360);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pstest-'));
 const logs = [];
-const fail = (m) => { console.error('FAIL: ' + m); process.exit(1); };
+const ann = (kind, title, text) => { if (process.env.GITHUB_ACTIONS) console.log(`::${kind} title=engine ${title}::` + String(text).slice(-3500).replace(/%/g, '%25').replace(/\r?\n/g, '%0A')); };
+const fail = (m) => { console.error('FAIL: ' + m); ann('error', 'failed', m + '\n' + (typeof logs !== 'undefined' ? logs.join('\n') : '') + (global.extraLog || '')); process.exit(1); };
 
 function listener(port, out) {
   const p = spawn(FF, ['-hide_banner', '-loglevel', 'error', '-y', '-listen', '1', '-f', 'flv', '-i', `rtmp://127.0.0.1:${port}/app/x`, '-c', 'copy', '-f', 'flv', out]);
@@ -79,6 +80,7 @@ function hasAudio(file) {
   if (!statuses.some((x) => /"b":\{"state":"retrying"/.test(x))) fail('second destination never showed as retrying');
   if (!statuses.some((x) => /"b":\{"state":"live"/.test(x))) fail('second destination never showed as live');
   console.log('Sample retry message:', (statuses.map((x) => JSON.parse(x).destinations.b).find((d) => d && d.state === 'retrying') || {}).message);
+  ann('notice', 'passed', `encoder ${s.encoder.id}; first ${fa} frames, second ${fb} frames`);
   console.log('PASS');
   process.exit(0);
 })().catch((e) => fail(e.stack));
