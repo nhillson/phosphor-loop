@@ -4,9 +4,9 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 let S = null, status = { live: false, destinations: {} }, quality = {};
 
 const QHINT = {
-  good: 'Works on most home internet. Needs about 5 Mbps upload.',
-  better: 'Sharper. Needs about 7 Mbps upload.',
-  best: 'Sharpest and smoothest. Needs about 8 Mbps upload and a good graphics card.',
+  good: '720p at 30 frames a second. Works on most home internet (about 6 Mbps upload).',
+  better: '1080p at 30 frames a second. The sharpest picture for video feedback (about 10 Mbps upload for Kick).',
+  best: '1080p at 60 frames a second. Smoothest motion, but each frame gets half the detail (about 10 Mbps upload for Kick).',
 };
 
 function fmtTime(ms) {
@@ -45,7 +45,10 @@ function renderStatus() {
   $('#airTitle').textContent = state === 'live' ? `Live · ${fmtTime(Date.now() - status.since)}` : title;
   let sub = 'Ready when you are.';
   if (state === 'starting') sub = 'Connecting to ' + (Object.keys(dests).map((k) => k === 'kick' ? 'Kick' : 'Twitch').join(' and ') || 'the platforms') + '…';
-  if (state === 'live') sub = status.kbps ? `Sending smoothly · ${(status.kbps / 1000).toFixed(1)} Mbps` : 'Sending…';
+  if (state === 'live') {
+    sub = status.kbps ? `Sending · ${(status.kbps / 1000).toFixed(1)} Mbps` : 'Sending…';
+    if (status.pictureFps) sub += ` · ${status.pictureFps} frames a second`;
+  }
   if (state === 'retrying') sub = 'Lost the connection. Trying again by itself.';
   $('#airSub').textContent = sub;
 
@@ -62,7 +65,9 @@ function renderStatus() {
   }
   $$('#quality button').forEach((b) => { b.disabled = !!status.live; });
   if (status.encoder) $('#encoder').textContent = 'Using: ' + status.encoder;
-  showNotice(status.notice);
+  // Phosphor Loop can't draw as fast as the stream asks: say so plainly and suggest the fix
+  const slow = state === 'live' && status.wantFps > 30 && status.pictureFps && status.pictureFps < status.wantFps * 0.85;
+  showNotice(status.notice || (slow ? { kind: 'warn', text: `This computer is drawing about ${status.pictureFps} frames a second, short of the ${status.wantFps} that Best sends, so the stream repeats frames. Better (30 frames a second) will look smoother and sharper.` } : null));
 }
 
 function showNotice(n) {

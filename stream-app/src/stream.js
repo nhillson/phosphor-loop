@@ -14,22 +14,33 @@ const ENCODERS = [
   { id: 'h264_qsv', label: 'Intel graphics' },
   { id: 'libx264', label: 'Processor (no graphics card help)' },
 ];
+// Each encoder has settings tiers, best first. The first tier the computer's graphics card accepts is used, so an
+// older card still gets the best settings it can do instead of falling all the way back to the processor.
+const TIERS = { h264_nvenc: ['best', 'good', 'basic'], h264_amf: ['best', 'basic'], h264_qsv: ['best', 'basic'], libx264: ['best'] };
 
-function encoderArgs(id, { fps, bitrate }) {
+function encoderArgs(id, { fps, bitrate }, tier = 'best') {
   const b = String(bitrate), buf = String(bitrate * 2), g = String(fps * 2);
+  const cbr = ['-b:v', b, '-maxrate', b, '-bufsize', buf, '-g', g];
   switch (id) {
     case 'h264_nvenc':
-      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-tune', 'll', '-rc', 'cbr', '-b:v', b, '-maxrate', b, '-bufsize', buf,
-        '-g', g, '-bf', '0', '-profile:v', 'high', '-forced-idr', '1'];
+      // Video feedback is fine detail that changes every frame, the hardest kind of picture to squeeze. These
+      // settings trade a little graphics-card time and about half a second of delay for a much cleaner picture.
+      if (tier === 'best') return ['-c:v', 'h264_nvenc', '-preset', 'p6', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'qres',
+        '-spatial-aq', '1', '-temporal-aq', '1', '-aq-strength', '8', '-rc-lookahead', '20', '-bf', '2', '-b_ref_mode', 'middle',
+        ...cbr, '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'high'];
+      if (tier === 'good') return ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'cbr', '-spatial-aq', '1',
+        '-rc-lookahead', '10', '-bf', '2', ...cbr, '-no-scenecut', '1', '-forced-idr', '1', '-profile:v', 'high'];
+      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'cbr', '-bf', '0', ...cbr, '-forced-idr', '1', '-profile:v', 'high'];
     case 'h264_amf':
-      return ['-c:v', 'h264_amf', '-usage', 'lowlatency', '-quality', 'balanced', '-rc', 'cbr', '-b:v', b, '-maxrate', b,
-        '-bufsize', buf, '-g', g, '-bf', '0', '-profile:v', 'high'];
+      if (tier === 'best') return ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'quality', '-rc', 'cbr',
+        '-preanalysis', '1', ...cbr, '-bf', '0', '-profile:v', 'high'];
+      return ['-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'balanced', '-rc', 'cbr', ...cbr, '-bf', '0', '-profile:v', 'high'];
     case 'h264_qsv':
-      return ['-c:v', 'h264_qsv', '-preset', 'faster', '-b:v', b, '-maxrate', b, '-bufsize', buf, '-g', g, '-bf', '0',
-        '-look_ahead', '0', '-profile:v', 'high'];
+      if (tier === 'best') return ['-c:v', 'h264_qsv', '-preset', 'slower', ...cbr, '-bf', '2', '-profile:v', 'high'];
+      return ['-c:v', 'h264_qsv', '-preset', 'faster', ...cbr, '-bf', '0', '-profile:v', 'high'];
     default:
-      return ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-b:v', b, '-maxrate', b, '-bufsize', buf,
-        '-g', g, '-keyint_min', g, '-sc_threshold', '0', '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr'];
+      return ['-c:v', 'libx264', '-preset', 'faster', ...cbr, '-keyint_min', g, '-sc_threshold', '0', '-bf', '2',
+        '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr'];
   }
 }
 
@@ -70,25 +81,31 @@ class Streamer extends EventEmitter {
     this.redact = (t) => t;
   }
 
-  // Try each graphics-card encoder with a tiny test picture and keep the first that works.
+  // Try each graphics-card encoder (and its settings tiers, best first) with a short test picture; keep the
+  // first that works.
   async probe() {
+    const tryArgs = (args) => new Promise((res) => {
+      execFile(this.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=1280x720:r=30',
+        '-frames:v', '30', '-pix_fmt', 'yuv420p', ...args, '-f', 'null', '-'],
+        { timeout: 20000, windowsHide: true }, (err, _o, stderr) => res(err ? String(stderr || err.message).trim().split('\n').pop() : ''));
+    });
     for (const e of ENCODERS) {
-      if (e.id === 'libx264') { this.encoder = e; break; }
-      const ok = await new Promise((res) => {
-        execFile(this.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=black:s=320x240:r=30',
-          '-frames:v', '10', ...encoderArgs(e.id, { fps: 30, bitrate: 1000000 }), '-f', 'null', '-'],
-          { timeout: 15000, windowsHide: true }, (err) => res(!err));
-      });
-      if (ok) { this.encoder = e; break; }
+      for (const tier of TIERS[e.id]) {
+        if (e.id === 'libx264') { this.encoder = { ...e, tier }; break; }
+        const problem = await tryArgs(encoderArgs(e.id, { fps: 30, bitrate: 4000000 }, tier));
+        if (!problem) { this.encoder = { ...e, tier }; break; }
+        if (e.id === 'h264_nvenc' || tier !== 'best') this.log(`Encoder ${e.id} (${tier}) not usable: ${problem.slice(0, 200)}`);
+      }
+      if (this.encoder) break;
     }
-    this.log(`Encoder: ${this.encoder.id}`);
+    this.log(`Encoder: ${this.encoder.id}, ${this.encoder.tier} settings`);
     return this.encoder;
   }
 
   // dests: [{id, name, url}], quality: {fps, bitrate}
   start(dests, quality) {
     if (this.live) return;
-    if (!this.encoder) this.encoder = ENCODERS[ENCODERS.length - 1];
+    if (!this.encoder) this.encoder = { ...ENCODERS[ENCODERS.length - 1], tier: 'best' };
     this.live = true;
     this.quality = quality;
     this.redact = redactor(dests.map((d) => d.secret));
@@ -103,12 +120,15 @@ class Streamer extends EventEmitter {
   startEncoder() {
     this.gen++;
     const q = this.quality;
-    const args = ['-hide_banner', '-loglevel', 'warning', '-fflags', '+genpts', '-thread_queue_size', '1024',
-      '-i', 'pipe:0', '-map', '0:v:0', '-map', '0:a:0?',
+    const args = ['-hide_banner', '-loglevel', 'warning', '-stats_period', '5', '-progress', 'pipe:2',
+      '-fflags', '+genpts', '-thread_queue_size', '1024', '-i', 'pipe:0', '-map', '0:v:0', '-map', '0:a:0?',
       '-r', String(q.fps), '-fps_mode', 'cfr', '-pix_fmt', this.encoder.id === 'h264_qsv' ? 'nv12' : 'yuv420p',
-      ...encoderArgs(this.encoder.id, q), '-bsf:v', 'dump_extra=freq=keyframe',
-      '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+      '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
+      ...encoderArgs(this.encoder.id, q, this.encoder.tier), '-bsf:v', 'dump_extra=freq=keyframe',
+      '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
       '-f', 'mpegts', '-mpegts_flags', '+resend_headers', '-muxdelay', '0', 'pipe:1'];
+    this.prog = { frame: 0, dup: 0, drop: 0, at: Date.now(), lastLog: Date.now(), lastFrame: 0, lastDup: 0, lastDrop: 0, partial: '' };
+    this.pictureFps = 0;
     const p = spawn(this.ffmpeg, args, { windowsHide: true });
     const gen = this.gen;
     this.enc = p;
@@ -121,7 +141,7 @@ class Streamer extends EventEmitter {
         s.proc.stdin.write(buf);
       }
     });
-    p.stderr.on('data', (d) => this.log('encoder: ' + this.redact(d).trim()));
+    p.stderr.on('data', (d) => this.encoderOutput(String(d)));
     p.on('exit', (code) => {
       if (this.enc === p) this.enc = null;
       if (this.live && gen === this.gen) {
@@ -195,6 +215,37 @@ class Streamer extends EventEmitter {
     this.startEncoder();
   }
 
+  // FFmpeg reports its progress every 5 seconds. From that: how many pictures a second really arrive from
+  // Phosphor Loop (frames it had to repeat mean the page drew fewer than asked for).
+  encoderOutput(text) {
+    const pr = this.prog;
+    const lines = (pr.partial + text).split(/\r?\n/);
+    pr.partial = lines.pop();
+    const other = [];
+    for (const line of lines) {
+      const m = line.match(/^(frame|dup_frames|drop_frames|progress)=(\S+)/);
+      if (!m) { if (line.trim()) other.push(line.trim()); continue; }
+      if (m[1] === 'frame') pr.frame = +m[2];
+      else if (m[1] === 'dup_frames') pr.dup = +m[2];
+      else if (m[1] === 'drop_frames') pr.drop = +m[2];
+      else if (m[1] === 'progress') {
+        const now = Date.now(), secs = (now - pr.at) / 1000;
+        if (secs > 1 && pr.lastFrame) {
+          const made = pr.frame - pr.lastFrame, dup = pr.dup - pr.lastDup;
+          this.pictureFps = Math.max(0, Math.round((made - dup) / secs));
+        }
+        if (now - pr.lastLog > 60000) {
+          pr.lastLog = now;
+          this.log(`Picture: ${this.pictureFps} new frames a second (asked for ${this.quality.fps}); ${(this.kbps / 1000).toFixed(1)} Mbps out; repeated ${pr.dup}, dropped ${pr.drop} so far`);
+        }
+        pr.at = now; pr.lastFrame = pr.frame; pr.lastDup = pr.dup; pr.lastDrop = pr.drop;
+      }
+    }
+    // "More than N frames duplicated" is covered by the picture line above
+    const keep = other.filter((l) => !/frames duplicated|^\s*$/.test(l));
+    if (keep.length) this.log('encoder: ' + this.redact(keep.join(' | ')));
+  }
+
   stop() {
     if (!this.live) return;
     this.live = false;
@@ -218,7 +269,8 @@ class Streamer extends EventEmitter {
   status() {
     const destinations = {};
     for (const [id, s] of this.senders) destinations[id] = { state: s.state, message: s.message };
-    return { live: this.live, since: this.live ? this.startedAt : 0, kbps: this.kbps, encoder: this.encoder && this.encoder.label, destinations };
+    return { live: this.live, since: this.live ? this.startedAt : 0, kbps: this.kbps, encoder: this.encoder && this.encoder.label,
+      pictureFps: this.live ? this.pictureFps : 0, wantFps: this.live && this.quality ? this.quality.fps : 0, destinations };
   }
   emitStatus() { this.emit('status', this.status()); }
 }
@@ -232,4 +284,4 @@ function explain(tail, def, wasLive) {
   return `${def.name} stopped.`;
 }
 
-module.exports = { Streamer, buildUrl, encoderArgs, redactor, ENCODERS };
+module.exports = { Streamer, buildUrl, encoderArgs, redactor, ENCODERS, TIERS };

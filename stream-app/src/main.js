@@ -11,11 +11,18 @@ const TEST = process.env.PHOSPHOR_TEST === '1';
 const SITE = process.env.PHOSPHOR_SITE || 'https://nhillson.github.io/phosphor-loop/';
 const PANEL_W = 360, PANEL_COLLAPSED_W = 48;
 
+// Upload speed per platform: Twitch takes up to 6 Mbps; Kick (Amazon IVS) takes up to 8.5 Mbps at 1080p60.
+// When both are on, one stream goes to both, so it uses the lower of the two.
 const QUALITY = {
-  good: { width: 1280, height: 720, fps: 30, bitrate: 3500000 },
-  better: { width: 1920, height: 1080, fps: 30, bitrate: 5000000 },
-  best: { width: 1920, height: 1080, fps: 60, bitrate: 6000000 },
+  good: { width: 1280, height: 720, fps: 30, bitrate: { twitch: 4500000, kick: 4500000 } },
+  better: { width: 1920, height: 1080, fps: 30, bitrate: { twitch: 6000000, kick: 8000000 } },
+  best: { width: 1920, height: 1080, fps: 60, bitrate: { twitch: 6000000, kick: 8000000 } },
 };
+// The picture is first recorded inside Phosphor Loop, then squeezed for the platforms. That first recording is
+// kept nearly lossless (very high quality, it never leaves the computer), so the picture is only really
+// squeezed once.
+const recordBitrate = (q) => (q.height >= 1080 ? 60000000 : 35000000) * (q.fps > 30 ? 1.5 : 1);
+const streamQuality = (q, dests) => ({ ...q, bitrate: Math.min(...dests.map((d) => q.bitrate[d.id] || q.bitrate.twitch)) });
 
 // Software drawing for the test computer, which has no graphics card
 if (TEST) app.commandLine.appendSwitch('enable-unsafe-swiftshader');
@@ -127,7 +134,7 @@ async function waitFrames(n, ceilingMs = 120000) {
 streamer.on('capture', async (gen) => {
   const q = QUALITY[settings.quality];
   try {
-    captureInfo = await siteCall('start', { gen, fps: q.fps, recordBitrate: q.bitrate * 3, sound: true });
+    captureInfo = await siteCall('start', { gen, fps: q.fps, recordBitrate: recordBitrate(q), sound: true });
     log(`Capture ${gen}: ${captureInfo.mimeType}, sound ${captureInfo.sound ? 'on' : 'off ' + captureInfo.soundErr}`);
     if (!captureInfo.sound) tell('Couldn’t hear this computer’s sound, so the stream is silent for now. Check that a speaker or headphones are set up in Windows.', 'warn');
   } catch (e) {
@@ -165,10 +172,11 @@ async function goLive() {
   try {
     if (probing) await probing;
     if (!(await waitForSite())) { tell('Phosphor Loop didn’t finish loading. Check the internet connection, then try again.', 'warn'); return { ok: false }; }
-    streamer.start(dests, QUALITY[settings.quality]);
+    const sq = streamQuality(QUALITY[settings.quality], dests);
+    streamer.start(dests, sq);
     if (settings.autopilotOnLive) siteCall('autopilot').catch(() => {});
     if (sleepBlock === null) sleepBlock = powerSaveBlocker.start('prevent-display-sleep');
-    log(`Going live to ${dests.map((d) => d.name).join(' + ')} at ${settings.quality}`);
+    log(`Going live to ${dests.map((d) => d.name).join(' + ')} at ${settings.quality} (${sq.height}p${sq.fps}, ${(sq.bitrate / 1e6).toFixed(1)} Mbps)`);
     return { ok: true };
   } finally { startingLive = false; sendStatus(); }
 }
