@@ -26,7 +26,6 @@ jobs:
         working-directory: clip-app
     env:
       GH_TOKEN: ${{ github.token }}
-      CLIPS_DATA: ${{ runner.temp }}\clips-data
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +37,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force vendor, test-out | Out-Null
+          # One app data folder for every test, so the picture recogniser's model is downloaded once
+          "CLIPS_DATA=$env:RUNNER_TEMP\clips-data" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $assets = gh release view latest -R BtbN/FFmpeg-Builds --json assets --jq '.assets[].name'
           $name = $assets | Where-Object { $_ -match '^ffmpeg-n\d+\.\d+-latest-win64-gpl-\d+\.\d+\.zip$' } | Sort-Object | Select-Object -Last 1
           if (-not $name) { $name = 'ffmpeg-master-latest-win64-gpl.zip' }
