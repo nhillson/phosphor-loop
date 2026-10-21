@@ -74,7 +74,7 @@ jobs:
       - name: Test the whole app (it tests itself against local test pages)
         run: node test/app-test.js
         env:
-          OUT: ${{ github.workspace }}\clip-app\test-out
+          OUT: ${{ github.workspace }}\clip-app\test-out\app
 
       - name: Build the installer
         if: success() || failure()
