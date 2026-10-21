@@ -101,13 +101,21 @@ jobs:
           if (-not (Test-Path test-out)) { exit 0 }
           gh release view clip-app-ci-logs 2>$null
           if ($LASTEXITCODE -ne 0) { gh release create clip-app-ci-logs --target $env:GITHUB_SHA --prerelease --title 'Phosphor Clips test results' --notes 'Results from the latest Windows test run.' }
-          $files = @()
-          foreach ($f in Get-ChildItem test-out -Recurse -File | Where-Object { $_.Extension -in '.txt', '.json', '.png' }) {
-            $flat = Join-Path $env:RUNNER_TEMP (($f.FullName.Substring((Resolve-Path test-out).Path.Length + 1)) -replace '[\\/]', '--')
-            Copy-Item $f.FullName $flat
-            $files += $flat
+          # Results and logs first, then pictures; one at a time, so one hiccup doesn't lose the rest
+          $root = (Resolve-Path test-out).Path
+          $all = Get-ChildItem test-out -Recurse -File | Where-Object { $_.Extension -in '.txt', '.json', '.png' } |
+            Sort-Object @{ Expression = { if ($_.Extension -eq '.png') { 1 } else { 0 } } }, FullName
+          foreach ($f in $all) {
+            $name = ($f.FullName.Substring($root.Length + 1)) -replace '[\\/]', '--'
+            $flat = Join-Path $env:RUNNER_TEMP $name
+            Copy-Item $f.FullName $flat -Force
+            for ($i = 1; $i -le 3; $i++) {
+              gh release upload clip-app-ci-logs $flat --clobber
+              if ($LASTEXITCODE -eq 0) { break }
+              Start-Sleep -Seconds 3
+            }
           }
-          if ($files) { gh release upload clip-app-ci-logs @files --clobber }
+          exit 0
 
       - name: Put the installer on the Releases page (only when every test passed)
         shell: pwsh
