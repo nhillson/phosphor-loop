@@ -203,10 +203,19 @@ function setupWeb() {
   wc.loadURL(START_PAGE);
 }
 
+let webWasShown = true;
 function placeWeb() {
   if (!web) return;
   web.setVisible(webShown);
   web.setBounds(webShown ? webBounds : { x: 0, y: 0, width: 0, height: 0 });
+  // The page's video stops while it's out of sight (the trimmer or the library is showing), so its sound
+  // doesn't play over the clip being trimmed
+  if (webWasShown && !webShown) {
+    try {
+      for (const f of web.webContents.mainFrame.framesInSubtree) f.executeJavaScript('document.querySelectorAll("video, audio").forEach((m) => m.pause())').catch(() => {});
+    } catch (_) { /* page gone */ }
+  }
+  webWasShown = webShown;
 }
 
 function webMenu(p) {
