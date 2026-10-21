@@ -27,17 +27,29 @@ const { findTools } = require('../src/engine.js');
   ].filter(([, f]) => fs.existsSync(f));
 
   const statuses = [];
+  const logLines = [];
+  const save = (o) => { if (process.env.RESULTS) fs.writeFileSync(process.env.RESULTS, JSON.stringify({ ...o, log: logLines }, null, 2)); };
+  process.on('uncaughtException', (e) => { save({ ok: false, error: String(e.stack || e) }); console.error(e); process.exit(1); });
   const vision = new Vision({
-    fork: (script) => fork(script, [], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] }),
+    fork: (script) => {
+      const child = fork(script, [], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+      for (const s of [child.stdout, child.stderr]) s.on('data', (d) => { const t = String(d).trim(); if (t) { logLines.push(t.slice(0, 2000)); console.log('   worker: ' + t); } });
+      return child;
+    },
     cacheDir: path.join(data, 'models'),
-    log: (s) => console.log('   ' + s),
+    log: (s) => { logLines.push(s); console.log('   ' + s); },
     onStatus: (s) => { if (s.text && (!statuses.length || s.pct - statuses[statuses.length - 1] >= 10)) { statuses.push(s.pct); console.log(`   ${s.text}: ${Math.round(s.pct)}%`); } },
   });
   const results = [];
   let right = 0;
   const t0 = Date.now();
   for (const [name, file, want] of cases) {
-    const scores = await vision.classify([file], DEFAULT_CATEGORIES);
+    let scores;
+    try { scores = await vision.classify([file], DEFAULT_CATEGORIES); } catch (e) {
+      results.push({ name, want, error: e.message });
+      console.log(`FAIL  ${name}: ${e.message}`);
+      continue;
+    }
     const s = combine(scores, {}, DEFAULT_CATEGORIES);
     const top = Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(', ');
     const ok = s.id === want;
@@ -49,6 +61,10 @@ const { findTools } = require('../src/engine.js');
   vision.stop();
   const ok = cases.length >= 3 && right >= cases.length - 1;
   console.log(`\n${right} of ${cases.length} right in ${(ms / 1000).toFixed(1)} s (including the first-time download)`);
-  if (process.env.RESULTS) fs.writeFileSync(process.env.RESULTS, JSON.stringify({ ok, right, of: cases.length, ms, results }, null, 2));
+  save({ ok, right, of: cases.length, ms, results });
   process.exit(ok ? 0 : 1);
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch((e) => {
+  console.error(e);
+  if (process.env.RESULTS) fs.writeFileSync(process.env.RESULTS, JSON.stringify({ ok: false, error: String(e.stack || e) }, null, 2));
+  process.exit(1);
+});

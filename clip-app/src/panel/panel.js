@@ -154,7 +154,7 @@ document.addEventListener('drop', async (e) => {
 /* ---------- the grabbed list ---------- */
 let jobsKey = '';
 function renderJobs() {
-  const key = JSON.stringify(S.jobs.map((j) => [j.id, j.status, j.text, Math.round(j.pct), j.title, j.strip[0], j.saved]));
+  const key = JSON.stringify([S.ed && S.ed.id, S.jobs.map((j) => [j.id, j.status, j.text, Math.round(j.pct), j.title, j.strip[0], j.saved])]);
   if (key !== jobsKey) {
     jobsKey = key;
     const ul = $('#jobs');
@@ -384,7 +384,13 @@ function renderEdCats() {
     const b = el('button', 'chip' + (S.ed.cat === c.id ? ' on' : '') + (sug === c.id ? ' guess' : ''), c.n);
     b.type = 'button';
     b.dataset.cat = c.id;
-    b.addEventListener('click', () => { S.ed.cat = c.id; S.ed.catTouched = true; renderEdCats(); updateSaveButtons(); });
+    b.addEventListener('click', () => {
+      S.ed.cat = c.id;
+      S.ed.catTouched = true;
+      if ($('#suggest').textContent === 'Pick one') $('#suggest').textContent = '';
+      renderEdCats();
+      updateSaveButtons();
+    });
     box.appendChild(b);
   }
   const add = el('button', 'chip add', '+ New');
@@ -421,7 +427,7 @@ function applySuggestion(j) {
   if (s && s.id) {
     const how = s.by === 'words' ? 'going by the title' : s.by === 'both' ? 'from the picture and the title' : 'from the picture';
     label.textContent = 'Looks like ' + catName(s.id) + ' (' + how + ')' + (j.looking ? ' … still looking' : '');
-  } else label.textContent = j.looking ? 'Looking at the picture…' : 'Pick one';
+  } else label.textContent = j.looking ? 'Looking at the picture…' : S.ed.cat ? '' : 'Pick one';
   renderEdCats();
   updateSaveButtons();
 }
