@@ -34,6 +34,7 @@ const { findTools } = require('../src/engine.js');
     fork: (script) => {
       const child = fork(script, [], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
       for (const s of [child.stdout, child.stderr]) s.on('data', (d) => { const t = String(d).trim(); if (t) { logLines.push(t.slice(0, 2000)); console.log('   worker: ' + t); } });
+      child.postMessage = (m) => child.send(m);   // the app's utility process says postMessage; Node's says send
       return child;
     },
     cacheDir: path.join(data, 'models'),
