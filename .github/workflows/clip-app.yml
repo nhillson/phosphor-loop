@@ -1,0 +1,115 @@
+name: Windows clip app
+
+# Builds Phosphor Clips (the Windows app that grabs videos and GIFs from the web, trims them and sorts them into a
+# clip library for Phosphor Loop), tests it on Windows, and puts the installer on the repository's Releases page.
+# Runs whenever clip-app/ changes on this branch, or by hand from the Actions tab ("Run workflow").
+on:
+  push:
+    branches: [clip-app]
+    paths:
+      - 'clip-app/**'
+      - '.github/workflows/clip-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clip-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: clip-app
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLIPS_DATA: ${{ runner.temp }}\clips-data
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Get FFmpeg, yt-dlp and Deno (the helper programs the app ships with)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force vendor, test-out | Out-Null
+          $assets = gh release view latest -R BtbN/FFmpeg-Builds --json assets --jq '.assets[].name'
+          $name = $assets | Where-Object { $_ -match '^ffmpeg-n\d+\.\d+-latest-win64-gpl-\d+\.\d+\.zip$' } | Sort-Object | Select-Object -Last 1
+          if (-not $name) { $name = 'ffmpeg-master-latest-win64-gpl.zip' }
+          Write-Host "FFmpeg: $name"
+          gh release download latest -R BtbN/FFmpeg-Builds -p $name -O ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffx
+          Copy-Item (Get-ChildItem ffx -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName vendor/ffmpeg.exe
+          Copy-Item (Get-ChildItem ffx -Recurse -Filter ffprobe.exe | Select-Object -First 1).FullName vendor/ffprobe.exe
+          gh release download -R yt-dlp/yt-dlp -p yt-dlp.exe -O vendor/yt-dlp.exe
+          gh release download -R denoland/deno -p deno-x86_64-pc-windows-msvc.zip -O deno.zip
+          Expand-Archive deno.zip -DestinationPath denox
+          Copy-Item denox/deno.exe vendor/deno.exe
+          vendor/ffmpeg.exe -hide_banner -version | Select-Object -First 1
+          Write-Host ("yt-dlp " + (vendor/yt-dlp.exe --version))
+          vendor/deno.exe --version | Select-Object -First 1
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Test the engine (local test pages, then real videos from the internet)
+        run: node test/engine-test.js
+        env:
+          NET: '1'
+          RESULTS: ${{ github.workspace }}\clip-app\test-out\engine.json
+
+      - name: Test the picture recogniser (downloads the model once)
+        run: node test/vision-test.js
+        env:
+          RESULTS: ${{ github.workspace }}\clip-app\test-out\vision.json
+
+      - name: Test the whole app (it tests itself against local test pages)
+        run: node test/app-test.js
+        env:
+          OUT: ${{ github.workspace }}\clip-app\test-out
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          npx electron-builder --win nsis --x64 --publish never 2>&1 | Tee-Object -FilePath test-out/build.txt
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-Item dist/Phosphor-Clips-Setup.exe | ForEach-Object { "Installer: {0:N0} MB" -f ($_.Length / 1MB) }
+
+      - name: Check the installed app starts and grabs on its own
+        shell: pwsh
+        run: |
+          # The unpacked app (what the installer puts on the computer), run against the local test pages
+          $env:ELECTRON = (Resolve-Path 'dist/win-unpacked/Phosphor Clips.exe').Path
+          $env:CLIPS_BIN = (Resolve-Path 'dist/win-unpacked/resources/bin').Path
+          $env:OUT = "$PWD\test-out\packaged"
+          node test/app-test.js
+
+      - name: Put the test results where they can be read
+        if: always()
+        shell: pwsh
+        run: |
+          if (-not (Test-Path test-out)) { exit 0 }
+          gh release view clip-app-ci-logs 2>$null
+          if ($LASTEXITCODE -ne 0) { gh release create clip-app-ci-logs --target $env:GITHUB_SHA --prerelease --title 'Phosphor Clips test results' --notes 'Results from the latest Windows test run.' }
+          $files = @()
+          foreach ($f in Get-ChildItem test-out -Recurse -File | Where-Object { $_.Extension -in '.txt', '.json', '.png' }) {
+            $flat = Join-Path $env:RUNNER_TEMP (($f.FullName.Substring((Resolve-Path test-out).Path.Length + 1)) -replace '[\\/]', '--')
+            Copy-Item $f.FullName $flat
+            $files += $flat
+          }
+          if ($files) { gh release upload clip-app-ci-logs @files --clobber }
+
+      - name: Put the installer on the Releases page
+        shell: pwsh
+        run: |
+          $tag = 'clip-app-latest'
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:GITHUB_SHA --prerelease --title 'Phosphor Clips for Windows' --notes 'Download Phosphor-Clips-Setup.exe below and double-click it to install.'
+          }
+          gh release upload $tag dist/Phosphor-Clips-Setup.exe --clobber

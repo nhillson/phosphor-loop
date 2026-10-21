@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Places to find clips</title>
+<style>
+  :root { --bg: #131116; --card: #211d26; --line: #3a3241; --text: #efe9f4; --dim: #a99fb3; --accent: #8b1ab8; --hi: #b04fe0; --ok: #45c08a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 36px 28px 48px; }
+  h1 { font-size: 26px; margin: 0 0 6px; font-weight: 600; }
+  .lead { color: var(--dim); margin: 0 0 26px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 34px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; gap: 14px; align-items: flex-start; }
+  .num { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .step b { display: block; margin-bottom: 2px; }
+  .step span { color: var(--dim); font-size: 13.5px; }
+  h2 { font-size: 17px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: var(--dim); font-size: 13.5px; margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 30px; }
+  a.site { display: block; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 15px; position: relative; overflow: hidden; }
+  a.site:hover { border-color: var(--hi); }
+  a.site::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--c, var(--accent)); }
+  a.site b { display: block; font-size: 15.5px; margin-bottom: 3px; }
+  a.site span { color: var(--dim); font-size: 13px; }
+  .free { display: inline-block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--ok); border: 1px solid rgba(69, 192, 138, 0.45); border-radius: 10px; padding: 0 8px; }
+  .care { display: inline-block; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: #e8a33d; border: 1px solid rgba(232, 163, 61, 0.45); border-radius: 10px; padding: 0 8px; }
+  .note { background: var(--card); border: 1px solid var(--line); border-left: 4px solid #e8a33d; border-radius: 10px; padding: 14px 18px; color: var(--dim); font-size: 13.5px; }
+  .note b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Find clips for Phosphor Loop</h1>
+  <p class="lead">Browse any site here. When a video plays, the panel on the right can grab it, or just the part you mark.</p>
+
+  <div class="steps">
+    <div class="step"><div class="num">1</div><div><b>Find a video</b><span>Pick a site below, search in the bar at the top, or paste a link on the right.</span></div></div>
+    <div class="step"><div class="num">2</div><div><b>Mark the good part</b><span>While it plays, press <i>Start here</i>, then <i>End here</i>. Or skip this to grab all of it.</span></div></div>
+    <div class="step"><div class="num">3</div><div><b>Grab, trim, save</b><span>Fine-tune the start and end, check the category it suggests, and save.</span></div></div>
+  </div>
+
+  <h2>Free to use, even on a stream</h2>
+  <p class="sub">Clips from these are free for anyone to use, so they're the safest choice for a 24/7 stream.</p>
+  <div class="grid">
+    <a class="site" style="--c:#05a081" href="https://www.pexels.com/videos/"><b>Pexels Videos</b><span>Nature, water, sky, abstract, cities. Lots in 4K.</span><br><em class="free">Free to use</em></a>
+    <a class="site" style="--c:#2ec66d" href="https://pixabay.com/videos/"><b>Pixabay Videos</b><span>Loops, backgrounds, particles, nature.</span><br><em class="free">Free to use</em></a>
+    <a class="site" style="--c:#e85d75" href="https://mixkit.co/free-stock-video/"><b>Mixkit</b><span>Polished stock clips: abstract, light, nature.</span><br><em class="free">Free to use</em></a>
+    <a class="site" style="--c:#0b3d91" href="https://images.nasa.gov/"><b>NASA Images &amp; Video</b><span>Earth from orbit, the Sun, galaxies, launches.</span><br><em class="free">Mostly public domain</em></a>
+    <a class="site" style="--c:#3366cc" href="https://commons.wikimedia.org/w/index.php?title=Special:MediaSearch&amp;type=video&amp;search=time-lapse"><b>Wikimedia Commons</b><span>Time-lapses, science, old films. Each says its licence.</span><br><em class="free">Free licences</em></a>
+    <a class="site" style="--c:#999" href="https://archive.org/details/prelinger"><b>Internet Archive: Prelinger</b><span>Old educational and industrial films. Great retro texture.</span><br><em class="free">Mostly public domain</em></a>
+  </div>
+
+  <h2>Everywhere else</h2>
+  <p class="sub">Grabbing works on almost any site. These clips belong to someone, though, so streaming them can get a stream muted or taken down.</p>
+  <div class="grid">
+    <a class="site" style="--c:#ff0033" href="https://www.youtube.com/results?search_query=vj+loop&amp;sp=EgIwAQ%253D%253D"><b>YouTube</b><span>This link only shows Creative Commons videos (free to reuse with credit).</span><br><em class="care">Check each video</em></a>
+    <a class="site" style="--c:#1ab7ea" href="https://vimeo.com/search?q=vj%20loop"><b>Vimeo</b><span>Lots of artists' visuals and VJ loops.</span><br><em class="care">Check each video</em></a>
+    <a class="site" style="--c:#9933ff" href="https://giphy.com/search/psychedelic"><b>GIPHY</b><span>GIFs of every kind. Right-click one and choose Grab this GIF.</span><br><em class="care">Check each GIF</em></a>
+    <a class="site" style="--c:#ff4500" href="https://www.reddit.com/r/oddlysatisfying/"><b>Reddit</b><span>r/oddlysatisfying, r/woahdude, r/EarthPorn and more.</span><br><em class="care">Check each video</em></a>
+  </div>
+
+  <div class="note"><b>Signing in:</b> sign in to a site here (Instagram, say) and grabbing from it uses that sign-in. This browser keeps its own sign-ins, separate from Chrome.</div>
+</div>
+</body>
+</html>

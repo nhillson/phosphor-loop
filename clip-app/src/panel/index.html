@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; media-src 'self' file:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Phosphor Clips</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span>Phosphor Clips</div>
+  <nav class="tabs" role="tablist">
+    <button class="tab" id="tabGet" role="tab" aria-selected="true" data-tab="get">Get clips</button>
+    <button class="tab" id="tabLib" role="tab" aria-selected="false" data-tab="lib">Library <span class="count" id="libCount">0</span></button>
+  </nav>
+  <div class="vision" id="vision" hidden><span class="dot"></span><span id="visionText"></span></div>
+</header>
+
+<main>
+  <!-- GET CLIPS: the browser on the left, the grabbing controls on the right -->
+  <section class="view get" id="viewGet">
+    <div class="webcol">
+      <form class="addr" id="addrForm" autocomplete="off">
+        <button type="button" class="ib" id="navBack" title="Back (Alt+Left)" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button type="button" class="ib" id="navFwd" title="Forward (Alt+Right)" aria-label="Forward"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <button type="button" class="ib" id="navReload" title="Reload (F5)" aria-label="Reload"><svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95M19 4v4h-4"/></svg></button>
+        <button type="button" class="ib" id="navHome" title="Start page: places to find clips" aria-label="Start page"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7M6 10v9h12v-9"/></svg></button>
+        <input id="addr" spellcheck="false" placeholder="Type a web address, or words to search for videos">
+        <span class="loading" id="loading" hidden></span>
+      </form>
+      <div class="webhost" id="webhost">
+        <!-- The web page is drawn here by the app. The trimmer covers it while a clip is being trimmed. -->
+        <section class="editor" id="editor" hidden aria-label="Trim and save">
+          <div class="ed-head">
+            <div class="ed-title"><b id="edTitle"></b><span id="edMeta"></span></div>
+            <button class="ib" id="edClose" title="Close (keeps it in the list to come back to)" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div>
+          <div class="ed-player">
+            <video id="edVideo" muted playsinline preload="auto"></video>
+            <button class="bigplay" id="edPlay" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+          </div>
+          <div class="timeline" id="tl">
+            <div class="strip" id="strip"></div>
+            <div class="shade left" id="shadeL"></div><div class="shade right" id="shadeR"></div>
+            <div class="sel" id="sel" title="Drag to move the chosen part"></div>
+            <div class="handle start" id="hStart" title="Drag: where the clip starts"><span></span></div>
+            <div class="handle end" id="hEnd" title="Drag: where the clip ends"><span></span></div>
+            <div class="playhead" id="ph"></div>
+          </div>
+          <div class="ed-times">
+            <div class="tgroup">
+              <span class="tl">Start</span>
+              <button class="nb" data-nudge="start,-1">−1s</button><button class="nb" data-nudge="start,-0.1">−0.1</button>
+              <b class="tv" id="tStart">0:00.0</b>
+              <button class="nb" data-nudge="start,0.1">+0.1</button><button class="nb" data-nudge="start,1">+1s</button>
+              <button class="nb wide" id="setStart" title="Key: I">Start here</button>
+            </div>
+            <div class="tgroup mid">
+              <button class="pp" id="edPP" title="Play or pause (Space)"><svg viewBox="0 0 24 24" id="ppIcon"><path d="M8 5v14l11-7z"/></svg></button>
+              <span class="len">Clip: <b id="tLen">0.0 s</b></span>
+              <label class="chk"><input type="checkbox" id="loopSel" checked> Loop it</label>
+            </div>
+            <div class="tgroup">
+              <button class="nb wide" id="setEnd" title="Key: O">End here</button>
+              <button class="nb" data-nudge="end,-1">−1s</button><button class="nb" data-nudge="end,-0.1">−0.1</button>
+              <b class="tv" id="tEnd">0:00.0</b>
+              <button class="nb" data-nudge="end,0.1">+0.1</button><button class="nb" data-nudge="end,1">+1s</button>
+              <span class="tl">End</span>
+            </div>
+          </div>
+          <div class="ed-cats">
+            <div class="row-label">Category <span class="suggest" id="suggest"></span></div>
+            <div class="chips" id="edCats"></div>
+          </div>
+          <div class="ed-save">
+            <label class="field name"><span>Name</span><input id="edName" maxlength="80" spellcheck="false"></label>
+            <label class="chk"><input type="checkbox" id="keepSound"> Keep sound</label>
+            <label class="field size"><span>Size</span>
+              <select id="maxH"><option value="720">720p</option><option value="1080">1080p</option><option value="1440">1440p</option><option value="2160">4K</option></select>
+            </label>
+            <div class="ed-buttons" id="edButtons">
+              <button class="btn ghost" id="edDiscard">Throw away</button>
+              <button class="btn" id="edSaveMore" title="Save this part, then pick another part of the same video">Save + another part</button>
+              <button class="btn primary" id="edSave">Save to library</button>
+            </div>
+            <div class="ed-progress" id="edProgress" hidden><div class="bar"><i id="edBar"></i></div><span id="edProgText">Saving…</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card grab">
+        <h2>Grab from this page</h2>
+        <div class="now" id="now"><span class="nowdot"></span><span id="nowText">Open a page with a video, then start it playing.</span></div>
+        <div class="marks">
+          <button class="mark" id="markStart"><small>Start here</small><b id="markStartVal">—</b></button>
+          <span class="arrow" aria-hidden="true">→</span>
+          <button class="mark" id="markEnd"><small>End here</small><b id="markEndVal">—</b></button>
+          <button class="ib clear" id="markClear" title="Clear the marks" aria-label="Clear the marks" hidden><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <p class="hint" id="markHint">While the video plays, press <b>Start here</b> when the good part begins and <b>End here</b> when it ends. Or don't mark anything and grab the whole video.</p>
+        <button class="btn primary big" id="grabPage">Grab this video</button>
+      </div>
+
+      <div class="card">
+        <h2>Or paste a link</h2>
+        <form class="linkform" id="linkForm" autocomplete="off">
+          <input id="link" spellcheck="false" placeholder="A video page, or a video or GIF link">
+          <button class="btn">Grab</button>
+        </form>
+        <div class="drop" id="drop">You can also <b>right-click</b> any video or GIF on a page, or <b>drop a file</b> from your computer here.</div>
+      </div>
+
+      <div class="card jobs">
+        <h2>Grabbed <span class="sub" id="jobsSub"></span></h2>
+        <ul id="jobs"></ul>
+        <p class="hint empty" id="jobsEmpty">Videos you grab show up here while they download. Then they open for trimming.</p>
+      </div>
+    </aside>
+  </section>
+
+  <!-- LIBRARY -->
+  <section class="view lib" id="viewLib" hidden>
+    <div class="libbar">
+      <div class="chips" id="libCats"></div>
+      <div class="libtools">
+        <input id="libSearch" type="search" placeholder="Find a clip" spellcheck="false">
+        <button class="btn small" id="catNew">+ New category</button>
+        <button class="btn small ghost" id="catEdit">Edit categories</button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="libempty" id="libEmpty" hidden>
+      <div class="big">No clips here yet.</div>
+      <p>Go to <b>Get clips</b>, find a video, mark the part you like and grab it.</p>
+    </div>
+    <footer class="libfoot">
+      <span>Library folder:</span> <code id="libDir"></code>
+      <button class="btn small ghost" id="libOpen">Open folder</button>
+      <button class="btn small ghost" id="libChange">Change…</button>
+      <button class="btn small ghost" id="libRescan" title="Pick up clips added, moved or deleted in File Explorer">Look again</button>
+    </footer>
+  </section>
+</main>
+
+<!-- One clip, opened from the library -->
+<div class="modal" id="clipModal" hidden>
+  <div class="sheet clipsheet" role="dialog" aria-modal="true" aria-labelledby="cmTitle">
+    <button class="ib close" id="cmClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <video id="cmVideo" muted loop autoplay playsinline></video>
+    <div class="cmbody">
+      <label class="field"><span>Name</span><input id="cmName" maxlength="80" spellcheck="false"></label>
+      <label class="field"><span>Category</span><select id="cmCat"></select></label>
+      <dl class="facts" id="cmFacts"></dl>
+      <div class="cmbuttons">
+        <button class="btn ghost" id="cmShow">Show in folder</button>
+        <button class="btn ghost" id="cmSource">Open where it came from</button>
+        <button class="btn danger" id="cmDelete">Delete</button>
+      </div>
+    </div>
+    <h3 id="cmTitle" class="sr"></h3>
+  </div>
+</div>
+
+<!-- Edit categories -->
+<div class="modal" id="catModal" hidden>
+  <div class="sheet catsheet" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+    <button class="ib close" id="catClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h3 id="catTitle">Categories</h3>
+    <p class="hint">Rename a category by typing over its name. Each category is a folder in the library; deleting one moves its clips to Other.</p>
+    <ul class="catlist" id="catList"></ul>
+    <form class="linkform" id="catAddForm" autocomplete="off"><input id="catAddName" maxlength="40" placeholder="New category name"><button class="btn">Add</button></form>
+  </div>
+</div>
+
+<!-- Asking: a question with buttons, or a name to type -->
+<div class="modal" id="askModal" hidden>
+  <div class="sheet asksheet" role="dialog" aria-modal="true" aria-labelledby="askText">
+    <p id="askText"></p>
+    <input id="askInput" maxlength="40" hidden>
+    <div class="askbuttons"><button class="btn ghost" id="askNo">Cancel</button><button class="btn primary" id="askYes">OK</button></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="panel.js"></script>
+</body>
+</html>
