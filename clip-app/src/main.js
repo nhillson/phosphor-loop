@@ -2,7 +2,7 @@
 // Phosphor Clips: one window with a web browser on the left and the grabbing controls on the right. Watch a video,
 // mark the part you want, grab it, trim it, pick its category (the app suggests one), and it's saved into the clip
 // library (Videos\Phosphor Clips, a folder per category) as an MP4 Phosphor Loop can play.
-const { app, BrowserWindow, WebContentsView, ipcMain, session, shell, dialog, Menu, clipboard, utilityProcess } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, shell, dialog, Menu, clipboard, utilityProcess, Tray, nativeImage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = fs.promises;
@@ -11,10 +11,14 @@ const { execFile } = require('node:child_process');
 const E = require('./engine.js');
 const { Library } = require('./library.js');
 const { Vision, combine } = require('./vision.js');
+const { startServer } = require('./server.js');
 
 const TEST = process.env.CLIPS_TEST === '1';
 const START_PAGE = pathToFileURL(path.join(__dirname, 'start', 'index.html')).href;
 const WEB_PARTITION = 'persist:web';
+// Started by Windows at sign-in: sit by the clock sharing the library, without opening the window
+let startHidden = process.argv.includes('--hidden');
+let quitting = false;
 
 if (TEST) app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 if (process.env.CLIPS_DATA) app.setPath('userData', process.env.CLIPS_DATA);
@@ -43,7 +47,7 @@ let settings = {};
 function loadSettings() {
   let s = {};
   try { s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch (_) { /* first run */ }
-  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, ...s };
+  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, ...s };
   if (process.env.CLIPS_LIBRARY) settings.libraryDir = process.env.CLIPS_LIBRARY;
   if (!settings.libraryDir) settings.libraryDir = path.join(app.getPath('videos'), 'Phosphor Clips');
   if (![720, 1080, 1440, 2160].includes(+settings.maxHeight)) settings.maxHeight = 1080;
@@ -158,7 +162,23 @@ function createWindow() {
   web.setBounds({ x: 0, y: 0, width: 0, height: 0 });
   setupWeb();
 
-  win.once('ready-to-show', () => { if (!TEST) win.maximize(); win.show(); });
+  win.once('ready-to-show', () => {
+    if (startHidden && !TEST) { startHidden = false; return; }
+    if (!TEST) win.maximize();
+    win.show();
+  });
+  // Closing the window keeps Phosphor Clips running by the clock, so Phosphor Loop can still use the library
+  win.on('close', (e) => {
+    if (quitting || TEST || !tray) return;
+    e.preventDefault();
+    win.hide();
+    pauseWebMedia();
+    if (!settings.toldTray) {
+      settings.toldTray = true;
+      saveSettings();
+      try { tray.displayBalloon({ title: 'Phosphor Clips is still running', content: 'It keeps sharing your clips with Phosphor Loop. Right-click its icon by the clock to quit.', iconType: 'info' }); } catch (_) { /* no balloons here */ }
+    }
+  });
   win.on('closed', () => { win = null; web = null; });
 }
 
@@ -210,12 +230,13 @@ function placeWeb() {
   web.setBounds(webShown ? webBounds : { x: 0, y: 0, width: 0, height: 0 });
   // The page's video stops while it's out of sight (the trimmer or the library is showing), so its sound
   // doesn't play over the clip being trimmed
-  if (webWasShown && !webShown) {
-    try {
-      for (const f of web.webContents.mainFrame.framesInSubtree) f.executeJavaScript('document.querySelectorAll("video, audio").forEach((m) => m.pause())').catch(() => {});
-    } catch (_) { /* page gone */ }
-  }
+  if (webWasShown && !webShown) pauseWebMedia();
   webWasShown = webShown;
+}
+function pauseWebMedia() {
+  try {
+    for (const f of web.webContents.mainFrame.framesInSubtree) f.executeJavaScript('document.querySelectorAll("video, audio").forEach((m) => m.pause())').catch(() => {});
+  } catch (_) { /* page gone */ }
 }
 
 function webMenu(p) {
@@ -302,7 +323,7 @@ const sendVideo = () => send('video', videoState());
 let polling = false;
 function pollVideo() {
   setInterval(async () => {
-    if (polling || !webShown || !win || win.isMinimized()) return;
+    if (polling || !webShown || !win || win.isMinimized() || !win.isVisible()) return;
     polling = true;
     try { video = await readVideo(); sendVideo(); } finally { polling = false; }
   }, 400);
@@ -521,7 +542,8 @@ function setupIpc() {
   handle('panel:ready', () => {
     panelReady = true;
     return {
-      version: app.getVersion(), settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight },
+      version: app.getVersion(), sharing: sharingState(),
+      settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows },
       library: libraryForPanel(), jobs: [...jobs.values()].map(jobForPanel), web: webState(), video: videoState(), vision: visionState,
     };
   });
@@ -652,16 +674,71 @@ function setupIpc() {
   handle('settings:set', (o) => {
     if (o && 'keepSound' in o) settings.keepSound = !!o.keepSound;
     if (o && [720, 1080, 1440, 2160].includes(+o.maxHeight)) settings.maxHeight = +o.maxHeight;
+    if (o && 'startWithWindows' in o) setStartWithWindows(!!o.startWithWindows);
     saveSettings();
   });
   handle('open:external', (url) => { if (/^https?:/i.test(url)) shell.openExternal(url); });
   handle('open:log', () => shell.openPath(path.join(dataDir(), 'log.txt')));
 }
 
+/* ---------- sharing the library with Phosphor Loop, the icon by the clock, starting with Windows ---------- */
+let sharing = null, tray = null;
+const sharingState = () => ({ on: !!sharing, port: sharing ? sharing.port : 0 });
+async function startSharing() {
+  const ports = process.env.CLIPS_PORT ? [+process.env.CLIPS_PORT] : undefined;
+  sharing = await startServer({ getLibrary: () => library, version: app.getVersion(), log, ports });
+  send('sharing', sharingState());
+  updateTray();
+}
+
+function showWindow() {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) { win.maximize(); win.show(); }
+  win.focus();
+}
+
+function setStartWithWindows(on) {
+  settings.startWithWindows = on;
+  if (process.platform === 'win32' && app.isPackaged && !TEST) {
+    try { app.setLoginItemSettings({ openAtLogin: on, args: ['--hidden'] }); } catch (e) { log('start with Windows: ' + e.message); }
+  }
+  log('start with Windows: ' + (on ? 'on' : 'off'));
+  updateTray();
+  send('settings', { startWithWindows: on });
+}
+
+function updateTray() {
+  if (!tray) return;
+  const shareText = sharing ? 'Sharing clips with Phosphor Loop' : 'Not sharing (another program has the port)';
+  tray.setToolTip('Phosphor Clips \u2013 ' + shareText.toLowerCase());
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open Phosphor Clips', click: showWindow },
+    { label: shareText, enabled: false },
+    { type: 'separator' },
+    { label: 'Start with Windows', type: 'checkbox', checked: !!settings.startWithWindows, click: (mi) => { setStartWithWindows(mi.checked); saveSettings(); } },
+    { type: 'separator' },
+    { label: 'Quit Phosphor Clips', click: () => { quitting = true; app.quit(); } },
+  ]));
+}
+
+function makeTray() {
+  if (TEST) return;
+  try {
+    const img = nativeImage.createFromPath(path.join(__dirname, 'icon.png')).resize({ width: 32, height: 32 });
+    tray = new Tray(img);
+    tray.on('click', showWindow);
+    tray.on('double-click', showWindow);
+    updateTray();
+  } catch (e) { log('tray: ' + e.message); tray = null; }
+}
+
 /* ---------- start ---------- */
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('second-instance', () => { startHidden = false; showWindow(); });
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
+  quitting = true;
+  if (sharing) sharing.close();
   for (const job of jobs.values()) { try { job.ac.abort(); if (job.cancel) job.cancel(); } catch (_) { /* closing */ } }
   if (vision) vision.stop();
 });
@@ -678,9 +755,15 @@ app.whenReady().then(async () => {
     settings.libraryDir = path.join(app.getPath('videos'), 'Phosphor Clips');
     await openLibrary();
   }
+  await startSharing();
+  makeTray();
+  // The first time, Phosphor Clips is set to start with Windows (out of sight, by the clock), so Phosphor Loop on
+  // this computer always has the library. It can be switched off from the icon by the clock or the Library page.
+  if (settings.startWithWindows === null) { setStartWithWindows(true); saveSettings(); }
+  else setStartWithWindows(!!settings.startWithWindows);
   createWindow();
   pollVideo();
   keepYtdlpFresh();
   if (!tools.ffmpeg || !tools.ytdlp) log('MISSING TOOLS: ' + JSON.stringify(tools));
-  if (TEST && process.env.CLIPS_TEST_URL) require('./selftest.js')({ app, win: () => win, web: () => web, jobs, library: () => library, log, mark, grabFromPage, startJob, readVideo });
+  if (TEST && process.env.CLIPS_TEST_URL) require('./selftest.js')({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo });
 });

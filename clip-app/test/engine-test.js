@@ -176,6 +176,49 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
     return `${json.clips.length} clips, ${json.cats.length} categories`;
   });
 
+  await test('sharing the library with Phosphor Loop: list, clip, thumbnail, only for its sites', async () => {
+    const { startServer } = require('../src/server.js');
+    const dir = path.join(work, 'Shared');
+    const lib = new Library(dir, { probe: (f) => E.probe(tools, f), thumb: (v, out, t) => E.frameAt(tools, v, t, out, { width: 480 }), log });
+    await lib.open();
+    const tmp = path.join(job(), 'y.mp4');
+    fs.copyFileSync(cut.file, tmp);
+    const clip = await lib.addClip(tmp, { n: 'Shared swirl', c: 'abstract', d: cut.probe.duration, w: cut.probe.width, h: cut.probe.height });
+    const sh = await startServer({ getLibrary: () => lib, version: 'test', ports: [0] });
+    const base = 'http://127.0.0.1:' + sh.port;
+    try {
+      const origin = 'https://nhillson.github.io';
+      let r = await fetch(base + '/library.json', { headers: { Origin: origin } });
+      assert.equal(r.status, 200);
+      assert.equal(r.headers.get('access-control-allow-origin'), origin);
+      const j = await r.json();
+      assert.equal(j.app, 'Phosphor Clips');
+      assert.equal(j.clips.length, 1);
+      assert.equal(j.clips[0].n, 'Shared swirl');
+      assert.equal(j.cats.find((c) => c.id === 'abstract').count, 1);
+      assert.ok(!JSON.stringify(j).includes(dir), 'no folder paths are shared');
+      r = await fetch(base + '/clip/' + clip.id, { headers: { Origin: origin, Range: 'bytes=0-99' } });
+      assert.equal(r.status, 206);
+      assert.equal((await r.arrayBuffer()).byteLength, 100);
+      r = await fetch(base + '/clip/' + clip.id, { headers: { Origin: origin } });
+      assert.equal(r.headers.get('content-type'), 'video/mp4');
+      assert.equal((await r.arrayBuffer()).byteLength, fs.statSync(lib.abs(clip)).size);
+      r = await fetch(base + '/thumb/' + clip.id, { headers: { Origin: origin } });
+      assert.equal(r.status, 200);
+      assert.equal(r.headers.get('content-type'), 'image/jpeg');
+      r = await fetch(base + '/library.json', { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Private-Network': 'true' } });
+      assert.equal(r.status, 204);
+      assert.equal(r.headers.get('access-control-allow-private-network'), 'true');
+      r = await fetch(base + '/library.json', { headers: { Origin: 'https://some-other-site.example' } });
+      assert.equal(r.status, 403, 'other websites are refused');
+      r = await fetch(base + '/library.json', { headers: { Origin: 'http://localhost:8080' } });
+      assert.equal(r.status, 200, 'a copy of Phosphor Loop on this computer is fine');
+      r = await fetch(base + '/clip/nope', { headers: { Origin: origin } });
+      assert.equal(r.status, 404);
+    } finally { sh.close(); }
+    return 'port ' + sh.port;
+  });
+
   await test('words: a title and tags point to a category', async () => {
     const g = guessFromText({ title: 'Swirling fractal colours - abstract loop', tags: ['vj loop', 'psychedelic'] }, DEFAULT_CATEGORIES);
     assert.equal(g.best, 'abstract');

@@ -22,7 +22,7 @@ const { findTools } = require('../src/engine.js');
   let electron = process.env.ELECTRON;
   if (!electron) electron = require('electron');   // the path to the Electron program, when installed with npm
   const env = {
-    ...process.env, CLIPS_TEST: '1', CLIPS_TEST_URL: site.url, CLIPS_TEST_OUT: out,
+    ...process.env, CLIPS_TEST: '1', CLIPS_TEST_URL: site.url, CLIPS_TEST_OUT: out, CLIPS_PORT: '0',
     CLIPS_DATA: process.env.CLIPS_DATA || path.join(work, 'data'), CLIPS_LIBRARY: path.join(work, 'Library'),
     CLIPS_FFMPEG: tools.ffmpeg, CLIPS_FFPROBE: tools.ffprobe, CLIPS_YTDLP: tools.ytdlp, CLIPS_DENO: tools.deno || '',
   };

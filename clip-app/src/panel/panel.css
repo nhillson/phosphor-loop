@@ -228,3 +228,7 @@ main { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
 .toast.ok { border-left-color: var(--ok); }
 .toast.bad { border-left-color: var(--bad); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
+
+.libfoot .share { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; }
+.libfoot .share .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.libfoot .share.on .dot { background: var(--ok); }

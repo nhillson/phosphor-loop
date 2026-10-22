@@ -667,6 +667,15 @@ $('#catAddForm').addEventListener('submit', async (e) => {
   if (r && r.ok) $('#catAddName').value = '';
 });
 
+/* ---------- sharing with Phosphor Loop ---------- */
+function renderSharing() {
+  const sh = S.sharing || {};
+  $('#share').classList.toggle('on', !!sh.on);
+  $('#shareText').textContent = sh.on ? 'Shared with Phosphor Loop' : 'Not shared with Phosphor Loop';
+  $('#startWin').checked = !!S.settings.startWithWindows;
+}
+$('#startWin').addEventListener('change', () => api.call('settings:set', { startWithWindows: $('#startWin').checked }));
+
 /* ---------- the picture recogniser's status ---------- */
 function renderVision() {
   const v = S.vision || {};
@@ -691,6 +700,8 @@ api.on('library', (lib) => {
   updateSaveButtons();
 });
 api.on('vision', (v) => { S.vision = v || {}; renderVision(); });
+api.on('sharing', (sh) => { S.sharing = sh || {}; renderSharing(); });
+api.on('settings', (o) => { Object.assign(S.settings, o || {}); renderSharing(); });
 api.on('toast', (t) => toast(t.text, t.kind));
 
 (async () => {
@@ -701,6 +712,8 @@ api.on('toast', (t) => toast(t.text, t.kind));
   S.video = st.video || {};
   S.vision = st.vision || {};
   S.jobs = st.jobs || [];
+  S.sharing = st.sharing || {};
+  renderSharing();
   renderWeb();
   renderLibrary();
   renderVision();

@@ -130,6 +130,15 @@ module.exports = async function selftest(h) {
     check('the library shows the clips', true, await pjs(`document.querySelectorAll('#grid .clip').length + ' cards'`));
     const json = JSON.parse(fs.readFileSync(path.join(lib.dir, 'library.json'), 'utf8'));
     check('library.json lists them', json.clips.length === 2, json.clips.map((c) => c.f).join(', '));
+
+    /* ---- 5. shared with Phosphor Loop ---- */
+    const sh = h.sharing();
+    if (!sh) check('the library is shared with Phosphor Loop', false, 'no sharing server');
+    else {
+      const r = await fetch('http://127.0.0.1:' + sh.port + '/library.json', { headers: { Origin: 'https://nhillson.github.io' } });
+      const shared = await r.json();
+      check('the library is shared with Phosphor Loop', r.ok && shared.clips.length === 2, 'port ' + sh.port + ', ' + shared.clips.length + ' clips');
+    }
     code = checks.every((c) => c.ok) ? 0 : 1;
   } catch (e) {
     check('self-test ran to the end', false, e.message);
