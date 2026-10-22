@@ -9,8 +9,6 @@ const { spawn } = require('node:child_process');
 
 const IS_WIN = process.platform === 'win32';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
-// Videos longer than this are only partly downloaded when a start and end are marked
-const LONG_VIDEO = 10 * 60;
 // Seconds kept either side of a marked part, so the trimmer has room to adjust
 const PAD = 3;
 
@@ -338,25 +336,37 @@ const progressReader = (total, onProgress) => (line) => {
 /* ---------------------------------------------------------------------------------------------------------------
    Pictures from a video: the filmstrip under the trimmer, frames for the picture recogniser, the library thumbnail
    --------------------------------------------------------------------------------------------------------------- */
-async function frameAt(tools, file, t, out, { width = 320, signal } = {}) {
+// A crop (fractions of the frame: {x, y, w, h}) as an ffmpeg crop filter, on even pixels, or '' for none
+function cropFilter(crop) {
+  if (!crop) return '';
+  const f = (n) => Math.min(1, Math.max(0, +n || 0)).toFixed(6);
+  const w = f(crop.w), h = f(crop.h);
+  if (+w >= 0.999 && +h >= 0.999) return '';
+  return `crop=floor(iw*${w}/2)*2:floor(ih*${h}/2)*2:floor(iw*${f(crop.x)}):floor(ih*${f(crop.y)})`;
+}
+const validCrop = (c) => !!c && ['x', 'y', 'w', 'h'].every((k) => Number.isFinite(+c[k])) && +c.w > 0.005 && +c.h > 0.005 &&
+  +c.x >= -0.001 && +c.y >= -0.001 && +c.x + +c.w <= 1.001 && +c.y + +c.h <= 1.001;
+
+async function frameAt(tools, file, t, out, { width = 320, signal, crop } = {}) {
+  const vf = [cropFilter(crop), `scale=${width}:-2:flags=bicubic`].filter(Boolean).join(',');
   const r = await run(tools.ffmpeg, ['-hide_banner', '-y', '-nostdin', '-ss', Math.max(0, t).toFixed(3), '-i', file,
-    '-frames:v', '1', '-vf', `scale=${width}:-2:flags=bicubic`, '-q:v', '3', out], { signal });
+    '-frames:v', '1', '-vf', vf, '-q:v', '3', out], { signal });
   if (r.code !== 0 || !fs.existsSync(out)) {
     // Right at the end of a file there may be no frame: try a moment earlier
-    if (t > 0.5) return frameAt(tools, file, t - 0.5, out, { width, signal });
+    if (t > 0.5) return frameAt(tools, file, t - 0.5, out, { width, signal, crop });
     throw new ClipError('Couldn’t take a picture from the video.', 'failed', r.stderr.slice(-300));
   }
   return out;
 }
 
-async function frames(tools, file, times, dir, prefix, { width = 320, signal } = {}) {
+async function frames(tools, file, times, dir, prefix, { width = 320, signal, crop } = {}) {
   await fsp.mkdir(dir, { recursive: true });
   const outs = new Array(times.length);
   let next = 0;
   const worker = async () => {
     while (next < times.length) {
       const i = next++;
-      outs[i] = await frameAt(tools, file, times[i], path.join(dir, `${prefix}-${String(i).padStart(2, '0')}.jpg`), { width, signal });
+      outs[i] = await frameAt(tools, file, times[i], path.join(dir, `${prefix}-${String(i).padStart(2, '0')}.jpg`), { width, signal, crop });
     }
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
@@ -394,14 +404,17 @@ function pickEncoder(tools, log) {
   return encoderPick;
 }
 
-async function cutClip(tools, src, out, { start = 0, end, keepSound = false, maxHeight = 1080, signal, log, onProgress } = {}) {
+async function cutClip(tools, src, out, { start = 0, end, keepSound = false, maxHeight = 1080, crop = null, signal, log, onProgress } = {}) {
   const p = await probe(tools, src, { signal });
   const stop = Math.min(end == null ? p.duration : end, p.duration || end || 0);
   const dur = Math.max(0.1, stop - start);
-  const { w, h } = fitSize(p, maxHeight);
+  // Cropped: only that part of the picture, then sized as usual
+  const cf = validCrop(crop) ? cropFilter(crop) : '';
+  const shown = cf ? { width: p.width * crop.w, height: p.height * crop.h } : p;
+  const { w, h } = fitSize(shown, maxHeight);
   const enc = await pickEncoder(tools, log);
   const fps = p.fps > 60 ? 60 : p.fps || 30;
-  const vf = [`scale=${w}:${h}:flags=lanczos`, 'setsar=1'];
+  const vf = [cf, `scale=${w}:${h}:flags=lanczos`, 'setsar=1'].filter(Boolean);
   if (p.fps > 60) vf.push('fps=60');
   vf.push('format=yuv420p');
   const args = ['-hide_banner', '-y', '-nostdin', '-ss', start.toFixed(3), '-i', src, '-t', dur.toFixed(3), '-map', '0:v:0'];
@@ -420,7 +433,44 @@ async function cutClip(tools, src, out, { start = 0, end, keepSound = false, max
   }
   if (r.code !== 0 || !fs.existsSync(out)) throw new ClipError('The clip couldn’t be made.', 'failed', r.stderr.slice(-500));
   const made = await probe(tools, out, { signal });
-  return { file: out, probe: made, sound, encoder: enc };
+  return { file: out, probe: made, sound, encoder: enc, crop: cf ? crop : null };
+}
+
+// The part to download for marked Start here / End here (seconds in the original video), with PAD either side so
+// the trimmer has room; only Start here marked: the minute after it. null when there's nothing to gain (the part
+// would be the whole video anyway).
+function partOf(marks, duration) {
+  if (!marks || !Number.isFinite(marks.start)) return null;
+  const a = Math.max(0, marks.start - PAD);
+  let b = (Number.isFinite(marks.end) && marks.end > marks.start ? marks.end : marks.start + 60) + PAD;
+  if (duration > 0) b = Math.min(duration, b);
+  if (!(b > a + 0.5)) return null;
+  if (duration > 0 && a < 0.5 && b > duration - 0.5) return null;
+  return [a, b];
+}
+
+// Just part of a video file on the web (a direct link, or the video a page plays), read by ffmpeg, which asks the
+// server for only the pieces it needs. The picture isn't re-made: it starts at the key frame before the start.
+async function downloadDirectPart(tools, url, jobDir, section, { referer, cookieHeader, signal, log, onProgress } = {}) {
+  const out = path.join(jobDir, 'source-part.mkv');
+  let headers = `User-Agent: ${UA}\r\n`;
+  if (referer) headers += `Referer: ${referer}\r\n`;
+  if (cookieHeader) headers += `Cookie: ${cookieHeader}\r\n`;
+  const len = section[1] - section[0];
+  const r = await run(tools.ffmpeg, ['-hide_banner', '-y', '-nostdin', '-headers', headers, '-ss', section[0].toFixed(3), '-i', url,
+    '-t', len.toFixed(3), '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', '-avoid_negative_ts', 'make_zero',
+    '-progress', 'pipe:1', '-nostats', out], { signal, log, onLine: progressReader(len, onProgress) });
+  if (r.code !== 0 || !fs.existsSync(out) || fs.statSync(out).size < 1024) {
+    throw new ClipError('The marked part couldn’t be downloaded on its own.', 'failed', r.stderr.slice(-400));
+  }
+  return out;
+}
+
+// Removes what a part download left behind before the whole video is downloaded instead
+async function clearSources(jobDir) {
+  for (const f of await fsp.readdir(jobDir).catch(() => [])) {
+    if (/^source/.test(f) && !/\.json$/.test(f)) await fsp.rm(path.join(jobDir, f), { force: true }).catch(() => {});
+  }
 }
 
 /* ---------------------------------------------------------------------------------------------------------------
@@ -435,13 +485,28 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
   await fsp.mkdir(jobDir, { recursive: true });
   let source = '', info = { title: '', url: req.url || '' }, offset = 0, section = null;
   const marks = req.marks && Number.isFinite(req.marks.start) ? { ...req.marks } : null;
+  // A video file on the web: the marked part (section) if there is one and the server allows it, else all of it
+  const fetchDirect = async (url, referer) => {
+    if (section) {
+      onStatus('Downloading the marked part…');
+      try { return await downloadDirectPart(tools, url, jobDir, section, { referer, cookieHeader: req.cookieHeader, signal, log, onProgress }); } catch (e) {
+        if (e.code === 'cancelled') throw e;
+        if (log) log('part download failed (' + String(e.detail || e.message).slice(-200) + '), downloading the whole video');
+        section = null;
+        await clearSources(jobDir);
+      }
+    }
+    onStatus('Downloading…');
+    return downloadDirect(url, jobDir, { referer, cookieHeader: req.cookieHeader, signal, onProgress, log });
+  };
   if (req.file) {
     onStatus('Opening the file…');
     source = req.file;
     info = { title: req.title || path.basename(req.file).replace(/\.[^.]+$/, ''), url: req.sourceUrl || '' };
   } else if (isDirectLink(req.url)) {
-    onStatus('Downloading…');
-    source = await downloadDirect(req.url, jobDir, { referer: req.referer, cookieHeader: req.cookieHeader, signal, onProgress, log });
+    // A video file opened straight in the browser, marked: just that part (a GIF is always fetched whole)
+    if (!/\.gifv?(?:[?#]|$)/i.test(req.url)) section = partOf(marks, req.pageDuration);
+    source = await fetchDirect(req.url, req.referer);
     // A GIF's file name is often meaningless ("giphy.gif"); the page it was on says more
     info = { title: req.pageTitle || titleFromUrl(req.url), url: req.referer || req.url };
   } else {
@@ -456,17 +521,24 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
       if (info.live) throw new ClipError('Live streams can’t be grabbed. Grab it once it’s finished.', 'live');
       // Some pages (a plain video tag, say) don't tell yt-dlp the length; the page's own player knows it
       if (!info.duration && req.pageDuration > 0) info.duration = req.pageDuration;
-      if (marks && info.duration > LONG_VIDEO) {
-        const a = Math.max(0, (marks.start || 0) - PAD);
-        const b = Math.min(info.duration, (Number.isFinite(marks.end) ? marks.end : marks.start + 60) + PAD);
-        if (b > a) { section = [a, b]; offset = a; }
+      // Marked: only the marked part comes down, whatever the video's length
+      section = partOf(marks, info.duration);
+      const ytdl = (part) => downloadWithYtdlp(tools, found.file, jobDir, { maxHeight: req.maxHeight || 1080, section: part, cookies: req.cookies, signal, log, onProgress });
+      if (section) {
+        onStatus('Downloading the marked part…');
+        try { source = await ytdl(section); } catch (e) {
+          if (e.code === 'cancelled') throw e;
+          // Some sites won't hand out a part: the whole video, then
+          if (log) log('part download failed (' + e.message + '), downloading the whole video');
+          section = null;
+          await clearSources(jobDir);
+        }
       }
-      onStatus(section ? 'Downloading the marked part…' : 'Downloading…');
-      source = await downloadWithYtdlp(tools, found.file, jobDir, { maxHeight: req.maxHeight || 1080, section, cookies: req.cookies, signal, log, onProgress });
+      if (!section) { onStatus('Downloading…'); source = await ytdl(null); }
     } else if (req.direct && /^https?:/i.test(req.direct)) {
       if (log) log('yt-dlp found nothing (' + (why && why.detail) + '), downloading the page’s own video');
-      onStatus('Downloading…');
-      source = await downloadDirect(req.direct, jobDir, { referer: req.url, cookieHeader: req.cookieHeader, signal, onProgress, log });
+      section = partOf(marks, req.pageDuration);
+      source = await fetchDirect(req.direct, req.url);
       info = { title: req.pageTitle || titleFromUrl(req.direct), url: req.url };
     } else {
       throw why || new ClipError('No video was found at that link.', 'unsupported');
@@ -478,7 +550,7 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
   const made = await makePlayable(tools, source, jobDir, { signal, log, onProgress });
   // A part download starts at the key frame before the asked-for start, so it runs a little long at the front:
   // where it really starts is its end minus its length
-  if (section && made.probe.duration > section[1] - section[0]) offset = Math.max(0, section[1] - made.probe.duration);
+  if (section) offset = Math.max(0, section[1] - made.probe.duration);
   return { source, playable: made.file, probe: made.probe, info, offset, marks };
 }
 
@@ -492,5 +564,5 @@ function titleFromUrl(url) {
 module.exports = {
   ClipError, findTools, run, probe, isDirectLink, videoInfo, summarize, downloadWithYtdlp, downloadDirect,
   makePlayable, frames, frameAt, spread, cutClip, pickEncoder, fetchVideo, fitSize, titleFromUrl, explainYtdlp,
-  LONG_VIDEO, PAD, UA,
+  partOf, cropFilter, validCrop, PAD, UA,
 };

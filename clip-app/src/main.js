@@ -581,7 +581,7 @@ function firstRange(job) {
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
 // The suggested category: words first (instant), then the picture recogniser's look at the chosen part
-async function suggest(job, range) {
+async function suggest(job, range, crop) {
   const r = job.result;
   if (!r) return;
   const info = { ...r.info, page: job.req.pageTitle, url: job.req.url };
@@ -593,7 +593,8 @@ async function suggest(job, range) {
   sendJobs();
   try {
     const [a, b] = range || job.range || [0, r.probe.duration];
-    const frames = await E.frames(tools, r.playable, E.spread(a, b, 4), path.join(job.dir, 'look'), 'l' + seq, { width: 336 });
+    // Only the part of the picture that's kept (a crop) is looked at
+    const frames = await E.frames(tools, r.playable, E.spread(a, b, 4), path.join(job.dir, 'look'), 'l' + seq, { width: 336, crop: E.validCrop(crop) ? crop : null });
     const scores = await vision.classify(frames, cats);
     if (seq !== job.looks) return;
     job.suggestion = combine(scores, info, cats);
@@ -726,9 +727,9 @@ function setupIpc() {
     dropJob(job);
     startJob(job.req);
   });
-  handle('job:suggest', ({ id, start, end }) => {
+  handle('job:suggest', ({ id, start, end, crop }) => {
     const job = jobs.get(id);
-    if (job && job.result) { job.range = [start, end]; suggest(job, [start, end]); }
+    if (job && job.result) { job.range = [start, end]; suggest(job, [start, end], crop); }
   });
   handle('job:save', async (o) => {
     const job = jobs.get(o.id);
@@ -745,7 +746,7 @@ function setupIpc() {
     try {
       const out = path.join(job.dir, 'clip-' + Date.now() + '.mp4');
       const made = await E.cutClip(tools, r.playable, out, {
-        start, end, keepSound: !!o.keepSound, maxHeight: +o.maxHeight || 1080, log,
+        start, end, keepSound: !!o.keepSound, maxHeight: +o.maxHeight || 1080, crop: E.validCrop(o.crop) ? o.crop : null, log,
         onProgress: (p) => { job.pct = p.pct; sendJobsSoon(); },
       });
       const clip = await library.addClip(made.file, {
@@ -754,8 +755,9 @@ function setupIpc() {
         src: r.info.url || job.req.url || job.req.sourceUrl || '', page: r.info.title || job.req.pageTitle || '', by: r.info.by || '',
         lic: r.info.lic || '', site: r.info.site || '', part: [round3(start + r.offset), round3(end + r.offset)],
         guess: job.suggestion && job.suggestion.id ? job.suggestion.id : undefined, thumbAt: made.probe.duration / 2,
+        crop: made.crop ? ['x', 'y', 'w', 'h'].map((k) => Math.round(made.crop[k] * 10000) / 10000) : undefined,
       });
-      log('saved ' + clip.f + ' (' + clip.w + 'x' + clip.h + ', ' + clip.d + ' s, ' + made.encoder + ')');
+      log('saved ' + clip.f + ' (' + clip.w + 'x' + clip.h + ', ' + clip.d + ' s, ' + made.encoder + (made.crop ? ', cropped' : '') + ')');
       settings.keepSound = !!o.keepSound;
       settings.maxHeight = +o.maxHeight || 1080;
       saveSettings();
@@ -921,5 +923,5 @@ app.whenReady().then(async () => {
   keepYtdlpFresh();
   if (!tools.ffmpeg || !tools.ytdlp) log('MISSING TOOLS: ' + JSON.stringify(tools));
   // (a self-test that can't even load ends the app, so a test run never hangs)
-  if (TEST && process.env.CLIPS_TEST_URL) (() => { try { return require('./selftest.js'); } catch (e) { log('selftest: FAIL could not load: ' + e.message); app.exit(1); return () => {}; } })()({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo, openFromLink, chromeDir });
+  if (TEST && process.env.CLIPS_TEST_URL) (() => { try { return require('./selftest.js'); } catch (e) { log('selftest: FAIL could not load: ' + e.message); app.exit(1); return () => {}; } })()({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo, openFromLink, chromeDir, tools: () => tools, run: E.run });
 });

@@ -35,6 +35,18 @@ module.exports = async function selftest(h) {
       fs.writeFileSync(path.join(out, name + '.web.json'), JSON.stringify(w.getBounds()));
     }
   };
+  // Real mouse moves, presses and releases in the panel (so pointer capture works as it does for a person)
+  const mouse = (type, x, y, held) => h.win().webContents.sendInputEvent({ type, x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1,
+    modifiers: held ? ['leftButtonDown'] : [] });
+  const mouseDrag = async (x1, y1, x2, y2) => {
+    mouse('mouseMove', x1, y1);
+    await panelFrames(2);
+    mouse('mouseDown', x1, y1);
+    await panelFrames(2);
+    for (let i = 1; i <= 8; i++) { mouse('mouseMove', x1 + ((x2 - x1) * i) / 8, y1 + ((y2 - y1) * i) / 8, true); await panelFrames(1); }
+    mouse('mouseUp', x2, y2);
+    await panelFrames(2);
+  };
   const loadPage = (url) => new Promise((r) => { page().once('did-finish-load', r); page().loadURL(url); });
   const vision = process.env.CLIPS_NO_VISION !== '1';
 
@@ -65,7 +77,11 @@ module.exports = async function selftest(h) {
     const ed = await pjs(`({ start: S.ed.start, end: S.ed.end, d: S.ed.d })`);
     check('the trimmer opens on the marked part', Math.abs(ed.start - markedStart) < 0.35 && Math.abs(ed.end - markedEnd) < 0.35,
       `${ed.start.toFixed(2)}-${ed.end.toFixed(2)} of ${ed.d.toFixed(1)} s`);
-    check('the whole short video came down', Math.abs(ed.d - 20) < 0.3, ed.d.toFixed(2) + ' s');
+    check('only the marked part came down (plus a little either side)', ed.d < 19 && ed.d > markedEnd - markedStart, ed.d.toFixed(2) + ' s of 20 s');
+    // The whole picture shows in the trimmer: the video is never bigger than its box (it used to be cut off)
+    const fit = await pjs(`(() => { const p = document.querySelector('#edPlayer').getBoundingClientRect(), v = document.querySelector('#edVideo').getBoundingClientRect();
+      return { pw: p.width, ph: p.height, vw: v.width, vh: v.height, fit: getComputedStyle(document.querySelector('#edVideo')).objectFit }; })()`);
+    check('the trimmer shows the whole picture', fit.vw <= fit.pw + 1 && fit.vh <= fit.ph + 1 && fit.fit === 'contain', `video ${Math.round(fit.vw)}x${Math.round(fit.vh)} in ${Math.round(fit.pw)}x${Math.round(fit.ph)}`);
     if (vision) await panelUntil(`(() => { const j = S.jobs.find((x) => x.id === S.ed.id); return j && !j.looking; })()`, 'the picture recogniser', 15 * 60 * 1000);
     const sug = await pjs(`(() => { const j = S.jobs.find((x) => x.id === S.ed.id); return j && j.suggestion; })()`);
     check('a category is suggested', sug && sug.id, sug ? `${sug.id} (${sug.by}, ${sug.sure})` : 'none');
@@ -97,10 +113,50 @@ module.exports = async function selftest(h) {
     await click('#edCats [data-cat="retro"]');
     await panelFrames(3);
     await shot('3-gif');
+    // Crop it: Square, then drag the box to the left edge with the mouse, then Done
+    await click('#cropBtn');
+    await panelUntil(`S.ed.cropping && !document.querySelector('#cropBar').hidden`, 'the crop tool', 5000);
+    await click('#cropBar [data-ratio="1:1"]');
+    await panelFrames(3);
+    const sq = await pjs('S.ed.crop');
+    check('Square makes the biggest square that fits', Math.abs(sq.w - 0.75) < 0.01 && sq.h > 0.99 && Math.abs(sq.x - 0.125) < 0.01, JSON.stringify(sq));
+    const box = await pjs(`(() => { const r = document.querySelector('#cropBox').getBoundingClientRect(), c = document.querySelector('#crop').getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2, left: c.left }; })()`);
+    await mouseDrag(box.x, box.y, box.left - 40, box.y);
+    await panelFrames(5);
+    await shot('3-crop');
+    const moved = await pjs('S.ed.crop');
+    check('dragging the crop box moves it (to the left edge)', moved.x < 0.005 && Math.abs(moved.w - 0.75) < 0.01, JSON.stringify(moved));
+    // A corner: in Free, the bottom-right corner dragged up and in makes the box smaller
+    await click('#cropBar [data-ratio="free"]');
+    const se = await pjs(`(() => { const r = document.querySelector('#cropBox [data-h="se"]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await mouseDrag(se.x, se.y, se.x - 30, se.y - 30);
+    await panelFrames(3);
+    const smaller = await pjs('S.ed.crop');
+    check('dragging a corner resizes the crop', smaller.w < moved.w - 0.02 && smaller.h < 0.98, JSON.stringify(smaller));
+    await click('#cropBar [data-ratio="1:1"]');
+    await panelFrames(3);
+    const box2 = await pjs(`(() => { const r = document.querySelector('#cropBox').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await mouseDrag(box2.x, box2.y, box.left - 40, box2.y);
+    await click('#cropDone');
+    await panelFrames(3);
+    check('the crop button says what\u2019s kept', /Cropped 240.240/.test(await pjs(`document.querySelector('#cropBtnText').textContent`)),
+      await pjs(`document.querySelector('#cropBtnText').textContent`));
     await click('#edSave');
     await panelUntil(`S.lib.clips.length >= 2 && !S.ed`, 'the GIF save', 120000);
     const clip2 = await pjs(`S.lib.clips.find((c) => c.c === 'retro')`);
     check('the GIF is saved as an MP4 clip in Retro & glitch', clip2 && /^Retro & glitch\/.+\.mp4$/.test(clip2.f), clip2 && clip2.f);
+    check('the cropped clip is the crop\u2019s size', clip2 && clip2.w === 240 && clip2.h === 240 && Array.isArray(clip2.crop), clip2 && `${clip2.w}x${clip2.h}`);
+    // ...and really is the left square of the GIF: compared with the GIF itself, cropped there and elsewhere
+    const psnr = async (cropSpec) => {
+      const file = path.join(h.library().dir, ...clip2.f.split('/'));
+      const r = await h.run(h.tools().ffmpeg, ['-hide_banner', '-nostdin', '-i', file, '-i', base + 'spin.gif', '-filter_complex',
+        `[1:v]${cropSpec},format=yuv420p,setsar=1[b];[0:v]format=yuv420p,setsar=1[a];[a][b]psnr`, '-frames:v', '30', '-f', 'null', '-']);
+      const m = /average:([\d.]+|inf)/.exec(r.stderr);
+      return m ? (m[1] === 'inf' ? 99 : +m[1]) : 0;
+    };
+    const right = await psnr('crop=240:240:0:0'), wrong = await psnr('crop=240:240:80:0');
+    check('the saved clip is the cropped part of the picture', right > 25 && right > wrong + 5, `${right.toFixed(1)} dB there, ${wrong.toFixed(1)} dB elsewhere`);
 
     /* ---- 3. a marked part of a long video: only that part is downloaded ---- */
     await loadPage(base + 'long.html');

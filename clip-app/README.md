@@ -11,9 +11,12 @@ library for Phosphor Loop.
 1. **Find a video** in the built-in browser (the start page lists free-to-use sites), or paste a link, or drop a
    file on the window, or right-click a video or GIF on any page.
 2. **Mark the good part** while it plays: *Start here*, then *End here*. Unmarked, the whole video is grabbed.
-   Videos over 10 minutes download only the marked part (plus 3 s either side).
-3. **Trim, pick a category, save.** The trimmer opens by itself; drag the purple handles or nudge them. The
-   category is suggested from the picture (CLIP, run on the processor) and the title/tags; one click changes it.
+   Marked, only the marked part downloads (plus 3 s either side), whatever the video's length; if a site won't hand
+   out a part, the whole video comes down instead.
+3. **Trim, crop, pick a category, save.** The trimmer opens by itself and always shows the whole picture. Drag the
+   purple handles or nudge them. **Crop** keeps part of the picture (Free, 16:9, 4:3 or Square; drag the box or its
+   corners). The category is suggested from the picture (CLIP, run on the processor, looking only at the cropped part)
+   and the title/tags; one click changes it.
 
 Clips are saved as H.264 MP4 (no sound unless *Keep sound* is ticked, up to 1080p by default, at most 60 fps),
 encoded on the NVIDIA card when there is one, in `Videos\Phosphor Clips\<Category>\<Name>.mp4`. `library.json`

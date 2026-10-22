@@ -33,11 +33,29 @@
         <section class="editor" id="editor" hidden aria-label="Trim and save">
           <div class="ed-head">
             <div class="ed-title"><b id="edTitle"></b><span id="edMeta"></span></div>
+            <div class="crop-bar" id="cropBar" hidden>
+              <span class="cb-label">Shape</span>
+              <button class="chip" data-ratio="free">Free</button>
+              <button class="chip" data-ratio="16:9">16:9</button>
+              <button class="chip" data-ratio="4:3">4:3</button>
+              <button class="chip" data-ratio="1:1">Square</button>
+              <span class="cb-gap"></span>
+              <button class="chip" id="cropReset" title="Back to the whole picture">Reset</button>
+              <button class="chip on" id="cropDone">Done</button>
+            </div>
             <button class="ib" id="edClose" title="Close (keeps it in the list to come back to)" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
           </div>
-          <div class="ed-player">
+          <div class="ed-player" id="edPlayer">
             <video id="edVideo" muted playsinline preload="auto"></video>
             <button class="bigplay" id="edPlay" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+            <!-- The crop box sits exactly over the picture (not the black bars around it) -->
+            <div class="crop" id="crop" hidden>
+              <div class="crop-box" id="cropBox">
+                <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i>
+                <i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i>
+                <span class="crop-size" id="cropSize"></span>
+              </div>
+            </div>
           </div>
           <div class="timeline" id="tl">
             <div class="strip" id="strip"></div>
@@ -58,6 +76,7 @@
             <div class="tgroup mid">
               <button class="pp" id="edPP" title="Play or pause (Space)"><svg viewBox="0 0 24 24" id="ppIcon"><path d="M8 5v14l11-7z"/></svg></button>
               <span class="len">Clip: <b id="tLen">0.0 s</b></span>
+              <button class="nb wide crop-btn" id="cropBtn" title="Keep only part of the picture"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/></svg><span id="cropBtnText">Crop</span></button>
               <label class="chk"><input type="checkbox" id="loopSel" checked> Loop it</label>
             </div>
             <div class="tgroup">

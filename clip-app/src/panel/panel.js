@@ -215,7 +215,8 @@ function openEditor(id) {
   if (S.tab !== 'get') setTab('get');
   const d = j.video.d;
   const [a, b] = j.range || [0, d];
-  S.ed = { id, d, fps: j.video.fps || 30, start: clamp(a, 0, d), end: clamp(b, 0, d), cat: '', catTouched: false, suggestion: undefined, looking: undefined, sugKey: '' };
+  S.ed = { id, d, fps: j.video.fps || 30, start: clamp(a, 0, d), end: clamp(b, 0, d), cat: '', catTouched: false, suggestion: undefined, looking: undefined, sugKey: '',
+    vw: j.video.w || 16, vh: j.video.h || 9, crop: null, ratio: 'free', cropping: false };
   if (S.ed.end - S.ed.start < MIN_LEN) S.ed.end = Math.min(d, S.ed.start + Math.max(MIN_LEN, d));
   $('#edTitle').textContent = j.title;
   $('#edTitle').title = j.url || j.title;
@@ -236,6 +237,7 @@ function openEditor(id) {
   $('#editor').hidden = false;
   syncWeb();
   layoutTimeline();
+  renderCrop();
   renderEdCats();
   applySuggestion(j);
   renderEdStatus(j);
@@ -307,11 +309,12 @@ function drag(ev, what) {
   ev.preventDefault();
   ev.stopPropagation();
   const target = ev.currentTarget;
-  target.setPointerCapture(ev.pointerId);
+  try { target.setPointerCapture(ev.pointerId); } catch (_) { /* fine: the window hears the release anyway */ }
   const playing = !vid.paused;
   vid.pause();
   const t0 = timeAt(ev), s0 = S.ed.start, e0 = S.ed.end;
   const move = (e) => {
+    if (e.buttons === 0) { up(); return; }   // let go somewhere the timeline didn't hear
     const t = timeAt(e);
     if (what === 'start') setStart(t);
     else if (what === 'end') setEnd(t);
@@ -323,18 +326,25 @@ function drag(ev, what) {
       seek(ns);
     } else seek(t);
   };
+  let done = false;
   const up = () => {
-    target.removeEventListener('pointermove', move);
-    target.removeEventListener('pointerup', up);
-    target.removeEventListener('pointercancel', up);
+    if (done) return;
+    done = true;
+    window.removeEventListener('pointermove', move, true);
+    window.removeEventListener('pointerup', up, true);
+    window.removeEventListener('pointercancel', up, true);
+    window.removeEventListener('blur', up);
+    if (!S.ed) return;
     if (what === 'seek') { if (playing) vid.play().catch(() => {}); return; }
     if (what === 'end') vid.currentTime = Math.max(S.ed.start, S.ed.end - 1.5);
     vid.play().catch(() => {});
     rangeChanged();
   };
-  target.addEventListener('pointermove', move);
-  target.addEventListener('pointerup', up);
-  target.addEventListener('pointercancel', up);
+  // Listened for on the whole window, so letting go anywhere ends the drag
+  window.addEventListener('pointermove', move, true);
+  window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', up, true);
+  window.addEventListener('blur', up);
   if (what === 'seek') move(ev);
 }
 $('#hStart').addEventListener('pointerdown', (e) => drag(e, 'start'));
@@ -356,14 +366,16 @@ let lookTimer = null;
 function rangeChanged() {
   if (!S.ed || S.ed.catTouched) return;
   clearTimeout(lookTimer);
-  const { id, start, end } = S.ed;
-  lookTimer = setTimeout(() => { if (S.ed && S.ed.id === id && !S.ed.catTouched) api.call('job:suggest', { id, start, end }); }, 900);
+  const { id, start, end, crop } = S.ed;
+  lookTimer = setTimeout(() => { if (S.ed && S.ed.id === id && !S.ed.catTouched) api.call('job:suggest', { id, start, end, crop }); }, 900);
 }
 
 document.addEventListener('keydown', (e) => {
   if (!S.ed || S.tab !== 'get' || S.modals) return;
   if (e.target.closest('input, select, textarea')) { if (e.key === 'Enter' && e.target.id === 'edName') save(false); return; }
   const k = e.key.toLowerCase();
+  // While cropping, Enter or Esc finishes the crop (rather than saving or closing)
+  if (S.ed.cropping && (k === 'enter' || k === 'escape')) { $('#cropDone').click(); e.preventDefault(); return; }
   const step = (dir) => { vid.pause(); seek(vid.currentTime + dir * (e.shiftKey ? 1 : 1 / (S.ed.fps || 30))); };
   if (k === ' ') { togglePlay(); e.preventDefault(); }
   else if (k === 'i' || k === '[') { setStart(vid.currentTime, false); rangeChanged(); }
@@ -372,6 +384,134 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'arrowright') { step(1); e.preventDefault(); }
   else if (k === 'enter') save(false);
   else if (k === 'escape') closeEditor();
+});
+
+/* ---------- crop ---------- */
+// S.ed.crop is the part of the picture kept, as fractions of the whole frame ({x, y, w, h}, 0 to 1), or null for
+// all of it. It stays for Save + another part. The box is drawn over the picture itself, not the black bars.
+const RATIOS = { free: 0, '16:9': 16 / 9, '4:3': 4 / 3, '1:1': 1 };
+const FULL = { x: 0, y: 0, w: 1, h: 1 };
+const cropEl = $('#crop'), cropBox = $('#cropBox');
+// Where the picture sits in the player (object-fit: contain)
+function pictureRect() {
+  const P = $('#edPlayer').getBoundingClientRect();
+  const s = Math.min(P.width / S.ed.vw, P.height / S.ed.vh);
+  const w = S.ed.vw * s, h = S.ed.vh * s;
+  return { left: (P.width - w) / 2, top: (P.height - h) / 2, width: w, height: h };
+}
+const minW = () => Math.min(1, 32 / S.ed.vw), minH = () => Math.min(1, 32 / S.ed.vh);
+function cropPixels(c) {
+  const r = c || FULL;
+  return [Math.round(r.w * S.ed.vw / 2) * 2, Math.round(r.h * S.ed.vh / 2) * 2];
+}
+function renderCrop() {
+  if (!S.ed) return;
+  const c = S.ed.crop, editing = S.ed.cropping;
+  cropEl.hidden = !c && !editing;
+  cropEl.classList.toggle('editing', editing);
+  cropEl.classList.toggle('locked', editing && S.ed.ratio !== 'free');
+  $('#cropBar').hidden = !editing;
+  $('#edPlay').style.visibility = editing ? 'hidden' : '';
+  $('#cropBtn').classList.toggle('on', !!c || editing);
+  const [pw, ph] = cropPixels(c);
+  $('#cropBtnText').textContent = c ? `Cropped ${pw}×${ph}` : 'Crop';
+  for (const b of $$('#cropBar [data-ratio]')) b.classList.toggle('on', b.dataset.ratio === S.ed.ratio);
+  if (cropEl.hidden) return;
+  const R = pictureRect();
+  Object.assign(cropEl.style, { left: R.left + 'px', top: R.top + 'px', width: R.width + 'px', height: R.height + 'px' });
+  const b = c || FULL;
+  Object.assign(cropBox.style, { left: b.x * 100 + '%', top: b.y * 100 + '%', width: b.w * 100 + '%', height: b.h * 100 + '%' });
+  $('#cropSize').textContent = `${pw} × ${ph}`;
+}
+new ResizeObserver(() => renderCrop()).observe($('#edPlayer'));
+// The fractions of the frame for a picture shape (width / height on screen)
+const fracH = (w, ratio) => (w * S.ed.vw) / (ratio * S.ed.vh);
+const fracW = (h, ratio) => (h * ratio * S.ed.vh) / S.ed.vw;
+// The biggest box of a shape that fits the frame, centred where the box is now
+function fitRatio(ratio) {
+  const now = S.ed.crop || FULL;
+  let w = 1, h = fracH(1, ratio);
+  if (h > 1) { h = 1; w = fracW(1, ratio); }
+  const cx = now.x + now.w / 2, cy = now.y + now.h / 2;
+  return { x: clamp(cx - w / 2, 0, 1 - w), y: clamp(cy - h / 2, 0, 1 - h), w, h };
+}
+function setRatio(r) {
+  S.ed.ratio = r;
+  if (RATIOS[r]) S.ed.crop = fitRatio(RATIOS[r]);
+  renderCrop();
+  cropChanged();
+}
+function cropChanged() {
+  const c = S.ed.crop;
+  // A box covering (nearly) the whole frame is no crop at all
+  if (c && c.x < 0.002 && c.y < 0.002 && c.w > 0.996 && c.h > 0.996) S.ed.crop = null;
+  rangeChanged();
+}
+$('#cropBtn').addEventListener('click', () => {
+  if (!S.ed) return;
+  S.ed.cropping = !S.ed.cropping;
+  if (S.ed.cropping && !S.ed.crop) S.ed.crop = { ...FULL };
+  if (!S.ed.cropping) cropChanged();
+  renderCrop();
+});
+$('#cropDone').addEventListener('click', () => { S.ed.cropping = false; cropChanged(); renderCrop(); });
+$('#cropReset').addEventListener('click', () => { S.ed.crop = { ...FULL }; S.ed.ratio = 'free'; renderCrop(); });
+$$('#cropBar [data-ratio]').forEach((b) => b.addEventListener('click', () => setRatio(b.dataset.ratio)));
+
+// Dragging: a handle resizes (keeping the shape when one is chosen), the box moves
+cropBox.addEventListener('pointerdown', (ev) => {
+  if (!S.ed || !S.ed.cropping || ev.button !== 0) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const handle = ev.target.dataset.h || 'move';
+  const R = cropEl.getBoundingClientRect();
+  const c0 = { ...(S.ed.crop || FULL) };
+  const ratio = RATIOS[S.ed.ratio];
+  const at = (e) => ({ x: clamp((e.clientX - R.left) / R.width, 0, 1), y: clamp((e.clientY - R.top) / R.height, 0, 1) });
+  const p0 = at(ev);
+  try { cropBox.setPointerCapture(ev.pointerId); } catch (_) { /* fine: the window hears the release anyway */ }
+  const move = (e) => {
+    // The button was let go somewhere the box didn't hear: stop following the pointer
+    if (e.buttons === 0) { up(); return; }
+    const p = at(e);
+    let { x, y, w, h } = c0;
+    if (handle === 'move') {
+      x = clamp(c0.x + p.x - p0.x, 0, 1 - c0.w);
+      y = clamp(c0.y + p.y - p0.y, 0, 1 - c0.h);
+    } else if (!ratio) {
+      if (handle.includes('w')) { x = clamp(p.x, 0, c0.x + c0.w - minW()); w = c0.x + c0.w - x; }
+      if (handle.includes('e')) w = clamp(p.x - c0.x, minW(), 1 - c0.x);
+      if (handle.includes('n')) { y = clamp(p.y, 0, c0.y + c0.h - minH()); h = c0.y + c0.h - y; }
+      if (handle.includes('s')) h = clamp(p.y - c0.y, minH(), 1 - c0.y);
+    } else {
+      // A corner, keeping the shape: the opposite corner stays put, and the box follows whichever way the
+      // pointer went further
+      const ax = handle.includes('w') ? c0.x + c0.w : c0.x, ay = handle.includes('n') ? c0.y + c0.h : c0.y;
+      const roomW = handle.includes('w') ? ax : 1 - ax, roomH = handle.includes('n') ? ay : 1 - ay;
+      w = Math.max(Math.abs(p.x - ax), fracW(Math.abs(p.y - ay), ratio));
+      w = clamp(w, Math.max(minW(), fracW(minH(), ratio)), Math.min(roomW, fracW(roomH, ratio)));
+      h = fracH(w, ratio);
+      x = handle.includes('w') ? ax - w : ax;
+      y = handle.includes('n') ? ay - h : ay;
+    }
+    S.ed.crop = { x, y, w, h };
+    renderCrop();
+  };
+  let done = false;
+  const up = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('pointermove', move, true);
+    window.removeEventListener('pointerup', up, true);
+    window.removeEventListener('pointercancel', up, true);
+    window.removeEventListener('blur', up);
+    cropChanged();
+  };
+  // Listened for on the whole window, so letting go anywhere ends the drag
+  window.addEventListener('pointermove', move, true);
+  window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', up, true);
+  window.addEventListener('blur', up);
 });
 
 /* category chips in the trimmer */
@@ -455,7 +595,7 @@ async function save(another) {
   const id = S.ed.id;
   const o = {
     id, start: S.ed.start, end: S.ed.end, cat: S.ed.cat, name: $('#edName').value.trim(),
-    keepSound: $('#keepSound').checked, maxHeight: +$('#maxH').value, another,
+    keepSound: $('#keepSound').checked, maxHeight: +$('#maxH').value, another, crop: S.ed.crop,
   };
   S.settings.keepSound = o.keepSound;
   S.settings.maxHeight = o.maxHeight;
@@ -588,6 +728,7 @@ function openClip(id) {
   fact('By', c.by);
   fact('Licence', c.lic);
   if (c.part) fact('Part', fmt(c.part[0]) + ' to ' + fmt(c.part[1]) + ' of the original');
+  if (c.crop) fact('Cropped', 'Yes, part of the picture');
   fact('Added', c.added ? new Date(c.added).toLocaleString() : '');
   fact('File', c.f);
   $('#cmSource').hidden = !/^https?:/.test(c.src || '');

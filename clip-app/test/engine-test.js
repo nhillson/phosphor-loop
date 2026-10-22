@@ -43,8 +43,8 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
   const site = await serve(media);
   let swirl = null;
 
-  await test('page with a video: yt-dlp reads it and downloads it whole', async () => {
-    const r = await E.fetchVideo(tools, { url: site.url + 'video.html', marks: { start: 5, end: 9 } }, job(), { log });
+  await test('page with a video, nothing marked: yt-dlp reads it and downloads it whole', async () => {
+    const r = await E.fetchVideo(tools, { url: site.url + 'video.html' }, job(), { log });
     assert.ok(fs.existsSync(r.playable));
     near(r.probe.duration, 20, 0.2, 'length');
     assert.equal(r.offset, 0);
@@ -115,6 +115,61 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
     assert.equal(r.probe.hasAudio, true);
     assert.equal(r.probe.height, 720);
     assert.equal(r.probe.width, 1280);
+  });
+
+  await test('short video with a marked part: only that part comes down (yt-dlp)', async () => {
+    const r = await E.fetchVideo(tools, { url: site.url + 'video.html', marks: { start: 12, end: 14 }, pageDuration: 20 }, job(), { log });
+    // 9 to 17 asked for; the part starts at the key frame before 9
+    assert.ok(r.probe.duration < 15, 'length ' + r.probe.duration);
+    assert.ok(r.offset <= 9.05 && r.offset >= 0, 'offset ' + r.offset);
+    near(r.offset + r.probe.duration, 17, 0.4, 'where the part ends');
+    return `${r.probe.duration.toFixed(1)} s from ${r.offset.toFixed(1)} s`;
+  });
+
+  await test('page yt-dlp can\u2019t read, marked: only that part of the page\u2019s video (ffmpeg)', async () => {
+    const r = await E.fetchVideo(tools, { url: site.url + 'blob.html', direct: site.url + 'swirl.mp4', marks: { start: 12, end: 14 }, pageDuration: 20 }, job(), { log });
+    assert.ok(r.probe.duration < 15, 'length ' + r.probe.duration);
+    near(r.offset + r.probe.duration, 17, 0.4, 'where the part ends');
+    return `${r.probe.duration.toFixed(1)} s from ${r.offset.toFixed(1)} s`;
+  });
+
+  await test('a video file link, marked: only that part', async () => {
+    const r = await E.fetchVideo(tools, { url: site.url + 'swirl.mp4', marks: { start: 4, end: 6 }, pageDuration: 20 }, job(), { log });
+    assert.ok(r.probe.duration < 12, 'length ' + r.probe.duration);
+    near(r.offset + r.probe.duration, 9, 0.4, 'where the part ends');
+  });
+
+  await test('the marked part: padding, start-only, and when it would be the whole video anyway', async () => {
+    assert.deepEqual(E.partOf({ start: 10, end: 20 }, 600), [7, 23]);
+    assert.deepEqual(E.partOf({ start: 10, end: null }, 600), [7, 73]);
+    assert.deepEqual(E.partOf({ start: 1, end: 5 }, 0), [0, 8]);
+    assert.equal(E.partOf({ start: 1, end: 18 }, 20), null, 'whole video anyway');
+    assert.equal(E.partOf(null, 600), null);
+  });
+
+  await test('cropping: only the kept part of the picture, sized from it', async () => {
+    const out = path.join(job(), 'crop.mp4');
+    // The right half of a 1280x720 picture: 640x720
+    const r = await E.cutClip(tools, swirl.playable, out, { start: 2, end: 4, crop: { x: 0.5, y: 0, w: 0.5, h: 1 }, log });
+    assert.equal(r.probe.width, 640);
+    assert.equal(r.probe.height, 720);
+    assert.ok(r.crop);
+    // It really is the right half: compared with the source cut there, and the left half
+    const cmp = async (spec) => {
+      const p = await E.run(tools.ffmpeg, ['-hide_banner', '-nostdin', '-i', out, '-ss', '2', '-i', swirl.playable, '-filter_complex',
+        `[1:v]${spec},format=yuv420p,setsar=1[b];[0:v]format=yuv420p,setsar=1[a];[a][b]psnr`, '-frames:v', '20', '-f', 'null', '-']);
+      const m = /average:([\d.]+|inf)/.exec(p.stderr);
+      return m ? (m[1] === 'inf' ? 99 : +m[1]) : 0;
+    };
+    const right = await cmp('crop=640:720:640:0'), left = await cmp('crop=640:720:0:0');
+    assert.ok(right > 28 && right > left + 5, `${right.toFixed(1)} dB right, ${left.toFixed(1)} dB left`);
+    // A tall crop on the 720-high picture stays at most 1080 high and even-sized; a bad crop is ignored
+    const r2 = await E.cutClip(tools, swirl.playable, path.join(job(), 'c2.mp4'), { start: 0, end: 1, crop: { x: 0.1, y: 0.1, w: 0.333, h: 0.777 }, log });
+    assert.equal(r2.probe.width % 2, 0);
+    assert.equal(r2.probe.height % 2, 0);
+    const r3 = await E.cutClip(tools, swirl.playable, path.join(job(), 'c3.mp4'), { start: 0, end: 1, crop: { x: 0.9, y: 0, w: 0.5, h: 1 }, log });
+    assert.equal(r3.probe.width, 1280, 'a crop past the edge is ignored');
+    return `right half ${right.toFixed(1)} dB vs left ${left.toFixed(1)} dB; ${r2.probe.width}x${r2.probe.height}`;
   });
 
   await test('cutting an odd-sized 120 fps video: even size, 60 fps', async () => {

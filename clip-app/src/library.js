@@ -185,7 +185,7 @@ class Library {
         id: newId(), n: path.basename(dest).replace(/\.[^.]+$/, ''), c: cat.id, f: rel(path.relative(this.dir, dest)),
         d: round(meta.d), w: meta.w, h: meta.h, fps: meta.fps, sound: !!meta.sound,
         src: meta.src || '', page: meta.page || '', by: meta.by || '', lic: meta.lic || '', site: meta.site || '',
-        part: meta.part || undefined, guess: meta.guess || undefined, added: new Date().toISOString(),
+        part: meta.part || undefined, crop: meta.crop || undefined, guess: meta.guess || undefined, added: new Date().toISOString(),
       };
       await this.makeThumb(clip, meta.thumbAt);
       this.data.clips.push(clip);
