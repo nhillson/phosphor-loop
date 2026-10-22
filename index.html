@@ -466,7 +466,10 @@
                 <span class="hint" id="vidLoopText">The whole video plays on repeat.</span>
               </div>
             </div>
+            <span class="pic-credit" id="clipCredit" hidden></span>
             <div class="dev-actions">
+              <button class="btn small" id="clipOpen" title="Your clips from Phosphor Clips on this computer, by category">Clip library…</button>
+              <button class="btn small" id="clipShuffle" title="Another clip from the library, from the category the gallery shows" hidden>Shuffle</button>
               <button class="btn small" id="pickVid">Choose a video…</button>
             </div>
           </div>
@@ -909,6 +912,34 @@
       <p class="hint" id="natHint">Tap a picture to feed it into loop A.</p>
       <div class="nat-grid" id="natGrid"></div>
       <p class="hint nat-foot">Photos from Wikimedia Commons’ Featured Pictures, free to use. Each one names its photographer when you pick it; the full list is in <a href="nature/CREDITS.txt" target="_blank" rel="noopener">nature/CREDITS.txt</a>.</p>
+    </div>
+  </div>
+
+  <div class="guide nat clips" id="clips" role="dialog" aria-modal="true" aria-labelledby="clipsTitle" hidden>
+    <div class="guide-bar nat-bar">
+      <span class="wordmark" id="clipsTitle">Clip library</span>
+      <span class="nat-count" id="clipsCount"></span>
+      <span class="spacer"></span>
+      <button class="btn small" id="clipsShuffle">Shuffle</button>
+      <button class="btn small" id="clipsFile">Choose a video file…</button>
+      <button class="btn small" id="clipsClose">Close</button>
+      <div class="chips nat-tabs" id="clipsTabs" role="group" aria-label="Categories"></div>
+    </div>
+    <div class="nat-inner">
+      <div class="clips-msg" id="clipsMsg" hidden>
+        <p id="clipsMsgText"></p>
+        <div class="dev-actions">
+          <button class="btn small" id="clipsRetry">Try again</button>
+          <a class="btn small" id="clipsGet" href="https://github.com/nhillson/phosphor-loop/releases/tag/clip-app-latest" target="_blank" rel="noopener">Get Phosphor Clips</a>
+        </div>
+      </div>
+      <div class="clips-ap" id="clipsAp" hidden>
+        <span class="lbl" id="clipsApLbl">Autopilot brings in clips from</span>
+        <div class="chips" id="clipsApCats" role="group" aria-labelledby="clipsApLbl"></div>
+      </div>
+      <p class="hint" id="clipsHint" hidden></p>
+      <div class="nat-grid clips-grid" id="clipsGrid"></div>
+      <p class="hint nat-foot" id="clipsFoot" hidden>Your clips from Phosphor Clips on this computer. Clips you grab and save there show up here.</p>
     </div>
   </div>
 

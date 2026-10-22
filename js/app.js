@@ -770,7 +770,9 @@ function chooseSource(slot, src) {
   if (src === 'camera' && !cam.on) startCamera();
   if (src === 'screen' && !scr.on) startScreen(true);
   if (src === 'phone') startPhoneLink();
-  if (src === 'video' && !vid.on) $('#vidFile').click();
+  // No video in yet: the clip library once it's been set up in this browser (its gallery also offers a file),
+  // otherwise straight to choosing a file
+  if (src === 'video' && !vid.on) { if (clipsWanted()) openClips(); else $('#vidFile').click(); }
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
@@ -2396,7 +2398,7 @@ function apPool() {
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
-  if (vid.on) pool.push('video');
+  if (vid.on || clipsReady()) pool.push('video');   // a clip from the clip library comes in when a look picks Video
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src);
   if (snd.analyser) pool.push('spectro');
   // Leave out the inputs switched off under Autopilot settings. If that leaves nothing it can use right now
@@ -2806,6 +2808,7 @@ function apStep(now, onBeat) {
   }
   if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
   apPicture(came);
+  apClip(came);
   syncUI();
   apStatus();
 }
@@ -2836,6 +2839,23 @@ function apPicture(k) {
     const M = tasteModel(), few = shown.sort(() => Math.random() - 0.5).slice(0, 12);
     natPick(tastePickBy(few, (i) => Math.tanh(((M.pref['natf:' + nat.pics[i].f] || 0) * 1.5 + (M.pref['natc:' + nat.pics[i].c] || 0) * 1.2) / 2)), true);
   }).catch(() => { /* offline before the list was ever saved: keep the picture there is */ });
+}
+// Clips from the clip library (Phosphor Clips): when a look picks Video and no video is in yet, Autopilot brings in
+// a clip from the categories ticked in the clip gallery, and every 1 to 3 new looks that use Video it puts in a
+// different one, the way it does with nature pictures. A video file of your own stays put, and nothing changes
+// when Video is switched off under Inputs Autopilot can use.
+function apClip(k) {
+  if (!clipsReady() || clips.own || !apAllowed('video')) return;
+  if (!vid.on) {
+    if (uses('video')) { ap.clipIn = apPicGap(); clipPick(pick(clipsAp()), true); }
+    return;
+  }
+  const came = k && loops[k];
+  if (!came || (came.tgt.in1 !== 'video' && came.tgt.in2 !== 'video')) return;
+  if (ap.clipIn > 1) { ap.clipIn--; return; }
+  ap.clipIn = apPicGap();
+  const others = clipsAp().filter((c) => c.id !== clips.cur);
+  if (others.length) clipPick(pick(others), true);
 }
 // Next look (beside the Autopilot buttons, or the L key): Autopilot's next new look straight away, cutting in
 // fast the way a look does on a beat, and the countdown to the one after starts again. If Autopilot is off it
@@ -3278,7 +3298,7 @@ function apScene(k) {
 function apUsable(src) {
   if (!src || src === 'none' || !(src in SRC_ID) || !apAllowed(src)) return false;
   if (is3D(src)) return worldOK(src);
-  if (src === 'video') return vid.on;
+  if (src === 'video') return vid.on || clipsReady();
   if (DEVICE.includes(src)) return liveActive(src);
   if (src === 'spectro') return !!snd.analyser;
   if (src === 'loop') return apSet.mix > 10;
@@ -4289,7 +4309,21 @@ function loadFile(file) {
     img.onerror = () => { URL.revokeObjectURL(url); toast('That picture couldn’t be opened. Try a JPG or PNG.'); };
     img.src = url;
   } else if (type.startsWith('video/')) {
-    const url = URL.createObjectURL(file);
+    clips.ask++;   // a library clip still on its way doesn't replace this one
+    openVideo(URL.createObjectURL(file), file.name).then((ok) => {
+      if (!ok) return;
+      // A video of your own: Autopilot leaves it in place instead of bringing in library clips
+      clips.own = true;
+      clipNoCredit();
+    });
+  } else {
+    toast('That file isn’t a picture or video.');
+  }
+}
+// Puts a video (an object URL) in as the Video input. quiet: in place without switching any loop to it (Autopilot,
+// or the page opening). Resolves true once its first frame is ready, false if it can't be played.
+function openVideo(url, name, { quiet = false } = {}) {
+  return new Promise((resolve) => {
     const v = mkVideo();
     v.loop = true;
     v.src = url;
@@ -4298,20 +4332,23 @@ function loadFile(file) {
       vidURL = url;
       vid.attach(v, null);
       vidUserPaused = false;
-      say($('#vidStatus'), `<span class="live"></span><b>${escapeHTML(file.name)}</b>`);
+      say($('#vidStatus'), `<span class="live"></span><b>${escapeHTML(name)}</b>`);
       $('#vcr').hidden = false;
       vidPlay.textContent = 'Pause';
       vidLoopA = null; vidLoopB = null; loopText();
       v.playbackRate = vidRate;
       $('#vidDur').textContent = fmtT(v.duration);
-      feedInto('video');
-      toast(`Feeding ${file.name} into loop ${edit}.`);
+      if (quiet) settleDevices();   // plays only while a loop uses it
+      else { feedInto('video'); toast(`Feeding ${name} into loop ${edit}.`); }
+      resolve(true);
     }, { once: true });
-    v.addEventListener('error', () => { URL.revokeObjectURL(url); toast('That video couldn’t be played here. Try an MP4 or WebM file.'); }, { once: true });
+    v.addEventListener('error', () => {
+      URL.revokeObjectURL(url);
+      if (!quiet) toast('That video couldn’t be played here. Try an MP4 or WebM file.');
+      resolve(false);
+    }, { once: true });
     v.play().catch(() => {});
-  } else {
-    toast('That file isn’t a picture or video.');
-  }
+  });
 }
 function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
@@ -4472,6 +4509,285 @@ natDlg.addEventListener('keydown', (e) => {
   try { last = localStorage.getItem(NAT_LAST_KEY); } catch (_) { /* fine */ }
   if (last) natList().then((pics) => { const i = pics.findIndex((p) => p.f === last); if (i >= 0 && nat.cur < 0 && !nat.own) natPick(i, true); }).catch(() => {});
 })();
+
+/* ================= clip library (Phosphor Clips) ================= */
+// Phosphor Clips (the Windows app in clip-app/ on the clip-app branch) grabs videos and GIFs from the web, trims them
+// and sorts them into categories. It shares that library with this page from the same computer, at
+// http://127.0.0.1:47811 (the next port or two if that one is taken), answering only Phosphor Loop's own sites.
+// The page only looks for it once the Clip library button has been used in this browser: browsers ask before a
+// website talks to programs on the computer, and other visitors shouldn't be asked. Picking a clip feeds it in as
+// the Video input; Autopilot brings in clips from the categories ticked in the gallery (see apClip).
+const CLIP_PORTS = [47811, 47812, 47813];
+const CLIP_ON_KEY = 'phosphor-clips-on', CLIP_TAB_KEY = 'phosphor-clips-tab', CLIP_OFF_KEY = 'phosphor-clips-ap-off', CLIP_LAST_KEY = 'phosphor-clips-last';
+// list: the clips (null until Phosphor Clips answers); cur: the clip in use; own: a video file of your own is in
+const clips = { base: '', list: null, cats: [], at: 0, req: null, cur: '', own: false, ask: 0, cat: 'all', off: [] };
+try {
+  clips.cat = localStorage.getItem(CLIP_TAB_KEY) || 'all';
+  clips.off = JSON.parse(localStorage.getItem(CLIP_OFF_KEY) || '[]');
+  if (!Array.isArray(clips.off)) clips.off = [];
+} catch (_) { /* fine, all categories */ }
+const clipsDlg = $('#clips'), clipsGrid = $('#clipsGrid'), clipsTabs = $('#clipsTabs');
+const clipsWanted = () => !APP && !inArtifact && lsGet(CLIP_ON_KEY) === '1';
+const clipFetchOpts = (signal) => ({ cache: 'no-store', signal, targetAddressSpace: 'loopback' });
+// The library from Phosphor Clips (asked again after 20 s, or straight away when fresh)
+function clipList(fresh) {
+  if (clips.req) return clips.req;
+  if (!fresh && clips.list && performance.now() - clips.at < 20000) return Promise.resolve(clips.list);
+  clips.req = (async () => {
+    const bases = CLIP_PORTS.map((p) => `http://127.0.0.1:${p}`);
+    if (clips.base) bases.sort((a, b) => (b === clips.base) - (a === clips.base));
+    let why = null;
+    for (const base of bases) {
+      const ac = new AbortController(), t = setTimeout(() => ac.abort(), 2500);
+      try {
+        const r = await fetch(base + '/library.json', clipFetchOpts(ac.signal));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        if (!d || d.app !== 'Phosphor Clips') throw new Error('not Phosphor Clips');
+        clips.base = base;
+        clips.list = Array.isArray(d.clips) ? d.clips : [];
+        clips.cats = Array.isArray(d.cats) ? d.cats : [];
+        clips.at = performance.now();
+        if (clips.cat !== 'all' && !clips.list.some((c) => c.c === clips.cat)) clips.cat = 'all';
+        return clips.list;
+      } catch (e) { why = e; } finally { clearTimeout(t); }
+    }
+    clips.list = null;
+    throw why || new Error('Phosphor Clips didn’t answer');
+  })();
+  clips.req.then(() => { clips.req = null; }, () => { clips.req = null; });
+  return clips.req;
+}
+const clipCatName = (id) => { const c = clips.cats.find((x) => x.id === id); return c ? c.n : id; };
+// The clips Autopilot may bring in: those in the ticked categories
+const clipsAp = () => (clips.list || []).filter((c) => !clips.off.includes(c.c));
+const clipsReady = () => !!clips.list && clipsAp().length > 0 && clipsWanted();
+// The clips in the gallery's chosen category (or all of them)
+const clipsShown = () => (clips.list || []).filter((c) => clips.cat === 'all' || c.c === clips.cat);
+function clipNoCredit() {
+  clips.cur = '';
+  try { localStorage.removeItem(CLIP_LAST_KEY); } catch (_) { /* fine */ }
+  $('#clipCredit').hidden = true;
+  clipMark();
+}
+function clipMark() {
+  for (const t of clipsGrid.children) t.setAttribute('aria-current', String(t.dataset.id === clips.cur));
+}
+// Feeds a library clip in as the Video input. quiet: in place, without switching a loop to Video (Autopilot, or
+// bringing back the last clip when the page opens). Resolves true once it's showing.
+function clipPick(c, quiet) {
+  if (!c || !clips.base) return Promise.resolve(false);
+  const ask = ++clips.ask;
+  return fetch(`${clips.base}/clip/${encodeURIComponent(c.id)}`, clipFetchOpts())
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then((blob) => {
+      if (ask !== clips.ask) return false;   // a later pick (or a video of your own) overtook this one
+      return openVideo(URL.createObjectURL(blob), c.n, { quiet }).then((ok) => {
+        if (!ok || ask !== clips.ask) return ok;
+        clips.cur = c.id;
+        clips.own = false;
+        const from = c.src && /^https?:/.test(c.src)
+          ? ` · <a href="${escapeHTML(c.src)}" target="_blank" rel="noopener">${escapeHTML(c.by || 'source')}</a>` : (c.by ? ` · ${escapeHTML(c.by)}` : '');
+        const credit = $('#clipCredit');
+        credit.innerHTML = `Clip library: ${escapeHTML(clipCatName(c.c))}${from}${c.lic ? ' · ' + escapeHTML(c.lic) : ''}`;
+        credit.hidden = false;
+        clipMark();
+        try { localStorage.setItem(CLIP_LAST_KEY, c.id); } catch (_) { /* fine */ }
+        return true;
+      });
+    })
+    .catch(() => {
+      if (ask === clips.ask && !quiet) toast('That clip couldn’t be loaded. Is Phosphor Clips still running?');
+      return false;
+    });
+}
+function clipShuffle() {
+  clipList().then(() => {
+    const shown = clipsShown().filter((c) => c.id !== clips.cur);
+    if (shown.length) clipPick(pick(shown));
+    else toast(clips.list.length ? 'There’s no other clip in this category.' : 'The clip library is empty. Save some clips with Phosphor Clips.');
+  }).catch(() => openClips());
+}
+function clipsSay(html) {
+  $('#clipsMsg').hidden = !html;
+  $('#clipsMsgText').innerHTML = html || '';
+}
+function clipsBuild() {
+  const list = clips.list || [];
+  const count = (id) => (id === 'all' ? list.length : list.filter((c) => c.c === id).length);
+  const cats = clips.cats.filter((c) => count(c.id) > 0);
+  clipsTabs.textContent = '';
+  for (const c of [{ id: 'all', n: 'All' }, ...cats]) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.cat = c.id;
+    b.innerHTML = `${escapeHTML(c.n)} <b>${count(c.id)}</b>`;
+    b.addEventListener('click', () => {
+      clips.cat = c.id;
+      try { localStorage.setItem(CLIP_TAB_KEY, c.id); } catch (_) { /* fine */ }
+      clipsFilter();
+      clipsDlg.scrollTop = 0;
+    });
+    clipsTabs.appendChild(b);
+  }
+  // Which categories Autopilot brings clips in from
+  const apBox = $('#clipsApCats');
+  apBox.textContent = '';
+  for (const c of cats) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.innerHTML = `<span class="led"></span>${escapeHTML(c.n)}`;
+    b.setAttribute('aria-pressed', String(!clips.off.includes(c.id)));
+    b.addEventListener('click', () => {
+      const on = clips.off.includes(c.id);
+      clips.off = on ? clips.off.filter((x) => x !== c.id) : [...clips.off, c.id];
+      b.setAttribute('aria-pressed', String(on));
+      try { localStorage.setItem(CLIP_OFF_KEY, JSON.stringify(clips.off)); } catch (_) { /* fine */ }
+      clipsApNote();
+    });
+    apBox.appendChild(b);
+  }
+  $('#clipsAp').hidden = !cats.length;
+  clipsGrid.textContent = '';
+  const frag = document.createDocumentFragment();
+  for (const c of list) {
+    const b = document.createElement('button');
+    b.className = 'nat-tile';
+    b.dataset.id = c.id;
+    b.dataset.c = c.c;
+    b.title = `${c.n} (${clipCatName(c.c)})`;
+    const thumb = c.thumb ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : '';
+    b.innerHTML = `${thumb}<em class="clip-dur">${fmtT(c.d || 0)}</em><span>${escapeHTML(c.n)}</span>`;
+    frag.appendChild(b);
+  }
+  clipsGrid.appendChild(frag);
+}
+function clipsApNote() {
+  const hint = $('#clipsHint');
+  hint.hidden = false;
+  const none = clips.list && clips.list.length && !clipsAp().length;
+  hint.textContent = none
+    ? `Tap a clip to feed it into loop ${edit}. No category is ticked, so Autopilot won’t bring in clips.`
+    : `Tap a clip to feed it into loop ${edit}. Autopilot puts in a new clip from the ticked categories every few looks; a video file of your own stays put.`;
+}
+function clipsFilter() {
+  for (const b of clipsTabs.children) b.setAttribute('aria-pressed', String(b.dataset.cat === clips.cat));
+  for (const t of clipsGrid.children) t.hidden = clips.cat !== 'all' && t.dataset.c !== clips.cat;
+  const n = clipsShown().length;
+  $('#clipsCount').textContent = clips.list ? `${n} CLIP${n === 1 ? '' : 'S'}` : '';
+}
+let clipsReturn = null;
+function openClips() {
+  try { localStorage.setItem(CLIP_ON_KEY, '1'); } catch (_) { /* fine */ }
+  if (clipsDlg.hidden) {
+    clipsReturn = document.activeElement;
+    clipsDlg.hidden = false;
+    document.documentElement.style.overflow = 'hidden';
+    $('#clipsClose').focus({ preventScroll: true });
+  }
+  clipsSay('Looking for Phosphor Clips on this computer…');
+  $('#clipsShuffle').hidden = true;
+  clipList(true).then((list) => {
+    if (clipsDlg.hidden) return;
+    clipsBuild();
+    clipsFilter();
+    clipMark();
+    $('#clipShuffle').hidden = !list.length;
+    $('#clipsShuffle').hidden = !list.length;
+    $('#clipsFoot').hidden = false;
+    if (!list.length) {
+      clipsSay('Phosphor Clips is running, but its library is empty. Grab a video there and save it, then press <b>Try again</b>.');
+      $('#clipsHint').hidden = true;
+      return;
+    }
+    clipsSay('');
+    clipsApNote();
+    clipsKeepOneReady();
+    const cur = clipsGrid.querySelector('[aria-current="true"]:not([hidden])');
+    if (cur) cur.scrollIntoView({ block: 'center' }); else clipsDlg.scrollTop = 0;
+  }).catch(() => {
+    if (clipsDlg.hidden) return;
+    clipsGrid.textContent = '';
+    clipsTabs.textContent = '';
+    $('#clipsAp').hidden = true;
+    $('#clipsHint').hidden = true;
+    $('#clipsFoot').hidden = true;
+    $('#clipsCount').textContent = '';
+    clipsSay('Phosphor Clips isn’t answering. Open <b>Phosphor Clips</b> on this computer (it shares your clips with Phosphor Loop, and can sit by the clock), then press <b>Try again</b>. ' +
+      'If the browser asks whether this site may look for or connect to devices or programs on your computer, choose <b>Allow</b>.');
+  });
+}
+function closeClips() {
+  if (clipsDlg.hidden) return;
+  clipsDlg.hidden = true;
+  document.documentElement.style.overflow = '';
+  if (clipsReturn && clipsReturn.focus) clipsReturn.focus();
+}
+if (APP) $('#clipOpen').hidden = true;   // Phosphor Clips is a Windows program; the phone has no library to reach
+$('#clipOpen').addEventListener('click', openClips);
+$('#clipShuffle').addEventListener('click', clipShuffle);
+$('#clipsClose').addEventListener('click', closeClips);
+$('#clipsRetry').addEventListener('click', openClips);
+$('#clipsShuffle').addEventListener('click', () => { clipShuffle(); closeClips(); });
+$('#clipsFile').addEventListener('click', () => { closeClips(); $('#vidFile').click(); });
+clipsGrid.addEventListener('click', (e) => {
+  const t = e.target.closest('.nat-tile');
+  if (!t) return;
+  const c = (clips.list || []).find((x) => x.id === t.dataset.id);
+  if (c) clipPick(c);
+  closeClips();
+});
+clipsDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeClips(); }
+  else e.stopPropagation(); // keep the keys from firing while browsing
+});
+// Video loops that came back with the page but whose clip can't (Phosphor Clips isn't running): back to a pattern
+function clipsDropVideo() {
+  if (vid.on) return;
+  let dropped = false;
+  for (const k of ['A', 'B']) {
+    const t = loops[k].tgt;
+    if (t.in1 === 'video') { t.in1 = k === 'A' ? 'wave' : 'shape'; dropped = true; }
+    if (t.in2 === 'video') { t.in2 = 'none'; dropped = true; }
+  }
+  if (dropped) { settleDevices(); syncUI(); toast('Picked up where you left off. Open Phosphor Clips, then choose Video again to bring the clip back.'); }
+}
+// A clip is kept ready (paused until a loop uses it) whenever the library has clips for Autopilot, so a look that
+// picks Video has a picture straight away, and Check each look sees the clip rather than an empty input
+function clipsKeepOneReady() {
+  if (!vid.on && !clips.own && clipsReady()) return clipPick(pick(clipsAp()), true);
+  return Promise.resolve(vid.on);
+}
+// When the page opens (after the last session is back): the clip in use last time comes back, and the library is
+// asked again every minute so Autopilot knows about new clips
+function clipsStart() {
+  if (!clipsWanted()) return;
+  const last = lsGet(CLIP_LAST_KEY);
+  clipList().then((list) => {
+    $('#clipShuffle').hidden = !list.length;
+    if (vid.on) return true;
+    const c = list.find((x) => x.id === last);
+    return c ? clipPick(c, true) : clipsKeepOneReady();
+  }).then((ok) => { if (!ok) clipsDropVideo(); }, () => clipsDropVideo());
+  setInterval(() => {
+    if (document.hidden || !clipsWanted()) return;
+    clipList(true).then(() => { $('#clipShuffle').hidden = !clips.list.length; clipsKeepOneReady(); }).catch(() => { /* not running right now */ });
+  }, 60000);
+}
+
+// For tests/clips_check.py, which can't see inside this file: the clip library's state and the bits of Autopilot it
+// touches (as __phosphorCapture does for the stream app)
+window.__plClips = {
+  get list() { return clips.list; }, get cur() { return clips.cur; }, get own() { return clips.own; },
+  get off() { return clips.off.slice(); }, set off(v) { clips.off = v.slice(); },
+  get vidOn() { return vid.on; }, get vidFrames() { return vid.frames; }, get edit() { return edit; },
+  wanted: () => clipsWanted(), ready: () => clipsReady(),
+  input: (k, slot) => loops[k].tgt[slot], setInput: (k, slot, src) => { loops[k].tgt[slot] = src; },
+  detachVideo: () => { vid.detach(); clips.cur = ''; },
+  apClip: (k, gap) => { if (gap != null) ap.clipIn = gap; apClip(k); },
+  videoUsable: () => apPool().includes('video') && apUsable('video'),
+  loadFile: (f) => loadFile(f), close: () => closeClips(),
+};
 
 const dropEl = $('#drop');
 let dragDepth = 0;
@@ -5090,7 +5406,7 @@ function applyRecipe(r) {
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
-  if (p.A.in1 === 'video' && !vid.on) p.A.in1 = 'picture';
+  if (p.A.in1 === 'video' && !vid.on) { if (clipsReady()) clipPick(pick(clipsAp()), true); else p.A.in1 = 'picture'; }
   patchLoop('A', p.A, true);
   patchLoop('B', p.B || B_PARTNER, true);
   mix.tgt.view = p.view ?? 0;
@@ -5314,7 +5630,9 @@ function loadPreset(pr, quiet) {
     burst();
     showOSD('PRESET', pr.name.toUpperCase().slice(0, 18));
   }
-  if (used.includes('video') && !vid.on) toast('This preset uses a video. Choose one under Video.');
+  if (used.includes('video') && !vid.on && clipsReady()) clipPick(pick(clipsAp()), true);
+  // (a session coming back with the page brings its library clip back by itself: see clipsStart)
+  else if (used.includes('video') && !vid.on && !(quiet && clipsWanted())) toast('This preset uses a video. Choose one under Video.');
   else if (used.includes('spectro') && !snd.analyser && snd.src === 'off' && !quiet) toast('This look uses the Spectrograph. Under the inputs, pick Computer sound or Microphone.');
   else if (ap.on && !quiet) toast(`Autopilot is on with this preset’s settings${ap.pins.size ? ' and pins' : ''}.`);
 }
@@ -6324,13 +6642,16 @@ function restoreSession() {
   try { s = JSON.parse(lsGet(LAST_KEY) || 'null'); } catch (_) {}
   if (!s || !s.look) return false;
   const d = JSON.parse(JSON.stringify(s.look));
-  // Screen sharing and video files need a person to pick them again, so those slots fall back to a pattern
+  // Screen sharing and video files need a person to pick them again, so those slots fall back to a pattern.
+  // A clip from the clip library comes back by itself (see clipsStart), so its slots stay on Video.
+  const clipBack = clipsWanted() && !!lsGet(CLIP_LAST_KEY);
   let missing = '';
   for (const k of ['A', 'B']) {
     const L = d[k];
     if (!L) continue;
     for (const slot of ['in1', 'in2']) {
       if (L[slot] !== 'screen' && L[slot] !== 'video') continue;
+      if (L[slot] === 'video' && clipBack) continue;
       missing = L[slot] === 'screen' ? 'Screen' : 'Video';
       L[slot] = slot === 'in2' ? 'none' : (k === 'A' ? 'wave' : 'shape');
     }
@@ -6518,7 +6839,7 @@ const GROUP_NAMES = { inputs: 'Input', apInputs: 'Autopilot uses', mirror: 'Mirr
                       specShape: 'Spectrograph', specListen: 'Spectrograph hears', textStyle: 'Text style', growSize: 'Grow size', timeShape: 'Time warp', cam: 'Camera style' };
 const NOT_LEARNABLE = '#showGroup *, .tabs button, .group-toggle, .pre-del, .pre-ren, #adminBox *, #adminLogin *, .pre-confirm button, #presetForm button, #presetSave, ' +
   '.tp-ic, #tasteRenForm *, #sessionForm *, #tasteOpen, ' +
-  '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen';
+  '#foldAll, #openAll, #full, #pickPic, #pickVid, #scrSelf, #scrOther, [data-snd="system"], #guideBtn, #natOpen, #clipOpen';
 function labelFor(el) {
   const l = document.querySelector(`label[for="${el.id}"]`);
   return l ? l.textContent.replace(/\s+/g, ' ').trim() : el.id;
@@ -6785,6 +7106,7 @@ function showStart() {
   } else if (midiSaved.enabled) midiStart();
   // The Android app puts the picture on a plugged-in projector or TV straight away, show mode or not
   if (APP && appInfo.display) setTimeout(() => { if (appInfo.display && !outputOpen()) openOutput(); }, 1200);
+  clipsStart();
   sessionReady = true;
 }
 

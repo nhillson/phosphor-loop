@@ -23,6 +23,10 @@ file don't rebuild the app.
    if the look matters. That browser can't open Claude's own local server, so the laptop check runs on the
    live site, right after a push. If the panel is hidden the page may pause; the script says so, and Nick can
    show it with Ctrl+Shift+B in the Claude app.
+4b. **Clip library** (Video › Clip library…, fed by the Phosphor Clips app on the `clip-app` branch):
+   `python3 tests/clips_check.py` uses a stand-in library; `CLIPS_APP=<clip-app folder>` uses the real sharing
+   server. Test clips are WebM because the workspace's Chromium can't play H.264. The test reaches into the app
+   through `window.__plClips`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

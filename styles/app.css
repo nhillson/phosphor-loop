@@ -721,6 +721,17 @@
   .nat-tile:hover img, .nat-tile:focus-visible img { transform: scale(1.06); filter: brightness(1.12); }
   .nat-tile[aria-current="true"] { border-color: var(--loop-a); box-shadow: 0 0 0 2px var(--loop-a), 0 0 14px var(--amber-glow); }
   .nat-foot { margin-top: 8px; }
+  /* ---------- clip library ---------- */
+  .clips-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .clips-grid .nat-tile { aspect-ratio: 16 / 9; }
+  .clip-dur { position: absolute; right: 5px; top: 5px; padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.7);
+    font: 14px/1.2 var(--f-osd); font-style: normal; color: #fff; }
+  .clips-ap { display: flex; flex-direction: column; gap: 4px; }
+  .clips-ap .lbl { font-size: 13px; color: var(--dim); }
+  .clips-msg { max-width: 62ch; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); }
+  .clips-msg p { margin: 0 0 10px; line-height: 1.5; color: var(--dim); }
+  .clips-msg p b { color: var(--ink); }
+  .clips-msg a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   .nat-foot a { color: var(--dim); }
   .g-foot { display: flex; justify-content: center; }
 
