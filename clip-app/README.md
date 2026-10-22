@@ -22,6 +22,16 @@ source page `src`, `page` title, `by`, licence `lic`, `part` of the original), i
 `nature/pictures.json`. Clips moved, added or deleted in File Explorer are picked up (a new folder becomes a new
 category).
 
+## Phosphor Loop uses the library
+
+Phosphor Clips shares the library with Phosphor Loop on the same computer (`src/server.js`, http://127.0.0.1:47811,
+falling back to 47812/47813). It answers only `https://*.github.io`, localhost pages and file pages. Closing the window
+keeps it by the clock, and it starts with Windows out of sight (on by default; tray menu or the Library page).
+In Phosphor Loop: **Video › Clip library…** opens the gallery; Autopilot brings in clips from the categories ticked
+there. Chrome 142+ asks once whether the site may reach apps on this device (Local Network Access): Allow.
+Phosphor Stream (Electron 38, Chromium 140) doesn't ask; if it moves to Electron 39+ its permission allow-list in
+`stream-app/src/main.js` needs the local/loopback network permission too.
+
 ## For Claude
 
 - Branch `clip-app`, folder `clip-app/`, built and tested by `.github/workflows/clip-app.yml` on a Windows runner.
