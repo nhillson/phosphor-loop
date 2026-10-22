@@ -110,8 +110,14 @@ def main():
 
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
+        # Developer mode on, as in Nick's Chrome (it's needed to add the button; without it Chrome turns an unpacked
+        # extension off when it reloads itself)
+        prof = os.path.join(work, 'chrome-profile')
+        os.makedirs(os.path.join(prof, 'Default'), exist_ok=True)
+        with open(os.path.join(prof, 'Default', 'Preferences'), 'w') as f:
+            json.dump({'extensions': {'ui': {'developer_mode': True}}}, f)
         ctx = p.chromium.launch_persistent_context(
-            os.path.join(work, 'chrome-profile'), headless=False, viewport={'width': 1280, 'height': 760},
+            prof, headless=False, viewport={'width': 1280, 'height': 760},
             args=[f'--disable-extensions-except={EXT}', f'--load-extension={EXT}', '--autoplay-policy=no-user-gesture-required'])
         sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event('serviceworker', timeout=20000)
         check('the extension loads', sw.url.endswith('/background.js'), sw.url)
@@ -181,6 +187,128 @@ def main():
         check('Open link in Phosphor Clips sends it', r.get('ok'), r.get('message', ''))
         m, at = app.wait_for(r'chrome: link (\S+)', 20, at)
         check('Phosphor Clips opens the link', bool(m) and m.group(1).endswith('video.html'))
+
+        # 4b. The button's menu: Start here / End here while the video plays, then Grab: only that part downloads
+        pg.goto(base + 'long.html')
+        video_frames(5)
+        tab_id = sw.evaluate(f"""async () => (await ({tab_of})({json.dumps(base + 'long.html')})).id""")
+        popup_url = f'chrome-extension://{ext_id}/popup.html?tab={tab_id}'
+
+        def text_until(m, sel, pattern, ceiling_s=10):
+            """The element's text once it matches (extension pages don't allow the usual in-page waits); the time
+            is only a ceiling"""
+            rx = re.compile(pattern)
+            end = time.time() + ceiling_s
+            t = ''
+            while time.time() < end:
+                t = m.inner_text(sel)
+                if rx.search(t):
+                    return t
+                time.sleep(0.1)
+            return t
+
+        def open_menu():
+            m = ctx.new_page()
+            m.set_viewport_size({'width': 340, 'height': 420})
+            m.goto(popup_url)
+            text_until(m, '#nowText', 'Video', 15)
+            return m
+
+        menu = open_menu()
+        # (paused at exact times: the page's tab is in the background while the menu is open, so its clock can't be
+        # watched frame by frame)
+        pg.evaluate("(() => { const v = document.querySelector('video'); v.pause(); v.currentTime = 200; })()")
+        text_until(menu, '#nowText', r'paused at 3:20\.0')
+        menu.click('#start')
+        pg.evaluate("document.querySelector('video').currentTime = 210")
+        text_until(menu, '#nowText', r'paused at 3:30\.0')
+        menu.click('#end')
+        sv, ev = menu.inner_text('#startVal'), menu.inner_text('#endVal')
+        check('Start here and End here mark the video in Chrome', sv == '3:20.0' and ev == '3:30.0', f'{sv} to {ev}')
+        note = menu.inner_text('#note')
+        check('the menu says only the marked part downloads', 'downloads' in note and '3:17' in note, note)
+        check('the big button says Grab the marked part', menu.inner_text('#grab') == 'Grab the marked part')
+        menu.screenshot(path=os.path.join(OUT, '3-menu-marked.png'))
+        # The menu closes when you click on the page; open it again and the marks are still there
+        menu.close()
+        menu = open_menu()
+        check('the marks are kept when the menu closes and opens again', menu.inner_text('#startVal') == sv and menu.inner_text('#endVal') == ev)
+        menu.click('#grab')
+        m, at = app.wait_for(r'chrome: grab (\S+) marked ([\d.]+)-([\d.]+) s', 20, at)
+        check('Phosphor Clips gets the grab with the marks', bool(m) and abs(float(m.group(2)) - 200) < 2 and abs(float(m.group(3)) - 210) < 2,
+              m.group(0) if m else 'nothing in the log')
+        m, at = app.wait_for(r'grab \S+ ready: (\d+)x(\d+) ([\d.]+) s', 120, at)
+        check('only the marked part downloads (plus a little either side)', bool(m) and float(m.group(3)) < 30, m.group(0) if m else 'it did not')
+        try:
+            done = text_until(menu, '#done', 'Sent to Phosphor Clips', 5)
+            check('the menu says it was sent', 'Sent to Phosphor Clips' in done)
+            menu.screenshot(path=os.path.join(OUT, '4-menu-sent.png'))
+        except Exception:
+            check('the menu says it was sent', menu.is_closed(), 'it closed already')
+        check('the video in Chrome pauses once it\u2019s grabbed', pg.evaluate("document.querySelector('video').paused"))
+        # Open this page in Phosphor Clips instead (what the button did before)
+        pg.evaluate("document.querySelector('video').play()")
+        video_frames(5)
+        menu = open_menu()
+        check('the marks are cleared after a grab', menu.inner_text('#startVal') == '\u2014')
+        menu.click('#openPage')
+        m, at = app.wait_for(r'chrome: page (\S+) at ([\d.]+) s \(button\)', 20, at)
+        check('Open this page in Phosphor Clips instead still works', bool(m) and m.group(1).endswith('long.html'), m.group(0) if m else 'nothing in the log')
+        if not menu.is_closed():
+            menu.close()
+
+        # 4c. The button updates itself when Phosphor Clips has newer files (once per version)
+        check('the button knows which versions are newer', sw.evaluate("() => self.__clips.newer('1.10.0', '1.9.2') && !self.__clips.newer('1.1.0', '1.1.0')"))
+        old_sw = sw
+        # With the menu open it waits (a reload would close the menu under the mouse), then reloads once it's closed
+        menu = open_menu()
+        sw.evaluate("() => { self.__clips.updateIfNewer('9.9.9'); }")
+        time.sleep(2)   # (a ceiling: a reload would have replaced this background within this time)
+        try:
+            waiting = sw.evaluate("async () => !!self.__clips && !(await chrome.storage.local.get('reloadFor')).reloadFor")
+        except Exception:
+            waiting = False
+        check('it waits while the menu is open', waiting)
+        menu.close()
+
+        def live_background(not_this=None, ceiling_s=20):
+            """The extension's background after a reload: a working one that isn't the old one (a ceiling, not a pause)"""
+            end = time.time() + ceiling_s
+            woke = False
+            while time.time() < end:
+                for w in ctx.service_workers:
+                    if w is not_this or not w.url.endswith('/background.js'):
+                        continue
+                    try:
+                        if w.evaluate("() => !!self.__clips"):
+                            return w
+                    except Exception:
+                        pass
+                if not woke and time.time() > end - ceiling_s + 3:
+                    # A background that has stopped starts again for a message: open the menu once to wake it
+                    try:
+                        m = ctx.new_page(); m.goto(popup_url); m.close()
+                    except Exception:
+                        pass
+                    woke = True
+                time.sleep(0.25)
+            return None
+
+        sw2 = live_background(not_this=old_sw)
+        if sw2:
+            again = sw2.evaluate("async () => (await chrome.storage.local.get('reloadFor')).reloadFor")
+            check('it reloads itself to pick up newer files', again == '9.9.9', again)
+            sw = sw2
+            sw.evaluate("() => { self.__clips.updateIfNewer('9.9.9'); }")
+            time.sleep(2)   # (a ceiling: a second reload would replace this background within this time)
+            try:
+                still = sw.evaluate("() => !!self.__clips")
+            except Exception:
+                still = False
+            check('only once per version (no reload loop)', still)
+        else:
+            check('it reloads itself to pick up newer files', False, 'no background came back')
+            sw = live_background() or old_sw
 
         # 5. A page that can't be sent (one of Chrome's own)
         pg.goto('chrome://version')

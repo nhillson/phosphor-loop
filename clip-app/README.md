@@ -13,6 +13,7 @@ library for Phosphor Loop.
 2. **Mark the good part** while it plays: *Start here*, then *End here*. Unmarked, the whole video is grabbed.
    Marked, only the marked part downloads (plus 3 s either side), whatever the video's length; if a site won't hand
    out a part, the whole video comes down instead.
+   In Chrome, the button's menu does the same: *Start here*, *End here*, *Grab the marked part*.
 3. **Trim, crop, pick a category, save.** The trimmer opens by itself and always shows the whole picture. Drag the
    purple handles or nudge them. **Crop** keeps part of the picture (Free, 16:9, 4:3 or Square; drag the box or its
    corners). The category is suggested from the picture (CLIP, run on the processor, looking only at the cropped part)
@@ -38,8 +39,19 @@ Phosphor Stream (Electron 38, Chromium 140) doesn't ask; if it moves to Electron
 ## Send to Phosphor Clips (the Chrome button, `chrome-button/`)
 
 A Chrome (or Edge) extension that hands what you're watching to Phosphor Clips on the same computer:
-- **The button**: the page opens in Phosphor Clips' browser and its video picks up at the same moment (YouTube also
-  gets `&t=`); Chrome's copy pauses. Phosphor Clips comes up from the clock.
+- **The button** opens a small menu (`popup.html`/`popup.js`): the video's clock (read 4 times a second with
+  `chrome.scripting`, every frame of the page, the biggest playing video), **Start here** / **End here** (keys S
+  and E; kept per tab and page in `chrome.storage.session` while the menu is closed), and **Grab the marked part**
+  (Enter): `POST /open` with `kind: 'grab'` and the marks, so only the marked part downloads (plus 3 s either side)
+  and opens in the trimmer; Chrome's copy pauses. Unmarked, it grabs the whole video. **Open this page in Phosphor
+  Clips instead**: the page opens in Phosphor Clips' browser and its video picks up at the same moment (YouTube
+  also gets `&t=`).
+- **Updates itself**: `/ping` reports the button version Phosphor Clips carries (`button`); when it's newer, the
+  extension waits until its menu is closed, then `chrome.runtime.reload()`s to pick up the new files from the
+  fixed folder (once per version, noted in `chrome.storage.local.reloadFor`, so it can't loop). Needs Developer
+  mode, which *Load unpacked* needs anyway. Buttons from before 1.1.0 don't do this: Phosphor Clips sees their
+  version (sent with each request and `/hello`) and its Library page shows an *Update the Chrome button* card
+  until the one manual reload in `chrome://extensions`.
 - **Right-click a video**: *Send this video to Phosphor Clips* (the same, for that video). **A GIF**: *Grab this GIF
   with Phosphor Clips* (straight to the trimmer; `.gif`/`.gifv` addresses). **A link**: *Open link in Phosphor Clips*.
 - Talks to the sharing server: `POST /open` and `POST /hello`, accepted only from extension origins (or a local

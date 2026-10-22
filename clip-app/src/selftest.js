@@ -208,6 +208,7 @@ module.exports = async function selftest(h) {
       const ping = await fetch(api + '/ping', { headers: { Origin: EXT } });
       check('the Chrome button can find Phosphor Clips', ping.ok && (await ping.json()).open === true);
       check('a website can\u2019t pretend to be the button saying hello', (await fetch(api + '/hello', { method: 'POST', headers: { Origin: 'https://evil.example' } })).status === 403);
+      // (an old button, 1.0.0, says hello without its version)
       await fetch(api + '/hello', { method: 'POST', headers: { Origin: EXT }, body: '{}' });
       // (a test run that reuses the app's settings may already know the button: then it's 'used', not 'added')
       await panelUntil(`S.chrome && !!S.chrome.seen`, 'the hello from Chrome', 20000);
@@ -220,6 +221,13 @@ module.exports = async function selftest(h) {
       check('the Add the button to Chrome helper shows its steps and pictures', await pjs(`document.querySelectorAll('#chromeModal .steps li').length === 4 && document.querySelector('#chromeFolder').textContent.length > 3`));
       await click('#chromeClose');
       await panelUntil(`document.querySelector('#chromeModal').hidden && S.modals === 0`, 'the helper to close', 5000);
+      // An older button than the one here: a card says to reload it once, and /ping tells newer buttons the version
+      await panelUntil(`S.chrome && S.chrome.outdated === true && !document.querySelector('#chromeCard').hidden`, 'the update card', 10000);
+      await panelFrames(5);
+      await shot('5b-update-card');
+      check('an old Chrome button gets an Update the Chrome button card', await pjs(`document.querySelector('#ccTitle').textContent === 'Update the Chrome button' && !document.querySelector('#ccUpdate').hidden`));
+      const latest = (await (await fetch(api + '/ping', { headers: { Origin: EXT } })).json()).button;
+      check('Phosphor Clips tells the button which version its files are', /^\d+\.\d+\.\d+$/.test(latest || ''), latest);
       // Websites can't make Phosphor Clips open things, and only web pages can be sent
       check('a website can\u2019t send pages to Phosphor Clips', (await send({ kind: 'page', url: base + 'video.html' }, 'https://evil.example')).status === 403);
       check('a request with no sender is refused', (await send({ kind: 'page', url: base + 'video.html' }, '')).status === 403);
@@ -250,6 +258,15 @@ module.exports = async function selftest(h) {
       check('a GIF sent from Chrome is accepted', sent.ok);
       await panelUntil(`S.ed && !document.querySelector('#editor').hidden && S.jobs.length > ${before}`, 'the GIF from Chrome in the trimmer', 120000);
       check('a GIF sent from Chrome opens in the trimmer', Math.abs((await pjs('S.ed.d')) - 4) < 0.3);
+      await click('#edDiscard');
+      await panelUntil(`!S.ed`, 'the trimmer to close');
+      // Start here / End here in Chrome, then Grab: straight to a download of only the marked part
+      sent = await send({ kind: 'grab', url: base + 'video.html', title: 'Swirling fractal colours', d: 20, t: 13, marks: { start: 12, end: 14 }, v: latest });
+      check('a marked grab from Chrome is accepted', sent.ok, (await sent.json()).message);
+      await panelUntil(`S.ed && !document.querySelector('#editor').hidden && S.ed.d < 19`, 'the marked grab in the trimmer', 120000);
+      const g = await pjs(`({ d: S.ed.d, start: S.ed.start, end: S.ed.end })`);
+      check('only the part marked in Chrome downloads, and the trimmer opens on it', g.d < 19 && Math.abs((g.end - g.start) - 2) < 0.4, `${g.start.toFixed(2)}-${g.end.toFixed(2)} of ${g.d.toFixed(1)} s`);
+      check('a button that\u2019s up to date clears the update card', await pjs(`!S.chrome.outdated && document.querySelector('#chromeCard').hidden`));
       await click('#edDiscard');
       await panelUntil(`!S.ed`, 'the trimmer to close');
       // Phosphor Clips started from Chrome's phosphor-clips:// link (when it wasn't running)

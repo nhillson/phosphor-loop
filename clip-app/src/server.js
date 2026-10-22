@@ -8,8 +8,10 @@
 //   GET /thumb/<id>     its thumbnail
 //   GET /ping           { app, version, open }
 // It also takes pages, videos and GIFs sent from Chrome by the Send to Phosphor Clips button (chrome-button/):
-//   POST /open          { kind: 'page' | 'video' | 'gif' | 'link', url, title, t, src, referer } -> opens it in the app
-//   POST /hello         the button saying it's in Chrome (so the setup helper can say it worked)
+//   POST /open          { kind: 'page' | 'video' | 'gif' | 'link' | 'grab', url, title, t, src, referer, marks, d, v }
+//                       -> opens it in the app ('grab': straight to a download of the marked part)
+//   POST /hello         { v } the button saying it's in Chrome (so the setup helper can say it worked)
+// /ping also says which version of the button's files Phosphor Clips has (button), so the button can update itself.
 // Only a browser extension may send these (or a program on this computer that says who it is with the
 // X-Phosphor-Clips header), so no website can make Phosphor Clips open things.
 const http = require('node:http');
@@ -106,7 +108,7 @@ function sendFile(req, res, file, headers) {
 
 // getLibrary() returns the open Library (it can change when the library folder is changed). onOpen(request, origin)
 // opens something sent from Chrome and returns { ok, message }. onHello(origin) hears the Chrome button say hello.
-function startServer({ getLibrary, onOpen = null, onHello = null, version = '', log = () => {}, ports = PORTS }) {
+function startServer({ getLibrary, onOpen = null, onHello = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin;
     let p = '';
@@ -134,10 +136,11 @@ function startServer({ getLibrary, onOpen = null, onHello = null, version = '', 
       if (req.method !== 'POST') { res.writeHead(405, { ...headers, Allow: 'POST' }); res.end(); return; }
       if (p === '/hello') {
         const yes = mayOpen(req);
-        if (yes && onHello) { try { onHello(origin || ''); } catch (_) { /* fine */ } }
-        req.resume();
-        res.writeHead(yes ? 200 : 403, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify({ ok: yes, app: 'Phosphor Clips', version }));
+        readBody(req).then((text) => { let b = {}; try { b = JSON.parse(text || '{}') || {}; } catch (_) { /* fine */ } return b; }, () => ({})).then((b) => {
+          if (yes && onHello) { try { onHello(origin || '', b); } catch (_) { /* fine */ } }
+          res.writeHead(yes ? 200 : 403, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ ok: yes, app: 'Phosphor Clips', version }));
+        });
         return;
       }
       handleOpen(req, res, headers, onOpen).catch((e) => { log('open: ' + e.message); try { res.writeHead(500); res.end(); } catch (_) { /* gone */ } });
@@ -147,7 +150,9 @@ function startServer({ getLibrary, onOpen = null, onHello = null, version = '', 
     const lib = getLibrary();
     if (p === '/ping') {
       res.writeHead(200, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify({ app: 'Phosphor Clips', version, open: !!onOpen }));
+      let extra = {};
+      try { extra = (pingInfo && pingInfo()) || {}; } catch (_) { /* fine */ }
+      res.end(JSON.stringify({ app: 'Phosphor Clips', version, open: !!onOpen, ...extra }));
       return;
     }
     if (!lib) { res.writeHead(503, headers); res.end(); return; }

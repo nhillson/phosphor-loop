@@ -812,12 +812,20 @@ $('#catAddForm').addEventListener('submit', async (e) => {
 // seen: '' (never heard from), 'added' (it said hello when added to Chrome), 'used' (it has sent something)
 function renderChrome() {
   const seen = (S.chrome && S.chrome.seen) || '';
+  const outdated = !!(S.chrome && S.chrome.outdated);
   const card = $('#chromeCard');
-  card.hidden = seen === 'used';
-  card.classList.toggle('added', seen === 'added');
-  if (seen === 'added') {
+  card.hidden = seen === 'used' && !outdated;
+  card.classList.toggle('added', seen === 'added' && !outdated);
+  card.classList.toggle('update', outdated);
+  $('#ccUpdate').hidden = !outdated;
+  $('#ccOpen').hidden = outdated;
+  if (outdated) {
+    // An older button than the one this Phosphor Clips has: reload it once (from 1.1 on it updates itself)
+    $('#ccTitle').textContent = 'Update the Chrome button';
+    $('#ccText').innerHTML = 'It now has <b>Start here / End here</b>. Reload it once: open <b>chrome://extensions</b> and press the round arrow \u21bb on <b>Send to Phosphor Clips</b>. After this it updates itself.';
+  } else if (seen === 'added') {
     $('#ccTitle').textContent = 'The Chrome button is in';
-    $('#ccText').textContent = 'On any page with a video, press Send to Phosphor Clips in Chrome, or right-click a video, GIF or link.';
+    $('#ccText').textContent = 'On a page with a video, press the button in Chrome, then Start here and End here while it plays. Or right-click a video, GIF or link.';
     $('#ccOpen').textContent = 'Show the steps again';
   }
   const st = $('#chromeState');
@@ -827,7 +835,7 @@ function renderChrome() {
 async function openChromeHelp() {
   const info = await api.call('chrome:info');
   if (info && info.folder) $('#chromeFolder').textContent = info.folder;
-  if (info) S.chrome = { seen: info.seen };
+  if (info) S.chrome = info;
   renderChrome();
   openModal('#chromeModal');
 }
@@ -886,11 +894,13 @@ api.on('library', (lib) => {
 api.on('vision', (v) => { S.vision = v || {}; renderVision(); });
 api.on('sharing', (sh) => { S.sharing = sh || {}; renderSharing(); });
 api.on('chrome', (c) => {
-  const was = (S.chrome && S.chrome.seen) || '';
+  const was = (S.chrome && S.chrome.seen) || '', wasOld = !!(S.chrome && S.chrome.outdated);
   S.chrome = c || {};
   renderChrome();
   if (!was && S.chrome.seen === 'added') toast('The Send to Phosphor Clips button is in Chrome.', 'ok');
+  if (wasOld && !S.chrome.outdated) toast('The Chrome button is up to date (' + (S.chrome.version || '') + ').', 'ok');
 });
+$('#ccUpdate').addEventListener('click', async () => { await api.call('chrome:copy', 'address'); toast('Copied chrome://extensions. Paste it into Chrome\u2019s address bar.', 'ok', 3500); });
 api.on('reveal', (r) => reveal(r));
 api.on('settings', (o) => { Object.assign(S.settings, o || {}); renderSharing(); });
 api.on('toast', (t) => toast(t.text, t.kind));

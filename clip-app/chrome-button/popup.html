@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Send to Phosphor Clips</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { width: 340px; color: #202124; background: #fff; font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+  .head img { width: 30px; height: 30px; border-radius: 7px; }
+  .head b { font-size: 15px; flex: 1; }
+  .app { font-size: 11.5px; color: #5f6368; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .app i { width: 7px; height: 7px; border-radius: 50%; background: #9aa0a6; }
+  .app.on i { background: #2e9e6b; }
+  .body { padding: 0 16px 16px; }
+  .now { display: flex; align-items: center; gap: 8px; color: #5f6368; font-size: 13px; min-height: 19px; }
+  .now i { width: 9px; height: 9px; border-radius: 50%; background: #9aa0a6; flex: none; }
+  .now.playing i { background: #2e9e6b; box-shadow: 0 0 0 3px rgba(46, 158, 107, 0.2); }
+  .now.paused i { background: #e8a33d; }
+  .now b { color: #202124; font-variant-numeric: tabular-nums; }
+  .marks { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
+  .mark { flex: 1; border-radius: 10px; border: 1.5px solid #dadce0; background: #f8f9fa; padding: 8px 6px; text-align: center; cursor: pointer;
+    font: inherit; color: inherit; }
+  .mark:hover:not(:disabled) { border-color: #b04fe0; }
+  .mark:disabled { opacity: 0.45; cursor: default; }
+  .mark small { display: block; font-size: 13px; font-weight: 600; color: #3c2a46; }
+  .mark span { font-size: 17px; font-variant-numeric: tabular-nums; color: #9aa0a6; }
+  .mark.set { border-color: #b04fe0; background: #f6ecfc; }
+  .mark.set span { color: #202124; }
+  .arrow { align-self: center; color: #9aa0a6; }
+  .x { align-self: center; border: 0; background: none; color: #80868b; font-size: 18px; cursor: pointer; padding: 0 2px; }
+  .x:hover { color: #202124; }
+  .go { margin-top: 14px; width: 100%; height: 44px; border: 0; border-radius: 10px; background: #8b1ab8; color: #fff; font: 600 15px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+  .go:hover:not(:disabled) { background: #a03ad0; }
+  .go:disabled { opacity: 0.5; cursor: default; }
+  .note { margin-top: 10px; font-size: 12.5px; color: #5f6368; line-height: 1.45; min-height: 18px; }
+  .note b { color: #202124; }
+  .note.bad { color: #c5221f; }
+  .sep { height: 1px; background: #eceff1; margin: 14px -16px 10px; }
+  .alt { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; color: #6a1b9a; font: 600 13.5px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+  .alt:hover { text-decoration: underline; }
+  .alt:disabled { color: #9aa0a6; cursor: default; text-decoration: none; }
+  .done { padding: 26px 16px 28px; text-align: center; }
+  .done .tick { width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 50%; background: #2e9e6b; color: #fff; display: grid; place-items: center; font-size: 24px; }
+  .done b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .done span { color: #5f6368; font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="head"><img src="icons/icon128.png" alt=""><b>Send to Phosphor Clips</b><span class="app" id="app" title=""><i></i><span id="appText">…</span></span></div>
+
+<div class="body" id="main">
+  <div class="now" id="now"><i></i><span id="nowText">Looking for a video…</span></div>
+  <div class="marks">
+    <button class="mark" id="start" title="Key: S"><small>Start here</small><span id="startVal">—</span></button>
+    <span class="arrow">→</span>
+    <button class="mark" id="end" title="Key: E"><small>End here</small><span id="endVal">—</span></button>
+    <button class="x" id="clear" title="Clear the marks" aria-label="Clear the marks" hidden>✕</button>
+  </div>
+  <button class="go" id="grab" disabled>Grab this video</button>
+  <div class="note" id="note"></div>
+  <div class="sep"></div>
+  <button class="alt" id="openPage">↗ Open this page in Phosphor Clips instead</button>
+</div>
+
+<div class="done" id="done" hidden><div class="tick">✓</div><b id="doneTitle">Sent to Phosphor Clips</b><span id="doneText"></span></div>
+
+<script src="popup.js"></script>
+</body>
+</html>

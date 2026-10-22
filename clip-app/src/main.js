@@ -50,7 +50,7 @@ let settings = {};
 function loadSettings() {
   let s = {};
   try { s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch (_) { /* first run */ }
-  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, chromeSeen: '', ...s };
+  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, chromeSeen: '', chromeVersion: '', ...s };
   if (process.env.CLIPS_LIBRARY) settings.libraryDir = process.env.CLIPS_LIBRARY;
   if (!settings.libraryDir) settings.libraryDir = path.join(app.getPath('videos'), 'Phosphor Clips');
   if (![720, 1080, 1440, 2160].includes(+settings.maxHeight)) settings.maxHeight = 1080;
@@ -391,16 +391,27 @@ function bringToFront() {
 }
 
 let pendingOpens = [];
-// What the Chrome button sent: { kind: 'page' | 'video' | 'gif' | 'link', url, title, t, src, referer }
+// What the Chrome button sent: { kind: 'page' | 'video' | 'gif' | 'link' | 'grab', url, title, t, src, referer, marks, d, v }
 function openFromChrome(o, via) {
   const url = String(o.url || '');
   if (!/^https?:\/\//i.test(url)) return { ok: false, message: 'Only web pages (http or https) can be opened.' };
-  if (!win || !web || !library) { pendingOpens.push([o, via]); return { ok: true, message: 'Opening Phosphor Clips\u2026' }; }
-  const kind = ['page', 'video', 'gif', 'link'].includes(o.kind) ? o.kind : 'page';
+  if (via !== 'link') chromeVersionSeen(o.v || '1.0.0');
+  if (!win || !web || !library) { pendingOpens.push([o, via]); return { ok: true, message: 'Opening Phosphor Clips…' }; }
+  const kind = ['page', 'video', 'gif', 'link', 'grab'].includes(o.kind) ? o.kind : 'page';
   const title = String(o.title || '').slice(0, 200);
   log('chrome: ' + kind + ' ' + url + (o.t ? ' at ' + (+o.t).toFixed(1) + ' s' : '') + ' (' + via + ')');
-  if (via !== 'link' && settings.chromeSeen !== 'used') { settings.chromeSeen = 'used'; saveSettings(); send('chrome', { seen: 'used' }); }
+  if (via !== 'link' && settings.chromeSeen !== 'used') { settings.chromeSeen = 'used'; saveSettings(); send('chrome', chromeState()); }
   bringToFront();
+  if (kind === 'grab') {
+    // Start here / End here pressed in Chrome: only that part downloads, straight to the trimmer
+    const num = (x) => (Number.isFinite(+x) && +x >= 0 ? +x : null);
+    const m = o.marks && num(o.marks.start) != null ? { start: num(o.marks.start), end: num(o.marks.end) } : null;
+    if (m && m.end != null && m.end <= m.start) m.end = null;
+    send('reveal', { text: m ? 'Grabbing the part you marked in Chrome…' : 'Grabbing the video from Chrome…' });
+    startJob({ url, direct: /^https?:/i.test(o.src || '') ? o.src : '', referer: url, pageTitle: title, pageDuration: num(o.d) || 0, marks: m });
+    log('chrome: grab ' + url + (m ? ' marked ' + m.start.toFixed(1) + '-' + (m.end != null ? m.end.toFixed(1) : '?') + ' s' : ' (whole video)'));
+    return { ok: true, message: m ? 'Grabbing the marked part' : 'Grabbing the video' };
+  }
   if (kind === 'gif') {
     // Straight to the trimmer, like right-clicking a GIF inside Phosphor Clips
     send('reveal', { text: 'Grabbing the GIF from Chrome\u2026' });
@@ -433,6 +444,26 @@ function openFromLink(arg) {
   } catch (e) { log('chrome link not understood: ' + e.message); return false; }
 }
 const linkIn = (argv) => (argv || []).find((a) => typeof a === 'string' && a.toLowerCase().startsWith(PROTOCOL + ':'));
+
+// The Chrome button's version, from what it sends. An older one than the files here gets a one-time "reload it"
+// card (from 1.1.0 on, the button reloads itself when it sees newer files)
+function buttonVersion() {
+  try { return JSON.parse(fs.readFileSync(path.join(chromeDir(), 'manifest.json'), 'utf8')).version || ''; } catch (_) { return ''; }
+}
+function newerVersion(a, b) {
+  const x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+const chromeOutdated = () => !!settings.chromeSeen && newerVersion(buttonVersion(), settings.chromeVersion || '1.0.0');
+const chromeState = () => ({ seen: settings.chromeSeen || '', version: settings.chromeVersion || '', outdated: chromeOutdated(), latest: buttonVersion() });
+function chromeVersionSeen(v) {
+  if (!v || v === settings.chromeVersion) return;
+  settings.chromeVersion = String(v).slice(0, 20);
+  saveSettings();
+  log('chrome: the button is version ' + settings.chromeVersion + (chromeOutdated() ? ' (older than ' + buttonVersion() + ')' : ''));
+  send('chrome', chromeState());
+}
 
 /* ---------- the Chrome button's files: copied to a fixed folder Chrome loads them from ---------- */
 const chromeDir = () => path.join(dataDir(), 'Chrome button');
@@ -669,7 +700,7 @@ function setupIpc() {
   handle('panel:ready', () => {
     panelReady = true;
     return {
-      version: app.getVersion(), sharing: sharingState(), chrome: { seen: settings.chromeSeen || '' },
+      version: app.getVersion(), sharing: sharingState(), chrome: chromeState(),
       settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows },
       library: libraryForPanel(), jobs: [...jobs.values()].map(jobForPanel), web: webState(), video: videoState(), vision: visionState,
     };
@@ -805,7 +836,7 @@ function setupIpc() {
     if (o && 'startWithWindows' in o) setStartWithWindows(!!o.startWithWindows);
     saveSettings();
   });
-  handle('chrome:info', () => ({ folder: chromeDir(), seen: settings.chromeSeen || '' }));
+  handle('chrome:info', () => ({ folder: chromeDir(), ...chromeState() }));
   handle('chrome:copy', (what) => {
     clipboard.writeText(what === 'folder' ? chromeDir() : 'chrome://extensions');
     return { ok: true };
@@ -823,14 +854,19 @@ async function startSharing() {
   sharing = await startServer({
     getLibrary: () => library, version: app.getVersion(), log, ports,
     onOpen: (o) => openFromChrome(o, 'button'),
-    // The Chrome button says hello when it's added to Chrome, so the setup helper can say it worked
-    onHello: () => {
-      if (settings.chromeSeen) return;
-      settings.chromeSeen = 'added';
-      saveSettings();
-      log('chrome: the button was added to Chrome');
-      send('chrome', { seen: 'added' });
+    // The Chrome button says hello when it's added to Chrome (and when Chrome starts), so the setup helper can say it
+    // worked and an old button can be spotted
+    onHello: (_origin, body) => {
+      if (!settings.chromeSeen) {
+        settings.chromeSeen = 'added';
+        saveSettings();
+        log('chrome: the button was added to Chrome');
+      }
+      chromeVersionSeen((body && body.v) || '1.0.0');
+      send('chrome', chromeState());
     },
+    // The button reads this to update itself when the files here are newer than it
+    pingInfo: () => ({ button: buttonVersion() }),
   });
   send('sharing', sharingState());
   updateTray();
