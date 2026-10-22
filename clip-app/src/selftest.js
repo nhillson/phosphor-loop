@@ -153,9 +153,10 @@ module.exports = async function selftest(h) {
       check('the Chrome button can find Phosphor Clips', ping.ok && (await ping.json()).open === true);
       check('a website can\u2019t pretend to be the button saying hello', (await fetch(api + '/hello', { method: 'POST', headers: { Origin: 'https://evil.example' } })).status === 403);
       await fetch(api + '/hello', { method: 'POST', headers: { Origin: EXT }, body: '{}' });
-      await panelUntil(`S.chrome && S.chrome.seen === 'added'`, 'the hello from Chrome', 20000);
+      // (a test run that reuses the app's settings may already know the button: then it's 'used', not 'added')
+      await panelUntil(`S.chrome && !!S.chrome.seen`, 'the hello from Chrome', 20000);
       await panelFrames(10);
-      await click('#ccOpen');
+      await click('#libChrome');
       await panelUntil(`!document.querySelector('#chromeModal').hidden && document.querySelector('#chromeState').classList.contains('ok')`, 'the Chrome helper', 10000);
       await panelUntil(`[...document.querySelectorAll('#chromeModal img')].every((i) => i.complete && i.naturalWidth > 0)`, 'the helper\u2019s pictures', 10000);
       await panelFrames(10);
