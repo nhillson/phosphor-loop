@@ -91,7 +91,11 @@ class App:
                 self.p.kill()
 
 
+APP = None
+
+
 def main():
+    global APP
     os.makedirs(OUT, exist_ok=True)
     work = tempfile.mkdtemp(prefix='clips-chrome-')
     fx = subprocess.Popen(['node', os.path.join(ROOT, 'test', 'serve-fixtures.js'), os.path.join(work, 'media')],
@@ -101,6 +105,7 @@ def main():
         sys.exit('FAIL: the test pages did not start: ' + first)
     base = first.split(' ', 1)[1]
     app = App(work)
+    APP = app
     m, at = app.wait_for(r'library sharing on http://127\.0\.0\.1:(\d+)', 90)
     if not m or int(m.group(1)) != PORT:
         print('\n'.join(app.lines[-30:]))
@@ -110,18 +115,23 @@ def main():
 
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
-        # Developer mode on, as in Nick's Chrome (it's needed to add the button; without it Chrome turns an unpacked
-        # extension off when it reloads itself)
-        prof = os.path.join(work, 'chrome-profile')
-        os.makedirs(os.path.join(prof, 'Default'), exist_ok=True)
-        with open(os.path.join(prof, 'Default', 'Preferences'), 'w') as f:
-            json.dump({'extensions': {'ui': {'developer_mode': True}}}, f)
         ctx = p.chromium.launch_persistent_context(
-            prof, headless=False, viewport={'width': 1280, 'height': 760},
+            os.path.join(work, 'chrome-profile'), headless=False, viewport={'width': 1280, 'height': 760},
             args=[f'--disable-extensions-except={EXT}', f'--load-extension={EXT}', '--autoplay-policy=no-user-gesture-required'])
         sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event('serviceworker', timeout=20000)
         check('the extension loads', sw.url.endswith('/background.js'), sw.url)
         ext_id = sw.url.split('/')[2]
+        # Developer mode on, as in Nick's Chrome (it's needed to add the button; without it Chrome turns an unpacked
+        # extension off when it reloads itself). Switched on on the extensions page, as he did.
+        try:
+            ep = ctx.new_page()
+            ep.goto('chrome://extensions')
+            ep.evaluate("() => chrome.developerPrivate.updateProfileConfiguration({ inDeveloperMode: true })")
+            dev = ep.evaluate("() => chrome.developerPrivate.getProfileConfiguration().then((c) => c.inDeveloperMode)")
+            ep.close()
+        except Exception as e:
+            dev = str(e).splitlines()[0]
+        check('Developer mode is on (as in Nick’s Chrome)', dev is True, str(dev))
         # Its Chrome functions are there once it has finished starting (a ceiling, not a pause)
         end = time.time() + 20
         while time.time() < end and not sw.evaluate("() => typeof chrome !== 'undefined' && !!chrome.contextMenus && !!self.__clips"):
@@ -360,4 +370,25 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException:
+        # Keep what was found so far (the Windows build's log can't always be read): results, the crash, the app's log
+        import traceback
+        tb = traceback.format_exc()
+        print(tb, flush=True)
+        check('the test ran to the end', False, tb[-1800:])
+        os.makedirs(OUT, exist_ok=True)
+        if APP:
+            try:
+                APP.stop()
+            except Exception:
+                pass
+            with open(os.path.join(OUT, 'app-log.txt'), 'w', encoding='utf-8') as f:
+                f.write('\n'.join(APP.lines))
+        with open(os.path.join(OUT, 'result.json'), 'w', encoding='utf-8') as f:
+            json.dump({'ok': False, 'passed': passed, 'failed': problems}, f, indent=2)
+        print(f"\n{len(passed)} passed, {len(problems)} failed")
+        sys.exit(1)
