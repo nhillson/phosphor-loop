@@ -94,6 +94,22 @@ jobs:
           $env:OUT = "$PWD\test-out\packaged"
           node test/app-test.js
 
+      - name: Test the Chrome button in Chromium, talking to the installed app
+        if: success() || failure()
+        shell: pwsh
+        run: |
+          python -m pip install --quiet playwright
+          python -m playwright install chromium
+          $env:ELECTRON = (Resolve-Path 'dist/win-unpacked/Phosphor Clips.exe').Path
+          $env:CLIPS_BIN = (Resolve-Path 'dist/win-unpacked/resources/bin').Path
+          $env:OUT = "$PWD\test-out\chrome"
+          $env:PYTHONUTF8 = '1'
+          python -u test/chrome_test.py
+
+      - name: Pack the Chrome button as a zip
+        shell: pwsh
+        run: Compress-Archive -Path chrome-button/* -DestinationPath dist/Phosphor-Clips-Chrome-Button.zip -Force
+
       - name: Put the test results where they can be read
         if: always()
         shell: pwsh
@@ -126,4 +142,4 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag --target $env:GITHUB_SHA --prerelease --title 'Phosphor Clips for Windows' --notes 'Download Phosphor-Clips-Setup.exe below and double-click it to install.'
           }
-          gh release upload $tag dist/Phosphor-Clips-Setup.exe --clobber
+          gh release upload $tag dist/Phosphor-Clips-Setup.exe dist/Phosphor-Clips-Chrome-Button.zip --clobber

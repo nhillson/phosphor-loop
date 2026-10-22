@@ -90,6 +90,17 @@
     </div>
 
     <aside class="side">
+      <div class="card chromecard" id="chromeCard" hidden>
+        <div class="cc-row">
+          <img src="img/chrome-button.png" alt="" class="cc-icon" id="ccIcon">
+          <div>
+            <h2 id="ccTitle">Send from Chrome</h2>
+            <p class="hint" id="ccText">Add a button to Chrome that sends the page you’re watching (or a video, GIF or link) straight here.</p>
+          </div>
+        </div>
+        <button class="btn" id="ccOpen">Add the button to Chrome…</button>
+      </div>
+
       <div class="card grab">
         <h2>Grab from this page</h2>
         <div class="now" id="now"><span class="nowdot"></span><span id="nowText">Open a page with a video, then start it playing.</span></div>
@@ -140,6 +151,7 @@
       <button class="btn small ghost" id="libOpen">Open folder</button>
       <button class="btn small ghost" id="libChange">Change…</button>
       <button class="btn small ghost" id="libRescan" title="Pick up clips added, moved or deleted in File Explorer">Look again</button>
+      <button class="btn small ghost" id="libChrome" title="The Send to Phosphor Clips button for Chrome">Chrome button…</button>
       <span class="share" id="share" title="Phosphor Loop's Clip library button and Autopilot read your clips from here"><span class="dot"></span><span id="shareText"></span></span>
       <label class="chk" title="Phosphor Clips starts out of sight (by the clock) when Windows starts, so Phosphor Loop always has the library"><input type="checkbox" id="startWin"> Start with Windows</label>
     </footer>
@@ -173,6 +185,38 @@
     <p class="hint">Rename a category by typing over its name. Each category is a folder in the library; deleting one moves its clips to Other.</p>
     <ul class="catlist" id="catList"></ul>
     <form class="linkform" id="catAddForm" autocomplete="off"><input id="catAddName" maxlength="40" placeholder="New category name"><button class="btn">Add</button></form>
+  </div>
+</div>
+
+<!-- Adding the Send to Phosphor Clips button to Chrome -->
+<div class="modal" id="chromeModal" hidden>
+  <div class="sheet chromesheet" role="dialog" aria-modal="true" aria-labelledby="chromeTitle">
+    <button class="ib close" id="chromeClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h3 id="chromeTitle">Add the button to Chrome</h3>
+    <p class="hint">Once, on this computer. About a minute. Chrome needs you to do these steps yourself.</p>
+    <ol class="steps">
+      <li>
+        <div class="st-text"><b>Open Chrome’s extensions page.</b> Press <i>Copy the address</i>, click Chrome’s address bar, paste (<kbd>Ctrl</kbd>+<kbd>V</kbd>) and press <kbd>Enter</kbd>.
+          <div class="st-acts"><button class="btn small" id="cpAddress">Copy the address</button></div></div>
+        <img src="img/chrome-1-address.png" alt="Chrome's address bar with chrome://extensions typed in">
+      </li>
+      <li>
+        <div class="st-text"><b>Turn on Developer mode</b>, the switch at the top right of that page.</div>
+        <img src="img/chrome-2-devmode.png" alt="The Developer mode switch">
+      </li>
+      <li>
+        <div class="st-text"><b>Press Load unpacked</b> (top left). In the window that opens, click the address bar at its top, paste (<kbd>Ctrl</kbd>+<kbd>V</kbd>), press <kbd>Enter</kbd>, then press <b>Select Folder</b>.
+          <div class="st-acts"><button class="btn small" id="cpFolder">Copy the folder’s location</button> <button class="btn small ghost" id="showFolder">Show the folder</button></div>
+          <code class="st-path" id="chromeFolder"></code></div>
+        <img src="img/chrome-3-load.png" alt="The Load unpacked button">
+      </li>
+      <li>
+        <div class="st-text"><b>Pin the button</b> so it’s always there: click the puzzle piece (a) at the top right of Chrome, then the pin (b) beside <i>Send to Phosphor Clips</i>.</div>
+        <img src="img/chrome-4-pin.png" alt="The puzzle piece and the pin">
+      </li>
+    </ol>
+    <div class="chrome-state" id="chromeState"><span class="dot"></span><span id="chromeStateText">Waiting for the button to appear in Chrome…</span></div>
+    <p class="hint">Then, on any page with a video: press the button, or right-click a video, GIF or link. Phosphor Clips must be running (it can sit by the clock); if it isn’t, the button offers to start it.</p>
   </div>
 </div>
 

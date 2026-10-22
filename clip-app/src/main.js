@@ -16,6 +16,9 @@ const { startServer } = require('./server.js');
 const TEST = process.env.CLIPS_TEST === '1';
 const START_PAGE = pathToFileURL(path.join(__dirname, 'start', 'index.html')).href;
 const WEB_PARTITION = 'persist:web';
+// Links like phosphor-clips://open?d=... start Phosphor Clips from Chrome's Send to Phosphor Clips button when the app
+// isn't running (when it is, the button talks to it through the library-sharing server instead)
+const PROTOCOL = 'phosphor-clips';
 // Started by Windows at sign-in: sit by the clock sharing the library, without opening the window
 let startHidden = process.argv.includes('--hidden');
 let quitting = false;
@@ -47,7 +50,7 @@ let settings = {};
 function loadSettings() {
   let s = {};
   try { s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch (_) { /* first run */ }
-  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, ...s };
+  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, chromeSeen: '', ...s };
   if (process.env.CLIPS_LIBRARY) settings.libraryDir = process.env.CLIPS_LIBRARY;
   if (!settings.libraryDir) settings.libraryDir = path.join(app.getPath('videos'), 'Phosphor Clips');
   if (![720, 1080, 1440, 2160].includes(+settings.maxHeight)) settings.maxHeight = 1080;
@@ -295,7 +298,7 @@ async function readVideo() {
   await Promise.all(frames.map(async (f) => {
     try {
       const r = await withTimeout(f.executeJavaScript(PROBE_JS), 1500);
-      if (r && (!best || r.score > best.score)) best = { ...r, frameUrl: f.url, sub: f !== wc.mainFrame };
+      if (r && (!best || r.score > best.score)) best = { ...r, frameUrl: f.url, sub: f !== wc.mainFrame, frame: f };
     } catch (_) { /* a frame that went away */ }
   }));
   return best;
@@ -311,6 +314,12 @@ function pageKey(url) {
 }
 function onPageChange(url) {
   const k = pageKey(url);
+  // A page sent from Chrome: its address once loaded (after any redirect) is the one whose video is picked up; going
+  // to another page after that forgets the pick-up
+  if (pendingSeek) {
+    if (!pendingSeek.page) pendingSeek.page = k;
+    else if (pendingSeek.page !== k) pendingSeek = null;
+  }
   if (k !== marks.page) { marks = { page: k, start: null, end: null }; sendVideo(); }
 }
 function videoState() {
@@ -325,8 +334,125 @@ function pollVideo() {
   setInterval(async () => {
     if (polling || !webShown || !win || win.isMinimized() || !win.isVisible()) return;
     polling = true;
-    try { video = await readVideo(); sendVideo(); } finally { polling = false; }
+    try {
+      video = await readVideo();
+      if (pendingSeek) await applySeek(video);
+      sendVideo();
+    } finally { polling = false; }
   }, 400);
+}
+
+/* ---------- pages, videos and GIFs sent from Chrome (the Send to Phosphor Clips button, chrome-button/) ---------- */
+// A page sent with the time its video was at: once that page's video can play, it jumps there and plays
+let pendingSeek = null;
+const SEEK_JS = (t) => `(() => {
+  let best = null, top = 0;
+  for (const v of document.querySelectorAll('video')) {
+    const r = v.getBoundingClientRect();
+    const score = (Math.max(0, r.width) * Math.max(0, r.height) + 1) * (v.readyState > 0 ? 1 : 0.05);
+    if (score > top) { top = score; best = v; }
+  }
+  if (!best || !(best.duration > ${t})) return false;
+  best.currentTime = ${t};
+  best.play().catch(() => {});
+  return true;
+})()`;
+async function applySeek(v) {
+  const ps = pendingSeek;
+  if (!ps || !web) return;
+  if (Date.now() > ps.until) { log('chrome: gave up picking the video up at ' + ps.t.toFixed(1) + ' s'); pendingSeek = null; return; }
+  if (!ps.page || pageKey(web.webContents.getURL()) !== ps.page || !v || !v.frame || !(v.d > ps.t)) return;
+  let done = false;
+  try { done = await withTimeout(v.frame.executeJavaScript(SEEK_JS(ps.t)), 1500); } catch (_) { /* the frame went away */ }
+  if (done && pendingSeek === ps) {
+    pendingSeek = null;
+    log('chrome: picked the video up at ' + ps.t.toFixed(1) + ' s');
+  }
+}
+
+// YouTube honours a start time in the address (and starts there after any advert), so it gets one too
+function withStartTime(url, t) {
+  try {
+    const u = new URL(url);
+    if (t >= 1 && /(^|\.)youtube\.com$/i.test(u.hostname) && u.pathname === '/watch') u.searchParams.set('t', Math.floor(t) + 's');
+    return u.href;
+  } catch (_) { return url; }
+}
+
+// Brings the window up from the clock and in front of Chrome
+function bringToFront() {
+  if (!win) return;
+  startHidden = false;
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) { if (!TEST) win.maximize(); win.show(); }
+  if (!TEST) { win.setAlwaysOnTop(true); win.moveTop(); }
+  win.focus();
+  if (!TEST) setTimeout(() => { if (win) win.setAlwaysOnTop(false); }, 300);
+}
+
+let pendingOpens = [];
+// What the Chrome button sent: { kind: 'page' | 'video' | 'gif' | 'link', url, title, t, src, referer }
+function openFromChrome(o, via) {
+  const url = String(o.url || '');
+  if (!/^https?:\/\//i.test(url)) return { ok: false, message: 'Only web pages (http or https) can be opened.' };
+  if (!win || !web || !library) { pendingOpens.push([o, via]); return { ok: true, message: 'Opening Phosphor Clips\u2026' }; }
+  const kind = ['page', 'video', 'gif', 'link'].includes(o.kind) ? o.kind : 'page';
+  const title = String(o.title || '').slice(0, 200);
+  log('chrome: ' + kind + ' ' + url + (o.t ? ' at ' + (+o.t).toFixed(1) + ' s' : '') + ' (' + via + ')');
+  if (via !== 'link' && settings.chromeSeen !== 'used') { settings.chromeSeen = 'used'; saveSettings(); send('chrome', { seen: 'used' }); }
+  bringToFront();
+  if (kind === 'gif') {
+    // Straight to the trimmer, like right-clicking a GIF inside Phosphor Clips
+    send('reveal', { text: 'Grabbing the GIF from Chrome\u2026' });
+    startJob({ url, referer: /^https?:/i.test(o.referer || '') ? o.referer : '', pageTitle: title });
+    return { ok: true, message: 'Grabbing the GIF' };
+  }
+  const t = kind === 'link' ? 0 : Math.max(0, +o.t || 0);
+  send('reveal', { text: kind === 'link' ? 'Opened the link from Chrome.' : 'Opened from Chrome' + (t >= 1 ? ', picking the video up where you were.' : '.') });
+  const go = withStartTime(url, t);
+  pendingSeek = t >= 1 ? { page: '', t, until: Date.now() + 60000 } : null;
+  web.webContents.loadURL(go);
+  return { ok: true, message: 'Opened in Phosphor Clips' };
+}
+function flushPendingOpens() {
+  const list = pendingOpens;
+  pendingOpens = [];
+  for (const [o, via] of list) openFromChrome(o, via);
+}
+
+// phosphor-clips://open?d=<the same request, as base64url JSON>, from the Chrome button when the app wasn't running
+function openFromLink(arg) {
+  try {
+    const u = new URL(arg);
+    if (u.protocol !== PROTOCOL + ':') return false;
+    const d = u.searchParams.get('d');
+    if (!d) { bringToFront(); return true; }
+    const o = JSON.parse(Buffer.from(d.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+    openFromChrome(o, 'link');
+    return true;
+  } catch (e) { log('chrome link not understood: ' + e.message); return false; }
+}
+const linkIn = (argv) => (argv || []).find((a) => typeof a === 'string' && a.toLowerCase().startsWith(PROTOCOL + ':'));
+
+/* ---------- the Chrome button's files: copied to a fixed folder Chrome loads them from ---------- */
+const chromeDir = () => path.join(dataDir(), 'Chrome button');
+function chromeSource() {
+  for (const d of [path.join(process.resourcesPath || '', 'chrome-button'), path.join(__dirname, '..', 'chrome-button')]) {
+    if (d && fs.existsSync(path.join(d, 'manifest.json'))) return d;
+  }
+  return '';
+}
+async function placeChromeButton() {
+  const src = chromeSource();
+  if (!src) { log('chrome button: files not found'); return; }
+  const dest = chromeDir();
+  const version = (d) => { try { return JSON.parse(fs.readFileSync(path.join(d, 'manifest.json'), 'utf8')).version; } catch (_) { return ''; } };
+  if (version(src) && version(src) === version(dest)) return;
+  try {
+    await fsp.rm(dest, { recursive: true, force: true });
+    await fsp.cp(src, dest, { recursive: true });
+    log('chrome button: files ' + version(src) + ' in ' + dest);
+  } catch (e) { log('chrome button: ' + e.message); }
 }
 
 async function mark(which) {
@@ -542,7 +668,7 @@ function setupIpc() {
   handle('panel:ready', () => {
     panelReady = true;
     return {
-      version: app.getVersion(), sharing: sharingState(),
+      version: app.getVersion(), sharing: sharingState(), chrome: { seen: settings.chromeSeen || '' },
       settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows },
       library: libraryForPanel(), jobs: [...jobs.values()].map(jobForPanel), web: webState(), video: videoState(), vision: visionState,
     };
@@ -677,6 +803,12 @@ function setupIpc() {
     if (o && 'startWithWindows' in o) setStartWithWindows(!!o.startWithWindows);
     saveSettings();
   });
+  handle('chrome:info', () => ({ folder: chromeDir(), seen: settings.chromeSeen || '' }));
+  handle('chrome:copy', (what) => {
+    clipboard.writeText(what === 'folder' ? chromeDir() : 'chrome://extensions');
+    return { ok: true };
+  });
+  handle('chrome:show', () => shell.openPath(chromeDir()));
   handle('open:external', (url) => { if (/^https?:/i.test(url)) shell.openExternal(url); });
   handle('open:log', () => shell.openPath(path.join(dataDir(), 'log.txt')));
 }
@@ -686,7 +818,18 @@ let sharing = null, tray = null;
 const sharingState = () => ({ on: !!sharing, port: sharing ? sharing.port : 0 });
 async function startSharing() {
   const ports = process.env.CLIPS_PORT ? [+process.env.CLIPS_PORT] : undefined;
-  sharing = await startServer({ getLibrary: () => library, version: app.getVersion(), log, ports });
+  sharing = await startServer({
+    getLibrary: () => library, version: app.getVersion(), log, ports,
+    onOpen: (o) => openFromChrome(o, 'button'),
+    // The Chrome button says hello when it's added to Chrome, so the setup helper can say it worked
+    onHello: () => {
+      if (settings.chromeSeen) return;
+      settings.chromeSeen = 'added';
+      saveSettings();
+      log('chrome: the button was added to Chrome');
+      send('chrome', { seen: 'added' });
+    },
+  });
   send('sharing', sharingState());
   updateTray();
 }
@@ -734,7 +877,11 @@ function makeTray() {
 }
 
 /* ---------- start ---------- */
-app.on('second-instance', () => { startHidden = false; showWindow(); });
+app.on('second-instance', (_e, argv) => {
+  startHidden = false;
+  const link = linkIn(argv);
+  if (!link || !openFromLink(link)) bringToFront();
+});
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
   quitting = true;
@@ -757,13 +904,22 @@ app.whenReady().then(async () => {
   }
   await startSharing();
   makeTray();
+  if (process.platform === 'win32' && app.isPackaged && !TEST) {
+    try { app.setAsDefaultProtocolClient(PROTOCOL); } catch (e) { log('link handler: ' + e.message); }
+  }
+  placeChromeButton();
+  const link = linkIn(process.argv);
+  if (link) startHidden = false;
   // The first time, Phosphor Clips is set to start with Windows (out of sight, by the clock), so Phosphor Loop on
   // this computer always has the library. It can be switched off from the icon by the clock or the Library page.
   if (settings.startWithWindows === null) { setStartWithWindows(true); saveSettings(); }
   else setStartWithWindows(!!settings.startWithWindows);
   createWindow();
+  if (link) openFromLink(link);
+  win.webContents.once('did-finish-load', flushPendingOpens);
   pollVideo();
   keepYtdlpFresh();
   if (!tools.ffmpeg || !tools.ytdlp) log('MISSING TOOLS: ' + JSON.stringify(tools));
-  if (TEST && process.env.CLIPS_TEST_URL) require('./selftest.js')({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo });
+  // (a self-test that can't even load ends the app, so a test run never hangs)
+  if (TEST && process.env.CLIPS_TEST_URL) (() => { try { return require('./selftest.js'); } catch (e) { log('selftest: FAIL could not load: ' + e.message); app.exit(1); return () => {}; } })()({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo, openFromLink, chromeDir });
 });

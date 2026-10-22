@@ -1,7 +1,7 @@
 {
   "name": "phosphor-clips",
   "productName": "Phosphor Clips",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Grab videos and GIFs from the web, trim them and sort them into a clip library for Phosphor Loop",
   "author": "Nick Hillson",
   "license": "UNLICENSED",
@@ -42,6 +42,10 @@
         "filter": [
           "*.exe"
         ]
+      },
+      {
+        "from": "chrome-button",
+        "to": "chrome-button"
       }
     ],
     "directories": {
@@ -63,7 +67,15 @@
       "deleteAppDataOnUninstall": false
     },
     "publish": null,
-    "npmRebuild": false
+    "npmRebuild": false,
+    "protocols": [
+      {
+        "name": "Phosphor Clips",
+        "schemes": [
+          "phosphor-clips"
+        ]
+      }
+    ]
   },
   "repository": {
     "type": "git",

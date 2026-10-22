@@ -215,7 +215,36 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
       assert.equal(r.status, 200, 'a copy of Phosphor Loop on this computer is fine');
       r = await fetch(base + '/clip/nope', { headers: { Origin: origin } });
       assert.equal(r.status, 404);
+      // The Chrome button: only an extension (or a program here that says who it is) may open things
+      const ext = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
+      const post = (path, body, headers) => fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+      r = await post('/open', { kind: 'page', url: 'https://example.com/' }, { Origin: ext });
+      assert.equal(r.status, 503, 'no onOpen here: still starting');
+      r = await post('/open', { kind: 'page', url: 'https://example.com/' }, { Origin: origin });
+      assert.equal(r.status, 403, 'a website (even Phosphor Loop) may not open things');
+      r = await fetch(base + '/library.json', { headers: { Origin: ext } });
+      assert.equal(r.status, 403, 'the button may not read the library');
     } finally { sh.close(); }
+    // With an onOpen, sends from the button arrive, checked
+    const got = [];
+    const sh2 = await startServer({ getLibrary: () => lib, ports: [0], onOpen: (o) => { got.push(o); return { ok: true, message: 'Opened' }; } });
+    try {
+      const b2 = 'http://127.0.0.1:' + sh2.port;
+      const ext = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
+      let r = await fetch(b2 + '/open', { method: 'POST', headers: { Origin: ext, 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'page', url: 'https://example.com/v', t: 12.5 }) });
+      assert.equal(r.status, 200);
+      assert.equal((await r.json()).message, 'Opened');
+      assert.deepEqual(got[0], { kind: 'page', url: 'https://example.com/v', t: 12.5 });
+      r = await fetch(b2 + '/open', { method: 'POST', headers: { 'X-Phosphor-Clips': '1' }, body: JSON.stringify({ kind: 'link', url: 'https://example.com/l' }) });
+      assert.equal(r.status, 200, 'a program here that says who it is');
+      r = await fetch(b2 + '/open', { method: 'POST', headers: { Origin: ext }, body: JSON.stringify({ kind: 'page', url: 'javascript:alert(1)' }) });
+      assert.equal(r.status, 400, 'only web pages');
+      r = await fetch(b2 + '/open', { method: 'POST', headers: { Origin: ext }, body: 'x'.repeat(20000) });
+      assert.equal(r.status, 413, 'too big');
+      r = await fetch(b2 + '/open', { headers: { Origin: ext } });
+      assert.equal(r.status, 405);
+      assert.equal(got.length, 2);
+    } finally { sh2.close(); }
     return 'port ' + sh.port;
   });
 

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Send to Phosphor Clips</title>
+<link rel="icon" href="icons/icon32.png">
+<style>
+  :root { --bg: #131116; --card: #211d26; --line: #3a3241; --text: #efe9f4; --dim: #a99fb3; --accent: #8b1ab8; --hi: #b04fe0; --ok: #45c08a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
+    display: grid; place-items: center; padding: 24px; }
+  .card { width: min(560px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px 30px; }
+  .head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .head img { width: 48px; height: 48px; }
+  h1 { font-size: 21px; margin: 0; font-weight: 600; }
+  p { color: var(--dim); margin: 10px 0; }
+  p b { color: var(--text); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 22px; border-radius: 10px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; font: 600 16px "Segoe UI", system-ui, sans-serif;
+    text-decoration: none; cursor: pointer; margin-top: 8px; }
+  .btn:hover { background: var(--hi); border-color: var(--hi); }
+  .btn.ghost { background: none; color: var(--text); border-color: var(--line); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .tip { margin-top: 18px; padding: 12px 14px; border-radius: 10px; background: rgba(139, 26, 184, 0.14); font-size: 14px; }
+  .state { margin-top: 14px; display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 15px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #776d80; flex: none; }
+  .state.ok { color: var(--text); }
+  .state.ok .dot { background: var(--ok); box-shadow: 0 0 0 4px rgba(69, 192, 138, 0.2); }
+  .state.wait .dot { background: #e8a33d; animation: pulse 1s ease-in-out infinite alternate; }
+  @keyframes pulse { to { opacity: 0.35; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="head"><img src="icons/icon128.png" alt=""><h1 id="title">Phosphor Clips isn’t running</h1></div>
+
+  <section id="notRunning" hidden>
+    <p>Phosphor Clips needs to be open (it can sit by the clock) for the button to send things to it.</p>
+    <div class="row">
+      <a class="btn" id="start" href="#">Start Phosphor Clips</a>
+    </div>
+    <p class="tip">Chrome will ask <b>“Open Phosphor Clips?”</b> Tick <b>Always allow</b>, then press <b>Open</b>. What you sent opens in Phosphor Clips by itself.</p>
+    <div class="state" id="state" hidden><span class="dot"></span><span id="stateText"></span></div>
+    <p id="getIt">Don’t have Phosphor Clips yet? <a href="#" id="getLink" style="color:#d6a4f0">Get it here</a>.</p>
+  </section>
+
+  <section id="notWeb" hidden>
+    <p>Only web pages can be sent. Chrome’s own pages (like settings or a new tab) and files on your computer can’t.</p>
+    <p>Open the page with the video you want, then press the button again.</p>
+    <div class="row"><button class="btn ghost" id="close1">Close this tab</button></div>
+  </section>
+
+  <section id="refused" hidden>
+    <p id="refusedText"></p>
+    <div class="row"><button class="btn ghost" id="close2">Close this tab</button></div>
+  </section>
+</main>
+<script src="explain.js"></script>
+</body>
+</html>

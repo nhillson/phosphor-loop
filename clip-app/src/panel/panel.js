@@ -544,7 +544,7 @@ function openModal(id) { $(id).hidden = false; S.modals++; syncWeb(); }
 function closeModal(id) { if ($(id).hidden) return; $(id).hidden = true; S.modals = Math.max(0, S.modals - 1); syncWeb(); }
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !S.modals) return;
-  for (const id of ['#askModal', '#catModal', '#clipModal']) if (!$(id).hidden) { if (id === '#askModal') $('#askNo').click(); else if (id === '#clipModal') closeClip(); else closeModal(id); break; }
+  for (const id of ['#askModal', '#chromeModal', '#catModal', '#clipModal']) if (!$(id).hidden) { if (id === '#askModal') $('#askNo').click(); else if (id === '#clipModal') closeClip(); else closeModal(id); break; }
 });
 function ask(text, { input = null, yes = 'OK', no = 'Cancel', danger = false } = {}) {
   return new Promise((resolve) => {
@@ -667,6 +667,49 @@ $('#catAddForm').addEventListener('submit', async (e) => {
   if (r && r.ok) $('#catAddName').value = '';
 });
 
+/* ---------- the Send to Phosphor Clips button in Chrome ---------- */
+// seen: '' (never heard from), 'added' (it said hello when added to Chrome), 'used' (it has sent something)
+function renderChrome() {
+  const seen = (S.chrome && S.chrome.seen) || '';
+  const card = $('#chromeCard');
+  card.hidden = seen === 'used';
+  card.classList.toggle('added', seen === 'added');
+  if (seen === 'added') {
+    $('#ccTitle').textContent = 'The Chrome button is in';
+    $('#ccText').textContent = 'On any page with a video, press Send to Phosphor Clips in Chrome, or right-click a video, GIF or link.';
+    $('#ccOpen').textContent = 'Show the steps again';
+  }
+  const st = $('#chromeState');
+  st.classList.toggle('ok', !!seen);
+  $('#chromeStateText').textContent = seen ? 'The button is in Chrome. Try it on a page with a video.' : 'Waiting for the button to appear in Chrome\u2026';
+}
+async function openChromeHelp() {
+  const info = await api.call('chrome:info');
+  if (info && info.folder) $('#chromeFolder').textContent = info.folder;
+  if (info) S.chrome = { seen: info.seen };
+  renderChrome();
+  openModal('#chromeModal');
+}
+$('#ccOpen').addEventListener('click', openChromeHelp);
+$('#libChrome').addEventListener('click', openChromeHelp);
+$('#chromeClose').addEventListener('click', () => closeModal('#chromeModal'));
+$('#chromeModal').addEventListener('click', (e) => { if (e.target.id === 'chromeModal') closeModal('#chromeModal'); });
+$('#cpAddress').addEventListener('click', async () => { await api.call('chrome:copy', 'address'); toast('Copied chrome://extensions. Paste it into Chrome\u2019s address bar.', 'ok', 3500); });
+$('#cpFolder').addEventListener('click', async () => { await api.call('chrome:copy', 'folder'); toast('Copied the folder\u2019s location. Paste it into the Load unpacked window\u2019s address bar.', 'ok', 3500); });
+$('#showFolder').addEventListener('click', () => api.call('chrome:show'));
+
+// Something sent from Chrome: show the browser (closing the trimmer and any window over it; a half-trimmed video
+// stays in the Grabbed list)
+function reveal(r) {
+  for (const id of ['#askModal', '#chromeModal', '#catModal', '#clipModal']) {
+    if ($(id).hidden) continue;
+    if (id === '#askModal') $('#askNo').click(); else if (id === '#clipModal') closeClip(); else closeModal(id);
+  }
+  if (S.ed) closeEditor();
+  setTab('get');
+  if (r && r.text) toast(r.text, 'ok', 3500);
+}
+
 /* ---------- sharing with Phosphor Loop ---------- */
 function renderSharing() {
   const sh = S.sharing || {};
@@ -701,6 +744,13 @@ api.on('library', (lib) => {
 });
 api.on('vision', (v) => { S.vision = v || {}; renderVision(); });
 api.on('sharing', (sh) => { S.sharing = sh || {}; renderSharing(); });
+api.on('chrome', (c) => {
+  const was = (S.chrome && S.chrome.seen) || '';
+  S.chrome = c || {};
+  renderChrome();
+  if (!was && S.chrome.seen === 'added') toast('The Send to Phosphor Clips button is in Chrome.', 'ok');
+});
+api.on('reveal', (r) => reveal(r));
 api.on('settings', (o) => { Object.assign(S.settings, o || {}); renderSharing(); });
 api.on('toast', (t) => toast(t.text, t.kind));
 
@@ -713,6 +763,8 @@ api.on('toast', (t) => toast(t.text, t.kind));
   S.vision = st.vision || {};
   S.jobs = st.jobs || [];
   S.sharing = st.sharing || {};
+  S.chrome = st.chrome || {};
+  renderChrome();
   renderSharing();
   renderWeb();
   renderLibrary();

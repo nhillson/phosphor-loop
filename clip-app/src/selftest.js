@@ -138,6 +138,69 @@ module.exports = async function selftest(h) {
       const r = await fetch('http://127.0.0.1:' + sh.port + '/library.json', { headers: { Origin: 'https://nhillson.github.io' } });
       const shared = await r.json();
       check('the library is shared with Phosphor Loop', r.ok && shared.clips.length === 2, 'port ' + sh.port + ', ' + shared.clips.length + ' clips');
+
+      /* ---- 6. the Send to Phosphor Clips button in Chrome ---- */
+      const EXT = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
+      const api = 'http://127.0.0.1:' + sh.port;
+      const send = (body, origin = EXT, extra = {}) => fetch(api + '/open', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}), ...extra }, body: JSON.stringify(body),
+      });
+      const folder = h.chromeDir();
+      check('the Chrome button\u2019s files are in their folder', fs.existsSync(path.join(folder, 'manifest.json')) && fs.existsSync(path.join(folder, 'background.js')), folder);
+      // It says hello when it's added to Chrome, and the helper notices
+      await click('#tabGet');
+      const ping = await fetch(api + '/ping', { headers: { Origin: EXT } });
+      check('the Chrome button can find Phosphor Clips', ping.ok && (await ping.json()).open === true);
+      check('a website can\u2019t pretend to be the button saying hello', (await fetch(api + '/hello', { method: 'POST', headers: { Origin: 'https://evil.example' } })).status === 403);
+      await fetch(api + '/hello', { method: 'POST', headers: { Origin: EXT }, body: '{}' });
+      await panelUntil(`S.chrome && S.chrome.seen === 'added'`, 'the hello from Chrome', 20000);
+      await panelFrames(10);
+      await click('#ccOpen');
+      await panelUntil(`!document.querySelector('#chromeModal').hidden && document.querySelector('#chromeState').classList.contains('ok')`, 'the Chrome helper', 10000);
+      await panelUntil(`[...document.querySelectorAll('#chromeModal img')].every((i) => i.complete && i.naturalWidth > 0)`, 'the helper\u2019s pictures', 10000);
+      await panelFrames(10);
+      await shot('5-chrome-helper');
+      check('the Add the button to Chrome helper shows its steps and pictures', await pjs(`document.querySelectorAll('#chromeModal .steps li').length === 4 && document.querySelector('#chromeFolder').textContent.length > 3`));
+      await click('#chromeClose');
+      await panelUntil(`document.querySelector('#chromeModal').hidden && S.modals === 0`, 'the helper to close', 5000);
+      // Websites can't make Phosphor Clips open things, and only web pages can be sent
+      check('a website can\u2019t send pages to Phosphor Clips', (await send({ kind: 'page', url: base + 'video.html' }, 'https://evil.example')).status === 403);
+      check('a request with no sender is refused', (await send({ kind: 'page', url: base + 'video.html' }, '')).status === 403);
+      check('only web pages can be sent', (await send({ kind: 'page', url: 'file:///C:/Windows/win.ini' })).status === 400);
+      // A page with its video at 5:00: it opens in the browser, the trimmer closes, and the video picks up there
+      await loadPage(base + 'video.html');
+      h.startJob({ url: base + 'spin.gif', pageTitle: 'A GIF to have the trimmer open' });
+      await panelUntil(`S.ed && !document.querySelector('#editor').hidden`, 'the trimmer (before sending from Chrome)', 120000);
+      let sent = await send({ kind: 'page', url: base + 'long.html', title: 'Twelve minute test pattern', t: 300 });
+      check('a page sent from Chrome is accepted', sent.ok, (await sent.json()).message);
+      await panelUntil(`!S.ed && document.querySelector('#editor').hidden && S.tab === 'get'`, 'the browser to come back', 20000);
+      const at = await ceiling(new Promise((resolve) => {
+        const look = async () => {
+          try {
+            const t = page().getURL().endsWith('long.html') ? await page().executeJavaScript(`(() => { const v = document.querySelector('video'); return v && v.readyState > 1 ? v.currentTime : -1; })()`) : -1;
+            if (t >= 299) { resolve(t); return; }
+          } catch (_) { /* still loading */ }
+          setTimeout(look, 250);
+        };
+        look();
+      }), 60000, 'the video to pick up at 5:00');
+      await videoFrames(10);
+      check('the page opens and its video picks up where it was in Chrome', at >= 299 && at < 320, at.toFixed(1) + ' s');
+      await shot('6-sent-from-chrome');
+      // Right-clicking a GIF in Chrome: straight to the trimmer
+      const before = h.jobs.size;
+      sent = await send({ kind: 'gif', url: base + 'spin.gif', referer: base + 'gif.html', title: 'A spinning test GIF' });
+      check('a GIF sent from Chrome is accepted', sent.ok);
+      await panelUntil(`S.ed && !document.querySelector('#editor').hidden && S.jobs.length > ${before}`, 'the GIF from Chrome in the trimmer', 120000);
+      check('a GIF sent from Chrome opens in the trimmer', Math.abs((await pjs('S.ed.d')) - 4) < 0.3);
+      await click('#edDiscard');
+      await panelUntil(`!S.ed`, 'the trimmer to close');
+      // Phosphor Clips started from Chrome's phosphor-clips:// link (when it wasn't running)
+      const d = Buffer.from(JSON.stringify({ kind: 'link', url: base + 'video.html', title: 'From a link' })).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const navigated = new Promise((resolve) => page().once('did-navigate', (_e, u) => resolve(u)));
+      check('a phosphor-clips:// link is understood', h.openFromLink('phosphor-clips://open?d=' + d));
+      const u = await ceiling(navigated, 20000, 'the link\u2019s page');
+      check('a phosphor-clips:// link opens its page', u.endsWith('video.html'), u);
     }
     code = checks.every((c) => c.ok) ? 0 : 1;
   } catch (e) {

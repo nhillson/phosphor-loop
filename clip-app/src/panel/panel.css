@@ -232,3 +232,27 @@ main { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
 .libfoot .share { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; }
 .libfoot .share .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .libfoot .share.on .dot { background: var(--ok); }
+
+/* ---------- the Chrome button ---------- */
+.chromecard { border-color: var(--accent-hi); background: linear-gradient(160deg, rgba(139, 26, 184, 0.22), var(--card) 60%); }
+.chromecard h2 { margin-bottom: 4px; }
+.chromecard .hint { margin: 0 0 12px; }
+.cc-row { display: flex; gap: 12px; align-items: flex-start; }
+.cc-icon { width: 40px; height: 40px; flex: none; border-radius: 8px; }
+.chromecard .btn { width: 100%; }
+.chromecard.added { background: var(--card); border-color: var(--line); }
+.chromesheet { width: min(860px, calc(100vw - 60px)); }
+.steps { list-style: none; counter-reset: st; margin: 16px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.steps li { counter-increment: st; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: center;
+  padding: 12px 14px 12px 56px; position: relative; border: 1px solid var(--line); border-radius: 12px; background: var(--card2); }
+.steps li::before { content: counter(st); position: absolute; left: 14px; top: 14px; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.steps img { width: 360px; border-radius: 8px; border: 1px solid var(--line); background: #fff; display: block; }
+.st-text { line-height: 1.5; }
+.st-acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.st-path { display: block; margin-top: 8px; font-size: 12px; color: var(--dim); overflow-wrap: anywhere; font-family: inherit; }
+kbd { font: 600 12px/1 inherit; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); }
+.chrome-state { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--bg); font-weight: 600; }
+.chrome-state .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; animation: blink 1s ease-in-out infinite alternate; }
+.chrome-state.ok .dot { background: var(--ok); animation: none; box-shadow: 0 0 0 4px rgba(69, 192, 138, 0.2); }
+@keyframes blink { to { opacity: 0.35; } }

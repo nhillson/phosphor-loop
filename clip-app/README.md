@@ -32,6 +32,26 @@ there. Chrome 142+ asks once whether the site may reach apps on this device (Loc
 Phosphor Stream (Electron 38, Chromium 140) doesn't ask; if it moves to Electron 39+ its permission allow-list in
 `stream-app/src/main.js` needs the local/loopback network permission too.
 
+## Send to Phosphor Clips (the Chrome button, `chrome-button/`)
+
+A Chrome (or Edge) extension that hands what you're watching to Phosphor Clips on the same computer:
+- **The button**: the page opens in Phosphor Clips' browser and its video picks up at the same moment (YouTube also
+  gets `&t=`); Chrome's copy pauses. Phosphor Clips comes up from the clock.
+- **Right-click a video**: *Send this video to Phosphor Clips* (the same, for that video). **A GIF**: *Grab this GIF
+  with Phosphor Clips* (straight to the trimmer; `.gif`/`.gifv` addresses). **A link**: *Open link in Phosphor Clips*.
+- Talks to the sharing server: `POST /open` and `POST /hello`, accepted only from extension origins (or a local
+  program sending `X-Phosphor-Clips: 1`). All requests are made from the extension's service worker or its own page:
+  Chrome's Local Network Access check exempts those (not content scripts). Needs only `activeTab`, `scripting`,
+  `contextMenus` and `http://127.0.0.1/*`.
+- **Not running**: it opens `explain.html` with a *Start Phosphor Clips* button: a `phosphor-clips://open?d=<base64url
+  JSON>` link (registered by the installer and `app.setAsDefaultProtocolClient`) that starts the app with the request.
+- **Installing**: Phosphor Clips copies the extension to `%APPDATA%\Phosphor Clips\Chrome button` (a fixed folder,
+  refreshed when the version changes) and its *Add the button to Chrome…* helper walks through Developer mode and
+  *Load unpacked* with pictures (`src/panel/img/chrome-*.png`, the extensions page screenshots made with Playwright).
+  The zip is also on the release page.
+- Tested by `test/chrome_test.py` (the real extension in Chromium, the real app beside it; on Linux under `xvfb-run`)
+  and the app's self-test (the server side, the helper, the pick-up, the link).
+
 ## For Claude
 
 - Branch `clip-app`, folder `clip-app/`, built and tested by `.github/workflows/clip-app.yml` on a Windows runner.
