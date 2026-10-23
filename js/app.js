@@ -6463,6 +6463,24 @@ syncShapeUI();
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
 // at that window's resolution, so the controls can stay on this screen.
 const outBtn = $('#outBtn');
+// "Spread out controls": while the output window shows the picture, this screen can trade its big preview for
+// more room for controls. The choice is remembered for the next time the output window opens.
+const wideBtn = $('#wideBtn'), WIDE_KEY = 'phosphor-wide-controls';
+let wideCtl = (() => { try { return localStorage.getItem(WIDE_KEY) === '1'; } catch (_) { return false; } })();
+function syncWide() {
+  const open = !!(outWin && !outWin.closed), on = wideCtl && open;
+  wideBtn.hidden = !open;
+  wideBtn.setAttribute('aria-pressed', String(on));
+  document.body.classList.toggle('wide-ctl', on);
+  fit();
+}
+wideBtn.addEventListener('click', () => {
+  wideCtl = !wideCtl;
+  try { localStorage.setItem(WIDE_KEY, wideCtl ? '1' : '0'); } catch (_) {}
+  syncWide();
+  toast(wideCtl ? 'Controls spread out. The small picture at the left is a preview; the full picture stays in the output window.'
+    : 'Back to the big preview.');
+});
 // Phones and tablets have no second screen, but a touchscreen computer with a projector does
 // In the Android app the button shows while a projector or TV is plugged in (or cast to)
 if (APP) outBtn.hidden = !appInfo.display;
@@ -6566,7 +6584,7 @@ function openOutput() {
   outBtn.setAttribute('aria-pressed', 'true');
   $$('#shape button').forEach((b) => { b.disabled = true; });
   $('#shapeNote').hidden = false;
-  fit();
+  syncWide();
   if (APP) { toast('The picture is on your other screen. The controls stay here.'); return; }
   toast(canFill && showMode
     ? 'Output window open. Tap Fill my other screen in it to put the picture on the projector.'
@@ -6579,7 +6597,7 @@ function closeOutput(alreadyClosed) {
   outBtn.setAttribute('aria-pressed', 'false');
   $$('#shape button').forEach((b) => { b.disabled = false; });
   $('#shapeNote').hidden = true;
-  fit();
+  syncWide();
 }
 outBtn.addEventListener('click', () => (outputOpen() ? closeOutput() : openOutput()));
 // Android app: plugging in a projector or TV puts the picture there by itself; unplugging brings it back

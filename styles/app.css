@@ -219,7 +219,24 @@
     overflow-y: auto; min-height: 0;
     border-left: 1px solid var(--line); background: var(--panel);
     padding: 20px;
-    display: flex; flex-direction: column; gap: 26px;
+  }
+  .panel-in { display: flex; flex-direction: column; gap: 26px; }
+  /* Output window open + "Spread out controls": the picture here becomes a small preview on the left and the
+     controls flow in columns across the rest of the screen */
+  @media (min-width: 901px) {
+    body.wide-ctl .deck { grid-template-columns: 320px minmax(0, 1fr); }
+    body.wide-ctl .monitor { padding: 14px 14px 12px; gap: 10px; overflow-y: auto; }
+    body.wide-ctl .stage { flex: none; height: 200px; }
+    body.wide-ctl .transport { gap: 6px; }
+    body.wide-ctl .transport .btn { padding-inline: 10px; }
+    body.wide-ctl .transport .spacer { display: none; }
+    body.wide-ctl .foot .keys { display: none; }
+    body.wide-ctl .panel { border-left: 1px solid var(--line); }
+    body.wide-ctl .panel-in { display: block; columns: 330px; column-gap: 28px; column-rule: 1px solid var(--line); }
+    body.wide-ctl .panel-in > * { break-inside: avoid; margin: 0 0 26px; }
+    body.wide-ctl .panel-in > .lede, body.wide-ctl .panel-in > .panel-tools { column-span: all; }
+    body.wide-ctl .panel-in > .panel-tools { margin-top: -14px; }
+    body.wide-ctl .panel-in > input[hidden] { display: none; }
   }
   .lede { margin: 0; color: var(--dim); max-width: 60ch; }
   .lede b { color: var(--ink); font-weight: 600; }
