@@ -221,7 +221,8 @@
     padding: 20px;
   }
   .panel-in { display: flex; flex-direction: column; gap: 26px; }
-  /* Output window open + "Spread out controls": the picture here becomes a small preview on the left and the
+  @media (max-width: 900px) { #wideBtn { display: none; } }
+  /* "Spread out controls": the picture here becomes a small preview on the left and the
      controls flow in columns across the rest of the screen */
   @media (min-width: 901px) {
     body.wide-ctl .deck { grid-template-columns: 320px minmax(0, 1fr); }

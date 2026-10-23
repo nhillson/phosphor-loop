@@ -18,7 +18,6 @@ body.idle .fsx{opacity:0;pointer-events:none}
 .hint.gone,body.idle .hint{opacity:0;pointer-events:none}
 .hint b{color:#8b1ab8}
 .hint button{margin-top:8px;min-height:34px;padding:5px 14px;border-radius:6px;border:1px solid #37313a;background:#322c35;color:#e4dae8;font:inherit;cursor:pointer}
-.show .hint button{min-height:60px;padding:12px 30px;font-size:21px;font-weight:600;border-color:#8b1ab8;background:#431f51;color:#f2d9fc}
 </style></head><body><canvas id="out"></canvas>
 <div class="hint" id="hint"><span id="hintText">Drag this window onto your projector or second screen, then <b>double-click the picture</b> (or press F) to fill it.</span><br><button id="other" hidden>Fill my other screen</button></div>
 <button class="fsx" id="fsx"><span class="x" aria-hidden="true">✕</span>Exit full screen</button>

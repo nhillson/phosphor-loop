@@ -6463,13 +6463,12 @@ syncShapeUI();
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
 // at that window's resolution, so the controls can stay on this screen.
 const outBtn = $('#outBtn');
-// "Spread out controls": while the output window shows the picture, this screen can trade its big preview for
-// more room for controls. The choice is remembered for the next time the output window opens.
+// "Spread out controls": the picture here shrinks to a small preview and the controls get the rest of the
+// screen. Works with or without the output window, and is remembered in this browser.
 const wideBtn = $('#wideBtn'), WIDE_KEY = 'phosphor-wide-controls';
 let wideCtl = (() => { try { return localStorage.getItem(WIDE_KEY) === '1'; } catch (_) { return false; } })();
 function syncWide() {
-  const open = !!(outWin && !outWin.closed), on = wideCtl && open;
-  wideBtn.hidden = !open;
+  const on = wideCtl;
   wideBtn.setAttribute('aria-pressed', String(on));
   document.body.classList.toggle('wide-ctl', on);
   fit();
@@ -6478,8 +6477,7 @@ wideBtn.addEventListener('click', () => {
   wideCtl = !wideCtl;
   try { localStorage.setItem(WIDE_KEY, wideCtl ? '1' : '0'); } catch (_) {}
   syncWide();
-  toast(wideCtl ? 'Controls spread out. The small picture at the left is a preview; the full picture stays in the output window.'
-    : 'Back to the big preview.');
+  toast(wideCtl ? 'Controls spread out. Press Spread out controls again for the big picture.' : 'Back to the big picture.');
 });
 // Phones and tablets have no second screen, but a touchscreen computer with a projector does
 // In the Android app the button shows while a projector or TV is plugged in (or cast to)
@@ -6563,11 +6561,6 @@ function openOutput() {
   // With two or more screens, Chrome can fill the other one directly
   const other = doc.getElementById('other');
   const canFill = !!(w.screen && w.screen.isExtended && 'getScreenDetails' in w);
-  if (canFill && showMode) {
-    // Show mode: one big button, since this window usually opened by itself on the controls screen
-    doc.body.classList.add('show');
-    doc.getElementById('hintText').textContent = 'Tap the button to put the picture on your projector or second screen.';
-  }
   if (canFill) {
     other.hidden = false;
     other.addEventListener('click', async () => {
@@ -6586,8 +6579,8 @@ function openOutput() {
   $('#shapeNote').hidden = false;
   syncWide();
   if (APP) { toast('The picture is on your other screen. The controls stay here.'); return; }
-  toast(canFill && showMode
-    ? 'Output window open. Tap Fill my other screen in it to put the picture on the projector.'
+  toast(canFill
+    ? 'Output window open. Press Fill my other screen in it, or drag it to your projector and double-click it.'
     : 'Output window open. Drag it to your projector or second screen, then double-click it to fill that screen.');
 }
 function closeOutput(alreadyClosed) {
@@ -6618,87 +6611,22 @@ window.addEventListener('pagehide', () => {
   if (sig && phonePeer) sig.send('LEAVE', phonePeer, {});
 });
 
-/* ================= show mode ================= */
-// For a computer that plays Phosphor Loop at gigs: after a restart it picks up where it left off,
-// reconnects the camera and microphone, opens the output window and keeps the screen awake.
-const SHOW_KEY = 'phosphor-show-v1', LAST_KEY = 'phosphor-last-v1', MIDI_KEY = 'phosphor-midi-v1';
+/* ================= keep the screen awake ================= */
+const MIDI_KEY = 'phosphor-midi-v1';
 function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (_) { return false; } }
-// ?show=1 in the address turns it on for that visit; the Show mode button remembers it in this browser
-const showParam = params.get('show');
-let showMode = showParam != null ? showParam !== '0' : lsGet(SHOW_KEY) === '1';
-const showBtn = $('#showBtn'), offlineNote = $('#offlineNote');
-if (inArtifact) $('#showGroup').hidden = true;
-function syncShowUI() { showBtn.setAttribute('aria-pressed', String(showMode)); }
-showBtn.addEventListener('click', () => {
-  showMode = !showMode;
-  lsSet(SHOW_KEY, showMode ? '1' : '0');
-  syncShowUI();
-  if (showMode) {
-    showExtras();
-    toast('Show mode is on. From the next start, Phosphor Loop picks up where you left off and opens the output window.');
-  } else toast('Show mode is off.');
-});
-
-// The current look is saved every couple of seconds, so a power cut costs nothing
-let sessionReady = false, lastSaved = '';
-function saveSession() {
-  if (!sessionReady) return;
-  let s;
-  try {
-    s = JSON.stringify({ v: 1, look: snapshot(), ap: ap.on, cam: camDeviceId,
-      snd: snd.src === 'loopback' ? { src: 'loopback', device: loopbackDeviceId }
-        : snd.src === 'mic' ? { src: 'mic', mic: micDeviceId } : { src: 'off' } });
-  } catch (_) { return; }
-  if (s !== lastSaved && lsSet(LAST_KEY, s)) lastSaved = s;
-}
-setInterval(saveSession, 2000);
-window.addEventListener('pagehide', saveSession);
-
-function restoreSession() {
-  let s = null;
-  try { s = JSON.parse(lsGet(LAST_KEY) || 'null'); } catch (_) {}
-  if (!s || !s.look) return false;
-  const d = JSON.parse(JSON.stringify(s.look));
-  // Screen sharing and video files need a person to pick them again, so those slots fall back to a pattern.
-  // A clip from the clip library comes back by itself (see clipsStart), so its slots stay on Video.
-  const clipBack = clipsWanted() && !!lsGet(CLIP_LAST_KEY);
-  let missing = '';
-  for (const k of ['A', 'B']) {
-    const L = d[k];
-    if (!L) continue;
-    for (const slot of ['in1', 'in2']) {
-      if (L[slot] !== 'screen' && L[slot] !== 'video') continue;
-      if (L[slot] === 'video' && clipBack) continue;
-      missing = L[slot] === 'screen' ? 'Screen' : 'Video';
-      L[slot] = slot === 'in2' ? 'none' : (k === 'A' ? 'wave' : 'shape');
-    }
-  }
-  if (s.cam) camDeviceId = s.cam;
-  loadPreset({ id: null, name: '', data: d }, true);
-  if (s.ap) setAutopilot(true, true);
-  if (s.snd && s.snd.src === 'mic') { micDeviceId = s.snd.mic || ''; setSound('mic'); }
-  if (s.snd && s.snd.src === 'loopback') { loopbackDeviceId = s.snd.device || ''; setSound('loopback'); }
-  showOSD('SHOW', 'RESUMED');
-  if (missing) toast(`Picked up where you left off. Choose ${missing} again to bring it back.`);
-  return true;
-}
-
-let wakeLock = null, extrasOn = false;
+const offlineNote = $('#offlineNote');
+// While Phosphor Loop is open and showing, the screen never dims or goes to sleep. The browser lets go of
+// this whenever the tab is hidden, so it is asked for again each time the page comes back.
+let wakeLock = null;
 async function keepAwake() {
-  if (!showMode || document.hidden || !('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
+  if (document.hidden || !('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
   try { wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
-function showExtras() {
-  keepAwake();
-  hideTip();
-  if (!midi.access) midiStart();
-  if (extrasOn) return;
-  extrasOn = true;
-  // A long press on the touchscreen shouldn't pop a menu up over the controls
-  document.addEventListener('contextmenu', (e) => { if (showMode) e.preventDefault(); });
-}
+// Some browsers only allow it after the first click or tap on the page
+['pointerdown', 'keydown'].forEach((t) => document.addEventListener(t, keepAwake, { passive: true }));
+keepAwake();
 
 // Show setup can save every nature picture ahead of time, for a show without internet (see sw.js)
 let natSaving = false;
@@ -7113,19 +7041,13 @@ midiClear.addEventListener('click', () => {
 renderMidiList();
 
 function showStart() {
-  syncShowUI();
   offlineStatus();
-  if (inArtifact) { sessionReady = true; return; }
-  if (showMode) {
-    showExtras();
-    restoreSession();
-    // With a second screen plugged in, open the output window straight away (the browser must allow pop-ups here)
-    if (!APP && window.screen && window.screen.isExtended) setTimeout(() => { if (!outputOpen()) openOutput(); }, 1200);
-  } else if (midiSaved.enabled) midiStart();
-  // The Android app puts the picture on a plugged-in projector or TV straight away, show mode or not
+  if (inArtifact) return;
+  if (midiSaved.enabled) midiStart();
+  // The Android app puts the picture on a plugged-in projector or TV straight away
   if (APP && appInfo.display) setTimeout(() => { if (appInfo.display && !outputOpen()) openOutput(); }, 1200);
   clipsStart();
-  sessionReady = true;
+  syncWide();
 }
 
 /* ================= loop ================= */

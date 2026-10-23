@@ -96,7 +96,8 @@ Both devices need internet. The free PeerJS service introduces them to each
 other, then the video goes phone-to-computer directly (or through PeerJS's
 relay if your network blocks direct links). Nothing is recorded.
 
-SHOW MODE (a computer that plays at gigs)
+A COMPUTER THAT PLAYS AT GIGS
+  The screen never dims or sleeps while Phosphor Loop is open, on any computer.
   1. Open your https:// address in Chrome once with internet. After a few
      seconds, Show setup says it's saved on this computer; from then on it
      opens without internet too (only the phone link still needs it).
@@ -104,14 +105,8 @@ SHOW MODE (a computer that plays at gigs)
   2. Click the icon left of the address, open Site settings, and set Camera,
      Microphone, MIDI devices, Pop-ups and redirects, and Window management
      to Allow, so nothing asks permission in the middle of a set.
-  3. Under Show setup, switch on Show mode (or add ?show=1 to the address).
-     Each time Phosphor Loop starts it then picks up the last look and
-     Autopilot, reconnects the camera and microphone, keeps the screen awake,
-     and opens the output window when a second screen is plugged in. Tap
-     "Fill my other screen" in that window to put the picture on the projector.
-  4. To start it with Windows, press Win+R, type shell:startup, and make a
-     shortcut there with this target (one line, with your address):
-       "C:\Program Files\Google\Chrome\Application\chrome.exe" --start-fullscreen https://YOUR-GITHUB-NAME.github.io/phosphor-loop/?show=1
+  3. Press Output window, then "Fill my other screen" in that window to put
+     the picture on the projector.
 
 MIDI CONTROLLER
   Under Show setup press "Use a MIDI controller" and allow it. Press Learn,
@@ -350,8 +345,7 @@ TIPS
     in your sound settings; on a Mac, use a multi-output device that includes
     BlackHole and your speakers/headphones to keep hearing the music too.
     Allow the browser's "microphone" permission (it covers all audio inputs).
-    Video sound set to Computer records the same sound. Show mode remembers
-    the adapter and reconnects it on the next start.
+    Video sound set to Computer records the same sound.
   - Video sound (next to Record): picks the sound in videos you record.
     Click it to step through Off, Mic, Computer and Both (mic and computer
     mixed together). If React to sound already hears that sound, the video
