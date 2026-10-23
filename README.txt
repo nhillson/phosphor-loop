@@ -40,7 +40,7 @@ ANDROID APP
     stay on the phone. Keep Phosphor Loop open on the phone during the show.
   - Snapshots and recordings go to the phone's Gallery, in a Phosphor Loop
     album.
-  - Screen sharing and MIDI controllers need a computer.
+  - Screen sharing needs a computer.
   - Updates to the website reach the app by themselves whenever the phone
     is online. The app is also rebuilt after every update, so its built-in
     offline copy always matches the site. Installing a new copy is optional;
@@ -99,22 +99,14 @@ relay if your network blocks direct links). Nothing is recorded.
 A COMPUTER THAT PLAYS AT GIGS
   The screen never dims or sleeps while Phosphor Loop is open, on any computer.
   1. Open your https:// address in Chrome once with internet. After a few
-     seconds, Show setup says it's saved on this computer; from then on it
-     opens without internet too (only the phone link still needs it).
-     Press "Save all nature pictures" there too, so every photo works offline.
+     seconds it's saved on this computer; from then on it opens without
+     internet too (only the phone link still needs it). Nature pictures you've
+     used are kept too.
   2. Click the icon left of the address, open Site settings, and set Camera,
-     Microphone, MIDI devices, Pop-ups and redirects, and Window management
+     Microphone, Pop-ups and redirects, and Window management
      to Allow, so nothing asks permission in the middle of a set.
   3. Press Output window, then "Fill my other screen" in that window to put
      the picture on the projector.
-
-MIDI CONTROLLER
-  Under Show setup press "Use a MIDI controller" and allow it. Press Learn,
-  touch a slider or button, then move a fader, turn a knob or press a button
-  on the controller. Repeat for each control and press Learn again to finish.
-  Mappings stay in this browser. A fader only takes over once it reaches the
-  slider's current position, so loading a look never makes the picture jump.
-  Endless knobs are recognized and work straight away.
 
 ADMIN: SHARED PRESETS FOR EVERYONE
   Shared presets show up for everyone who opens the site. Only someone with
@@ -217,7 +209,7 @@ TIPS
     Under it, a tally shows how many looks have been judged since the page
     opened, how many passed (and on the first try), and why the rest didn't.
   - More like this and Not this (in the small strip right under the picture,
-    or the Y and X keys; they can go on MIDI pads too) teach Autopilot your
+    or the Y and X keys) teach Autopilot your
     taste. Beside them, a countdown shows the seconds this look has left.
     In full screen during a taste session, a small timer and the two buttons
     appear at the bottom middle when the mouse moves (or the picture is
@@ -274,7 +266,7 @@ TIPS
   - Next look (beside Autopilot under the picture, under Autopilot
     settings, or the L key): skips straight to Autopilot's next new look,
     cutting in quickly, and starts Autopilot if it's off. The wait for the
-    look after that starts over. It can be learned onto a MIDI button too.
+    look after that starts over.
   - Pins: while Autopilot runs, a small pin shows beside each setting. Tap
     it (or just move that slider, with "Pin it, keep going" chosen) and the
     setting stays put on the loop you're changing (the A or B tab) while
@@ -426,7 +418,7 @@ TIPS
     "Nature pictures..." for a gallery of about 500 photos (sea life, birds,
     bugs, frogs, flowers, mushrooms and more). Tap one to feed it in. The
     arrow buttons and Shuffle flip through the kind chosen in the gallery
-    without opening it, and work from a MIDI controller too (Learn). Each
+    without opening it. Each
     photo's credit shows under its name. "Your own picture..." still loads
     a file of yours.
   - Split lines (under Mirror): every other line of the picture slides left

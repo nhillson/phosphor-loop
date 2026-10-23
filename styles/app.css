@@ -407,22 +407,6 @@
   .qr-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 14px; }
   .qr-url { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; user-select: all; }
 
-  /* show setup and MIDI */
-  .midi-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-  .midi-list li {
-    display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 3px 4px 3px 10px;
-    border-radius: 6px; background: var(--well); border: 1px solid var(--line); font-size: 13.5px;
-  }
-  .midi-list .src { font: 16px/1 var(--f-osd); color: var(--dim); white-space: nowrap; }
-  .midi-list .dst { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .midi-list button {
-    flex: none; width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer;
-    border: 1px solid var(--line); background: var(--raise); font: 600 15px/1 var(--f-body);
-  }
-  #offlineNote:not(:empty) { margin-top: 6px; color: var(--dim); }
-  .midi-can { outline: 1px dashed var(--faint); outline-offset: 2px; cursor: cell; }
-  .midi-mapped { outline: 1px solid var(--loop-b); outline-offset: 2px; }
-  .midi-target { outline: 2px solid var(--tally) !important; outline-offset: 2px; }
 
   .ctl { display: grid; gap: 2px; }
   .ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
