@@ -424,6 +424,113 @@ vec3 seedText(vec2 p, float t) {
   float l = texture(uText, q).r;
   return hsv(fract(t * 0.05 + q.x * 0.3), 0.55, 1.0) * l;
 }
+// Patchwork: a hand-inked grid like Nick's sketchbook pages. Every cell holds a little marker drawing (three bars,
+// a basket weave, diagonal stripes, pinwheel triangles, hourglasses or circles), and neighboring cells join into
+// patches of one kind. Each patch redraws itself every several seconds, cell by cell like a pen filling it in; some
+// rows slide sideways a cell at a time, and every 40 s or so a sweep across the page cuts it into new patches.
+const vec3 PW_PAL[16] = vec3[16](
+  vec3(0.93, 0.42, 0.62), vec3(0.72, 0.16, 0.42), vec3(0.52, 0.36, 0.75), vec3(0.18, 0.20, 0.62),
+  vec3(0.20, 0.62, 0.80), vec3(0.10, 0.46, 0.42), vec3(0.52, 0.84, 0.70), vec3(0.84, 0.92, 0.30),
+  vec3(0.98, 0.78, 0.22), vec3(0.98, 0.50, 0.16), vec3(0.95, 0.60, 0.52), vec3(0.52, 0.28, 0.18),
+  vec3(0.07, 0.07, 0.09), vec3(0.55, 0.55, 0.58), vec3(0.80, 0.60, 0.86), vec3(0.36, 0.68, 0.28));
+const vec3 PW_PAPER = vec3(0.80, 0.78, 0.74);
+vec3 pwCol(float h) { return PW_PAL[int(h * 16.0) & 15]; }
+// A marker-filled shape: solid color, a darker rim and faint pen strokes. d is how far inside the shape (cells),
+// s runs across the strokes.
+vec3 pwInk(vec3 base, vec3 c, float d, float s, float aa) {
+  vec3 ink = c * (0.9 + 0.1 * sin(s * 70.0)) * mix(0.62, 1.0, smoothstep(0.0, 0.07, d));
+  return mix(base, ink, smoothstep(0.0, aa, d));
+}
+vec3 pwCell(vec2 u, vec2 cell, vec2 pid, float seed, float aa) {
+  float h0 = hash(pid + seed * 1.37), h1 = hash(pid * 1.9 + seed * 2.11 + 4.0);
+  float h2 = hash(pid * 2.7 + seed * 0.73 + 9.0), h3 = hash(pid * 3.3 + seed * 1.91 + 2.0);
+  vec3 cols[4] = vec3[4](pwCol(h1), pwCol(h2), pwCol(h3), pwCol(fract(h1 + h3 * 7.0)));
+  vec2 par = mod(cell, 2.0);
+  float hc = hash(cell * 1.13 + seed * 0.57);
+  vec3 c = PW_PAPER;
+  int type = h0 < 0.22 ? 0 : h0 < 0.40 ? 1 : h0 < 0.55 ? 2 : h0 < 0.66 ? 3 : h0 < 0.82 ? 4 : h0 < 0.93 ? 5 : 6;
+  if (type <= 2) {
+    // Bars: two to four marker strokes, across or upright; the basket weave turns every other cell
+    bool vert = type == 1 || (type == 2 && par.x != par.y);
+    vec2 v = vert ? u.yx : u;
+    float n = h3 > 0.8 ? 2.0 : h3 < 0.12 ? 4.0 : 3.0;
+    float y = v.y * n, i = floor(y), fy = fract(y);
+    float d = min((0.29 - abs(fy - 0.5)) / n, 0.38 - abs(v.x - 0.5));
+    int k = int(mod((vert ? cell.y : cell.x) * floor(h2 * 3.0) + (vert ? cell.x : cell.y) * floor(h1 * 2.0 + 1.0) + (h2 > 0.7 ? i : 0.0), 3.0));
+    c = pwInk(c, cols[k], d, fy, aa);
+  } else if (type == 3) {
+    // Diagonal stripes that flip every other cell into chevrons and diamonds
+    float w = (par.x > 0.5 ? u.x + u.y : u.x - u.y + 1.0) * 2.0;
+    float i = floor(w), f = fract(w);
+    float d = min(0.36 - abs(f - 0.5), min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y)) - 0.06) * 0.7;
+    c = pwInk(c, cols[int(mod(i + par.y, 2.0))], d, f, aa);
+  } else if (type == 4) {
+    // Pinwheels: each cell cut corner to corner, turned so four cells spin round a point
+    float r = par.x + par.y * 2.0;
+    vec2 v = u - 0.5;
+    if (r == 1.0) v = vec2(-v.y, v.x); else if (r == 3.0) v = -v; else if (r == 2.0) v = vec2(v.y, -v.x);
+    v += 0.5;
+    float e = min(min(v.x, 1.0 - v.x), min(v.y, 1.0 - v.y));
+    float dg = (v.y - v.x) * 0.7071;
+    vec3 ca = hc < 0.18 ? PW_PAL[12] : cols[int(hc * 3.0)];
+    c = pwInk(c, ca, min(dg - 0.035, e - 0.07), v.x + v.y, aa);
+    if (hc > 0.35) c = pwInk(c, cols[int(fract(hc * 7.0) * 4.0)], min(-dg - 0.035, e - (hc > 0.7 ? 0.2 : 0.07)), v.x - v.y, aa);
+  } else if (type == 5) {
+    // Hourglasses: four triangles meeting in the middle, top and bottom one color, the sides another
+    vec2 v = u - 0.5;
+    float e = 0.44 - max(abs(v.x), abs(v.y));
+    float dg = (abs(v.y) - abs(v.x)) * 0.7071;
+    c = pwInk(c, cols[int(par.x)], min(dg - 0.03, e), v.x * 2.0, aa);
+    c = pwInk(c, hc < 0.3 ? PW_PAL[12] : cols[2 + int(par.y)], min(-dg - 0.03, e), v.y * 2.0, aa);
+  } else {
+    // Circles: quarter circles in four cells make one striped circle on a dark ground
+    vec2 ctr = 1.0 - par;
+    float r = length(u - ctr);
+    float e = min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y));
+    c = pwInk(c, cols[3], min(r - 0.86, e - 0.05), u.x + u.y, aa);
+    float s = fract(u.y * 3.0);
+    c = pwInk(c, cols[int(mod(floor(u.y * 3.0) + cell.y * 3.0, 3.0))], min(min(0.8 - r, 0.3 - abs(s - 0.5)) / 3.0, e - 0.05), s, aa);
+  }
+  // The inked grid line round every cell
+  float gl = min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y));
+  return mix(vec3(0.16, 0.14, 0.18), c, smoothstep(0.0, aa * 1.5, gl - 0.012));
+}
+vec3 seedPatch(vec2 p, float t) {
+  // Input size 100 fills the screen; smaller makes it a page in the middle
+  float fill = uScale / 2.5;
+  vec2 hs = vec2(0.5 * uSim.x / uSim.y, 0.5) * fill;
+  if (abs(p.x) > hs.x || abs(p.y) > hs.y) return vec3(0.0);
+  const float N = 20.0;              // cells from top to bottom
+  vec2 g0 = p / fill * N, g = g0;
+  float aa = N / (fill * uSim.y);    // one pixel, in cells
+  // Some rows slide sideways one cell at a time, now and then
+  float row = floor(g.y), rh = hash(vec2(row, 3.7));
+  if (rh > 0.55) {
+    float ph = t * (0.05 + 0.07 * hash(vec2(row, 8.1))) + rh * 7.0;
+    g.x += (floor(ph) + smoothstep(0.72, 1.0, fract(ph))) * (hash(vec2(row, 5.3)) > 0.5 ? 1.0 : -1.0);
+  }
+  vec2 cell = floor(g), u = fract(g);
+  // How the page is cut into patches; a new cut sweeps across the page about every 40 s
+  float P = floor((t - (g0.x + g0.y) * 0.25) / 40.0);
+  vec2 B = floor(cell / 6.0), inB = mod(cell, 6.0);
+  float hb = hash(B + P * 13.1);
+  vec2 pid = hb < 0.15 ? vec2(B.x * 2.0 + 0.5, cell.y + 500.0)            // a border of one-cell strips
+           : hb < 0.6 ? B * 2.0 + floor(inB / 3.0)                         // four small patches
+           : B * 2.0;                                                       // one big one
+  pid += P * 37.0;
+  // Each patch redraws itself every 6 to 15 s, cell by cell from the top corner
+  float hp = hash(pid * 0.71 + 2.3);
+  float ph = t / (6.0 + 9.0 * hp) + hp * 9.0;
+  float ord = ((5.0 - inB.y) * 6.0 + inB.x) / 36.0 * 0.8 + hash(cell) * 0.2;
+  float e = floor(ph) - (fract(ph) < ord * 0.3 ? 1.0 : 0.0);
+  vec3 c = pwCell(u, cell, pid, e, aa);
+  // Laid over the trails like the spectrograph (see main), never added to them as light, so the white paper can't
+  // pile up into a white screen. The ink covers almost fully; the paper less and less as Trails goes up, so the
+  // echoes show through the gaps between the strokes.
+  float inked = clamp(length(c - PW_PAPER) * 5.0, 0.0, 1.0);
+  gSpecA = mix(mix(1.0, 0.25, smoothstep(0.3, 0.97, uDecay)), 0.9, inked);
+  return c;
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -431,6 +538,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 2) return seedBars(g, uTime);
   if (id == 3) return seedSparks(g, uTime);
   if (id == 11) return seedInk(p);
+  if (id == 12) return seedPatch(p, uTime);
   if (id == 22) return seedSpec(p);
   if (id == 24) return seedText(p, uTime);
   // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this

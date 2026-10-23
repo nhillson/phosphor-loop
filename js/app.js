@@ -35,10 +35,10 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, cubes: 13, horizon: 14, cavern: 15,
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
                  sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
@@ -75,6 +75,7 @@ const STARTERS = [
     B: { in1: 'sparks', zoom: 50, spin: -40, trails: 86, color: 18, warp: 30 },
     xab: 70, xba: 45, view: 35 },
   { name: 'Ink', A: { in1: 'ink', size: 70, zoom: 0, spin: 0, trails: 100, color: 3, flow: 75, blur: 0.03 } },
+  { name: 'Patchwork', A: { in1: 'patchwork', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Cubes', A: { in1: 'cubes', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Horizon', A: { in1: 'horizon', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Cavern', A: { in1: 'cavern', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
@@ -629,7 +630,7 @@ function showSlider(k) {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -964,7 +965,7 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'picture', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5,
@@ -1608,7 +1609,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -1747,7 +1748,7 @@ function limFold(k, v) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -2394,7 +2395,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'picture', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'picture', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -2576,6 +2577,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
     if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
     if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
+    if (sc.in1 === 'patchwork') sc.size = Math.round(rnd(55, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
@@ -5306,6 +5308,11 @@ const RECIPES = [
     how: 'TEXT · ZOOM IN 32 · TRAILS 88 · COLOR 16',
     sw: 'radial-gradient(ellipse 46% 20% at 50% 50%,#fff3b0 0 30%,transparent 32%),repeating-radial-gradient(ellipse at 50% 50%,#140a2a 0 6px,#ff7ac6 6px 8px,#6a2bd9 8px 10px)',
     patch: { A: { in1: 'text', size: 80, zoom: 32, spin: 0, trails: 88, color: 16, blur: 0.05 } } },
+  { name: 'Sketchbook', after: 'Try a smaller Input size to make it a page in the middle, or turn Zoom in up for a tunnel of tiles.',
+    text: 'A hand-inked page of little marker tiles: bars, basket weave, pinwheels and hourglasses. Each patch keeps redrawing itself cell by cell while rows slide along.',
+    how: 'PATCHWORK · INPUT SIZE 100 · EVERYTHING ELSE OFF',
+    sw: 'repeating-linear-gradient(0deg,#2a2430 0 1px,transparent 1px 12px),repeating-linear-gradient(90deg,#2a2430 0 1px,transparent 1px 12px),repeating-linear-gradient(0deg,#cdc7bd 0 2px,#ee6b9e 2px 4px,#cdc7bd 4px 6px,#33a0cc 6px 8px)',
+    patch: { A: { in1: 'patchwork', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } } },
   { name: 'Living picture', after: 'Try a few nature pictures with ◀ ▶ under Picture, or slide Grow up and down.',
     text: 'Patterns grow over the picture like the markings on a shell or a fish, starting from its outlines and slowly spreading.',
     how: 'PICTURE · GROW 45 FINE · TRAILS 93',
