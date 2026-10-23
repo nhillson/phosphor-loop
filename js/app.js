@@ -5309,7 +5309,7 @@ const RECIPES = [
     sw: 'radial-gradient(ellipse 46% 20% at 50% 50%,#fff3b0 0 30%,transparent 32%),repeating-radial-gradient(ellipse at 50% 50%,#140a2a 0 6px,#ff7ac6 6px 8px,#6a2bd9 8px 10px)',
     patch: { A: { in1: 'text', size: 80, zoom: 32, spin: 0, trails: 88, color: 16, blur: 0.05 } } },
   { name: 'Sketchbook', after: 'Try a smaller Input size to make it a page in the middle, or turn Zoom in up for a tunnel of tiles.',
-    text: 'A hand-inked page of tiles that keep turning in ripples, so their lines join up into new paths, loops, mazes and weaves.',
+    text: 'A hand-inked sketchbook page of marker tiles (bars, triangles, bowties, circles, curls and weaves) that keep turning in ripples into new pinwheels, diamonds, paths and mazes.',
     how: 'PATCHWORK · INPUT SIZE 100 · EVERYTHING ELSE OFF',
     sw: 'repeating-linear-gradient(0deg,#2a2430 0 1px,transparent 1px 12px),repeating-linear-gradient(90deg,#2a2430 0 1px,transparent 1px 12px),repeating-linear-gradient(0deg,#cdc7bd 0 2px,#ee6b9e 2px 4px,#cdc7bd 4px 6px,#33a0cc 6px 8px)',
     patch: { A: { in1: 'patchwork', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } } },
