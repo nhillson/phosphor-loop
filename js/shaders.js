@@ -424,10 +424,12 @@ vec3 seedText(vec2 p, float t) {
   float l = texture(uText, q).r;
   return hsv(fract(t * 0.05 + q.x * 0.3), 0.55, 1.0) * l;
 }
-// Patchwork: a hand-inked grid like Nick's sketchbook pages. Every cell holds a little marker drawing (three bars,
-// a basket weave, diagonal stripes, pinwheel triangles, hourglasses or circles), and neighboring cells join into
-// patches of one kind. Each patch redraws itself every several seconds, cell by cell like a pen filling it in; some
-// rows slide sideways a cell at a time, and every 40 s or so a sweep across the page cuts it into new patches.
+// Patchwork: a hand-inked grid like Nick's sketchbook pages, made of turning tiles whose lines join up. Every tile's
+// three marker lanes leave its edges at the same three spots (a sixth, half and five sixths of the way along), so
+// however a tile is turned, its lanes run on into its neighbours' and together they draw long paths, loops, mazes
+// and weaves. Every few seconds a ripple runs across the page and tiles turn a quarter (or half) turn, lifting
+// slightly as they go, and the lines snap together into a new pattern. Each stretch of turns follows one rule
+// (random, diagonal waves, spinning checks, rings, a four-way mirror) and one mix of tiles, then moves on.
 const vec3 PW_PAL[16] = vec3[16](
   vec3(0.93, 0.42, 0.62), vec3(0.72, 0.16, 0.42), vec3(0.52, 0.36, 0.75), vec3(0.18, 0.20, 0.62),
   vec3(0.20, 0.62, 0.80), vec3(0.10, 0.46, 0.42), vec3(0.52, 0.84, 0.70), vec3(0.84, 0.92, 0.30),
@@ -435,98 +437,124 @@ const vec3 PW_PAL[16] = vec3[16](
   vec3(0.07, 0.07, 0.09), vec3(0.55, 0.55, 0.58), vec3(0.80, 0.60, 0.86), vec3(0.36, 0.68, 0.28));
 const vec3 PW_PAPER = vec3(0.80, 0.78, 0.74);
 vec3 pwCol(float h) { return PW_PAL[int(h * 16.0) & 15]; }
-// A marker-filled shape: solid color, a darker rim and faint pen strokes. d is how far inside the shape (cells),
-// s runs across the strokes.
+// A marker stroke: solid color, a darker rim and faint pen strokes. d is how far inside the stroke (cells),
+// s runs across it.
 vec3 pwInk(vec3 base, vec3 c, float d, float s, float aa) {
-  vec3 ink = c * (0.9 + 0.1 * sin(s * 70.0)) * mix(0.62, 1.0, smoothstep(0.0, 0.07, d));
+  vec3 ink = c * (0.9 + 0.1 * sin(s * 70.0)) * mix(0.62, 1.0, smoothstep(0.0, 0.06, d));
   return mix(base, ink, smoothstep(0.0, aa, d));
 }
-vec3 pwCell(vec2 u, vec2 cell, vec2 pid, float seed, float aa) {
-  float h0 = hash(pid + seed * 1.37), h1 = hash(pid * 1.9 + seed * 2.11 + 4.0);
-  float h2 = hash(pid * 2.7 + seed * 0.73 + 9.0), h3 = hash(pid * 3.3 + seed * 1.91 + 2.0);
-  vec3 cols[4] = vec3[4](pwCol(h1), pwCol(h2), pwCol(h3), pwCol(fract(h1 + h3 * 7.0)));
-  vec2 par = mod(cell, 2.0);
-  float hc = hash(cell * 1.13 + seed * 0.57);
+const float PW_HW = 0.1;   // half the width of a lane
+// One lane: d is the distance from its middle line, mid says it's the middle lane (its own color)
+vec3 pwLane(vec3 c, float d, float s, bool mid, vec3 cMid, vec3 cOut, float aa) {
+  return pwInk(c, mid ? cMid : cOut, PW_HW - abs(d), d * 3.0, aa);
+}
+// The three straight lanes across a tile (as distances from each), nearest first
+vec2 pwStraight(float y) {   // x: distance to the nearest lane, y: 1 if it's the middle one
+  float a = y - 1.0 / 6.0, b = y - 0.5, c = y - 5.0 / 6.0;
+  float m = abs(a) < abs(b) ? a : b; if (abs(c) < abs(m)) m = c;
+  return vec2(m, m == b ? 1.0 : 0.0);
+}
+// type 0: straight lanes; 1: curves (quarter circles round the corners, a Truchet tile); 2: a woven crossing,
+// across over up or up over across; 3: one curve and two straight (the middle lane bends round a corner)
+vec3 pwTile(vec2 v, int type, bool over, vec3 cMid, vec3 cOut, float aa) {
   vec3 c = PW_PAPER;
-  int type = h0 < 0.22 ? 0 : h0 < 0.40 ? 1 : h0 < 0.55 ? 2 : h0 < 0.66 ? 3 : h0 < 0.82 ? 4 : h0 < 0.93 ? 5 : 6;
-  if (type <= 2) {
-    // Bars: two to four marker strokes, across or upright; the basket weave turns every other cell
-    bool vert = type == 1 || (type == 2 && par.x != par.y);
-    vec2 v = vert ? u.yx : u;
-    float n = h3 > 0.8 ? 2.0 : h3 < 0.12 ? 4.0 : 3.0;
-    float y = v.y * n, i = floor(y), fy = fract(y);
-    float d = min((0.29 - abs(fy - 0.5)) / n, 0.38 - abs(v.x - 0.5));
-    int k = int(mod((vert ? cell.y : cell.x) * floor(h2 * 3.0) + (vert ? cell.x : cell.y) * floor(h1 * 2.0 + 1.0) + (h2 > 0.7 ? i : 0.0), 3.0));
-    c = pwInk(c, cols[k], d, fy, aa);
-  } else if (type == 3) {
-    // Diagonal stripes that flip every other cell into chevrons and diamonds
-    float w = (par.x > 0.5 ? u.x + u.y : u.x - u.y + 1.0) * 2.0;
-    float i = floor(w), f = fract(w);
-    float d = min(0.36 - abs(f - 0.5), min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y)) - 0.06) * 0.7;
-    c = pwInk(c, cols[int(mod(i + par.y, 2.0))], d, f, aa);
-  } else if (type == 4) {
-    // Pinwheels: each cell cut corner to corner, turned so four cells spin round a point
-    float r = par.x + par.y * 2.0;
-    vec2 v = u - 0.5;
-    if (r == 1.0) v = vec2(-v.y, v.x); else if (r == 3.0) v = -v; else if (r == 2.0) v = vec2(v.y, -v.x);
-    v += 0.5;
-    float e = min(min(v.x, 1.0 - v.x), min(v.y, 1.0 - v.y));
-    float dg = (v.y - v.x) * 0.7071;
-    vec3 ca = hc < 0.18 ? PW_PAL[12] : cols[int(hc * 3.0)];
-    c = pwInk(c, ca, min(dg - 0.035, e - 0.07), v.x + v.y, aa);
-    if (hc > 0.35) c = pwInk(c, cols[int(fract(hc * 7.0) * 4.0)], min(-dg - 0.035, e - (hc > 0.7 ? 0.2 : 0.07)), v.x - v.y, aa);
-  } else if (type == 5) {
-    // Hourglasses: four triangles meeting in the middle, top and bottom one color, the sides another
-    vec2 v = u - 0.5;
-    float e = 0.44 - max(abs(v.x), abs(v.y));
-    float dg = (abs(v.y) - abs(v.x)) * 0.7071;
-    c = pwInk(c, cols[int(par.x)], min(dg - 0.03, e), v.x * 2.0, aa);
-    c = pwInk(c, hc < 0.3 ? PW_PAL[12] : cols[2 + int(par.y)], min(-dg - 0.03, e), v.y * 2.0, aa);
-  } else {
-    // Circles: quarter circles in four cells make one striped circle on a dark ground
-    vec2 ctr = 1.0 - par;
-    float r = length(u - ctr);
-    float e = min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y));
-    c = pwInk(c, cols[3], min(r - 0.86, e - 0.05), u.x + u.y, aa);
-    float s = fract(u.y * 3.0);
-    c = pwInk(c, cols[int(mod(floor(u.y * 3.0) + cell.y * 3.0, 3.0))], min(min(0.8 - r, 0.3 - abs(s - 0.5)) / 3.0, e - 0.05), s, aa);
+  if (type == 0) {
+    vec2 s = pwStraight(v.y);
+    return pwLane(c, s.x, v.x, s.y > 0.5, cMid, cOut, aa);
   }
-  // The inked grid line round every cell
-  float gl = min(min(u.x, 1.0 - u.x), min(u.y, 1.0 - u.y));
-  return mix(vec3(0.16, 0.14, 0.18), c, smoothstep(0.0, aa * 1.5, gl - 0.012));
+  if (type == 1) {
+    // Corner (0,0): the inner lane and the middle lane; corner (1,1) the same; the two other corners the outer lanes
+    float r0 = length(v), r1 = length(v - 1.0), r2 = length(v - vec2(1.0, 0.0)), r3 = length(v - vec2(0.0, 1.0));
+    float d = r0 - 0.5; bool mid = true; float s = atan(v.y, v.x);
+    if (abs(r1 - 0.5) < abs(d)) { d = r1 - 0.5; s = atan(v.y - 1.0, v.x - 1.0); }
+    float o = r0 - 1.0 / 6.0;
+    if (abs(r1 - 1.0 / 6.0) < abs(o)) o = r1 - 1.0 / 6.0;
+    if (abs(r2 - 1.0 / 6.0) < abs(o)) o = r2 - 1.0 / 6.0;
+    if (abs(r3 - 1.0 / 6.0) < abs(o)) o = r3 - 1.0 / 6.0;
+    if (abs(o) < abs(d)) { d = o; mid = false; }
+    return pwLane(c, d, s, mid, cMid, cOut, aa);
+  }
+  if (type == 2) {
+    vec2 a = pwStraight(over ? v.x : v.y), b = pwStraight(over ? v.y : v.x);   // b goes on top
+    c = pwLane(c, a.x, over ? v.y : v.x, a.y > 0.5, cMid, cOut, aa);
+    c = mix(c, PW_PAPER, smoothstep(0.0, aa, PW_HW + 0.06 - abs(b.x)));   // a gap either side, so it reads as over
+    return pwLane(c, b.x, over ? v.x : v.y, b.y > 0.5, cMid, cOut, aa);
+  }
+  // Mixed: the outer lanes run straight across; the middle lanes from the bottom and right edges join in a curve
+  // that weaves under them, and those from the left and top edges end in dots
+  vec2 s = pwStraight(v.y);
+  if (s.y < 0.5) c = pwLane(c, s.x, v.x, false, cMid, cOut, aa);
+  float r = length(v - vec2(1.0, 0.0)) - 0.5;
+  c = mix(c, PW_PAPER, smoothstep(0.0, aa, PW_HW + 0.06 - abs(r)));
+  c = pwLane(c, r, v.x + v.y, true, cMid, cOut, aa);
+  // ...and the left edge's middle lane ends in a dot, and so does the top's
+  float e = min(length(v - vec2(0.0, 0.5)), length(v - vec2(0.5, 1.0))) - 0.17;
+  return pwInk(c, cMid, -e, v.x, aa);
+}
+// How a tile is turned (0 to 3 quarter turns) at step n, by the rule of this stretch of steps
+float pwTurn(vec2 cell, float n, vec2 ctr) {
+  float E = floor(n / 6.0), k = floor(hash(vec2(E, 4.2)) * 5.0);
+  vec2 d = cell - ctr;
+  float o;
+  if (k < 1.0) o = floor(hash(cell + n * 0.37) * 4.0);                                     // random
+  else if (k < 2.0) o = cell.x + cell.y + n;                                               // diagonal waves
+  else if (k < 3.0) o = mod(cell.x + cell.y, 2.0) < 0.5 ? n : -n + floor(hash(cell) * 2.0); // spinning checks
+  else if (k < 4.0) o = floor(length(d) / 2.0) + n;                                         // rings
+  else {                                                                                     // four-way mirror
+    vec2 q = abs(d + 0.5);
+    o = floor(hash(floor(q) + n * 0.61) * 4.0) + (d.x < 0.0 ? 1.0 : 0.0) + (d.y < 0.0 ? 2.0 : 0.0);
+  }
+  return mod(o, 4.0);
+}
+int pwType(vec2 cell, float n) {
+  float E = floor(n / 6.0), mixk = hash(vec2(E, 9.7)), h = hash(cell * 0.93 + E * 5.3);
+  if (mixk < 0.3) return 1;                                  // all curves: a classic maze of loops
+  if (mixk < 0.5) return h < 0.6 ? 1 : 0;                    // curves and straights
+  if (mixk < 0.7) return h < 0.55 ? 2 : 0;                   // a woven cloth
+  return h < 0.4 ? 1 : h < 0.6 ? 0 : h < 0.8 ? 2 : 3;        // everything
 }
 vec3 seedPatch(vec2 p, float t) {
   // Input size 100 fills the screen; smaller makes it a page in the middle
   float fill = uScale / 2.5;
   vec2 hs = vec2(0.5 * uSim.x / uSim.y, 0.5) * fill;
   if (abs(p.x) > hs.x || abs(p.y) > hs.y) return vec3(0.0);
-  const float N = 20.0;              // cells from top to bottom
-  vec2 g0 = p / fill * N, g = g0;
-  float aa = N / (fill * uSim.y);    // one pixel, in cells
-  // Some rows slide sideways one cell at a time, now and then
-  float row = floor(g.y), rh = hash(vec2(row, 3.7));
-  if (rh > 0.55) {
-    float ph = t * (0.05 + 0.07 * hash(vec2(row, 8.1))) + rh * 7.0;
-    g.x += (floor(ph) + smoothstep(0.72, 1.0, fract(ph))) * (hash(vec2(row, 5.3)) > 0.5 ? 1.0 : -1.0);
-  }
+  const float N = 16.0;              // tiles from top to bottom
+  vec2 g = p / fill * N;
+  float aa = N / (fill * uSim.y);    // one pixel, in tiles
   vec2 cell = floor(g), u = fract(g);
-  // How the page is cut into patches; a new cut sweeps across the page about every 40 s
-  float P = floor((t - (g0.x + g0.y) * 0.25) / 40.0);
-  vec2 B = floor(cell / 6.0), inB = mod(cell, 6.0);
-  float hb = hash(B + P * 13.1);
-  vec2 pid = hb < 0.15 ? vec2(B.x * 2.0 + 0.5, cell.y + 500.0)            // a border of one-cell strips
-           : hb < 0.6 ? B * 2.0 + floor(inB / 3.0)                         // four small patches
-           : B * 2.0;                                                       // one big one
-  pid += P * 37.0;
-  // Each patch redraws itself every 6 to 15 s, cell by cell from the top corner
-  float hp = hash(pid * 0.71 + 2.3);
-  float ph = t / (6.0 + 9.0 * hp) + hp * 9.0;
-  float ord = ((5.0 - inB.y) * 6.0 + inB.x) / 36.0 * 0.8 + hash(cell) * 0.2;
-  float e = floor(ph) - (fract(ph) < ord * 0.3 ? 1.0 : 0.0);
-  vec3 c = pwCell(u, cell, pid, e, aa);
+  // A step every 2.6 s; it ripples out from a point that moves with each stretch of six steps
+  const float W = 2.6;
+  float E0 = floor(t / (W * 6.0));
+  vec2 ctr = floor((vec2(hash(vec2(E0, 1.3)), hash(vec2(E0, 7.9))) - 0.5) * vec2(N * uSim.x / uSim.y, N));
+  float tl = t - length(cell + 0.5 - ctr) * 0.07;
+  float n = floor(tl / W), a = clamp((fract(tl / W) * W) / 0.9, 0.0, 1.0);   // a: how far through turning
+  float o0 = pwTurn(cell, n - 1.0, ctr), o1 = pwTurn(cell, n, ctr);
+  float dlt = mod(o1 - o0, 4.0); if (dlt > 2.5) dlt -= 4.0;
+  float ea = a * a * (3.0 - 2.0 * a);
+  float ang = (o0 + dlt * ea) * 1.5707963;
+  // While it turns a tile lifts and shrinks a little, so the corners never poke into the next one
+  float lift = (dlt != 0.0 || pwType(cell, n - 1.0) != pwType(cell, n)) ? sin(3.14159265 * a) : 0.0;
+  float sc = 1.0 - 0.22 * lift;
+  vec2 v = rot(ang) * (u - 0.5) / sc + 0.5;
+  vec3 gap = vec3(0.12, 0.10, 0.14);
+  vec3 c;
+  if (v.x < 0.0 || v.y < 0.0 || v.x > 1.0 || v.y > 1.0) c = gap;
+  else {
+    float nn = a < 0.5 ? n - 1.0 : n;
+    // Colors by patch: the middle lanes one color, the outer lanes another, so joined lanes read as one path.
+    // A new set of colors sweeps across the page about every 30 s.
+    float P = floor((t - (g.x + g.y) * 0.25) / 30.0);
+    float hP = hash(floor((cell + 0.5) / 7.0) + P * 13.1);
+    vec3 cMid = pwCol(hP), cOut = pwCol(fract(hP * 7.31 + 0.5));
+    bool over = mod(cell.x + cell.y + floor(nn / 6.0), 2.0) < 0.5;
+    c = pwTile(v, pwType(cell, nn), over, cMid, cOut, aa / sc);
+    // The inked grid line round each tile, faint so the lanes read as running on
+    float gl = min(min(v.x, 1.0 - v.x), min(v.y, 1.0 - v.y));
+    c = mix(mix(gap, c, 0.65), c, smoothstep(0.0, aa * 1.5, gl - 0.01));
+  }
   // Laid over the trails like the spectrograph (see main), never added to them as light, so the white paper can't
   // pile up into a white screen. The ink covers almost fully; the paper less and less as Trails goes up, so the
-  // echoes show through the gaps between the strokes.
+  // echoes show through the gaps between the lanes.
   float inked = clamp(length(c - PW_PAPER) * 5.0, 0.0, 1.0);
   gSpecA = mix(mix(1.0, 0.25, smoothstep(0.3, 0.97, uDecay)), 0.9, inked);
   return c;
