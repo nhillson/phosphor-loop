@@ -5,7 +5,7 @@
 //  2. When the recording stops, FFmpeg squeezes that working file into the finished .mp4 at the chosen quality. It
 //     isn't racing the clock, so it can use the careful settings (and the processor, if there's no graphics card).
 // Colours are converted from the browser's BT.601 to BT.709 (what YouTube expects), with sharp colour edges, the same
-// way the stream does. Sound: AAC 384 kbps stereo, YouTube's recommendation.
+// way the stream does, and the file is labelled BT.709 throughout (the browser labels its colours as old TV video). Sound: AAC 384 kbps stereo, YouTube's recommendation.
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -57,7 +57,7 @@ function finish({ ffmpeg, input, output, plan, family, seconds, onProgress = () 
     const args = ['-hide_banner', '-loglevel', 'error', '-nostats', '-progress', 'pipe:1', '-y',
       ...(plan.height > 1080 && family !== 'libx264' ? ['-hwaccel', 'auto'] : []),
       '-i', input,
-      '-vf', `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}`,
+      '-vf', `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt},setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv`,
       '-r', String(plan.fps), '-fps_mode', 'cfr',
       ...finalArgs(family, plan),
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',

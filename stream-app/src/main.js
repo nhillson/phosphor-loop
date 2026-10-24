@@ -764,7 +764,7 @@ async function runTest() {
     if (!result.recording.ok) throw new Error('the recording could not be saved');
     const info = await new Promise((r) => execFile(ffmpegPath(), ['-hide_banner', '-i', saved.output], (_e, _o, se) => r(String(se))));
     result.recording.info = info.split('\n').filter((l) => /Stream|Duration/.test(l)).map((l) => l.trim()).join(' | ');
-    if (!/Video: h264.*1920x1080/.test(info) || !/Audio: aac/.test(info)) throw new Error('the recording is not 1080p H.264 with AAC sound: ' + result.recording.info);
+    if (!/Video: h264.*\(tv, bt709[,)].*1920x1080/.test(info) || !/Audio: aac/.test(info)) throw new Error('the recording is not 1080p H.264 labelled BT.709 with AAC sound: ' + result.recording.info);
     if ((await sizeNow())[1] !== 720) throw new Error('after recording, the picture did not go back to the stream size');
     result.pageFpsBefore = await pageFps();
     // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
