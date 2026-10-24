@@ -452,6 +452,14 @@
   .ctl { display: grid; gap: 2px; }
   /* Descriptions shown as hover tooltips instead (see hintsToTips) */
   .hint.as-tip { display: none !important; }
+  .snd-loops-ctl { margin-bottom: 10px; }
+  [data-tip] { cursor: help; }
+  button[data-tip] { cursor: pointer; }
+  .tip-pop {
+    position: fixed; z-index: 1000; max-width: 340px; padding: 8px 10px; border-radius: 6px; pointer-events: none;
+    background: #18151a; border: 1px solid var(--line); color: var(--ink); font-size: 13px; line-height: 1.45;
+    white-space: pre-line; box-shadow: 0 6px 20px rgba(0,0,0,.55);
+  }
   .ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .ctl-head label, .ctl-head .lbl { font-weight: 600; font-size: 15px; }
   .mini {

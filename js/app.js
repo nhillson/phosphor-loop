@@ -17,13 +17,25 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 
 /* ================= hints as hover tooltips ================= */
 // The small grey descriptions under the controls are tucked away and shown as a tooltip when the mouse rests on the
-// control they describe. Lines that report what's happening right now (what's pinned, what Check each look has
-// judged, a loop that isn't on screen, a preset note...) stay on show. A description whose words change later
-// (Pushed by's, say, which names the other loop) keeps its tooltip up to date.
+// name of the control they describe (its label, not the fader itself), after a little over a second. Lines that
+// report what's happening right now (what's pinned, what Check each look has judged, a loop that isn't on screen,
+// a preset note...) stay on show. A description whose words change later (Pushed by's, say, which names the other
+// loop) keeps its tooltip up to date.
 const HINT_KEEP = ['feedNote', 'hiddenHint', 'vidLoopText', 'limSum', 'apCheckStat', 'apPinList', 'sharpNote', 'shapeNote',
   'sharedHint', 'adminMsg', 'presetEmpty', 'presetApNote', 'tasteSum', 'micTip', 'loopbackHint', 'tasteAdminNote'];
 // Where a description that isn't inside a control's own box goes
-const HINT_TARGET = { loopsHint: '#h-mix', dropHint: '#inputs' };
+const HINT_TARGET = { loopsHint: '#h-mix', dropHint: '#in1Lbl' };
+// The rows that open under an input (3D world, Text...) put their description on that input's button
+const ROW_INPUT = { 'row-3d': 'world', 'row-fractal': 'fractal', 'row-spectro': 'spectro', 'row-text': 'text', 'row-picture': 'picture',
+  'row-video': 'video', 'row-camera': 'camera', 'row-screen': 'screen', 'row-phone': 'phone', 'row-loop': 'loop' };
+const TIP_DELAY = 1200;
+// The name to hover for a control's box: its label, else the box's first label-like line, else the box itself
+function tipLabel(box) {
+  if (!box.matches('.ctl, .dev')) return box;
+  if (box.id in ROW_INPUT) { const b = $(`#inputs [data-src="${ROW_INPUT[box.id]}"]`); if (b) return b; }
+  return box.querySelector(':scope > .ctl-head label, :scope > .ctl-head .lbl, :scope > .lbl, :scope > label, :scope > .dev-status')
+    || box.querySelector(':scope > .btn, :scope > .chips, :scope > .seg') || box;
+}
 function hintsToTips() {
   const tips = new Map();
   for (const h of $$('.panel .hint')) {
@@ -34,7 +46,9 @@ function hintsToTips() {
       while (t && (t.classList.contains('hint') || t.hasAttribute('hidden') || t.getAttribute('role') === 'status')) t = t.previousElementSibling;
       t = t || h.closest('.group, section');
     }
-    if (!tips.has(t)) tips.set(t, { own: t.getAttribute('title') || '', hints: [] });
+    t = tipLabel(t);
+    // A native tooltip on the same name joins the new one, so only one ever shows
+    if (!tips.has(t)) { tips.set(t, { own: t.getAttribute('title') || '', hints: [] }); t.removeAttribute('title'); }
     tips.get(t).hints.push(h);
     h.classList.add('as-tip');
   }
@@ -42,7 +56,7 @@ function hintsToTips() {
     const T = tips.get(t);
     const words = T.hints.filter((h) => h.classList.contains('as-tip')).map((h) => h.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
     const text = [T.own, ...words].filter(Boolean).join('\n\n');
-    if (text) t.setAttribute('title', text); else t.removeAttribute('title');
+    if (text) t.dataset.tip = text; else delete t.dataset.tip;
   };
   for (const t of tips.keys()) write(t);
   // Descriptions whose words change, or that are shown again, update their tooltip
@@ -54,6 +68,60 @@ function hintsToTips() {
   for (const T of tips.values()) for (const h of T.hints) mo.observe(h, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 }
 hintsToTips();
+// The tooltip itself: one box, shown under (or over) the name the mouse rests on
+const tipPop = document.createElement('div');
+tipPop.className = 'tip-pop';
+tipPop.setAttribute('role', 'tooltip');
+tipPop.hidden = true;
+document.body.appendChild(tipPop);
+let tipFor = null, tipTimer = 0;
+function tipHide() { clearTimeout(tipTimer); tipTimer = 0; tipFor = null; tipPop.hidden = true; }
+function tipShow(el) {
+  if (!document.contains(el) || !el.dataset.tip) return;
+  tipPop.textContent = el.dataset.tip;
+  tipPop.hidden = false;
+  const r = el.getBoundingClientRect(), w = tipPop.offsetWidth, h = tipPop.offsetHeight;
+  let top = r.bottom + 6;
+  if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  tipPop.style.left = `${Math.round(Math.min(Math.max(8, r.left), innerWidth - w - 8))}px`;
+  tipPop.style.top = `${Math.round(top)}px`;
+}
+document.addEventListener('pointerover', (e) => {
+  if (e.pointerType && e.pointerType !== 'mouse') return;
+  const el = e.target.closest ? e.target.closest('[data-tip]') : null;
+  if (el === tipFor) return;
+  tipHide();
+  if (!el) return;
+  tipFor = el;
+  tipTimer = setTimeout(() => tipShow(el), TIP_DELAY);
+});
+document.addEventListener('pointerout', (e) => { if (tipFor && !(e.relatedTarget && tipFor.contains(e.relatedTarget))) tipHide(); });
+for (const type of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(type, tipHide, { capture: true, passive: true });
+document.addEventListener('scroll', tipHide, { capture: true, passive: true });
+
+/* ================= scroll wheel on faders ================= */
+// Rolling the mouse wheel over any fader moves it: one notch is 2 on a 0 to 100 fader (Shift for the finest
+// step). It works as if the fader had been dragged, so everything that listens to the fader follows.
+let wheelAcc = 0, wheelEl = null;
+document.addEventListener('wheel', (e) => {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement) || el.type !== 'range' || el.disabled) return;
+  e.preventDefault();
+  if (el !== wheelEl) { wheelEl = el; wheelAcc = 0; }
+  // A mouse notch is about 100 pixels (or 3 lines); a trackpad sends many small amounts, which add up to notches
+  const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY;
+  wheelAcc += d;
+  const notches = Math.trunc(wheelAcc / 100) || (Math.abs(d) >= 50 ? Math.sign(d) : 0);
+  if (!notches) return;
+  wheelAcc = Math.abs(d) >= 50 ? 0 : wheelAcc - notches * 100;
+  const min = +el.min || 0, max = el.max === '' ? 100 : +el.max, step = el.step === 'any' ? (max - min) / 100 : +el.step || 1;
+  const per = e.shiftKey ? step : Math.max(step, Math.round((max - min) / 50 / step) * step);
+  const v = Math.min(max, Math.max(min, +el.value - notches * per));
+  if (v === +el.value) return;
+  el.value = v;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}, { passive: false });
 // Inside a Claude artifact the camera, screen sharing and network links are refused, so those inputs hide there.
 const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
 // The Android app (android/ folder) opens this page with a helper called PhosphorApp. It adds what a phone
@@ -6083,6 +6151,8 @@ $$('.panel .group').forEach((group) => {
   btn.addEventListener('click', () => set(body.hidden, true));
   foldControls.push(set);
 });
+// Loops that react stays in sight even with React to sound folded away
+{ const g = $('#soundGroup'), row = $('#sndLoops').closest('.ctl'); row.classList.add('snd-loops-ctl'); g.insertBefore(row, g.querySelector(':scope > .group-body')); }
 $('#foldAll').addEventListener('click', () => foldControls.forEach((set) => set(false, true)));
 $('#openAll').addEventListener('click', () => foldControls.forEach((set) => set(true, true)));
 
