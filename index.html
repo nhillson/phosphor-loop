@@ -109,163 +109,8 @@
       <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick an input</b>, move a slider, or <b>drag on the screen</b> to draw.</p>
       <div class="panel-tools"><button class="linkish" id="foldAll">Collapse all</button><button class="linkish" id="openAll">Expand all</button></div>
 
-      <section class="group" aria-labelledby="h-looks">
-        <h2 id="h-looks">Looks</h2>
-        <div class="quick-actions">
-          <button class="btn" id="neutral" title="Just the input, every effect off (key N)">Neutral</button>
-          <button class="btn" id="surprise">Surprise me</button>
-          <button class="btn" id="autopilot" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
-        </div>
-      </section>
-
-      <section class="group" id="apGroup" aria-labelledby="h-ap">
-        <h2 id="h-ap">Autopilot settings</h2>
-        <p class="ap-state" id="apState" role="status">Autopilot is off.</p>
-        <button class="btn wide next-look" id="nextLook" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look now</button>
-        <div class="ctl">
-          <div class="ctl-head"><label for="apEvery">New look every</label><output id="apEveryOut" for="apEvery"></output></div>
-          <input type="range" id="apEvery" min="0" max="100" step="1" value="44">
-          <div class="ends"><span>10 seconds</span><span>2 minutes</span></div>
-        </div>
-        <div class="ctl">
-          <div class="ctl-head"><label for="apFade">Fade time</label><output id="apFadeOut" for="apFade"></output></div>
-          <input type="range" id="apFade" min="0" max="100" step="1" value="63">
-          <div class="ends"><span>Quick</span><span>Slow</span></div>
-        </div>
-        <div class="ctl">
-          <div class="ctl-head"><label for="apWild">How wild</label><output id="apWildOut" for="apWild"></output></div>
-          <input type="range" id="apWild" min="0" max="100" step="1" value="50">
-          <div class="ends"><span>Calm</span><span>Wild</span></div>
-        </div>
-        <div class="ctl">
-          <div class="ctl-head"><label for="apMix">Mix the two loops</label><output id="apMixOut" for="apMix"></output></div>
-          <input type="range" id="apMix" min="0" max="100" step="1" value="50">
-          <div class="ends"><span>Never</span><span>Often</span></div>
-          <span class="hint">How often it shows both loops at once and pours one into the other.</span>
-        </div>
-        <div class="ctl">
-          <button class="btn wide lim-btn" id="limOpen" aria-controls="lim" aria-expanded="false" title="Set the lowest and highest Autopilot may put each slider at">
-            <svg viewBox="0 0 24 12" aria-hidden="true"><rect x="1" y="5" width="22" height="2" rx="1" fill="currentColor" opacity=".35"/><rect x="7" y="5" width="10" height="2" fill="currentColor"/><rect x="5.5" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="15.5" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg>
-            Fader limits…<span class="lim-count" id="limCount" hidden></span>
-          </button>
-          <span class="hint" id="limSum">No limits yet: Autopilot can use the whole of every slider.</span>
-        </div>
-        <div class="ctl">
-          <div class="chips"><button class="chip" id="apCheck" aria-pressed="true"><span class="led"></span>Check each look</button></div>
-          <span class="hint">Tries each new look out of sight first, skips ones that are dull, nearly black or turning white, and keeps the richest. Switch it off to see every look Autopilot makes.</span>
-          <span class="hint" id="apCheckStat">Nothing judged yet since this page opened.</span>
-        </div>
-        <div class="ctl">
-          <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
-          <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
-        </div>
-        <div class="ctl">
-          <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
-          <div class="chips" id="apInputs" role="group" aria-labelledby="apInputsLbl"></div>
-          <span class="hint">Click one to switch it off: Autopilot leaves it out from its next new look. Right-click one (or press and hold it) to choose how often it comes in, from Rarely to Lots; the pie beside the name fills up to show it. 3D worlds and Fractals also let you set each world and fractal. A pinned input still stays. Video, Camera, Screen and Phone only come in while they’re running.</span>
-        </div>
-        <div class="ctl">
-          <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
-          <div class="seg seg-3" id="apTouch" role="group" aria-labelledby="apTouchLbl">
-            <button data-touch="pin" aria-pressed="true">Pin it, keep going</button>
-            <button data-touch="play" aria-pressed="false">Play along</button>
-            <button data-touch="stop" aria-pressed="false">Stop Autopilot</button>
-          </div>
-          <span class="hint">Play along: your change shows straight away, nothing gets pinned, and Autopilot keeps going, changing that setting again with its next look.</span>
-        </div>
-        <div class="ctl">
-          <span class="lbl">Pinned</span>
-          <p class="hint" id="apPinList">Nothing pinned.</p>
-          <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
-        </div>
-        <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
-      </section>
-
-      <section class="group" id="tasteGroup" aria-labelledby="h-taste">
-        <h2 id="h-taste">Taste profiles</h2>
-        <p class="ap-state" id="tasteState" role="status">Autopilot isn’t following a taste profile.</p>
-        <button class="btn wide session-btn" id="sessionStart"><span class="led"></span>Start taste session</button>
-        <button class="btn wide session-btn" id="sessionTrain" hidden><span class="led"></span><span id="sessionTrainLbl">Train this profile again</span></button>
-        <p class="hint">Start taste session makes a new profile from scratch: Autopilot runs, you rate its looks with More like this and Not this under the picture, and when you finish you name it. Train again adds another session to the lit profile, with Autopilot already following it, so you can correct what it brings (one profile per song, trained as often as you like).</p>
-        <div class="presets tp-list" id="tasteList"></div>
-        <form class="preset-form" id="tasteRenForm" hidden>
-          <label for="tasteRenName" class="lbl" id="tasteRenLbl">New name</label>
-          <div class="preset-row">
-            <input type="text" id="tasteRenName" maxlength="40" autocomplete="off" spellcheck="false">
-            <button class="btn small" type="submit">Rename</button>
-            <button class="btn small" type="button" id="tasteRenCancel">Cancel</button>
-          </div>
-        </form>
-        <p class="hint">Tap a profile and Autopilot follows it; tap it again to stop. Ratings you make outside a session go into the lit one (with none lit, rating starts a session). On your own profiles, ✎ renames, ⤓ saves a file to send to someone, and × deletes.</p>
-        <p class="hint" id="tasteSum">Nothing learned yet. Press More like this or Not this under the picture.</p>
-        <div class="ctl">
-          <div class="ctl-head"><label for="apTaste">Follow my taste</label><output id="apTasteOut" for="apTaste"></output></div>
-          <input type="range" id="apTaste" min="0" max="100" step="1" value="50">
-          <div class="ends"><span>Surprise me</span><span>Stick to what I like</span></div>
-        </div>
-        <div class="ctl">
-          <div class="chips"><button class="chip" id="apHints" aria-pressed="true"><span class="led"></span>Learn from hints</button></div>
-          <span class="hint">Also learns without you pressing anything: skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that setting.</span>
-        </div>
-        <div class="ctl">
-          <div class="chips"><button class="chip" id="apFsKeep" aria-pressed="false"><span class="led"></span>Keep timer and rating buttons showing in full screen</button></div>
-          <span class="hint">In full screen during a taste session, the timer and the More like this and Not this buttons normally fade away when the mouse is still. Switch this on to keep them showing.</span>
-        </div>
-        <div class="taste-actions">
-          <button class="btn small" id="tasteOpen">Open a taste file…</button>
-          <input type="file" id="tasteFile" accept=".json,application/json" hidden>
-        </div>
-        <p class="hint" id="tasteAdminNote" hidden><b class="admin-tag">ADMIN</b> ⇪ on one of your profiles shares it with everyone (the same name replaces it). On a shared one, ✎ renames it and × takes it away.</p>
-      </section>
-
-      <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
-        <h2 id="h-shared">Shared presets</h2>
-        <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
-        <div class="presets" id="sharedList"></div>
-        <div class="admin" id="adminBox" hidden>
-          <span class="admin-tag">ADMIN · ONLY YOU SEE THIS</span>
-          <form class="preset-form" id="sharedForm" hidden>
-            <label for="sharedName" class="lbl" id="sharedFormLbl">Name it for everyone</label>
-            <div class="preset-row">
-              <input type="text" id="sharedName" maxlength="40" autocomplete="off" spellcheck="false">
-              <button class="btn small" type="submit" id="sharedGo">Share</button>
-              <button class="btn small" type="button" id="sharedCancel">Cancel</button>
-            </div>
-          </form>
-          <button class="btn wide" id="sharedAdd">Share current look with everyone</button>
-          <p class="hint">Everyone sees a new or changed shared preset about a minute later. Share while Autopilot runs and it keeps Autopilot too. On a shared preset, ✎ renames it and × takes it away.</p>
-          <button class="linkish" id="adminOut" type="button">Stop being the admin on this device</button>
-        </div>
-        <form class="preset-form admin" id="adminLogin" hidden>
-          <span class="admin-tag">ADMIN</span>
-          <label for="adminKey" class="lbl">Admin key</label>
-          <div class="preset-row">
-            <input type="password" id="adminKey" autocomplete="off" spellcheck="false" placeholder="Paste your GitHub key">
-            <button class="btn small" type="submit" id="adminGo">Unlock</button>
-          </div>
-          <span class="hint" id="adminMsg">Paste the key you made on GitHub. It stays in this browser only.</span>
-        </form>
-      </section>
-
-      <section class="group" id="presetGroup" aria-labelledby="h-pre">
-        <h2 id="h-pre">My presets</h2>
-        <p class="hint" id="presetEmpty">Nothing saved yet. Set up a look you like, then save it here.</p>
-        <div class="presets" id="presetList"></div>
-        <form class="preset-form" id="presetForm" hidden>
-          <label for="presetName" class="lbl">Name this look</label>
-          <div class="preset-row">
-            <input type="text" id="presetName" maxlength="40" autocomplete="off" spellcheck="false">
-            <button class="btn small" type="submit">Save</button>
-            <button class="btn small" type="button" id="presetCancel">Cancel</button>
-          </div>
-        </form>
-        <button class="btn wide" id="presetSave">Save current look</button>
-        <p class="hint" id="presetApNote">Autopilot is on, so this preset will keep Autopilot’s settings and pins too, and start Autopilot again when you load it.</p>
-        <p class="hint" id="presetNote">Presets stay in this browser on this device. Save under the same name to update one. Pictures and videos aren’t saved, only the settings.</p>
-      </section>
-
       <section class="group" aria-labelledby="h-mix">
-        <h2 id="h-mix">Mix the two loops</h2>
+        <h2 id="h-mix">Loops</h2>
         <div class="ctl">
           <div class="ctl-head"><label for="view">What you see</label><output id="viewOut" for="view"></output></div>
           <input type="range" id="view" class="ab" min="0" max="100" step="1" value="0">
@@ -285,52 +130,6 @@
         <p class="hint">Each feed pours one loop’s picture into the other loop’s trails. Turn both up and the loops trade shapes. You can also choose the other loop as an input below.</p>
       </section>
 
-      <section class="group" id="soundGroup" aria-labelledby="h-sound">
-        <h2 id="h-sound">React to sound</h2>
-        <div class="seg seg-2" id="soundSrc" role="group" aria-label="What to listen to">
-          <button data-snd="off" aria-pressed="true">Off</button>
-          <button data-snd="system" aria-pressed="false">Computer sound</button>
-          <button data-snd="mic" aria-pressed="false">Microphone</button>
-          <button data-snd="loopback" aria-pressed="false">Loopback adapter</button>
-        </div>
-        <div class="dev" id="soundRow" hidden>
-          <span class="dev-status" id="sndStatus">Not listening.</span>
-          <div class="meter" aria-hidden="true">
-            <div class="mbar"><i id="mLow"></i><span>LOW</span></div>
-            <div class="mbar"><i id="mMid"></i><span>MID</span></div>
-            <div class="mbar"><i id="mHigh"></i><span>HIGH</span></div>
-            <div class="mbeat" id="mBeat">● BEAT</div>
-          </div>
-          <div class="dev-actions">
-            <button class="btn small" id="sndRetry" hidden>Try again</button>
-            <button class="btn small" id="sndUseMic" hidden>Use Microphone or Stereo Mix</button>
-          </div>
-          <div class="ctl" id="micPick" hidden>
-            <label for="micSel" class="lbl">Listen to</label>
-            <select id="micSel"></select>
-            <span class="hint" id="micTip" hidden></span>
-          </div>
-          <p class="hint" id="loopbackHint" hidden>Choose BlackHole, Stereo Mix or another loopback input. Route your computer’s audio to that adapter in your sound settings; use a multi-output device to keep hearing it through your speakers too. Your browser calls audio input access “microphone” permission.</p>
-          <div class="ctl">
-            <div class="ctl-head"><label for="sndAmt">Amount</label><output id="sndAmtOut" for="sndAmt"></output></div>
-            <input type="range" id="sndAmt" min="0" max="100" step="1" value="60">
-            <div class="ends"><span>Subtle</span><span>Wild</span></div>
-          </div>
-          <div class="ctl">
-            <span class="lbl">What the music moves</span>
-            <div class="chips" id="sndMap">
-              <button class="chip" data-map="kick" aria-pressed="true" title="The picture punches in on every kick and pumps with the bass"><span class="led"></span>Zoom kick</button>
-              <button class="chip" data-map="size" aria-pressed="true" title="The input swells on the bass"><span class="led"></span>Input size</button>
-              <button class="chip" data-map="spin" aria-pressed="true" title="Spin follows the mids"><span class="led"></span>Spin</button>
-              <button class="chip" data-map="color" aria-pressed="true" title="Colors jump with the highs and the beat"><span class="led"></span>Color</button>
-              <button class="chip" data-map="warp" aria-pressed="true" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
-              <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
-            </div>
-          </div>
-        </div>
-        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else and the picture moves with it. Record keeps the sound too.</p>
-      </section>
-
       <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
         <div class="tabs" role="tablist" aria-label="Which loop to edit">
           <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span>Loop A <span class="vis" id="visA" role="img"></span></button>
@@ -339,7 +138,7 @@
         <p class="hint" id="hiddenHint" hidden><span id="hiddenText">Loop B isn’t on screen right now.</span> <button class="linkish" id="showLoop">Show both loops</button></p>
 
         <div class="group">
-          <h2 id="h-in">What feeds loop A</h2>
+          <h2 id="h-in">Inputs</h2>
           <div class="ctl-head" id="in1Head"><span class="lbl" id="in1Lbl">Main input</span></div>
           <div class="seg seg-5" id="inputs">
             <button data-src="wave" aria-pressed="false">Wave</button>
@@ -535,7 +334,7 @@
         </div>
 
         <div class="group">
-          <h2 id="h-shape">Shape loop A</h2>
+          <h2 id="h-shape">Effects</h2>
           <div class="ctl">
             <div class="ctl-head"><label for="zoom">Zoom</label><output id="zoomOut" for="zoom"></output></div>
             <input type="range" id="zoom" class="bipolar" min="-100" max="100" step="1" value="0">
@@ -622,10 +421,7 @@
             </div>
             <span class="hint">Each part of the picture shows a different moment. One edge (or the middle) is right now, and the further from it, the longer ago, so anything moving stretches into ribbons and waves.</span>
           </div>
-        </div>
-
-        <div class="group">
-          <h2 id="h-self">Loop A feeds on itself</h2>
+          <h3 class="subhead">Feeds on itself</h3>
           <p class="hint">Each of these lets the picture decide what happens to it next.</p>
           <div class="ctl">
             <div class="ctl-head"><label for="lookup">Look-up</label><output id="lookupOut" for="lookup"></output></div>
@@ -672,6 +468,120 @@
         </div>
       </section>
 
+      <section class="group" id="soundGroup" aria-labelledby="h-sound">
+        <h2 id="h-sound">React to sound</h2>
+        <div class="seg seg-2" id="soundSrc" role="group" aria-label="What to listen to">
+          <button data-snd="off" aria-pressed="true">Off</button>
+          <button data-snd="system" aria-pressed="false">Computer sound</button>
+          <button data-snd="mic" aria-pressed="false">Microphone</button>
+          <button data-snd="loopback" aria-pressed="false">Loopback adapter</button>
+        </div>
+        <div class="dev" id="soundRow" hidden>
+          <span class="dev-status" id="sndStatus">Not listening.</span>
+          <div class="meter" aria-hidden="true">
+            <div class="mbar"><i id="mLow"></i><span>LOW</span></div>
+            <div class="mbar"><i id="mMid"></i><span>MID</span></div>
+            <div class="mbar"><i id="mHigh"></i><span>HIGH</span></div>
+            <div class="mbeat" id="mBeat">● BEAT</div>
+          </div>
+          <div class="dev-actions">
+            <button class="btn small" id="sndRetry" hidden>Try again</button>
+            <button class="btn small" id="sndUseMic" hidden>Use Microphone or Stereo Mix</button>
+          </div>
+          <div class="ctl" id="micPick" hidden>
+            <label for="micSel" class="lbl">Listen to</label>
+            <select id="micSel"></select>
+            <span class="hint" id="micTip" hidden></span>
+          </div>
+          <p class="hint" id="loopbackHint" hidden>Choose BlackHole, Stereo Mix or another loopback input. Route your computer’s audio to that adapter in your sound settings; use a multi-output device to keep hearing it through your speakers too. Your browser calls audio input access “microphone” permission.</p>
+          <div class="ctl">
+            <div class="ctl-head"><label for="sndAmt">Amount</label><output id="sndAmtOut" for="sndAmt"></output></div>
+            <input type="range" id="sndAmt" min="0" max="100" step="1" value="60">
+            <div class="ends"><span>Subtle</span><span>Wild</span></div>
+          </div>
+          <div class="ctl">
+            <span class="lbl">What the music moves</span>
+            <div class="chips" id="sndMap">
+              <button class="chip" data-map="kick" aria-pressed="true" title="The picture punches in on every kick and pumps with the bass"><span class="led"></span>Zoom kick</button>
+              <button class="chip" data-map="size" aria-pressed="true" title="The input swells on the bass"><span class="led"></span>Input size</button>
+              <button class="chip" data-map="spin" aria-pressed="true" title="Spin follows the mids"><span class="led"></span>Spin</button>
+              <button class="chip" data-map="color" aria-pressed="true" title="Colors jump with the highs and the beat"><span class="led"></span>Color</button>
+              <button class="chip" data-map="warp" aria-pressed="true" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
+              <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else and the picture moves with it. Record keeps the sound too.</p>
+      </section>
+
+      <section class="group" id="apGroup" aria-labelledby="h-ap">
+        <h2 id="h-ap">Autopilot</h2>
+        <div class="quick-actions">
+          <button class="btn" id="neutral" title="Just the input, every effect off (key N)">Neutral</button>
+          <button class="btn" id="surprise">Surprise me</button>
+          <button class="btn" id="autopilot" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
+        </div>
+        <p class="ap-state" id="apState" role="status">Autopilot is off.</p>
+        <button class="btn wide next-look" id="nextLook" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look now</button>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apEvery">New look every</label><output id="apEveryOut" for="apEvery"></output></div>
+          <input type="range" id="apEvery" min="0" max="100" step="1" value="44">
+          <div class="ends"><span>10 seconds</span><span>2 minutes</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apFade">Fade time</label><output id="apFadeOut" for="apFade"></output></div>
+          <input type="range" id="apFade" min="0" max="100" step="1" value="63">
+          <div class="ends"><span>Quick</span><span>Slow</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apWild">How wild</label><output id="apWildOut" for="apWild"></output></div>
+          <input type="range" id="apWild" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Calm</span><span>Wild</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apMix">Mix the two loops</label><output id="apMixOut" for="apMix"></output></div>
+          <input type="range" id="apMix" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Never</span><span>Often</span></div>
+          <span class="hint">How often it shows both loops at once and pours one into the other.</span>
+        </div>
+        <div class="ctl">
+          <button class="btn wide lim-btn" id="limOpen" aria-controls="lim" aria-expanded="false" title="Set the lowest and highest Autopilot may put each slider at">
+            <svg viewBox="0 0 24 12" aria-hidden="true"><rect x="1" y="5" width="22" height="2" rx="1" fill="currentColor" opacity=".35"/><rect x="7" y="5" width="10" height="2" fill="currentColor"/><rect x="5.5" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="15.5" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg>
+            Fader limits…<span class="lim-count" id="limCount" hidden></span>
+          </button>
+          <span class="hint" id="limSum">No limits yet: Autopilot can use the whole of every slider.</span>
+        </div>
+        <div class="ctl">
+          <div class="chips"><button class="chip" id="apCheck" aria-pressed="true"><span class="led"></span>Check each look</button></div>
+          <span class="hint">Tries each new look out of sight first, skips ones that are dull, nearly black or turning white, and keeps the richest. Switch it off to see every look Autopilot makes.</span>
+          <span class="hint" id="apCheckStat">Nothing judged yet since this page opened.</span>
+        </div>
+        <div class="ctl">
+          <div class="chips"><button class="chip" id="apBeat" aria-pressed="false"><span class="led"></span>Change on the beat</button></div>
+          <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
+          <div class="chips" id="apInputs" role="group" aria-labelledby="apInputsLbl"></div>
+          <span class="hint">Click one to switch it off: Autopilot leaves it out from its next new look. Right-click one (or press and hold it) to choose how often it comes in, from Rarely to Lots; the pie beside the name fills up to show it. 3D worlds and Fractals also let you set each world and fractal. A pinned input still stays. Video, Camera, Screen and Phone only come in while they’re running.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="apTouchLbl">When you move a control while it runs</span>
+          <div class="seg seg-3" id="apTouch" role="group" aria-labelledby="apTouchLbl">
+            <button data-touch="pin" aria-pressed="true">Pin it, keep going</button>
+            <button data-touch="play" aria-pressed="false">Play along</button>
+            <button data-touch="stop" aria-pressed="false">Stop Autopilot</button>
+          </div>
+          <span class="hint">Play along: your change shows straight away, nothing gets pinned, and Autopilot keeps going, changing that setting again with its next look.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl">Pinned</span>
+          <p class="hint" id="apPinList">Nothing pinned.</p>
+          <div class="dev-actions"><button class="btn small" id="apUnpin" hidden>Unpin all</button></div>
+        </div>
+        <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
+      </section>
+
       <section class="group" aria-labelledby="h-screen">
         <h2 id="h-screen">Screen</h2>
         <div class="ctl">
@@ -693,6 +603,89 @@
           </div>
           <span class="hint" id="sharpNote"></span>
         </div>
+      </section>
+
+      <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
+        <h2 id="h-shared">Shared presets</h2>
+        <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
+        <div class="presets" id="sharedList"></div>
+        <div class="admin" id="adminBox" hidden>
+          <span class="admin-tag">ADMIN · ONLY YOU SEE THIS</span>
+          <form class="preset-form" id="sharedForm" hidden>
+            <label for="sharedName" class="lbl" id="sharedFormLbl">Name it for everyone</label>
+            <div class="preset-row">
+              <input type="text" id="sharedName" maxlength="40" autocomplete="off" spellcheck="false">
+              <button class="btn small" type="submit" id="sharedGo">Share</button>
+              <button class="btn small" type="button" id="sharedCancel">Cancel</button>
+            </div>
+          </form>
+          <button class="btn wide" id="sharedAdd">Share current look with everyone</button>
+          <p class="hint">Everyone sees a new or changed shared preset about a minute later. Share while Autopilot runs and it keeps Autopilot too. On a shared preset, ✎ renames it and × takes it away.</p>
+          <button class="linkish" id="adminOut" type="button">Stop being the admin on this device</button>
+        </div>
+        <form class="preset-form admin" id="adminLogin" hidden>
+          <span class="admin-tag">ADMIN</span>
+          <label for="adminKey" class="lbl">Admin key</label>
+          <div class="preset-row">
+            <input type="password" id="adminKey" autocomplete="off" spellcheck="false" placeholder="Paste your GitHub key">
+            <button class="btn small" type="submit" id="adminGo">Unlock</button>
+          </div>
+          <span class="hint" id="adminMsg">Paste the key you made on GitHub. It stays in this browser only.</span>
+        </form>
+      </section>
+
+      <section class="group" id="presetGroup" aria-labelledby="h-pre">
+        <h2 id="h-pre">My presets</h2>
+        <p class="hint" id="presetEmpty">Nothing saved yet. Set up a look you like, then save it here.</p>
+        <div class="presets" id="presetList"></div>
+        <form class="preset-form" id="presetForm" hidden>
+          <label for="presetName" class="lbl">Name this look</label>
+          <div class="preset-row">
+            <input type="text" id="presetName" maxlength="40" autocomplete="off" spellcheck="false">
+            <button class="btn small" type="submit">Save</button>
+            <button class="btn small" type="button" id="presetCancel">Cancel</button>
+          </div>
+        </form>
+        <button class="btn wide" id="presetSave">Save current look</button>
+        <p class="hint" id="presetApNote">Autopilot is on, so this preset will keep Autopilot’s settings and pins too, and start Autopilot again when you load it.</p>
+        <p class="hint" id="presetNote">Presets stay in this browser on this device. Save under the same name to update one. Pictures and videos aren’t saved, only the settings.</p>
+      </section>
+
+      <section class="group" id="tasteGroup" aria-labelledby="h-taste">
+        <h2 id="h-taste">Taste profiles</h2>
+        <p class="ap-state" id="tasteState" role="status">Autopilot isn’t following a taste profile.</p>
+        <button class="btn wide session-btn" id="sessionStart"><span class="led"></span>Start taste session</button>
+        <button class="btn wide session-btn" id="sessionTrain" hidden><span class="led"></span><span id="sessionTrainLbl">Train this profile again</span></button>
+        <p class="hint">Start taste session makes a new profile from scratch: Autopilot runs, you rate its looks with More like this and Not this under the picture, and when you finish you name it. Train again adds another session to the lit profile, with Autopilot already following it, so you can correct what it brings (one profile per song, trained as often as you like).</p>
+        <div class="presets tp-list" id="tasteList"></div>
+        <form class="preset-form" id="tasteRenForm" hidden>
+          <label for="tasteRenName" class="lbl" id="tasteRenLbl">New name</label>
+          <div class="preset-row">
+            <input type="text" id="tasteRenName" maxlength="40" autocomplete="off" spellcheck="false">
+            <button class="btn small" type="submit">Rename</button>
+            <button class="btn small" type="button" id="tasteRenCancel">Cancel</button>
+          </div>
+        </form>
+        <p class="hint">Tap a profile and Autopilot follows it; tap it again to stop. Ratings you make outside a session go into the lit one (with none lit, rating starts a session). On your own profiles, ✎ renames, ⤓ saves a file to send to someone, and × deletes.</p>
+        <p class="hint" id="tasteSum">Nothing learned yet. Press More like this or Not this under the picture.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="apTaste">Follow my taste</label><output id="apTasteOut" for="apTaste"></output></div>
+          <input type="range" id="apTaste" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Surprise me</span><span>Stick to what I like</span></div>
+        </div>
+        <div class="ctl">
+          <div class="chips"><button class="chip" id="apHints" aria-pressed="true"><span class="led"></span>Learn from hints</button></div>
+          <span class="hint">Also learns without you pressing anything: skipping a new look in its first few seconds counts a little against it, and pinning a setting counts for that setting.</span>
+        </div>
+        <div class="ctl">
+          <div class="chips"><button class="chip" id="apFsKeep" aria-pressed="false"><span class="led"></span>Keep timer and rating buttons showing in full screen</button></div>
+          <span class="hint">In full screen during a taste session, the timer and the More like this and Not this buttons normally fade away when the mouse is still. Switch this on to keep them showing.</span>
+        </div>
+        <div class="taste-actions">
+          <button class="btn small" id="tasteOpen">Open a taste file…</button>
+          <input type="file" id="tasteFile" accept=".json,application/json" hidden>
+        </div>
+        <p class="hint" id="tasteAdminNote" hidden><b class="admin-tag">ADMIN</b> ⇪ on one of your profiles shares it with everyone (the same name replaces it). On a shared one, ✎ renames it and × takes it away.</p>
       </section>
 
 
@@ -727,7 +720,7 @@
       <section>
         <h2><small>Start here</small>Your first 30 seconds</h2>
         <ol class="g-steps">
-          <li><b>Pick an input.</b> Under What feeds loop A, choose what goes into the loop: a pattern, a picture, your camera, a 3D world or a fractal.</li>
+          <li><b>Pick an input.</b> Under Inputs, choose what goes into the loop: a pattern, a picture, your camera, a 3D world or a fractal.</li>
           <li><b>Drag on the screen.</b> You draw light straight into the loop and watch it echo.</li>
           <li><b>Move Zoom and Spin.</b> They change the picture the most. Double-click a slider to put it back.</li>
           <li><b>Press Surprise me</b> for something new, or <b>Autopilot</b> to let it run by itself.</li>
@@ -737,7 +730,7 @@
       <section>
         <h2><small>Reference</small>What the controls do</h2>
         <div class="g-grid">
-          <div class="g-card"><h3>Looks</h3><dl>
+          <div class="g-card"><h3>Autopilot</h3><dl>
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
@@ -756,12 +749,12 @@
             <dt>Autopilot settings</dt><dd>How often a new look comes, how slowly it fades in, how wild it gets, and how often it shows both loops at once. How wild also sets how much each new look changes: at Calm only a few settings and inputs change, in the middle about 3 in 4 of them get something new (every effect is on in about half the looks), and at Wild nearly all of them change and most effects are on at once. Check each look tries looks out of sight and skips the poor ones. Change on the beat makes each new look cut in on a beat of the music. Under Inputs Autopilot can use, switch off any input you don’t want it to bring in, or right-click one (press and hold on a touchscreen) to choose how often it comes in: Off, Rarely, Less, Normal, More or Lots. The little pie beside each name shows its setting, and the menu says roughly what share of Autopilot’s picks it gets. For 3D worlds and Fractals the menu also lists every world and fractal, each with its own switch and setting. Switching off Picture also stops it changing the picture. Double-click a slider there to put it back.</dd>
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Mirror is in there too, with its five stops (Off, 2, 4, 6, 8): its handles snap to them, and the stops they sit on count, so lowest 2 and highest 6 means Autopilot uses 2, 4 or 6. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
-          <div class="g-card"><h3>Mix the two loops</h3><dl>
+          <div class="g-card"><h3>Loops</h3><dl>
             <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
             <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes. The loop being fed has to be on screen and have some Trails; raising a feed brings that loop on screen, and if its Trails are at 0 a note offers to fix it.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
-          <div class="g-card"><h3>What feeds the loop</h3><dl>
+          <div class="g-card"><h3>Inputs</h3><dl>
             <dt>Wave, Shape, Bars, Sparks, Ink, Patchwork, 3D world, Fractals</dt><dd>Built-in patterns that need no setup. Ink lands drops of color about twice a second; pair it with Flow. Patchwork is a hand-inked page of small ruled cells like a sketchbook: marker bars, triangles, bowties, striped circles, eyes, mountains and half moons, plus line tiles (straights, curls, square curls, weaves, crossroads, rings) whose lines run on into each other as paths, loops and mazes. Every few seconds a ripple runs across the page and tiles turn, making pinwheels, diamonds, zigzags and new paths. Every 15 seconds or so the rule for how they turn (random, diagonal waves, spinning checks, rings, a four-way mirror) and the mix of tiles change: Sketchbook (most often), Quilt, Maze, Cloth, Circuit or Everything. A smaller Input size makes it a page in the middle. 3D world opens a picker of ten 3D worlds to fly through, circle round, drift past or, in Mount Ribbit, walk on (W A S D walk, Shift runs, J jumps). Fractals opens a picker of six 3D fractals (Menger sponge, Mandelbulb, Mandelbox, Sierpinski, Julia and Kaleidoscope) with a camera that wanders on its own: it rolls and turns, sweeps round the outside, dives deep into the endless detail and climbs back out, and each loop takes its own route. Input size widens or narrows the view, and with React to sound on, the flight surges on the kick and the lights flare on the beat. Camera style picks how a fractal's camera moves: Glide wanders and rolls through as before, Runner races low over the surface, banking hard and surging on each beat, Crawler creeps along the surface step by step with its view bobbing (both keep the surface underneath, so the picture doesn't roll over), and Mix it up takes each in turn (every 16 beats, or about every 8 seconds without music). Each loop has its own, and Autopilot picks one with every new look.</dd>
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
@@ -774,7 +767,7 @@
             <dt>Only movement</dt><dd>For live inputs and video: only what moves gets in.</dd>
             <dt>Adjust the picture</dt><dd>Under each picture, video or live input: Tracking (worn-tape wobble), Brightness, Contrast, Color, Cut out dark parts, and Hold this frame.</dd>
           </dl></div>
-          <div class="g-card"><h3>Shape the loop</h3><dl>
+          <div class="g-card"><h3>Effects</h3><dl>
             <dt>Zoom</dt><dd>In makes a tunnel. Out shrinks the picture into itself.</dd>
             <dt>Spin</dt><dd>Twists every echo. Small amounts make spirals.</dd>
             <dt>Trails</dt><dd>How long echoes last. High is dreamy, low is snappy, and None turns the feedback off.</dd>
@@ -789,7 +782,7 @@
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
             <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
           </dl></div>
-          <div class="g-card"><h3>Feeds on itself</h3><dl>
+          <div class="g-card"><h3>Effects: feeds on itself</h3><dl>
             <dt>Look-up</dt><dd>Each spot copies from a spot its own color points to: how red it is says how far to the side, how green how far up or down, and how blue turns that direction round. The picture keeps rearranging itself by its own colors into folds and liquid-metal swirls. Dark parts stay put. More Color shift gives it more to work with.</dd>
             <dt>Chase</dt><dd>Zoom and Spin normally turn around the middle. With Chase they turn around the brightest part of the picture, and as the tunnel pulls that light away, it heads for the next bright spot, so the middle of the tunnel keeps wandering. Needs some Zoom or Spin.</dd>
             <dt>Breathe</dt><dd>Like React to sound, but the loop listens to itself. As the picture gets brighter it zooms out, as it gets darker it zooms in, and the more it moves the faster it spins. It settles into its own slow rhythm, and pulls back before it turns white.</dd>

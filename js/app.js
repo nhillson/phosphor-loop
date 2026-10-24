@@ -50,7 +50,7 @@ function loopDefaults() {
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
-// The sliders under "Loop A feeds on itself"
+// The sliders under Effects › Feeds on itself
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
 const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
@@ -801,9 +801,6 @@ function setEdit(k) {
   editor.dataset.loop = k;
   $('#tabA').setAttribute('aria-selected', String(k === 'A'));
   $('#tabB').setAttribute('aria-selected', String(k === 'B'));
-  $('#h-in').textContent = `What feeds loop ${k}`;
-  $('#h-shape').textContent = `Shape loop ${k}`;
-  $('#h-self').textContent = `Loop ${k} feeds on itself`;
   syncUI();
   syncPins();
 }
@@ -2175,7 +2172,7 @@ function whiteWatch(now, dt, wA, wB) {
   }
 }
 
-// Two Autopilot buttons: one under Looks, and one in the row under the picture,
+// Two Autopilot buttons: one at the top of Autopilot, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
 const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
 function setAutopilot(on, quiet) {
@@ -3997,7 +3994,7 @@ $('#apReset').addEventListener('click', () => {
 // Check each look and the white-out watch are doing
 function apStatus() {
   let html;
-  if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (under Looks, under the picture, or the P key) to start it.';
+  if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (at the top of Autopilot, under the picture, or the P key) to start it.';
   else {
     const s = Math.max(0, Math.round((ap.next - performance.now()) / 1000));
     const P = ap.prep, holding = P && P.hold && !P.ok;
@@ -5303,7 +5300,7 @@ const RECIPES = [
     how: 'SHAPE · COLOR CHASE 80 · ZOOM IN 18 · TRAILS 92',
     sw: 'linear-gradient(100deg,#0b0614 0 30%,#ff3b3b 34%,#ffd23b 40%,#3bff9a 46%,#3b8bff 52%,#c43bff 58%,#0b0614 64%)',
     patch: { A: { in1: 'shape', form: 3, zoom: 18, spin: 8, trails: 92, color: 10, chroma: 80 } } },
-  { name: 'Name in lights', after: 'Type your own words in the Your text box under What feeds loop A.',
+  { name: 'Name in lights', after: 'Type your own words in the Your text box under Inputs.',
     text: 'Your band’s name, a title or the venue, flying down a tunnel of its own echoes. Type your own words and they change straight away.',
     how: 'TEXT · ZOOM IN 32 · TRAILS 88 · COLOR 16',
     sw: 'radial-gradient(ellipse 46% 20% at 50% 50%,#fff3b0 0 30%,transparent 32%),repeating-radial-gradient(ellipse at 50% 50%,#140a2a 0 6px,#ff7ac6 6px 8px,#6a2bd9 8px 10px)',
@@ -5875,7 +5872,10 @@ renderTaste();
 
 /* ================= folding sections ================= */
 // Every section heading folds its section away. What's folded is remembered in this browser.
-const FOLD_KEY = 'phosphor-folded-v1';
+// Presets and taste profiles sit folded at the bottom until opened (v2: the controls were rearranged, so everyone
+// starts again from these defaults).
+const FOLD_KEY = 'phosphor-folded-v2';
+const FOLD_DEFAULT = ['h-shared', 'h-pre', 'h-taste'];
 let folded = {};
 try { folded = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (_) { folded = {}; }
 const foldControls = [];
@@ -5906,7 +5906,7 @@ $$('.panel .group').forEach((group) => {
     body.hidden = !open;
     if (save) { folded[key] = !open; try { localStorage.setItem(FOLD_KEY, JSON.stringify(folded)); } catch (_) {} }
   };
-  set(!folded[key], false);
+  set(!(folded[key] ?? FOLD_DEFAULT.includes(key)), false);
   btn.addEventListener('click', () => set(body.hidden, true));
   foldControls.push(set);
 });

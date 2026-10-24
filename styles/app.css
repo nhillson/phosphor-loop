@@ -263,6 +263,7 @@
   }
   .group-toggle[aria-expanded="false"] .chev { transform: rotate(-45deg); }
   .group-body { display: flex; flex-direction: column; gap: 12px; }
+  .group .subhead { margin: 10px 0 0; font: 10px/1 var(--f-display); letter-spacing: .2em; text-transform: uppercase; color: var(--dim); opacity: .8; }
   .panel-tools { display: flex; gap: 14px; margin-top: -14px; font-size: 13px; }
   .panel-tools .linkish { font-weight: 500; }
 
