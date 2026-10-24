@@ -743,7 +743,8 @@ function makeHiker(start, face, firstStop) {
   gradAt(W.p.x, W.p.y, W.p.z, W.n); W.vn.copy(W.n); retangent(W.f, W.n);
   return W;
 }
-const hikers = { A: makeHiker([0, 3, 36], [0, 0, -1], 3), B: makeHiker([30, 3, -26], [-1, 0, 0.6], 9) };
+const hikers = { A: makeHiker([0, 3, 36], [0, 0, -1], 3), B: makeHiker([30, 3, -26], [-1, 0, 0.6], 9),
+                 C: makeHiker([-24, 3, 30], [1, 0, -0.3], 11), D: makeHiker([10, 3, -34], [0, 0, 1], 1) };
 
 function planTo(W, li) {
   const L = LM[li];

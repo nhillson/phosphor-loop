@@ -27,6 +27,9 @@ file don't rebuild the app.
    `python3 tests/clips_check.py` uses a stand-in library; `CLIPS_APP=<clip-app folder>` uses the real sharing
    server. Test clips are WebM because the workspace's Chromium can't play H.264. The test reaches into the app
    through `window.__plClips`.
+4c. **Loops C and D, and Spread out controls' columns:** `python3 tests/loops_check.py` (about 3 minutes). Each
+   loop's column is a copy of the hidden sidebar editor; clicks and sliders in a copy are passed to the real one
+   (see "a column per loop" in js/app.js), so new editor controls work there without extra code.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

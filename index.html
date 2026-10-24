@@ -106,15 +106,34 @@
 
     <aside class="panel" aria-label="Controls">
     <div class="panel-in">
-      <p class="lede">Two loops, <b>A</b> and <b>B</b>, feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick an input</b>, move a slider, or <b>drag on the screen</b> to draw.</p>
+      <p class="lede">Two loops, <b>A</b> and <b>B</b> (add <b>C</b> and <b>D</b> under Loops), feed the picture back into themselves, a little zoomed, turned and tinted, sixty times a second. <b>Pick an input</b>, move a slider, or <b>drag on the screen</b> to draw.</p>
       <div class="panel-tools"><button class="linkish" id="foldAll">Collapse all</button><button class="linkish" id="openAll">Expand all</button></div>
 
       <section class="group" aria-labelledby="h-mix">
         <h2 id="h-mix">Loops</h2>
         <div class="ctl">
-          <div class="ctl-head"><label for="view">What you see</label><output id="viewOut" for="view"></output></div>
-          <input type="range" id="view" class="ab" min="0" max="100" step="1" value="0">
-          <div class="ends"><span>Loop A</span><span>Both</span><span>Loop B</span></div>
+          <div class="ctl-head"><span class="lbl" id="loopCountLbl">How many loops</span></div>
+          <div class="seg seg-3" id="loopCount" role="group" aria-labelledby="loopCountLbl">
+            <button data-n="2" aria-pressed="true">2 loops</button>
+            <button data-n="3" aria-pressed="false" title="Adds loop C">3 loops</button>
+            <button data-n="4" aria-pressed="false" title="Adds loops C and D">4 loops</button>
+          </div>
+        </div>
+        <div class="ctl show-ctl" data-loop-row="A">
+          <div class="ctl-head"><label for="showA">Show <span class="mini a">A</span></label><output id="showAOut" for="showA"></output></div>
+          <input type="range" id="showA" class="lf lf-a" min="0" max="100" step="1" value="100">
+        </div>
+        <div class="ctl show-ctl" data-loop-row="B">
+          <div class="ctl-head"><label for="showB">Show <span class="mini b">B</span></label><output id="showBOut" for="showB"></output></div>
+          <input type="range" id="showB" class="lf lf-b" min="0" max="100" step="1" value="0">
+        </div>
+        <div class="ctl show-ctl" data-loop-row="C" hidden>
+          <div class="ctl-head"><label for="showC">Show <span class="mini c">C</span></label><output id="showCOut" for="showC"></output></div>
+          <input type="range" id="showC" class="lf lf-c" min="0" max="100" step="1" value="100">
+        </div>
+        <div class="ctl show-ctl" data-loop-row="D" hidden>
+          <div class="ctl-head"><label for="showD">Show <span class="mini d">D</span></label><output id="showDOut" for="showD"></output></div>
+          <input type="range" id="showD" class="lf lf-d" min="0" max="100" step="1" value="100">
         </div>
         <div class="ctl">
           <div class="ctl-head"><label for="xab">Feed <span class="mini a">A</span> into <span class="mini b">B</span></label><output id="xabOut" for="xab"></output></div>
@@ -126,16 +145,28 @@
           <input type="range" id="xba" min="0" max="100" step="1" value="0">
           <div class="ends"><span>Off</span><span>Strong</span></div>
         </div>
+        <div class="ctl" data-loop-row="C" hidden>
+          <div class="ctl-head"><label for="xc">Feed <span class="mini a" id="xcFrom">A</span> into <span class="mini c">C</span></label><output id="xcOut" for="xc"></output></div>
+          <input type="range" id="xc" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Strong</span></div>
+        </div>
+        <div class="ctl" data-loop-row="D" hidden>
+          <div class="ctl-head"><label for="xd">Feed <span class="mini c">C</span> into <span class="mini d">D</span></label><output id="xdOut" for="xd"></output></div>
+          <input type="range" id="xd" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Strong</span></div>
+        </div>
         <div class="hint feed-note" id="feedNote" role="status" hidden></div>
-        <p class="hint">Each feed pours one loop’s picture into the other loop’s trails. Turn both up and the loops trade shapes. You can also choose the other loop as an input below.</p>
+        <p class="hint" id="loopsHint">Each Show fader sets how strongly that loop is on screen; 0 hides it. Each feed pours one loop’s picture into another loop’s trails. Turn both up and the loops trade shapes. You can also choose the other loop as an input below.</p>
       </section>
 
       <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
-        <div class="tabs" role="tablist" aria-label="Which loop to edit">
-          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span>Loop A <span class="vis" id="visA" role="img"></span></button>
-          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span>Loop B <span class="vis" id="visB" role="img"></span></button>
+        <div class="tabs" id="tabs" data-n="2" role="tablist" aria-label="Which loop to edit">
+          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span><span class="tab-name">Loop A</span> <span class="vis" id="visA" role="img"></span></button>
+          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span><span class="tab-name">Loop B</span> <span class="vis" id="visB" role="img"></span></button>
+          <button role="tab" id="tabC" aria-selected="false" aria-controls="editor" hidden><span class="tag">C</span><span class="tab-name">Loop C</span> <span class="vis" id="visC" role="img"></span></button>
+          <button role="tab" id="tabD" aria-selected="false" aria-controls="editor" hidden><span class="tag">D</span><span class="tab-name">Loop D</span> <span class="vis" id="visD" role="img"></span></button>
         </div>
-        <p class="hint" id="hiddenHint" hidden><span id="hiddenText">Loop B isn’t on screen right now.</span> <button class="linkish" id="showLoop">Show both loops</button></p>
+        <p class="hint" id="hiddenHint" hidden><span id="hiddenText">Loop B isn’t on screen right now.</span> <button class="linkish" id="showLoop">Show this loop</button></p>
 
         <div class="group">
           <h2 id="h-in">Inputs</h2>
@@ -750,7 +781,7 @@
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Mirror is in there too, with its five stops (Off, 2, 4, 6, 8): its handles snap to them, and the stops they sit on count, so lowest 2 and highest 6 means Autopilot uses 2, 4 or 6. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
           <div class="g-card"><h3>Loops</h3><dl>
-            <dt>What you see</dt><dd>Show loop A, loop B, or both laid over each other.</dd>
+            <dt>How many loops and Show</dt><dd>Two loops, A and B, to start with; pick 3 loops or 4 loops under Loops to add loop C, then D. Each loop has its own Show fader: 100 shows it fully, 0 hides it, and loops that are showing are laid over each other. Loops C and D work just like A and B: C and D feed, push and dye each other the way A and B do (with three loops, C takes loop A as its other loop). Autopilot steers loops A and B; loops C and D keep whatever you give them, while Auto-drift keeps them moving. With Spread out controls on, each loop gets a column of its own, side by side (two loops share a column when the screen is too narrow).</dd>
             <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes. The loop being fed has to be on screen and have some Trails; raising a feed brings that loop on screen, and if its Trails are at 0 a note offers to fix it.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>

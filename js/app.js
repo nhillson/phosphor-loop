@@ -54,9 +54,34 @@ function loopDefaults() {
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
 const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
-const MIX_SLIDERS = ['view', 'xab', 'xba'];
+// Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
+const KEYS = ['A', 'B', 'C', 'D'];
+const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
+// How far apart the loops' own clocks, colors and camera routes start, so no two loops move in step
+const LOOP_OFF = { A: 0, B: 1, C: 0.62, D: 1.38 };
+let loopCount = 2;
+const loopOn = (k) => LOOP_NUM[k] < loopCount;
+const activeKeys = () => KEYS.slice(0, loopCount);
+// Each loop has one other loop it can take as an input, be pushed or dyed by, and be fed from: A and B pair up,
+// and so do C and D. With three loops, C pairs with A.
+function otherLoop(k) {
+  if (k === 'A') return 'B';
+  if (k === 'B') return 'A';
+  if (k === 'C') return loopCount >= 4 ? 'D' : 'A';
+  return 'C';
+}
+// The feed slider that pours into loop k (from its other loop). xab is Feed A into B, so it pours into B.
+const FEED_INTO = { A: 'xba', B: 'xab', C: 'xc', D: 'xd' };
+const FEED_TO = { xba: 'A', xab: 'B', xc: 'C', xd: 'D' };
+const SHOW = { A: 'showA', B: 'showB', C: 'showC', D: 'showD' };
+const MIX_SLIDERS = ['showA', 'showB', 'showC', 'showD', 'xab', 'xba', 'xc', 'xd'];
+// Autopilot pins and limits what used to be one fader between A and B ("view"), so the A and B faders share that pin
+const pinKeyOf = (p) => (p === 'showA' || p === 'showB' ? 'view' : p);
 // What loop B holds when a look only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
+// What loops C and D start with when they're switched on
+const C_START = { in1: 'bars', size: 50, zoom: 28, spin: 40, trails: 88, color: 16, warp: 18, mirror: 2, blur: 0.1 };
+const D_START = { in1: 'sparks', zoom: -30, spin: -24, trails: 90, color: 20, warp: 12, mirror: 6, edge: 1, blur: 0.15 };
 
 // Looks Autopilot can start from and vary (the first one opens the page)
 const STARTERS = [
@@ -103,9 +128,27 @@ function mkLoop() {
   return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0, tw: null,
            probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], cells: crystalStart(), breath: { z: 0, s: 1 } };
 }
-const loops = { A: mkLoop(), B: mkLoop() };
-const mixDefaults = { view: 0, xab: 0, xba: 0 };
-const mix = { tgt: { ...mixDefaults }, cur: { ...mixDefaults }, base: { ...mixDefaults } };
+const loops = { A: mkLoop(), B: mkLoop(), C: mkLoop(), D: mkLoop() };
+const mixDefaults = { showA: 100, showB: 0, showC: 100, showD: 100, xab: 0, xba: 0, xc: 0, xd: 0 };
+// "view" is the old single fader between loops A and B (0 A only, 50 both, 100 B only). Autopilot, taste profiles
+// and old presets still think in it, so it reads and writes the A and B Show faders: setting view 25 shows A fully
+// and B at half, and the Show faders read back as the nearest view.
+function viewOf(a, b) {
+  a = clamp(+a || 0, 0, 100); b = clamp(+b || 0, 0, 100);
+  if (a <= 0 && b <= 0) return 0;
+  return a >= b ? 50 * b / a : 100 - 50 * a / b;
+}
+function withView(o) {
+  Object.defineProperty(o, 'view', {
+    enumerable: false, configurable: true,
+    get() { return viewOf(this.showA, this.showB); },
+    set(v) { const [a, b] = weights(clamp(+v || 0, 0, 100)); this.showA = a * 100; this.showB = b * 100; },
+  });
+  return o;
+}
+const mix = { tgt: withView({ ...mixDefaults }), cur: withView({ ...mixDefaults }), base: { ...mixDefaults } };
+// How strongly loop k is on screen (0 to 1), from these Show faders (mix.tgt or mix.cur)
+const wOf = (m, k) => (loopOn(k) ? clamp(m[SHOW[k]], 0, 100) / 100 : 0);
 // Which look is on screen: goes up by one whenever a new look comes on screen (one Autopilot brings in, or a whole
 // new look on a loop that's showing), but not when Autopilot tries out its next look out of sight, nudges a slider
 // or builds a 3D world up. A rating stands for the look on screen until this changes, and the rating buttons stay lit.
@@ -209,8 +252,8 @@ function droneOf(sc, k) {
   if (!f.drone) f.drone = {};
   let dr = f.drone[k];
   if (!dr || simT - dr.used > 3) {
-    dr = f.drone[k] = makeDrone(f.de, k === 'B' ? 2 : 1, { start: 3.2, roam: 2.2, size: 1.2, far: 0.45, near: f.near, dive: 70, speed: 0.55,
-                                                           phase0: k === 'B' ? 0.35 : 0, lure: f.lure });
+    dr = f.drone[k] = makeDrone(f.de, LOOP_NUM[k] + 1, { start: 3.2, roam: 2.2, size: 1.2, far: 0.45, near: f.near, dive: 70, speed: 0.55,
+                                                           phase0: LOOP_OFF[k] * 0.35, lure: f.lure });
   }
   dr.used = simT;
   return dr;
@@ -302,7 +345,7 @@ const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'u
 gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
 gl.useProgram(compProg.p);
-set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1);
+set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1); set1i(compProg, 'uC', 2); set1i(compProg, 'uD', 3);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
 // Time warp gets its own program, so a graphics card that can't draw it only loses Time warp
@@ -336,9 +379,11 @@ function makeTarget(w = simW, h = simH) {
   const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
   return { tex, fbo, ok };
 }
+// Loops C and D get their pictures only once they're first switched on
 function makeAllTargets() {
   loops.A.rt = [makeTarget(), makeTarget()];
   loops.B.rt = [makeTarget(), makeTarget()];
+  for (const k of ['C', 'D']) loops[k].rt = loops[k].rt || loopOn(k) ? [makeTarget(), makeTarget()] : null;
   return makeTarget();
 }
 let comp = makeAllTargets();
@@ -346,13 +391,28 @@ if (useFloat && ![...loops.A.rt, ...loops.B.rt, comp].every((t) => t.ok)) {
   useFloat = false;
   comp = makeAllTargets();
 }
-function clearTargets() {
+const allRT = () => KEYS.flatMap((k) => loops[k].rt || []);
+function clearLoopTargets(k) {
   gl.clearColor(0, 0, 0, 1);
-  for (const t of [...loops.A.rt, ...loops.B.rt, comp]) {
+  for (const t of loops[k].rt || []) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
-  twForget(loops.A); twForget(loops.B);
+  twForget(loops[k]);
+}
+function clearTargets() {
+  gl.clearColor(0, 0, 0, 1);
+  for (const t of [...allRT(), comp]) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  for (const k of KEYS) twForget(loops[k]);
+}
+function ensureTargets(k) {
+  if (loops[k].rt) return;
+  loops[k].rt = [makeTarget(), makeTarget()];
+  loops[k].front = 0;
+  clearLoopTargets(k);
 }
 clearTargets();
 
@@ -580,8 +640,8 @@ const sliderEls = {}, outputs = {};
     takeOver(k);
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     showSlider(k);
-    if ((k === 'xab' || k === 'xba') && +el.value > 0) showFedLoop(k);
-    if (k === 'view' || k === 'xab' || k === 'xba' || k === 'trails') syncVisibility();
+    if (k in FEED_TO && +el.value > 0) showFedLoop(k);
+    if (isMix || k === 'trails') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
     takeOver(k);
@@ -597,12 +657,9 @@ function sliderText(k, v) {
   switch (k) {
     case 'zoom': return v > 0 ? `IN ${v}` : v < 0 ? `OUT ${-v}` : 'HOLD';
     case 'spin': return v > 0 ? `RIGHT ${v}` : v < 0 ? `LEFT ${-v}` : 'HOLD';
-    case 'view': {
-      const wA = Math.round(Math.min(1, 2 * (1 - v / 100)) * 100), wB = Math.round(Math.min(1, 2 * v / 100) * 100);
-      return wB === 0 ? 'A ONLY' : wA === 0 ? 'B ONLY' : `A ${wA} · B ${wB}`;
-    }
+    case 'showA': case 'showB': case 'showC': case 'showD': return v === 0 ? 'HIDDEN' : String(v);
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
-    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'trails':
+    case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
     case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal': return v === 0 ? 'OFF' : String(v);
     // How far back the far edge reaches
     case 'time': return v === 0 ? 'OFF' : `${twSpan(v).toFixed(1)} SEC`;
@@ -747,7 +804,7 @@ function camMixTick(dt) {
 function camStyleOf(k) {
   const c = loops[k].tgt.cam;
   if (c !== 'mix') return CAM_STYLES.includes(c) ? c : 'glide';
-  return ['glide', 'runner', 'crawler'][(Math.floor(camMix.n / 16) + (k === 'B' ? 1 : 0)) % 3];
+  return ['glide', 'runner', 'crawler'][(Math.floor(camMix.n / 16) + LOOP_NUM[k]) % 3];
 }
 const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE'];
 $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
@@ -760,7 +817,7 @@ $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
 }));
 if (!twProg) $('#timeCtl').hidden = true;
 
-function uses(src) { return ['A', 'B'].some((k) => loops[k].tgt.in1 === src || loops[k].tgt.in2 === src); }
+function uses(src) { return activeKeys().some((k) => loops[k].tgt.in1 === src || loops[k].tgt.in2 === src); }
 
 // Pick an input for the loop being edited. Devices start right here, inside the click, so the
 // browser treats the camera or screen request as something the person asked for.
@@ -779,7 +836,7 @@ function chooseSource(slot, src) {
   if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
-  if (src !== 'none') showOSD(`INPUT ${edit}`, src === 'loop' ? `LOOP ${edit === 'A' ? 'B' : 'A'}` : SRC_LABEL[src].toUpperCase());
+  if (src !== 'none') showOSD(`INPUT ${edit}`, src === 'loop' ? `LOOP ${otherLoop(edit)}` : SRC_LABEL[src].toUpperCase());
 }
 
 // Turn off the camera and screen share when nothing uses them; pause an unused video.
@@ -794,21 +851,49 @@ function settleDevices() {
 
 /* ================= UI: loop tabs ================= */
 const editor = $('#editor');
-$('#tabA').addEventListener('click', () => setEdit('A'));
-$('#tabB').addEventListener('click', () => setEdit('B'));
+for (const k of KEYS) $('#tab' + k).addEventListener('click', () => setEdit(k));
 function setEdit(k) {
+  if (!loopOn(k)) k = 'A';
   edit = k;
   editor.dataset.loop = k;
-  $('#tabA').setAttribute('aria-selected', String(k === 'A'));
-  $('#tabB').setAttribute('aria-selected', String(k === 'B'));
+  for (const j of KEYS) $('#tab' + j).setAttribute('aria-selected', String(k === j));
   syncUI();
   syncPins();
 }
 $('#showLoop').addEventListener('click', () => {
-  takeOver('view');
-  mix.tgt.view = 50;
+  takeOver(SHOW[edit]);
+  mix.tgt[SHOW[edit]] = 100;
   syncUI();
 });
+// How many loops: 2, 3 or 4. A loop switched on starts from a fresh look of its own, fully on screen; one switched
+// off keeps its settings (hidden and not drawn) for when it comes back.
+function setLoopCount(n, how) {
+  n = clamp(Math.round(+n || 2), 2, 4);
+  const was = loopCount;
+  loopCount = n;
+  for (const k of activeKeys()) ensureTargets(k);
+  if (how !== 'load') {
+    for (const k of ['C', 'D']) {
+      if (LOOP_NUM[k] < was || !loopOn(k) || loops[k].started) continue;
+      loops[k].started = true;
+      patchLoop(k, k === 'C' ? C_START : D_START);
+      Object.assign(loops[k].cur, loops[k].tgt);
+      clearLoopTargets(k);
+      mix.tgt[SHOW[k]] = mix.cur[SHOW[k]] = 100;
+      mix.tgt[FEED_INTO[k]] = mix.cur[FEED_INTO[k]] = 0;
+    }
+  }
+  if (!loopOn(edit)) edit = 'A';
+  $('#tabs').dataset.n = String(n);
+  for (const k of KEYS) $('#tab' + k).hidden = !loopOn(k);
+  $$('#loopCount button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === n)));
+  $$('[data-loop-row]').forEach((el) => { el.hidden = !loopOn(el.dataset.loopRow); });
+  settleDevices();
+  setEdit(edit);
+  if (how === 'click' && n > was) { setEdit(KEYS[n - 1]); toast(`Loop ${KEYS[n - 1]} is on, laid over the others. Its Show fader is under Loops.`); }
+  wideLayout();
+}
+$$('#loopCount button').forEach((b) => b.addEventListener('click', () => setLoopCount(+b.dataset.n, 'click')));
 function weights(v) { return [Math.min(1, 2 * (1 - v / 100)), Math.min(1, 2 * v / 100)]; }
 // Whether loop k looks at the other loop's picture: as an input, or to be pushed or dyed by it.
 // The other loop then keeps running even when it isn't on screen.
@@ -819,23 +904,23 @@ function readsOther(k) {
 // A feed pours into the other loop, so if that loop isn't on screen, raising the slider slides
 // What you see to Both. (Only for the slider itself.)
 function showFedLoop(k) {
-  const from = k === 'xab' ? 'A' : 'B', to = k === 'xab' ? 'B' : 'A';
-  const [wA, wB] = weights(mix.tgt.view);
-  if ((to === 'A' ? wA : wB) > 0) return;
-  mix.tgt.view = 50;
-  sliderEls.view.value = 50;
-  showSlider('view');
-  toast(`Showing both loops, so you can see loop ${from} pouring into loop ${to}.`);
+  const to = FEED_TO[k], from = otherLoop(to);
+  if (wOf(mix.tgt, to) > 0) return;
+  mix.tgt[SHOW[to]] = 100;
+  sliderEls[SHOW[to]].value = 100;
+  showSlider(SHOW[to]);
+  toast(`Showing loop ${to}, so you can see loop ${from} pouring into it.`);
 }
 // Says why a raised Feed slider shows nothing, with a button that fixes it
 const feedNote = $('#feedNote');
-function syncFeedNote(wA, wB) {
+function syncFeedNote() {
   const notes = [];
-  for (const [key, from, to] of [['xab', 'A', 'B'], ['xba', 'B', 'A']]) {
+  for (const to of activeKeys()) {
+    const key = FEED_INTO[to], from = otherLoop(to);
     if (!(mix.tgt[key] > 0)) continue;
-    if ((to === 'A' ? wA : wB) === 0) {
-      notes.push([`Loop ${to} isn’t on screen, so you can’t see what loop ${from} pours into it.`, 'Show both loops',
-        () => { mix.tgt.view = 50; }, 'view']);
+    if (wOf(mix.tgt, to) === 0) {
+      notes.push([`Loop ${to} isn’t on screen, so you can’t see what loop ${from} pours into it.`, `Show loop ${to}`,
+        () => { mix.tgt[SHOW[to]] = 100; }, SHOW[to]]);
     } else if (loops[to].tgt.trails < 10) {
       notes.push([`Loop ${to} has no trails, so what loop ${from} pours in disappears straight away.`, `Give loop ${to} trails`,
         () => { loops[to].tgt.trails = 60; }, 'trails', to]);
@@ -855,21 +940,20 @@ function syncFeedNote(wA, wB) {
   feedNote.hidden = notes.length === 0;
 }
 function syncVisibility() {
-  const [wA, wB] = weights(mix.tgt.view);
-  for (const [id, w] of [['#visA', wA], ['#visB', wB]]) {
-    const el = $(id);
+  for (const k of KEYS) {
+    const el = $('#vis' + k), w = wOf(mix.tgt, k);
     el.classList.toggle('on', w > 0);
     el.title = w > 0 ? 'On screen' : 'Not on screen';
     el.setAttribute('aria-label', el.title);
   }
-  const hidden = (edit === 'A' ? wA : wB) === 0;
+  const hidden = wOf(mix.tgt, edit) === 0;
   $('#hiddenHint').hidden = !hidden;
-  const other = edit === 'A' ? 'B' : 'A';
-  const feedsOther = (edit === 'A' ? mix.tgt.xab : mix.tgt.xba) > 0 || readsOther(other);
-  $('#hiddenText').textContent = feedsOther
-    ? `Loop ${edit} isn’t on screen, but it still feeds loop ${other}.`
+  // The loops this one feeds or is read by
+  const fed = activeKeys().filter((j) => j !== edit && otherLoop(j) === edit && (mix.tgt[FEED_INTO[j]] > 0 || readsOther(j)));
+  $('#hiddenText').textContent = fed.length
+    ? `Loop ${edit} isn’t on screen, but it still feeds loop ${fed.join(' and ')}.`
     : `Loop ${edit} isn’t on screen right now.`;
-  syncFeedNote(wA, wB);
+  syncFeedNote();
 }
 
 function syncUI() {
@@ -898,7 +982,9 @@ function syncUI() {
   if (frac) $('#hintFractal').textContent = HINT_3D[frac];
   $$('#fractals button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.world === frac)));
   $$('#cam button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cam === (t.cam || 'glide'))));
-  const otherK = edit === 'A' ? 'B' : 'A';
+  const otherK = otherLoop(edit);
+  $('#xcFrom').textContent = otherLoop('C');
+  $('#xcFrom').className = `mini ${otherLoop('C').toLowerCase()}`;
   $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
   $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
   in2Sel.querySelector('option[value="loop"]').textContent = `Loop ${otherK}’s picture`;
@@ -908,6 +994,7 @@ function syncUI() {
   $('#motionCtl').hidden = !LIVE.some(usesHere);
   $('#motion').setAttribute('aria-pressed', String(!!t.motion));
   syncVisibility();
+  if (!mirroring) mirrorRefreshSoon();
 }
 
 /* ================= looks & surprise ================= */
@@ -937,7 +1024,7 @@ function patchLoop(k, p, force) {
   L.base = { ...L.tgt };
   // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
   L.gen = (L.gen || 0) + 1;
-  if (weights(mix.tgt.view)[k === 'A' ? 0 : 1] > 0.05) lookOnScreen++;
+  if (wOf(mix.tgt, k) > 0.05) lookOnScreen++;
 }
 function applyPatch(c) {
   patchLoop('A', c.A);
@@ -991,6 +1078,12 @@ function surprise() {
   markPreset(null);
   const both = Math.random() < 0.5;
   applyPatch({ A: randomLoop(), B: randomLoop(), view: both ? Math.round(rnd(30, 70)) : 0, xab: both ? Math.round(rnd(0, 70)) : 0, xba: both ? Math.round(rnd(0, 70)) : 0 });
+  // Loops C and D get a surprise of their own too, while they're on
+  for (const k of ['C', 'D']) if (loopOn(k)) {
+    patchLoop(k, randomLoop());
+    mix.tgt[FEED_INTO[k]] = Math.random() < 0.5 ? Math.round(rnd(0, 70)) : 0;
+    mix.base = { ...mix.tgt };
+  }
   syncUI();
   burst();
   showOSD('SURPRISE', 'NEW LOOK');
@@ -1610,10 +1703,11 @@ function neutral() {
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
-  patchLoop('A', flat, true);
-  patchLoop('B', { ...flat }, true);
-  for (const k of ['A', 'B']) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; }
-  for (const q of ['view', 'xab', 'xba']) { mix.tgt[q] = 0; mix.cur[q] = 0; }
+  for (const k of activeKeys()) patchLoop(k, { ...flat }, true);
+  for (const k of activeKeys()) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; }
+  // Just loop A on screen, and nothing fed anywhere
+  for (const q of MIX_SLIDERS) { mix.tgt[q] = 0; mix.cur[q] = 0; }
+  mix.tgt.showA = mix.cur.showA = 100;
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((x) => { adj[x] = adjDefaults(); });
   syncAdjUI();
@@ -1663,7 +1757,8 @@ const PINS = {
   restless: { name: 'Restless', fields: ['restless'] },
   julia: { name: 'Fractal fold', fields: ['julia'] },
   crystal: { name: 'Crystal', fields: ['crystal'] },
-  view: { name: 'What you see', fields: ['view'], mix: true },
+  // The Show A and Show B faders together (one pin, on either fader, holds both)
+  view: { name: 'Show A and B', fields: ['showA', 'showB'], mix: true },
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
   xba: { name: 'Feed B into A', fields: ['xba'], mix: true },
 };
@@ -1978,7 +2073,6 @@ function checkStatText() {
   const bad = Object.entries(c.why).filter(([, n]) => n).sort((a, b) => b[1] - a[1]).map(([w, n]) => `${n} ${w === 'white' ? 'turning white' : w === 'dark' ? 'nearly black' : w === 'plain' ? 'dull' : 'frozen'}`);
   return `Since this page opened: ${c.n} look${c.n === 1 ? '' : 's'} judged, ${c.ok} passed (${pct(c.ok, c.n)}). ${c.firstOk} of ${c.first} passed on the first try (${pct(c.firstOk, c.first)}).` + (bad.length ? ` Thrown away: ${bad.join(', ')}.` : '');
 }
-const otherLoop = (k) => (k === 'A' ? 'B' : 'A');
 const canTryOut = () => !ap.pins.has('view') && !limSpan('view');
 function prepBegin(k, now, rush) {
   ap.prep = { k, since: now, tries: 0, rush: !!rush, ok: false, best: null, look: null, v: null, hold: 0 };
@@ -2221,6 +2315,11 @@ function setAutopilot(on, quiet) {
 // finished handling the move, which is why holdPin waits for a microtask.
 function takeOver(key, from) {
   if (!ap.on) return;
+  // Autopilot steers loops A and B only, so changing loop C or D (or their Show and Feed faders) leaves it running
+  if (key === 'showC' || key === 'showD' || key === 'xc' || key === 'xd') return;
+  const isMixKey = key === 'view' || MIX_SLIDERS.includes(key);
+  if (key && !isMixKey && (from || edit) !== 'A' && (from || edit) !== 'B') return;
+  key = pinKeyOf(key);
   if (key && PINS[key] && apSet.touch === 'play') { rampLet(key, from || edit); return; }
   if (key && PINS[key] && apSet.touch === 'pin') {
     const P = PINS[key], loopKey = from || edit;
@@ -2348,8 +2447,7 @@ function togglePinBoth(key) {
 }
 // A small pin beside each setting Autopilot can change. They show while Autopilot runs, and whenever one is pinned.
 const PIN_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h6v1.2L10 3v3.5L12.5 9v1.2H8.6V15H7.4v-4.8H3.5V9L6 6.5V3L5 2.2z" fill="currentColor"/></svg>';
-for (const key of Object.keys(PINS)) {
-  const anchor = key === 'in1' ? $('#in1Head') : $('#' + key);
+for (const key of Object.keys(PINS)) for (const anchor of key === 'in1' ? [$('#in1Head')] : key === 'view' ? [$('#showA'), $('#showB')] : [$('#' + key)]) {
   const head = key === 'in1' ? anchor : anchor && anchor.closest('.ctl') && anchor.closest('.ctl').querySelector('.ctl-head');
   if (!head) continue;
   const b = document.createElement('button');
@@ -4093,6 +4191,12 @@ function limRow(k, holder) {
   }
   const ends = main && main.closest('.ctl') && main.closest('.ctl').querySelector('.ends');
   if (ends && k !== 'mirror') row.appendChild(ends.cloneNode(true));
+  if (k === 'view') {
+    const e = document.createElement('div');
+    e.className = 'ends';
+    e.innerHTML = '<span>A only</span><span>Both</span><span>B only</span>';
+    row.appendChild(e);
+  }
   if (k === 'trails') {
     const h = document.createElement('span');
     h.className = 'hint';
@@ -4744,9 +4848,9 @@ clipsDlg.addEventListener('keydown', (e) => {
 function clipsDropVideo() {
   if (vid.on) return;
   let dropped = false;
-  for (const k of ['A', 'B']) {
+  for (const k of KEYS) {
     const t = loops[k].tgt;
-    if (t.in1 === 'video') { t.in1 = k === 'A' ? 'wave' : 'shape'; dropped = true; }
+    if (t.in1 === 'video') { t.in1 = k === 'B' ? 'shape' : 'wave'; dropped = true; }
     if (t.in2 === 'video') { t.in2 = 'none'; dropped = true; }
   }
   if (dropped) { settleDevices(); syncUI(); toast('Picked up where you left off. Open Phosphor Clips, then choose Video again to bring the clip back.'); }
@@ -5018,9 +5122,9 @@ $('#camOff').addEventListener('click', () => dropSource('camera'));
 
 // Swap a device out of every slot that uses it
 function dropSource(src) {
-  for (const k of ['A', 'B']) {
+  for (const k of KEYS) {
     const t = loops[k].tgt;
-    if (t.in1 === src) t.in1 = k === 'A' ? 'wave' : 'shape';
+    if (t.in1 === src) t.in1 = k === 'B' ? 'shape' : 'wave';
     if (t.in2 === src) t.in2 = 'none';
   }
   settleDevices();
@@ -5411,6 +5515,8 @@ function applyRecipe(r) {
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
   if (p.A.in1 === 'video' && !vid.on) { if (clipsReady()) clipPick(pick(clipsAp()), true); else p.A.in1 = 'picture'; }
+  // A recipe is a look for two loops
+  setLoopCount(2, 'load');
   patchLoop('A', p.A, true);
   patchLoop('B', p.B || B_PARTNER, true);
   mix.tgt.view = p.view ?? 0;
@@ -5494,7 +5600,10 @@ function snapshot() {
   return {
     v: 1,
     A: clone(loops.A.tgt), B: clone(loops.B.tgt),
-    mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba },
+    // Loops C and D, and how many loops, only when there are more than two (older versions just read A and B)
+    ...(loopCount > 2 ? { n: loopCount, C: clone(loops.C.tgt), ...(loopCount > 3 ? { D: clone(loops.D.tgt) } : {}) } : {}),
+    mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba, showA: mix.tgt.showA, showB: mix.tgt.showB,
+           ...(loopCount > 2 ? { showC: mix.tgt.showC, xc: mix.tgt.xc } : {}), ...(loopCount > 3 ? { showD: mix.tgt.showD, xd: mix.tgt.xd } : {}) },
     adj: clone(adj),
     snd: { amount: snd.amount, map: clone(snd.map) },
     drift,
@@ -5584,17 +5693,26 @@ presetForm.addEventListener('submit', async (e) => {
 function loadPreset(pr, quiet) {
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
+  // A preset saved with three or four loops brings them back; any other is a look for two loops
+  const n = d.n === 3 || d.n === 4 ? d.n : 2;
+  setLoopCount(n, 'load');
   patchLoop('A', d.A || {}, true);
   patchLoop('B', d.B || B_PARTNER, true);
+  if (n > 2) { patchLoop('C', d.C || C_START, true); loops.C.started = true; }
+  if (n > 3) { patchLoop('D', d.D || D_START, true); loops.D.started = true; }
   const m = d.mix || {};
   mix.tgt.view = m.view ?? 0; mix.tgt.xab = m.xab ?? 0; mix.tgt.xba = m.xba ?? 0;
+  if (Number.isFinite(m.showA) && Number.isFinite(m.showB)) { mix.tgt.showA = m.showA; mix.tgt.showB = m.showB; }
+  mix.tgt.showC = m.showC ?? 100; mix.tgt.xc = m.xc ?? 0;
+  mix.tgt.showD = m.showD ?? 100; mix.tgt.xd = m.xd ?? 0;
+  for (const k of ['C', 'D']) if (loopOn(k)) clearLoopTargets(k);
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((d.adj && d.adj[src]) || {}) }; });
   syncAdjUI();
   if (d.snd) { if (d.snd.amount != null) snd.amount = d.snd.amount; if (d.snd.map) Object.assign(snd.map, d.snd.map); syncSoundUI(); }
   if (typeof d.drift === 'boolean') setDrift(d.drift);
   // Start any camera, screen or phone the preset uses, right here inside the click
-  const used = [loops.A.tgt.in1, loops.A.tgt.in2, loops.B.tgt.in1, loops.B.tgt.in2];
+  const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
   if (used.includes('text') && d.text && typeof d.text.str === 'string') {
     txt.str = d.text.str.slice(0, 60);
@@ -6339,20 +6457,22 @@ function resim(aspect) {
   }
   h = Math.min(h, maxTex);
   if (w === simW && h === simH) { sharpSay(); return; }
-  const oldA = loops.A.rt, oldB = loops.B.rt, oldComp = comp;
-  const frontA = oldA[loops.A.front].tex, frontB = oldB[loops.B.front].tex;
+  const old = KEYS.filter((k) => loops[k].rt).map((k) => ({ k, rt: loops[k].rt, front: loops[k].rt[loops[k].front].tex }));
+  const oldComp = comp;
   const sized = h !== simH;
   simW = w; simH = h; simAspect = simW / simH;
   // Time warp's memory belongs to the old size; it starts again at the new one
-  if (sized) for (const L of [loops.A, loops.B]) if (L.tw) twDrop(L);
+  if (sized) for (const k of KEYS) if (loops[k].tw) twDrop(loops[k]);
   sharpAuto.settle = 30;
-  loops.A.rt = [makeTarget(), makeTarget()];
-  loops.B.rt = [makeTarget(), makeTarget()];
+  for (const o of old) {
+    const L = loops[o.k];
+    L.rt = [makeTarget(), makeTarget()];
+    copyInto(L.rt[0], o.front);
+    L.front = 0;
+  }
   comp = makeTarget();
-  copyInto(loops.A.rt[0], frontA);
-  copyInto(loops.B.rt[0], frontB);
-  loops.A.front = 0; loops.B.front = 0;
-  [...oldA, ...oldB, oldComp].forEach(dropTarget);
+  for (const o of old) o.rt.forEach(dropTarget);
+  dropTarget(oldComp);
   sharpSay();
 }
 // The Picture sharpness buttons, its note and the line count at the top of the page
@@ -6478,6 +6598,7 @@ function syncWide() {
   const on = wideCtl;
   wideBtn.setAttribute('aria-pressed', String(on));
   document.body.classList.toggle('wide-ctl', on);
+  wideLayout();
   fit();
 }
 wideBtn.addEventListener('click', () => {
@@ -6486,6 +6607,179 @@ wideBtn.addEventListener('click', () => {
   syncWide();
   toast(wideCtl ? 'Controls spread out. Press Spread out controls again for the big picture.' : 'Back to the big picture.');
 });
+
+/* ================= Spread out controls: a column per loop ================= */
+// With Spread out controls on, the first column holds Loops and, below it, React to sound and everything after it.
+// Each loop then gets a column of its own with its Inputs and Effects, so all the loops can be set side by side. If
+// the screen is too narrow for a column per loop, two loops share a column, one above the other.
+// The loop settings with the tabs stay on the page, hidden: each loop's column is a copy of them, kept up to date
+// for that loop, and anything done in a copy (a click, a slider, a typed word) is passed on to the real one with
+// that column's loop chosen, so every control behaves exactly as it does in the sidebar.
+var wideCols = null, wideReady = false, mirroring = false, mirrorTimer = 0;
+const panelIn = $('.panel-in');
+const panelOrder = [...panelIn.children];
+const WIDE_COL_MIN = 330, WIDE_GAP = 28;
+const MIRROR_SKIP = ['id', 'for', 'aria-controls', 'aria-labelledby', 'aria-describedby'];
+function mirrorStrip(root) {
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    if (el.id) { el.dataset.mid = el.id; el.removeAttribute('id'); }
+    for (const a of MIRROR_SKIP) if (el.hasAttribute(a)) el.removeAttribute(a);
+  }
+  return root;
+}
+const mirrorClone = (el) => (el.nodeType === 1 ? mirrorStrip(el.cloneNode(true)) : el.cloneNode(true));
+// Where an element sits under root (child numbers, top down), and the element at that spot under another root
+function mirrorPath(root, el) {
+  const path = [];
+  while (el && el !== root) { const p = el.parentElement; if (!p) return null; path.push(Array.prototype.indexOf.call(p.children, el)); el = p; }
+  return el === root ? path.reverse() : null;
+}
+function atPath(root, path) { let el = root; for (const i of path) { el = el && el.children[i]; } return el || null; }
+function mirrorAttrs(r, m) {
+  for (const { name, value } of r.attributes) {
+    if (MIRROR_SKIP.includes(name)) continue;
+    if (m.getAttribute(name) !== value) m.setAttribute(name, value);
+  }
+  for (const { name } of [...m.attributes]) {
+    if (name === 'data-mid' || MIRROR_SKIP.includes(name)) continue;
+    if (!r.hasAttribute(name)) m.removeAttribute(name);
+  }
+}
+// Brings copy m in line with the real element r: what shows, what's pressed, the words and the slider positions.
+// A part whose make-up has changed (new buttons, say) is copied afresh, unless it's being used right now.
+function mirrorCopy(r, m) {
+  const busy = m.contains(document.activeElement);
+  if (r.children.length !== m.children.length || [...r.children].some((c, i) => c.tagName !== m.children[i].tagName)) {
+    if (busy) return;
+    m.replaceChildren(...[...r.childNodes].map(mirrorClone));
+  } else if (r.children.length === 0) {
+    if (m.textContent !== r.textContent) m.textContent = r.textContent;
+  } else if (r.childNodes.length === m.childNodes.length) {
+    r.childNodes.forEach((n, i) => { const o = m.childNodes[i]; if (n.nodeType === 3 && o.nodeType === 3 && o.data !== n.data) o.data = n.data; });
+  }
+  for (let i = 0; i < r.children.length; i++) {
+    const rc = r.children[i], mc = m.children[i];
+    mirrorAttrs(rc, mc);
+    mirrorCopy(rc, mc);
+  }
+  if ((r.tagName === 'INPUT' || r.tagName === 'SELECT' || r.tagName === 'TEXTAREA') && m !== document.activeElement) {
+    if (m.value !== r.value) m.value = r.value;
+    if (r.type === 'checkbox' || r.type === 'radio') m.checked = r.checked;
+  }
+  if (r.tagName === 'DETAILS') m.open = r.open;
+  if (r.tagName === 'CANVAS' && r.width > 0 && r.height > 0) {
+    try { const g = m.getContext('2d'); g.clearRect(0, 0, m.width, m.height); g.drawImage(r, 0, 0, m.width, m.height); } catch (_) {}
+  }
+}
+// Copies every loop's column from the real settings, each shown for its own loop in turn
+function mirrorRefresh() {
+  mirrorTimer = 0;
+  if (!wideCols || mirroring) return;
+  const keep = edit;
+  mirroring = true;
+  try {
+    for (const k of activeKeys()) {
+      const m = wideCols.mirrors[k];
+      if (!m) continue;
+      if (edit !== k) setEdit(k);
+      mirrorCopy(editor, m);
+      m.dataset.loop = k;
+      m.parentElement.classList.toggle('editing', k === keep);
+    }
+  } finally {
+    if (edit !== keep) setEdit(keep);
+    mirroring = false;
+  }
+}
+function mirrorRefreshSoon() {
+  if (!wideCols || mirroring || mirrorTimer) return;
+  mirrorTimer = requestAnimationFrame(mirrorRefresh);
+}
+// Something done in loop k's column: done to the real control instead, with loop k chosen
+function mirrorForward(e) {
+  const m = e.currentTarget, k = m.dataset.loop;
+  if (!loopOn(k) || mirroring) return;
+  const t = e.target;
+  if (e.type === 'keydown') {
+    if (t.matches && t.matches('input[type="text"]') && (e.key === 'Enter' || e.key === 'Escape')) t.blur();
+    return;
+  }
+  // A label's click is only passed on through the control it belongs to
+  if (e.type === 'click' && t.closest && t.closest('label') && !t.closest('button, input, select, a')) return;
+  const path = mirrorPath(m, t);
+  const real = path && atPath(editor, path);
+  if (!real) { mirrorRefreshSoon(); return; }
+  if (edit !== k) setEdit(k);
+  if (e.type === 'input' || e.type === 'change') {
+    if ('value' in t && real.value !== t.value) real.value = t.value;
+    if (t.type === 'checkbox' || t.type === 'radio') real.checked = t.checked;
+    real.dispatchEvent(new Event(e.type, { bubbles: true }));
+  } else {
+    if (e.type === 'contextmenu') e.preventDefault();
+    real.dispatchEvent(new MouseEvent(e.type, { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+      button: e.button, buttons: e.buttons, detail: e.detail, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey }));
+  }
+  for (const w of Object.values(wideCols ? wideCols.mirrors : {})) w.parentElement.classList.toggle('editing', w.dataset.loop === edit);
+  mirrorRefreshSoon();
+}
+function makeMirror(k) {
+  const wrap = document.createElement('section');
+  wrap.className = 'loop-col';
+  wrap.setAttribute('aria-label', `Loop ${k} settings`);
+  const head = document.createElement('div');
+  head.className = 'loop-col-head';
+  head.innerHTML = `<span class="tag t-${k.toLowerCase()}">${k}</span><span>Loop ${k}</span>`;
+  const m = mirrorStrip(editor.cloneNode(true));
+  m.classList.add('mirror');
+  m.dataset.loop = k;
+  for (const type of ['click', 'dblclick', 'contextmenu', 'input', 'change', 'keydown']) m.addEventListener(type, mirrorForward);
+  wrap.append(head, m);
+  return m;
+}
+function wideBuild() {
+  const root = document.createElement('div');
+  root.className = 'wide-cols';
+  const first = document.createElement('div');
+  first.className = 'wide-col first';
+  for (const el of panelOrder) first.appendChild(el);
+  root.appendChild(first);
+  panelIn.appendChild(root);
+  wideCols = { root, first, cols: [], mirrors: {} };
+}
+function wideTeardown() {
+  if (mirrorTimer) cancelAnimationFrame(mirrorTimer);
+  mirrorTimer = 0;
+  for (const el of panelOrder) panelIn.appendChild(el);
+  wideCols.root.remove();
+  wideCols = null;
+}
+// A column per loop when they fit beside the first one, otherwise two loops to a column
+function wideArrange() {
+  const W = wideCols, n = loopCount;
+  const width = panelIn.clientWidth;
+  const fits = (c) => c * WIDE_COL_MIN + (c - 1) * WIDE_GAP <= width;
+  const per = fits(1 + n) ? 1 : 2;
+  const nCols = Math.ceil(n / per);
+  for (const k of KEYS) if (!loopOn(k) && W.mirrors[k]) { W.mirrors[k].parentElement.remove(); delete W.mirrors[k]; }
+  for (const k of activeKeys()) if (!W.mirrors[k]) W.mirrors[k] = makeMirror(k);
+  while (W.cols.length > nCols) W.cols.pop().remove();
+  while (W.cols.length < nCols) { const c = document.createElement('div'); c.className = 'wide-col loops'; W.root.appendChild(c); W.cols.push(c); }
+  activeKeys().forEach((k, i) => { const c = W.cols[Math.floor(i / per)], wrap = W.mirrors[k].parentElement; if (wrap.parentElement !== c || c.children[i % per] !== wrap) c.appendChild(wrap); });
+  W.root.style.gridTemplateColumns = `repeat(${1 + nCols}, minmax(0, 1fr))`;
+  W.root.dataset.per = String(per);
+}
+function wideLayout() {
+  if (!wideReady) return;
+  const on = wideCtl && matchMedia('(min-width: 901px)').matches;
+  if (!on) { if (wideCols) wideTeardown(); return; }
+  if (!wideCols) wideBuild();
+  wideArrange();
+  mirrorRefresh();
+}
+window.addEventListener('resize', () => { if (wideCols || wideCtl) wideLayout(); });
+// Autopilot and the music change settings without anyone touching the columns, so they're looked over now and then
+setInterval(() => { if (wideCols && !document.hidden) mirrorRefreshSoon(); }, 700);
+wideReady = true;
 // Phones and tablets have no second screen, but a touchscreen computer with a projector does
 // In the Android app the button shows while a projector or TV is plugged in (or cast to)
 if (APP) outBtn.hidden = !appInfo.display;
@@ -6860,12 +7154,12 @@ function draw3D(k, name, slot, scale) {
   gl.viewport(0, 0, w, h);
   gl.useProgram(sc.prog.p);
   set2f(sc.prog, 'uSim', w, h);
-  set1f(sc.prog, 'uTime', simT + (k === 'B' ? 11.0 : 0));
-  set1f(sc.prog, 'uTravel', (sc.z + (k === 'B' ? sc.offB : 0)) % sc.period);
+  set1f(sc.prog, 'uTime', simT + (11.0 * LOOP_OFF[k]));
+  set1f(sc.prog, 'uTravel', (sc.z + (sc.offB * LOOP_OFF[k])) % sc.period);
   // Input size is the lens: at 100 it sees about as much as your eye, lower sees wider
   set1f(sc.prog, 'uLens', 0.47 * Math.pow(2.5 / scale, 0.6));
   set1f(sc.prog, 'uGlow', sceneGlow);
-  set1f(sc.prog, 'uSeed', k === 'B' ? 37 : 0);
+  set1f(sc.prog, 'uSeed', 37 * LOOP_OFF[k]);
   if (sc.fly) {
     // The fractals: where this loop's wandering camera is, which way it looks and how it is rolled
     const dr = droneOf(sc, k);
@@ -6879,7 +7173,7 @@ function draw3D(k, name, slot, scale) {
   return rt.tex;
 }
 // Mount Ribbit draws each loop's hiker's view on a canvas of its own, which is copied in here (one picture per loop)
-const extTex = { A: null, B: null };
+const extTex = { A: null, B: null, C: null, D: null };
 function drawExt(k, sc, scale) {
   const X = sc.ext;
   if (X.state === 'idle') X.build();
@@ -6917,7 +7211,10 @@ function ribKey(e, down) {
   if (c === 'KeyJ') { if (!e.repeat) rib.jump = true; } else rib.held.add(c);
   return c !== 'ShiftLeft' && c !== 'ShiftRight';
 }
-function ribDriven() { return loops[edit].tgt.in1 === 'ribbit' || loops[edit].tgt.in2 === 'ribbit' ? edit : edit === 'A' ? 'B' : 'A'; }
+function ribDriven() {
+  const has = (k) => loops[k].tgt.in1 === 'ribbit' || loops[k].tgt.in2 === 'ribbit';
+  return has(edit) ? edit : activeKeys().find(has) || otherLoop(edit);
+}
 function ribControls() {
   const c = { fwd: false, back: false, left: false, right: false, run: false, jump: rib.jump };
   for (const code of rib.held) c[RIB_KEYS[code]] = true;
@@ -7081,11 +7378,11 @@ function breathe(k, amt, dt) {
 }
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
-  const otherK = k === 'A' ? 'B' : 'A';
+  const otherK = otherLoop(k);
   const otherTex = shownTex(otherK), otherPrev = shownPrev(otherK);
   let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
   if (drift) {
-    const d = driftT + (k === 'B' ? 37.0 : 0);
+    const d = driftT + (37.0 * LOOP_OFF[k]);
     // Flow brings its own motion, so Auto-drift barely zooms or turns a flowing loop.
     // The 3D flights move by themselves, so there Auto-drift only tints.
     const still = is3D(t.in1) ? 0 : 1;
@@ -7149,7 +7446,7 @@ function runLoop(k, xf, brush, f) {
 
   set2f(fbProg, 'uSim', simW, simH);
   set1f(fbProg, 'uPxK', simH / SIM_H);
-  set1f(fbProg, 'uTime', simT + (k === 'B' ? 11.0 : 0));
+  set1f(fbProg, 'uTime', simT + (11.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uZoom', (z / 100) * 0.03 * f);
   set1f(fbProg, 'uSpin', -(s / 100) * 0.045 * f);
   set1f(fbProg, 'uDecay', Math.pow(decay60, f));
@@ -7165,11 +7462,11 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uSplitOff', sp * 0.06);
   // Gentle low on the slider, wild at the top
   set1f(fbProg, 'uMelt', Math.pow(clamp(c.melt, 0, 100) / 100, 1.3) * MELT_K * f);
-  set1f(fbProg, 'uMeltTurn', simT * 0.07 + (k === 'B' ? 2.0 : 0));
+  set1f(fbProg, 'uMeltTurn', simT * 0.07 + (2.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uPush', Math.pow(clamp(c.push, 0, 100) / 100, 1.3) * PUSH_K * f);
-  set1f(fbProg, 'uPushTurn', simT * 0.05 + (k === 'B' ? 3.0 : 0));
+  set1f(fbProg, 'uPushTurn', simT * 0.05 + (3.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uDye', Math.min(0.6, Math.pow(clamp(c.dye, 0, 100) / 100, 1.2) * DYE_K * f));
-  set1f(fbProg, 'uDyeTurn', simT * 0.03 + (k === 'B' ? 0.5 : 0));
+  set1f(fbProg, 'uDyeTurn', simT * 0.03 + (0.5 * LOOP_OFF[k]));
   // Feeds on itself
   set1f(fbProg, 'uLook', Math.min(0.2, Math.pow(clamp(c.lookup, 0, 100) / 100, 1.2) * LOOK_K * f));
   const ch = clamp(c.chase, 0, 100) / 100;
@@ -7179,10 +7476,10 @@ function runLoop(k, xf, brush, f) {
   L.chaseAt[1] += (goal[1] - L.chaseAt[1]) * ce;
   set2f(fbProg, 'uCenter', L.chaseAt[0], L.chaseAt[1]);
   set1f(fbProg, 'uChroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
-  set1f(fbProg, 'uChromaTurn', simT * 0.4 + (k === 'B' ? 1.0 : 0));
+  set1f(fbProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.3 * clamp(c.restless, 0, 100) / 100, f));
   set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
-  const ja = 2.2 + 0.9 * Math.sin(simT * 0.021 + (k === 'B' ? 2.0 : 0));
+  const ja = 2.2 + 0.9 * Math.sin(simT * 0.021 + (2.0 * LOOP_OFF[k]));
   set2f(fbProg, 'uJuliaC', 0.7885 * Math.cos(ja), 0.7885 * Math.sin(ja));
   set1f(fbProg, 'uCrystal', Math.pow(clamp(c.crystal, 0, 100) / 100, 1.2) * f);
   const lc = U(fbProg, 'uCells[0]');
@@ -7199,7 +7496,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uGain', c.gain * gainBoost);
   set1f(fbProg, 'uForm', t.form);
   if (t.in1 === 'wave' || t.in2 === 'wave') {
-    computeWave(simT + (k === 'B' ? 11.0 : 0), t.form);
+    computeWave(simT + (11.0 * LOOP_OFF[k]), t.form);
     const lw = U(fbProg, 'uWave[0]'), lb = U(fbProg, 'uWaveBox[0]');
     if (lw) gl.uniform2fv(lw, wavePts);
     if (lb) gl.uniform4fv(lb, waveBoxes);
@@ -7214,7 +7511,7 @@ function runLoop(k, xf, brush, f) {
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
   set1f(fbProg, 'uInkDt', inkOn ? f / 60 : 0);
   if (inkOn) {
-    computeInk(simT + (k === 'B' ? 11.0 : 0), scale, fl * 60);
+    computeInk(simT + (11.0 * LOOP_OFF[k]), scale, fl * 60);
     const li = U(fbProg, 'uInk[0]'), la = U(fbProg, 'uInkAmt[0]'), lc = U(fbProg, 'uInkCol[0]');
     if (li) gl.uniform4fv(li, inkPos);
     if (la) gl.uniform4fv(la, inkAmt);
@@ -7240,7 +7537,7 @@ function runLoop(k, xf, brush, f) {
   }
   set4f(fbProg, 'uBrush', b[0], b[1], b[2], b[3]);
   set1f(fbProg, 'uBrushOn', on);
-  const bc = hsv(((simT * 0.15) + (k === 'B' ? 0.5 : 0)) % 1, 0.65, 1);
+  const bc = hsv(((simT * 0.15) + (0.5 * LOOP_OFF[k])) % 1, 0.65, 1);
   set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   L.front = 1 - L.front;
@@ -7362,11 +7659,16 @@ function frame() {
   const kLoop = ap.on ? 1 - Math.exp(-dt * glide) : k;
   const kMix = ap.on ? 1 - Math.exp(-dt * glide * 0.73) : k;
   if (ap.on && !frozen) rampTick(now);
-  for (const key of ['A', 'B']) {
+  for (const key of activeKeys()) {
     const L = loops[key];
-    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p, key) || ramping(p, key) ? k : kLoop);
+    // Autopilot doesn't steer loops C and D, so they always answer their sliders at the hand-moved pace
+    const kl = key === 'A' || key === 'B' ? kLoop : k;
+    for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p, key) || ramping(p, key) ? k : kl);
   }
-  for (const p of MIX_SLIDERS) mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (pinned(p) || rampingMix(p) ? k : kMix);
+  for (const p of MIX_SLIDERS) {
+    const own = p === 'showC' || p === 'showD' || p === 'xc' || p === 'xd';
+    mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (own || pinned(pinKeyOf(p)) || rampingMix(p) ? k : kMix);
+  }
   if (ap.on && !frozen && now >= ap.next) apTick(now);
   if (lookOnScreen !== ratedLook) syncRated();
   if (!frozen) simT += dt;
@@ -7396,41 +7698,51 @@ function frame() {
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
       // Runner dips and springs with the beat while React to sound is on
-      if (sc.fly) for (const k of ['A', 'B']) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) {
+      if (sc.fly) for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) {
         const style = camStyleOf(k);
         droneOf(sc, k).fly(step, { style, drive: style === 'runner' && snd.analyser ? sndPower() * snd.env.beat : 0 });
       }
       // Mount Ribbit's hikers walk on, the same way
       if (sc.ext) {
         const drive = ribDriven(), ctl = ribControls();
-        for (const k of ['A', 'B']) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) sc.ext.step(k, dt, dt > 0 ? step / dt : 1, k === drive ? ctl : null, rib.auto);
+        for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) sc.ext.step(k, dt, dt > 0 ? step / dt : 1, k === drive ? ctl : null, rib.auto);
       }
     }
     sceneGlow = glow;
   }
 
-  const [wA, wB] = weights(mix.cur.view);
-  const xab = clamp(mix.cur.xab, 0, 100) / 100, xba = clamp(mix.cur.xba, 0, 100) / 100;
+  const W = {};
+  for (const key of KEYS) W[key] = wOf(mix.cur, key);
+  const wA = W.A, wB = W.B;
   const f = dt * 60;
   if (!frozen) {
     let brush = null;
     if (drawing && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
-    // A hidden loop also runs while Check each look is trying a look out on it
+    // A hidden loop also runs while Check each look is trying a look out on it, and while a loop that's running
+    // is fed from it or reads it (as an input, or to be pushed or dyed by it)
     const trying = ap.prep ? ap.prep.k : null;
-    const needA = wA > 0.001 || xab > 0.001 || readsOther('B') || trying === 'A';
-    const needB = wB > 0.001 || xba > 0.001 || readsOther('A') || trying === 'B';
-    if (needA) runLoop('A', xba, wA > 0.01 ? brush : null, f);
-    if (needB) runLoop('B', xab, wB > 0.01 ? brush : null, f);
+    const act = activeKeys(), need = {};
+    for (const key of act) need[key] = W[key] > 0.001 || trying === key;
+    for (let pass = 0; pass < 2; pass++) for (const key of act) {
+      if (!need[key]) continue;
+      const o = otherLoop(key);
+      if (loopOn(o) && (clamp(mix.cur[FEED_INTO[key]], 0, 100) > 0.1 || readsOther(key))) need[o] = true;
+    }
+    for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
   }
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shownTex('A'));
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, shownTex('B'));
+  for (const key of KEYS) {
+    gl.activeTexture(gl.TEXTURE0 + LOOP_NUM[key]);
+    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? shownTex(key) : shownTex('A'));
+  }
   set2f(compProg, 'uSim', simW, simH);
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
+  set1f(compProg, 'uWC', W.C);
+  set1f(compProg, 'uWD', W.D);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   eyeTick(now, dt, wA, wB);
 
@@ -7485,7 +7797,7 @@ function frame() {
 
 /* ================= start ================= */
 applyPatch(STARTERS[reduceMotion ? Math.max(0, STARTERS.findIndex((c) => c.name === 'Calm')) : 0]);
-for (const key of ['A', 'B']) Object.assign(loops[key].cur, loops[key].tgt);
+for (const key of KEYS) Object.assign(loops[key].cur, loops[key].tgt);
 Object.assign(mix.cur, mix.tgt);
 setEdit('A');
 // Autopilot's eye is made now, with everything else, so starting Autopilot never waits for it

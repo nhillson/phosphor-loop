@@ -743,15 +743,17 @@ void main() {
 
 const FS_COMPOSITE = `#version 300 es
 precision highp float;
-uniform sampler2D uA, uB;
-uniform float uWA, uWB;
+uniform sampler2D uA, uB, uC, uD;
+uniform float uWA, uWB, uWC, uWD;
 uniform vec2 uSim;
 out vec4 o;
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   vec3 a = texture(uA, uv).rgb * uWA;
   vec3 b = texture(uB, uv).rgb * uWB;
-  o = vec4(1.0 - (1.0 - a) * (1.0 - b), 1.0);
+  vec3 c = uWC > 0.0 ? texture(uC, uv).rgb * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? texture(uD, uv).rgb * uWD : vec3(0.0);
+  o = vec4(1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d), 1.0);
 }`;
 
 // Time warp: each part of a loop's picture comes from a different moment. The loop's recent frames are kept
