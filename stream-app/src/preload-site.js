@@ -19,4 +19,6 @@ contextBridge.exposeInMainWorld('phosphorStream', {
   problem: (text) => ipcRenderer.send('capture-problem', String(text).slice(0, 300)),
   sample: (w, h, buf) => ipcRenderer.send('sample', w, h, buf),
   sampleRec: (buf, mime) => ipcRenderer.send('sample-rec', buf, String(mime || '')),
+  recChunk: (buf) => ipcRenderer.send('rec-chunk', buf),
+  recDone: () => ipcRenderer.send('rec-done'),
 });

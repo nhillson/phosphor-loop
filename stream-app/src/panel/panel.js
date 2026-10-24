@@ -47,6 +47,7 @@ function renderSettings() {
   if (S.kick.server && !$('#server-kick').value) $('#server-kick').value = S.kick.server;
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) $(`#opt-${k}`).checked = S[k];
   renderStreaming();
+  renderRec();
   $('#opt-yt-hevc').checked = !!S.youtube.hevc;
   $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
   $('#qualityHint').innerHTML = '';
@@ -66,6 +67,42 @@ function renderStreaming() {
     : 'Off: the picture is drawn at this screen’s size, up to 4K. Set it in Phosphor Loop under Screen › Picture sharpness (Full is sharpest). Go live switches this on.';
   $('#panel').classList.toggle('not-streaming', !on);
 }
+/* ---- recording a video ---- */
+// The recording options as chosen, or the stream's own while live (the page draws one size at a time)
+const REC_MBPS = { youtube: { 2160: 45, 1440: 24, 1080: 12 }, clean: { 2160: 100, 1440: 50, 1080: 30 }, perfect: { 2160: 250, 1440: 130, 1080: 70 } };
+function recSizeText(h) { return h >= 2160 ? '4K' : h + 'p'; }
+function renderRec() {
+  if (!S) return;
+  const r = S.record || { size: 2160, quality: 'clean', fps: 30 };
+  const R = status.rec || { state: 'idle' };
+  const busy = R.state !== 'idle';
+  $$('[data-rsize]').forEach((b) => { b.setAttribute('aria-checked', String(+b.dataset.rsize === r.size)); b.disabled = busy || !!status.live; });
+  $$('[data-rq]').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.rq === r.quality)); b.disabled = busy; });
+  $$('[data-rfps]').forEach((b) => { b.setAttribute('aria-checked', String(+b.dataset.rfps === r.fps)); b.disabled = busy || !!status.live; });
+  const mbps = REC_MBPS[r.quality][r.size] * (r.fps > 30 ? 1.5 : 1);
+  const gb5 = (mbps + 0.384) * 300 / 8 / 1000;
+  let hint = `${recSizeText(r.size)} at ${r.fps} fps, ${mbps} Mbps: about ${gb5 < 1 ? Math.round(gb5 * 1000) + ' MB' : gb5.toFixed(1) + ' GB'} for 5 minutes, with sound. Saved to Videos › Phosphor Loop.`;
+  if (status.live) {
+    const q = quality[S.quality];
+    hint = `While live, the video is recorded at the stream’s size and speed (${q ? recSizeText(q.height) + ' at ' + q.fps + ' fps' : 'the stream’s'}), in the quality chosen here. For 4K, pick 4K under Picture quality before going live, or record while off air.`;
+  }
+  $('#recHint').textContent = hint;
+  const btn = $('#recBtn');
+  btn.classList.toggle('on', R.state === 'recording');
+  btn.disabled = R.state === 'starting' || R.state === 'saving' || !!status.starting || !!tune.running;
+  const secs = R.since ? Math.max(0, Math.floor((Date.now() - R.since) / 1000)) : 0;
+  const mb = (R.bytes || 0) / 1e6;
+  $('#recLabel').textContent = R.state === 'recording'
+    ? `Stop recording · ${fmtTime(secs * 1000).replace(/^00:/, '')}${R.height ? ' · ' + recSizeText(R.height) : ''}${R.slow ? ` · only ${R.slow} fps!` : ''}`
+    : R.state === 'starting' ? 'Getting ready…' : R.state === 'saving' ? 'Saving…' : 'Record';
+  $('#recSaving').hidden = R.state !== 'saving';
+  if (R.state === 'saving') {
+    $('#recBar').style.width = Math.round(4 + 96 * (R.progress || 0)) + '%';
+    $('#recStep').textContent = `Saving your video: ${Math.round(100 * (R.progress || 0))}%. Keep the app open until it’s done.`;
+  }
+  $('#recFolder').textContent = R.last ? 'Show the last video in its folder' : 'Open the recordings folder';
+}
+
 const STATE_WORDS = { connecting: 'Connecting…', live: 'Live', retrying: 'Reconnecting…' };
 function renderStatus() {
   const dests = status.destinations || {};
@@ -75,7 +112,7 @@ function renderStatus() {
   if (status.starting) state = 'starting';
   else if (status.live) state = anyLive ? 'live' : (states.includes('retrying') ? 'retrying' : 'starting');
   $('#onair').dataset.state = state;
-  if (S) renderStreaming();
+  if (S) { renderStreaming(); renderRec(); }
   $('#stripDot').classList.toggle('live', state === 'live');
 
   const title = { off: 'Off air', starting: 'Going live…', live: 'Live', retrying: 'Reconnecting…' }[state];
@@ -209,6 +246,15 @@ $$('[data-show]').forEach((b) => b.addEventListener('click', () => {
   b.textContent = input.type === 'password' ? 'Show' : 'Hide';
 }));
 $$('[data-q]').forEach((b) => b.addEventListener('click', () => { if (!status.live) save({ quality: b.dataset.q }); }));
+$$('[data-rsize]').forEach((b) => b.addEventListener('click', () => save({ record: { size: +b.dataset.rsize } })));
+$$('[data-rq]').forEach((b) => b.addEventListener('click', () => save({ record: { quality: b.dataset.rq } })));
+$$('[data-rfps]').forEach((b) => b.addEventListener('click', () => save({ record: { fps: +b.dataset.rfps } })));
+$('#recBtn').addEventListener('click', () => {
+  const R = status.rec || {};
+  if (R.state === 'idle' || !R.state) window.app.record(true);
+  else if (R.state === 'recording') window.app.record(false);
+});
+$('#recFolder').addEventListener('click', () => window.app.openRecordings());
 $('#opt-streaming').addEventListener('change', (e) => save({ streaming: e.target.checked }));
 for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) {
   $(`#opt-${k}`).addEventListener('change', (e) => save({ [k]: e.target.checked }));
@@ -219,7 +265,7 @@ $('#openLog').addEventListener('click', () => window.app.openLog());
 
 window.app.onStatus((s) => { status = s; renderStatus(); });
 window.app.onNotice((n) => { status.notice = n; showNotice(n); });
-setInterval(() => { if (status.live) renderStatus(); }, 1000);
+setInterval(() => { if (status.live || (status.rec && status.rec.state === 'recording')) renderStatus(); }, 1000);
 
 (async () => {
   const st = await window.app.state();

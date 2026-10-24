@@ -124,3 +124,15 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent-hi);
 .streaming-toggle > span:first-child { display: flex; flex-direction: column; gap: 3px; }
 .streaming-toggle small { font-weight: 400; font-size: 12px; color: var(--muted); line-height: 1.35; }
 .not-streaming #quality, .not-streaming #quality2 { opacity: .55; }
+
+/* Record a video */
+#recBlock .seg { margin-bottom: 6px; }
+.recbtn { height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 10px; }
+.recbtn:hover:not(:disabled) { border-color: var(--live); }
+.recbtn:disabled { opacity: .6; cursor: default; }
+.recbtn .rdot { width: 14px; height: 14px; border-radius: 50%; background: var(--live); flex: none; }
+.recbtn.on { background: #3a1416; border-color: var(--live); }
+.recbtn.on .rdot { border-radius: 3px; animation: recblink 1.2s steps(2, start) infinite; }
+@keyframes recblink { to { visibility: hidden; } }
+#recFolder { align-self: flex-start; }

@@ -8,6 +8,7 @@ const { execFile } = require('node:child_process');
 const { Streamer, buildUrl, VARIANTS } = require('./stream.js');
 const { Tuner, candidates, pick } = require('./tune.js');
 const capturePageSource = require('./capture-page.js');
+const { REC_SIZES, REC_QUALITY, REC_DEFAULTS, recPlan, finish, outputName } = require('./record.js');
 
 const TEST = process.env.PHOSPHOR_TEST === '1';
 const SITE = process.env.PHOSPHOR_SITE || 'https://nhillson.github.io/phosphor-loop/';
@@ -56,6 +57,7 @@ const DEFAULTS = {
   // as Phosphor Loop's Picture sharpness picks (up to 4K), for watching or projecting rather than streaming.
   streaming: true,
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
+  record: { ...REC_DEFAULTS }, // Record a video: size (2160, 1440 or 1080 lines), quality (youtube, clean, perfect), fps (30 or 60)
   tuned: null, // what the sharpness test picked: { variant, label, at, quality, detail, usual, usualDetail, gpu }
 };
 function lock(text) {
@@ -76,7 +78,7 @@ function loadSettings() {
   let s = {};
   try { s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch (_) {}
   settings = { ...DEFAULTS, ...s, twitch: { ...DEFAULTS.twitch, ...s.twitch }, kick: { ...DEFAULTS.kick, ...s.kick },
-    youtube: { ...DEFAULTS.youtube, ...s.youtube } };
+    youtube: { ...DEFAULTS.youtube, ...s.youtube }, record: { ...DEFAULTS.record, ...s.record } };
   if (!QUALITY[settings.quality]) settings.quality = 'good';
 }
 function saveSettings() {
@@ -89,7 +91,7 @@ function publicSettings() {
     kick: { enabled: settings.kick.enabled, server: settings.kick.server, hasKey: !!settings.kick.key },
     youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
     streaming: settings.streaming, quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
-    autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed,
+    autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed, record: settings.record,
   };
 }
 function publicTune() {
@@ -121,7 +123,7 @@ let win, site, sleepBlock = null, notice = null, captureInfo = null, probing = n
 
 function fullStatus() {
   const v = streamer.encoder && VARIANTS[streamer.encoder.variant];
-  return { ...streamer.status(), streaming: settings.streaming, notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
+  return { ...streamer.status(), streaming: settings.streaming, rec: recStatus(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
 }
 function sendStatus() {
   if (!win || win.isDestroyed()) return;
@@ -228,6 +230,7 @@ let startingLive = false;
 async function goLive() {
   if (streamer.live || startingLive) return { ok: true };
   if (tune.running) { tell('The sharpness test is still running. Go live once it finishes (a minute or two).', 'warn'); return { ok: false }; }
+  if (rec.state === 'recording' || rec.state === 'starting') { tell('Stop the recording first, then go live. (To record while streaming, go live first, then press Record.)', 'warn'); return { ok: false }; }
   const dests = destinations();
   if (!dests.length) {
     const msg = !PLATFORMS.some((p) => settings[p].enabled) ? 'Switch on Twitch, Kick or YouTube first.'
@@ -298,12 +301,17 @@ function createWindow() {
   wc.setBackgroundThrottling(false);
   wc.on('dom-ready', () => wc.executeJavaScript(capturePageSource()).catch((e) => log('Inject failed: ' + e.message)));
   wc.on('did-finish-load', async () => {
+    if (rec.state === 'recording') { log('Page reloaded while recording; saving what was recorded'); recordStop(true); }
     if (!streamer.live) return;
     // The page reloaded while live: pick the picture up again
     log('Page reloaded while live; reconnecting the picture');
     if (await waitForSite()) streamer.restartEncoder();
   });
-  wc.on('render-process-gone', (_e, d) => { log('Page stopped: ' + d.reason); setTimeout(() => wc.reload(), 1500); });
+  wc.on('render-process-gone', (_e, d) => {
+    log('Page stopped: ' + d.reason);
+    if (rec.state === 'recording') recordStop(true);
+    setTimeout(() => wc.reload(), 1500);
+  });
   wc.on('did-fail-load', (_e, code, desc, url, isMain) => {
     if (!isMain) return;
     log(`Page failed to load: ${desc}`);
@@ -319,7 +327,14 @@ function createWindow() {
   wc.loadURL(SITE);
 
   win.on('close', (e) => {
-    if (!streamer.live || TEST) return;
+    if (TEST) return;
+    if (rec.state !== 'idle') {
+      const r = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Close anyway', 'Keep the app open'], defaultId: 1, cancelId: 1,
+        title: 'Recording', message: rec.state === 'saving' ? 'Your video is still being saved. Close anyway? It won’t be finished.'
+          : 'You’re recording. Close anyway? The video won’t be finished.' });
+      if (r === 1) { e.preventDefault(); return; }
+    }
+    if (!streamer.live) return;
     const r = dialog.showMessageBoxSync(win, { type: 'question', buttons: ['Stop and close', 'Keep streaming'], defaultId: 1, cancelId: 1,
       title: 'You’re live', message: 'You’re live right now. Stop the stream and close?' });
     if (r === 1) e.preventDefault();
@@ -367,6 +382,7 @@ ipcMain.on('sample-rec', (_e, buf, mime) => { if (tuner) tuner.saveRecording(buf
 async function sharpnessTest({ ids, frames, apply = true } = {}) {
   if (tune.running) return { ok: false };
   if (streamer.live || startingLive) { tell('Stop the stream first, then run the sharpness test.', 'warn'); return { ok: false }; }
+  if (rec.state !== 'idle') { tell('Finish the recording first, then run the sharpness test.', 'warn'); return { ok: false }; }
   if (!settings.streaming) { tell('Switch Streaming? on first: the test measures the picture at the stream’s size.', 'warn'); return { ok: false }; }
   tune = { running: true, step: 'Getting ready…', i: 0, n: 0, results: [], summary: '' };
   sendTune(); sendStatus();
@@ -458,6 +474,125 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
 }
 ipcMain.handle('sharpness-test', () => sharpnessTest());
 
+/* ---------- recording a video file (see record.js) ---------- */
+const rec = { state: 'idle', plan: null, ownSize: false, temp: '', ws: null, startedAt: 0, bytes: 0, progress: 0, last: '', slow: 0,
+  timer: null, doneWait: null, framesAt: 0, framesT: 0, lastSend: 0 };
+const recDir = () => path.join(app.getPath('videos'), 'Phosphor Loop');
+function recStatus() {
+  const p = rec.plan;
+  return { state: rec.state, since: rec.startedAt, bytes: rec.bytes, progress: rec.progress, last: rec.last ? path.basename(rec.last) : '',
+    height: p ? p.height : 0, fps: p ? p.fps : 0, live: !!(p && p.live), slow: rec.slow };
+}
+// While live, a recording is made at the stream's own size and speed (the page can only draw one size at a time)
+function livePlan() {
+  const q = QUALITY[settings.quality];
+  const size = q.height >= 2160 ? 2160 : q.height >= 1440 ? 1440 : 1080;
+  const p = recPlan({ ...settings.record, size, fps: q.fps });
+  const k = (q.width * q.height) / (p.width * p.height);
+  return { ...p, width: q.width, height: q.height, bitrate: Math.round(p.bitrate * k), live: true };
+}
+async function recordStart() {
+  if (rec.state !== 'idle') return { ok: false };
+  if (startingLive) { tell('Wait until the stream has started, then press Record.', 'warn'); return { ok: false }; }
+  if (tune.running) { tell('The sharpness test is still running. Record once it finishes.', 'warn'); return { ok: false }; }
+  const live = streamer.live;
+  const plan = live ? livePlan() : { ...recPlan(settings.record), live: false };
+  rec.state = 'starting'; rec.plan = plan; rec.ownSize = !live; rec.bytes = 0; rec.progress = 0; rec.slow = 0;
+  tell(''); sendStatus();
+  try {
+    fs.mkdirSync(recDir(), { recursive: true });
+    if (!(await waitForSite())) throw new Error('Phosphor Loop isn’t ready yet');
+    if (!live) { await resizeSite(); await waitFrames(20); }
+    rec.temp = path.join(recDir(), `.recording ${Date.now()}.mkv`);
+    rec.ws = fs.createWriteStream(rec.temp);
+    rec.ws.on('error', (e) => { log('Recording: could not write: ' + e.message); tell('Couldn’t write the recording to the Videos folder (is the disk full?). Stopping.', 'warn'); recordStop(true); });
+    const info = await siteCall('rec-start', { fps: plan.fps, bitrate: plan.firstBitrate });
+    rec.state = 'recording';
+    rec.startedAt = Date.now();
+    log(`Recording ${plan.width}x${plan.height} at ${plan.fps} fps, ${REC_QUALITY[plan.quality].label} (${(plan.bitrate / 1e6).toFixed(0)} Mbps)${live ? ', while live' : ''}; working copy ${info.mimeType} at ${(plan.firstBitrate / 1e6).toFixed(0)} Mbps, sound ${info.sound ? 'on' : 'off ' + info.soundErr}`);
+    if (!info.sound) tell('Couldn’t hear this computer’s sound, so the recording is silent. Check that a speaker or headphones are set up in Windows.', 'warn');
+    rec.framesAt = await siteCall('frames').catch(() => 0); rec.framesT = Date.now();
+    rec.timer = setInterval(recTick, 2000);
+    sendStatus();
+    return { ok: true };
+  } catch (e) {
+    log('Recording could not start: ' + e.message);
+    try { if (rec.ws) rec.ws.destroy(); fs.rmSync(rec.temp, { force: true }); } catch (_) {}
+    rec.ws = null; rec.state = 'idle'; rec.plan = null;
+    if (rec.ownSize) { rec.ownSize = false; resizeSite(); }
+    tell('Couldn’t start recording: ' + e.message, 'warn');
+    sendStatus();
+    return { ok: false };
+  }
+}
+// Every 2 seconds while recording: the time and size shown, and whether the page keeps up with the frame rate
+async function recTick() {
+  if (rec.state !== 'recording') return;
+  const f = await siteCall('frames').catch(() => null), now = Date.now();
+  if (f != null && now - rec.framesT >= 4000) {
+    const fps = (f - rec.framesAt) / ((now - rec.framesT) / 1000);
+    rec.framesAt = f; rec.framesT = now;
+    const want = rec.plan.fps;
+    if (fps < want * 0.85) {
+      rec.slow = Math.round(fps);
+      if (!rec.warned) {
+        rec.warned = true;
+        tell(`This computer is drawing about ${Math.round(fps)} frames a second, short of the ${want} this recording needs, so the video will repeat frames. A smaller size (1440p) or 30 fps will look smoother.`, 'warn');
+      }
+    } else rec.slow = 0;
+  }
+  sendStatus();
+}
+ipcMain.on('rec-chunk', (_e, buf) => { if (rec.ws) { rec.ws.write(Buffer.from(buf)); rec.bytes += buf.byteLength; } });
+ipcMain.on('rec-done', () => { if (rec.doneWait) rec.doneWait(); });
+async function recordStop(broken) {
+  if (rec.state !== 'recording') return;
+  rec.state = 'saving'; rec.progress = 0; rec.warned = false;
+  clearInterval(rec.timer);
+  sendStatus();
+  const plan = rec.plan, seconds = (Date.now() - rec.startedAt) / 1000;
+  // The page hands over its last pieces, then says it's done (the ceiling is for a page that has gone)
+  const done = new Promise((r) => { rec.doneWait = r; setTimeout(r, broken ? 1000 : 15000); });
+  let stopped = false;
+  try { stopped = await siteCall('rec-stop'); } catch (_) {}
+  if (stopped) await done;
+  rec.doneWait = null;
+  if (rec.ws) await new Promise((r) => rec.ws.end(r));
+  rec.ws = null;
+  // Back to the size the stream (or the window) wants
+  if (rec.ownSize) { rec.ownSize = false; resizeSite(); }
+  const output = outputName(recDir());
+  const family = streamer.encoder ? streamer.encoder.id : 'libx264';
+  const progress = (p) => { rec.progress = p; if (Date.now() - rec.lastSend > 500) { rec.lastSend = Date.now(); sendStatus(); } };
+  let problem = await finish({ ffmpeg: ffmpegPath(), input: rec.temp, output, plan, family, seconds, onProgress: progress, log });
+  if (problem && family !== 'libx264') {
+    log(`Recording: ${family} couldn’t finish it (${problem.slice(0, 200)}); using the processor instead`);
+    rec.progress = 0;
+    problem = await finish({ ffmpeg: ffmpegPath(), input: rec.temp, output, plan, family: 'libx264', seconds, onProgress: progress, log });
+  }
+  if (!problem) {
+    try { fs.rmSync(rec.temp, { force: true }); } catch (_) {}
+    rec.last = output;
+    let gb = 0; try { gb = fs.statSync(output).size / 1e9; } catch (_) {}
+    log(`Recording saved: ${output} (${gb.toFixed(2)} GB, ${seconds.toFixed(0)} s)`);
+    tell(`Saved “${path.basename(output)}” (${gb < 1 ? Math.round(gb * 1000) + ' MB' : gb.toFixed(1) + ' GB'}) in Videos › Phosphor Loop.`, 'info');
+  } else {
+    // Keep what was recorded, under a name that can be found
+    const keep = output.replace(/\.mp4$/, ' (unfinished).mkv');
+    try { fs.renameSync(rec.temp, keep); } catch (_) {}
+    log('Recording could not be finished: ' + problem);
+    tell(`Couldn’t finish the video. What was recorded is kept in Videos › Phosphor Loop as “${path.basename(keep)}”.`, 'warn');
+  }
+  rec.state = 'idle'; rec.plan = null; rec.progress = 0;
+  sendStatus();
+  return { ok: !problem, output };
+}
+ipcMain.handle('record', (_e, on) => (on ? recordStart() : recordStop()));
+ipcMain.handle('open-recordings', () => {
+  try { fs.mkdirSync(recDir(), { recursive: true }); } catch (_) {}
+  if (rec.last && fs.existsSync(rec.last)) shell.showItemInFolder(rec.last); else shell.openPath(recDir());
+});
+
 /* ---------- controls panel ---------- */
 const HELP = {
   twitch: 'https://dashboard.twitch.tv/settings/stream',
@@ -473,6 +608,12 @@ ipcMain.handle('save', async (_e, patch) => {
     else { await stopLive(); tell('Stream stopped: Streaming? is off.', 'info'); }
   }
   if ('streaming' in patch && !tune.running) settings.streaming = !!patch.streaming;
+  if (patch.record && rec.state === 'idle') {
+    const r = patch.record, cur = settings.record;
+    if (REC_SIZES[r.size]) cur.size = +r.size;
+    if (REC_QUALITY[r.quality]) cur.quality = r.quality;
+    if (r.fps === 30 || r.fps === 60) cur.fps = r.fps;
+  }
   for (const p of PLATFORMS) {
     if (!patch[p]) continue;
     const cur = settings[p];
@@ -495,6 +636,8 @@ ipcMain.handle('save', async (_e, patch) => {
   return publicSettings();
 });
 function captureConfig() {
+  // A recording made while off air draws at the recording's own size and speed
+  if (rec.plan && rec.ownSize) return { width: rec.plan.width, height: rec.plan.height, fps: rec.plan.fps, renderHeight: rec.plan.height, off: false };
   const q = QUALITY[settings.quality];
   return { width: q.width, height: q.height, fps: q.fps, renderHeight: q.height, off: !settings.streaming };
 }
@@ -604,6 +747,19 @@ async function runTest() {
     await stopLive();
     await new Promise((res) => setTimeout(res, 6000)); // let the last pieces reach the test server (shutdown, not a picture wait)
     if (dir) fs.writeFileSync(path.join(dir, 'panel-off.png'), (await win.webContents.capturePage()).toPNG());
+    // Recording a video off air: 1080p, YouTube standard, a few seconds, saved as an .mp4 with sound
+    settings.record = { size: 1080, quality: 'youtube', fps: 30 };
+    const rs = await recordStart();
+    if (!rs.ok) throw new Error('recording did not start');
+    if ((await sizeNow())[1] !== 1080) throw new Error('the recording did not draw at its own size');
+    await waitFrames(90);
+    const saved = await recordStop();
+    result.recording = { ok: !!(saved && saved.ok), file: saved && saved.output };
+    if (!result.recording.ok) throw new Error('the recording could not be saved');
+    const info = await new Promise((r) => execFile(ffmpegPath(), ['-hide_banner', '-i', saved.output], (_e, _o, se) => r(String(se))));
+    result.recording.info = info.split('\n').filter((l) => /Stream|Duration/.test(l)).map((l) => l.trim()).join(' | ');
+    if (!/Video: h264.*1920x1080/.test(info) || !/Audio: aac/.test(info)) throw new Error('the recording is not 1080p H.264 with AAC sound: ' + result.recording.info);
+    if ((await sizeNow())[1] !== 720) throw new Error('after recording, the picture did not go back to the stream size');
     result.pageFpsBefore = await pageFps();
     // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
     const t = await sharpnessTest({ ids: ['x264-veryfast', 'nv-p7-full'], frames: 30 });

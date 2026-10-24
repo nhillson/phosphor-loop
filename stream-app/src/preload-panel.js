@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('app', {
   collapse: (on) => ipcRenderer.invoke('collapse', on),
   openLog: () => ipcRenderer.invoke('open-log'),
   sharpnessTest: () => ipcRenderer.invoke('sharpness-test'),
+  record: (on) => ipcRenderer.invoke('record', on),
+  openRecordings: () => ipcRenderer.invoke('open-recordings'),
   onTune: (fn) => ipcRenderer.on('tune', (_e, t) => fn(t)),
   onStatus: (fn) => ipcRenderer.on('status', (_e, s) => fn(s)),
   onNotice: (fn) => ipcRenderer.on('notice', (_e, n) => fn(n)),

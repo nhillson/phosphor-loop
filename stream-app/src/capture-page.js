@@ -86,7 +86,38 @@ module.exports = function capturePageSource() {
     return { width: c.width, height: c.height };
   }
 
+  // Recording a video file: a second recorder of its own, next to the stream's, so a recording never disturbs the
+  // stream (or the other way round). Its pieces go to the app in order; recDone says the last one has gone.
+  async function recStart(opts) {
+    recStop();
+    const hook = window.__phosphorCapture;
+    if (!hook || !hook.canvas) throw new Error('Phosphor Loop is still starting');
+    const audio = (await sound(true)).clone();
+    const video = hook.canvas.captureStream(opts.fps).getVideoTracks()[0];
+    const types = ['video/x-matroska;codecs=avc1,opus', 'video/webm;codecs=h264,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
+    const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t));
+    const rec = new MediaRecorder(new MediaStream([video, audio]), { mimeType, videoBitsPerSecond: opts.bitrate, audioBitsPerSecond: 320000 });
+    let chain = Promise.resolve();
+    rec.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      chain = chain.then(() => e.data.arrayBuffer()).then((buf) => window.phosphorStream.recChunk(buf)).catch(() => {});
+    };
+    rec.onstop = () => { video.stop(); audio.stop(); chain.then(() => window.phosphorStream.recDone()); };
+    rec.onerror = (e) => window.phosphorStream.problem('recording: ' + String((e && e.error && e.error.message) || 'recorder error'));
+    rec.start(500);
+    S.recFile = rec;
+    return { mimeType, width: hook.canvas.width, height: hook.canvas.height, sound: !!S.loop, soundErr: S.loop ? '' : (S.soundErr || '') };
+  }
+  function recStop() {
+    const rec = S.recFile;
+    S.recFile = null;
+    if (rec && rec.state !== 'inactive') { try { rec.stop(); return true; } catch (_) {} }
+    return false;
+  }
+
   window.phosphorStreamCapture = async (cmd, opts = {}) => {
+    if (cmd === 'rec-start') return recStart(opts);
+    if (cmd === 'rec-stop') return recStop();
     if (cmd === 'frames') return S.frames;
     if (cmd === 'ready') return !!(window.__phosphorCapture && window.__phosphorCapture.canvas);
     if (cmd === 'autopilot') { try { window.__phosphorCapture.autopilot(); return true; } catch (_) { return false; } }

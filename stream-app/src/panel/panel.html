@@ -102,6 +102,31 @@
     <p class="hint" id="qualityHint"></p>
   </section>
 
+  <section class="block" id="recBlock">
+    <h2>Record a video</h2>
+    <div class="seg" id="recSize" role="radiogroup" aria-label="Recording size">
+      <button role="radio" data-rsize="2160"><b>4K</b><small>2160p</small></button>
+      <button role="radio" data-rsize="1440"><b>1440p</b><small>2K</small></button>
+      <button role="radio" data-rsize="1080"><b>1080p</b><small>Full HD</small></button>
+    </div>
+    <div class="seg" id="recQ" role="radiogroup" aria-label="Recording quality">
+      <button role="radio" data-rq="youtube"><b>Standard</b><small>YouTube’s own</small></button>
+      <button role="radio" data-rq="clean"><b>Very clean</b><small>recommended</small></button>
+      <button role="radio" data-rq="perfect"><b>Near-perfect</b><small>very large</small></button>
+    </div>
+    <div class="seg seg2" id="recFps" role="radiogroup" aria-label="Recording frame rate">
+      <button role="radio" data-rfps="30"><b>30 fps</b><small>sharper detail</small></button>
+      <button role="radio" data-rfps="60"><b>60 fps</b><small>smoother motion</small></button>
+    </div>
+    <p class="hint" id="recHint"></p>
+    <button class="recbtn" id="recBtn"><span class="rdot" aria-hidden="true"></span><span id="recLabel">Record</span></button>
+    <div class="tune-run" id="recSaving" hidden>
+      <div class="meter" aria-hidden="true"><span id="recBar"></span></div>
+      <small id="recStep">Saving your video…</small>
+    </div>
+    <button class="link" id="recFolder">Open the recordings folder</button>
+  </section>
+
   <section class="block" id="tune">
     <h2>Sharpness test</h2>
     <p class="hint" id="tuneHint">Tries each encoder setting on 5 seconds of your picture, on this PC’s own graphics card, and keeps the sharpest one this PC can keep up with. Takes a few minutes. Works best on a busy, detailed look.</p>
