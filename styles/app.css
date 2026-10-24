@@ -400,8 +400,12 @@
     --amber: var(--loop-d); --amber-ink: #9db8ff; --amber-glow: rgba(91, 140, 255, .45);
     --press-1: #1d2b4f; --press-2: #15203b; --press-ink: #d9e4ff;
   }
-  /* Autopilot steers loops A and B only, so loops C and D have no pins */
-  .editor[data-loop="C"] .pin, .editor[data-loop="D"] .pin { display: none !important; }
+  /* A pin only shows on settings Autopilot is in charge of; loops (and faders) that are yours have none */
+  .pin.not-ap { display: none !important; }
+  /* While Autopilot runs, each loop tab says whose it is: AUTO for Autopilot's, YOU for yours */
+  .tabs .who { font: 400 14px/1 var(--f-osd); letter-spacing: .04em; padding: 2px 4px; border-radius: 3px; border: 1px solid var(--line); color: var(--dim); }
+  .tabs .who.auto { color: var(--amber-ink, #e7b8ff); border-color: var(--loop-a); }
+  .ap-loops-ctl { margin-top: 12px; }
   .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border-radius: 9px; background: var(--well); border: 1px solid var(--line); }
   .tabs button {
     display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px;

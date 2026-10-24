@@ -161,10 +161,10 @@
 
       <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
         <div class="tabs" id="tabs" data-n="2" role="tablist" aria-label="Which loop to edit">
-          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span><span class="tab-name">Loop A</span> <span class="vis" id="visA" role="img"></span></button>
-          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span><span class="tab-name">Loop B</span> <span class="vis" id="visB" role="img"></span></button>
-          <button role="tab" id="tabC" aria-selected="false" aria-controls="editor" hidden><span class="tag">C</span><span class="tab-name">Loop C</span> <span class="vis" id="visC" role="img"></span></button>
-          <button role="tab" id="tabD" aria-selected="false" aria-controls="editor" hidden><span class="tag">D</span><span class="tab-name">Loop D</span> <span class="vis" id="visD" role="img"></span></button>
+          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span><span class="tab-name">Loop A</span> <span class="who" id="whoA" hidden></span><span class="vis" id="visA" role="img"></span></button>
+          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span><span class="tab-name">Loop B</span> <span class="who" id="whoB" hidden></span><span class="vis" id="visB" role="img"></span></button>
+          <button role="tab" id="tabC" aria-selected="false" aria-controls="editor" hidden><span class="tag">C</span><span class="tab-name">Loop C</span> <span class="who" id="whoC" hidden></span><span class="vis" id="visC" role="img"></span></button>
+          <button role="tab" id="tabD" aria-selected="false" aria-controls="editor" hidden><span class="tag">D</span><span class="tab-name">Loop D</span> <span class="who" id="whoD" hidden></span><span class="vis" id="visD" role="img"></span></button>
         </div>
         <p class="hint" id="hiddenHint" hidden><span id="hiddenText">Loop B isn’t on screen right now.</span> <button class="linkish" id="showLoop">Show this loop</button></p>
 
@@ -564,6 +564,24 @@
         </div>
         <p class="ap-state" id="apState" role="status">Autopilot is off.</p>
         <button class="btn wide next-look" id="nextLook" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look now</button>
+        <div class="ctl ap-loops-ctl">
+          <div class="ctl-head"><span class="lbl" id="apLoopsLbl">Loops Autopilot runs</span></div>
+          <div class="chips snd-loops" id="apLoops" role="group" aria-labelledby="apLoopsLbl">
+            <button class="chip" data-aploop="A" aria-pressed="true" title="Whether Autopilot runs loop A"><span class="led"></span>Loop <span class="mini a">A</span></button>
+            <button class="chip" data-aploop="B" aria-pressed="true" title="Whether Autopilot runs loop B"><span class="led"></span>Loop <span class="mini b">B</span></button>
+            <button class="chip" data-aploop="C" aria-pressed="true" title="Whether Autopilot runs loop C (also while it’s switched off under Loops, for when it comes on)"><span class="led"></span>Loop <span class="mini c">C</span></button>
+            <button class="chip" data-aploop="D" aria-pressed="true" title="Whether Autopilot runs loop D (also while it’s switched off under Loops, for when it comes on)"><span class="led"></span>Loop <span class="mini d">D</span></button>
+          </div>
+          <span class="hint">Lit loops are Autopilot’s. The others are yours: Autopilot never changes them, and moving their controls doesn’t pin anything or stop Autopilot. Your loops’ Show faders and the feeds pouring into them are yours too.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="apTurnsLbl">With more than one loop</span>
+          <div class="seg seg-2" id="apTurns" role="group" aria-labelledby="apTurnsLbl">
+            <button data-turns="1" aria-pressed="true">Take turns</button>
+            <button data-turns="0" aria-pressed="false">All at once</button>
+          </div>
+          <span class="hint">Take turns: one of Autopilot’s loops gets a new look each time while the others drift, so the picture changes a piece at a time. All at once: every one of its loops gets a new look together, for bigger changes. Loops A and B count as one turn when Autopilot runs both, since it fades between them.</span>
+        </div>
         <div class="ctl">
           <div class="ctl-head"><label for="apEvery">New look every</label><output id="apEveryOut" for="apEvery"></output></div>
           <input type="range" id="apEvery" min="0" max="100" step="1" value="44">

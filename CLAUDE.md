@@ -27,6 +27,8 @@ file don't rebuild the app.
    `python3 tests/clips_check.py` uses a stand-in library; `CLIPS_APP=<clip-app folder>` uses the real sharing
    server. Test clips are WebM because the workspace's Chromium can't play H.264. The test reaches into the app
    through `window.__plClips`.
+4d. **Loops Autopilot runs** (Autopilot runs some loops, Nick the rest; Take turns / All at once):
+   `python3 tests/ap_loops_check.py` (about 3 minutes). It reaches into Autopilot through `window.__plAp`.
 4c. **Loops C and D, and Spread out controls' columns:** `python3 tests/loops_check.py` (about 3 minutes). Each
    loop's column is a copy of the hidden sidebar editor; clicks and sliders in a copy are passed to the real one
    (see "a column per loop" in js/app.js), so new editor controls work there without extra code.

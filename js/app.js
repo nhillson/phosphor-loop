@@ -1002,6 +1002,7 @@ function setLoopCount(n, how) {
   for (const k of KEYS) $('#tab' + k).hidden = !loopOn(k);
   $$('#loopCount button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === n)));
   $$('[data-loop-row]').forEach((el) => { el.hidden = !loopOn(el.dataset.loopRow); });
+  if (typeof syncApLoops === 'function') syncApLoops();
   settleDevices();
   setEdit(edit);
   if (how === 'click' && n > was) { setEdit(KEYS[n - 1]); toast(`Loop ${KEYS[n - 1]} is on, laid over the others. Its Show fader is under Loops.`); }
@@ -1887,6 +1888,8 @@ const PINS = {
   view: { name: 'Show A and B', fields: ['showA', 'showB'], mix: true },
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
   xba: { name: 'Feed B into A', fields: ['xba'], mix: true },
+  xc: { name: 'Feed into C', fields: ['xc'], mix: true },
+  xd: { name: 'Feed into D', fields: ['xd'], mix: true },
 };
 // Fader limits (the Fader limits button under Autopilot settings): the lowest and highest Autopilot may put each
 // slider at, the same on both loops. They are limits only. Autopilot never changes them, and never parks a slider
@@ -1970,11 +1973,16 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [] };
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [],
+  runs: ['A', 'B', 'C', 'D'], turns: true };
+// Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
+// Autopilot never changes them, doesn't drift them, and moving their controls neither pins anything nor stops it.
+// Turns: with more than one loop to run, one gets a new look each time (taking turns) rather than all at once.
+const cleanRuns = (v) => { const r = Array.isArray(v) ? KEYS.filter((k) => v.includes(k)) : []; return r.length ? r : [...AP_DEFAULTS.runs]; };
 // When you move a control while Autopilot runs: pin it ('pin'), just play along without pinning ('play'), or stop
 // Autopilot ('stop')
 const cleanTouch = (v) => (v === 'stop' || v === 'play' ? v : 'pin');
-const apSet = { ...AP_DEFAULTS, lim: {}, weights: {} };
+const apSet = { ...AP_DEFAULTS, runs: [...AP_DEFAULTS.runs], lim: {}, weights: {} };
 // How often Autopilot brings each input in, set by right-clicking its switch: Off, Rarely, Less, Normal, More or Lots
 // (the pie on the switch shows which). 3D worlds and Fractals have one for the group, which is how often one of them
 // comes up at all, and one for each world and fractal, which decides which one it is; a world or fractal can also be
@@ -2017,6 +2025,8 @@ try {
     apSet.hints = s.hints !== false;
     apSet.fsKeep = s.fsKeep === true;
     apSet.touch = cleanTouch(s.touch);
+    apSet.runs = cleanRuns(s.runs);
+    apSet.turns = s.turns !== false;
     apSet.off = cleanOff(s.off);
     apSet.lim = cleanLim(s.lim);
     apSet.weights = cleanWeights(s.weights);
@@ -2041,7 +2051,7 @@ function isPinned(key, L) {
   const P = PINS[key];
   if (!P) return false;
   if (P.mix) return ap.pins.has(key);
-  return ap.pins.has(`${key}@${L}`) || ap.pins.has(`${key}@both`);
+  return ap.pins.has(`${key}@${L}`) || ((L === 'A' || L === 'B') && ap.pins.has(`${key}@both`));
 }
 function pinnedBoth(key) { return !!PINS[key] && !PINS[key].mix && ap.pins.has(`${key}@both`); }
 // Pins saved before pins were per loop held their setting on both loops, so they still do
@@ -2051,10 +2061,24 @@ function addSavedPin(id) {
   if (!P) return;
   if (P.mix) { if (!where) ap.pins.add(key); return; }
   if (!where || where === 'both') ap.pins.add(`${key}@both`);
-  else if (where === 'A' || where === 'B') ap.pins.add(`${key}@${where}`);
+  else if (KEYS.includes(where)) ap.pins.add(`${key}@${where}`);
 }
 function unpinKey(key, where) { const id = `${key}@${where}`; ap.pins.delete(id); delete ap.pinVal[id]; }
 const pinned = (k, L) => ap.on && isPinned(k, L);
+// Whether Autopilot runs loop k (it has to be switched on under Loops as well)
+const apRuns = (k) => loopOn(k) && apSet.runs.includes(k);
+const apMine = () => activeKeys().filter(apRuns);
+// Autopilot swaps loops A and B (a new look out of sight, then fading over) only when it runs both of them
+const apPair = () => apRuns('A') && apRuns('B');
+// Whether a fader under Loops is Autopilot's: the A and B Show faders when it runs both A and B, a Feed when it
+// runs the loop being fed. The C and D Show faders are always yours.
+function apOwnsMix(p) {
+  if (p === 'view' || p === 'showA' || p === 'showB') return apPair();
+  if (p in FEED_TO) return apRuns(FEED_TO[p]);
+  return false;
+}
+// Who a control belongs to while Autopilot runs: loop k's setting, or a fader under Loops
+const apOwns = (key, k) => (key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
 
 /* ================= autopilot's eye ================= */
 // While Autopilot runs it keeps an eye on the picture. Every few hundredths of a second a tiny 64 x 36 copy is
@@ -2331,8 +2355,8 @@ function coolLoop(k) {
     }
   };
   if (t.trails > 45) lower(t, 'trails', Math.max(45, t.trails - 6), isPinned('trails', k));
-  const feed = k === 'A' ? 'xba' : 'xab';
-  if (mix.tgt[feed] > 4) lower(mix.tgt, feed, mix.tgt[feed] * 0.6, ap.pins.has(feed));
+  const feed = FEED_INTO[k];
+  if (mix.tgt[feed] > 4 && apOwnsMix(feed)) lower(mix.tgt, feed, mix.tgt[feed] * 0.6, ap.pins.has(feed));
   if (t.grow > 30) lower(t, 'grow', t.grow - 12, isPinned('grow', k));
   if (IMAGE_INPUTS.includes(t.in1) && t.size > 40) lower(t, 'size', Math.max(40, t.size - 8), isPinned('size', k));
   return did;
@@ -2355,7 +2379,8 @@ function whiteWatch(now, dt, wA, wB) {
   }
   watch.cool = 0;
   watch.hot += dt;
-  const shown = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0.05);
+  // Only Autopilot's own loops are turned down; a loop that's yours is left as you set it
+  const shown = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0.05 && apRuns(k));
   const own = (k) => { const R = eyeRecent(k, 3000, now); return R.length ? Math.max(eyeAvg(R, 'white'), R[R.length - 1].white) : null; };
   // A notch at a time, and none while it's already getting darker (sliders glide, so a change takes a moment to show)
   if (now - watch.stepT >= WATCH.step * 1000 && !darker) {
@@ -2363,7 +2388,7 @@ function whiteWatch(now, dt, wA, wB) {
     // The loops that are white on their own; if neither is, it's the two of them added together
     const culprits = shown.filter((k) => { const w = own(k); return w == null || w > WATCH.white * 0.6; });
     let did = false;
-    if (shown.length === 2 && !culprits.length && !ap.pins.has('view')) {
+    if (shown.length === 2 && !culprits.length && !ap.pins.has('view') && apPair()) {
       const keep = (own('A') ?? 0) <= (own('B') ?? 0) ? 'A' : 'B';
       const to = limSpan('view') ? nearLim('view', keep === 'A' ? 0 : 100) : (keep === 'A' ? 0 : 100);
       if (to !== mix.tgt.view) { mix.tgt.view = to; did = true; }
@@ -2407,6 +2432,8 @@ function setAutopilot(on, quiet) {
   Object.assign(watch, { hot: 0, cool: 0, easing: '', skipped: false });
   document.documentElement.classList.toggle('ap-on', on);
   apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
+  ap.turnN = 0;
+  syncApLoops();
   if (on) {
     setDrift(true);
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
@@ -2428,7 +2455,7 @@ function setAutopilot(on, quiet) {
           : 'Autopilot is on. It changes a little at a time. Touch any control to take over.');
     }
   } else {
-    loops.A.ramp = loops.B.ramp = null;
+    for (const k of KEYS) loops[k].ramp = null;
     settleDevices();
     if (!quiet) showOSD('AUTOPILOT', 'OFF');
   }
@@ -2441,17 +2468,16 @@ function setAutopilot(on, quiet) {
 // finished handling the move, which is why holdPin waits for a microtask.
 function takeOver(key, from) {
   if (!ap.on) return;
-  // Autopilot steers loops A and B only, so changing loop C or D (or their Show and Feed faders) leaves it running
-  if (key === 'showC' || key === 'showD' || key === 'xc' || key === 'xd') return;
-  const isMixKey = key === 'view' || MIX_SLIDERS.includes(key);
-  if (key && !isMixKey && (from || edit) !== 'A' && (from || edit) !== 'B') return;
+  // A control that's yours (a loop Autopilot doesn't run, or a fader under Loops it doesn't use) is simply yours:
+  // nothing is pinned and Autopilot keeps going
+  if (key && !apOwns(key, from || edit)) return;
   key = pinKeyOf(key);
   if (key && PINS[key] && apSet.touch === 'play') { rampLet(key, from || edit); return; }
   if (key && PINS[key] && apSet.touch === 'pin') {
-    const P = PINS[key], loopKey = from || edit;
+    const P = PINS[key], loopKey = from || edit, ab = loopKey === 'A' || loopKey === 'B';
     const fresh = !isPinned(key, loopKey);
     // Only the loop being changed gets pinned, unless this setting is already pinned on both loops
-    const id = P.mix ? key : pinnedBoth(key) ? `${key}@both` : `${key}@${loopKey}`;
+    const id = P.mix ? key : ab && pinnedBoth(key) ? `${key}@both` : `${key}@${loopKey}`;
     ap.pins.add(id);
     queueMicrotask(() => holdPin(id, loopKey));
     if (fresh) {
@@ -2460,7 +2486,7 @@ function takeOver(key, from) {
       saveAp();
       apStatus();
       toast(P.mix ? `Pinned ${P.name}. Autopilot keeps changing the rest. Tap its pin to let it go.`
-        : `Pinned ${P.name} on loop ${loopKey}. Tap its pin to let it go, or right-click the pin to hold it on both loops.`);
+        : `Pinned ${P.name} on loop ${loopKey}. Tap its pin to let it go${ab ? ', or right-click the pin to hold it on both loops' : ''}.`);
     }
     return;
   }
@@ -2470,11 +2496,11 @@ function takeOver(key, from) {
 apBtns.forEach((b) => b.addEventListener('click', () => setAutopilot(!ap.on)));
 // Brings every slider Autopilot is in charge of (not pinned) inside its fader limits, gliding there
 function apIntoLimits() {
-  for (const k of ['A', 'B']) {
+  for (const k of apMine()) {
     const t = loops[k].tgt;
     for (const key of LIM_LOOP) if (!isPinned(key, k)) t[key] = nearLim(key, t[key]);
   }
-  for (const key of LIM_MIX) if (!ap.pins.has(key)) mix.tgt[key] = nearLim(key, mix.tgt[key]);
+  for (const key of LIM_MIX) if (!ap.pins.has(key) && apOwnsMix(key)) mix.tgt[key] = nearLim(key, mix.tgt[key]);
 }
 // Puts a new look for loop k inside the fader limits (pinned settings stay as they are)
 function apLimit(sc, k) {
@@ -2496,7 +2522,7 @@ function holdPin(id, from) {
   const { key, where } = pinParse(id);
   const P = PINS[key];
   if (!P) return;
-  const L = where === 'A' || where === 'B' ? where : from;
+  const L = KEYS.includes(where) ? where : where === 'both' && from !== 'A' && from !== 'B' ? 'A' : from;
   const src = P.mix ? mix.tgt : loops[L].tgt;
   const v = {};
   for (const f of P.fields) v[f] = src[f];
@@ -2535,10 +2561,10 @@ function togglePin(key) {
     pinsChanged();
     return;
   }
-  const L = edit, other = L === 'A' ? 'B' : 'A';
+  const L = edit, other = L === 'A' ? 'B' : 'A', ab = L === 'A' || L === 'B';
   if (isPinned(key, L)) {
     // Freed on this loop only: a pin on both loops stays on the other one
-    if (pinnedBoth(key)) {
+    if (ab && pinnedBoth(key)) {
       const v = ap.pinVal[`${key}@both`];
       unpinKey(key, 'both');
       ap.pins.add(`${key}@${other}`);
@@ -2550,7 +2576,7 @@ function togglePin(key) {
     ap.pins.add(`${key}@${L}`);
     holdPin(`${key}@${L}`, L);
     tasteHintPin(key, L);
-    toast(`Pinned ${name} on loop ${L}. Right-click the pin to hold it on both loops.`);
+    toast(`Pinned ${name} on loop ${L}.${ab ? ' Right-click the pin to hold it on both loops.' : ''}`);
   }
   pinsChanged();
 }
@@ -2558,7 +2584,8 @@ function togglePin(key) {
 // each (taken from the loop being edited), or frees it on both if it's pinned on both already
 function togglePinBoth(key) {
   const P = PINS[key], name = P.name;
-  if (P.mix) { togglePin(key); return; }
+  // Pins on both loops are for A and B; on loop C or D a right-click is the same as a tap
+  if (P.mix || (edit !== 'A' && edit !== 'B')) { togglePin(key); return; }
   const wasBoth = pinnedBoth(key) || (isPinned(key, 'A') && isPinned(key, 'B'));
   for (const w of ['A', 'B', 'both']) unpinKey(key, w);
   if (wasBoth) {
@@ -2592,15 +2619,18 @@ for (const key of Object.keys(PINS)) for (const anchor of key === 'in1' ? [$('#i
 function syncPins() {
   $$('.pin').forEach((b) => {
     const key = b.dataset.pin, P = PINS[key], name = P.name;
-    const on = isPinned(key, edit), both = !P.mix && isPinned(key, 'A') && isPinned(key, 'B');
+    const ab = edit === 'A' || edit === 'B';
+    const on = isPinned(key, edit), both = !P.mix && ab && isPinned(key, 'A') && isPinned(key, 'B');
     b.setAttribute('aria-pressed', String(on));
     b.classList.toggle('both', both);
+    // A pin only shows on a setting Autopilot is in charge of (not on loops, or faders, that are yours)
+    b.classList.toggle('not-ap', P.mix ? !apOwnsMix(key) : !apRuns(edit));
     b.setAttribute('aria-label', both ? `${name} is pinned on both loops` : `Pin ${name}${P.mix ? '' : ` on loop ${edit}`}`);
     b.title = P.mix
       ? (on ? `${name} is pinned: Autopilot leaves it alone. Tap to let Autopilot change it again.` : `Pin ${name}: Autopilot leaves it where it is`)
       : both ? `${name} is pinned on both loops. Tap to free it on loop ${edit} only; right-click to free it on both.`
-      : on ? `${name} is pinned on loop ${edit}. Tap to let Autopilot change it again; right-click to pin it on both loops.`
-      : `Pin ${name} on loop ${edit}: Autopilot leaves it where it is. Right-click to pin it on both loops.`;
+      : on ? `${name} is pinned on loop ${edit}. Tap to let Autopilot change it again${ab ? '; right-click to pin it on both loops' : ''}.`
+      : `Pin ${name} on loop ${edit}: Autopilot leaves it where it is.${ab ? ' Right-click to pin it on both loops.' : ''}`;
   });
   const names = [];
   for (const [key, P] of Object.entries(PINS)) {
@@ -2608,6 +2638,7 @@ function syncPins() {
     const a = isPinned(key, 'A'), b = isPinned(key, 'B');
     if (a && b) names.push(`${P.name} (both loops)`);
     else if (a || b) names.push(`${P.name} (loop ${a ? 'A' : 'B'})`);
+    for (const k of ['C', 'D']) if (isPinned(key, k)) names.push(`${P.name} (loop ${k})`);
   }
   $('#apPinList').textContent = names.length ? names.join(' · ')
     : `Nothing pinned. While Autopilot runs, a pin shows beside each setting. Tap it${apSet.touch === 'pin' ? ', or just move that slider,' : ''} to keep the setting where it is on the loop you’re changing. Right-click a pin to keep it on both loops.`;
@@ -2736,16 +2767,18 @@ function apFx(sc, w) {
   if (sc.time && sc.timeShape == null) sc.timeShape = Math.floor(Math.random() * 3);
 }
 // The look as Autopilot would make it without your taste (apScene, under Learn my taste, leans it your way)
+const apMate = (k) => (k === 'A' ? 'B' : k === 'B' ? 'A' : k);
 function apSceneRaw(k) {
   const pool = apPool(), w = apSet.wild / 100, sw = apSwitch(w);
-  // The loop on screen now (the new look goes on the other one), as Autopilot picked it
-  const shown = rampLook(k === 'A' ? 'B' : 'A');
+  // The look it varies from, as Autopilot picked it: for A or B the loop on screen now (the new look goes on the
+  // other one); loops C and D change in place, so they vary from their own look
+  const mate = apMate(k), shown = rampLook(mate);
   // The input comes first: as How wild says, a new one (picked by apPick before anything else, so the starter looks
   // below can't tip it towards the inputs they happen to use) or the one on screen now
   const keepIn = Math.random() >= sw && shown.in1 !== 'loop' && pool.includes(shown.in1);
   const how = {};
   const in1 = keepIn ? shown.in1 : apPick(pool, how);
-  const asInput = keepIn ? !!loops[k === 'A' ? 'B' : 'A'].asInput : !!how.asInput;
+  const asInput = keepIn ? !!loops[mate].asInput : !!how.asInput;
   let sc;
   if (Math.random() < 0.45) {
     // Start from one of the starter looks and vary it: one made for this input when there is one
@@ -2829,8 +2862,8 @@ function nudge(k) {
 // already above 75, a new look from Autopilot keeps this loop's Trails at 75 or below (unless Trails is pinned),
 // still inside the Trails limits. A lowest Trails limit above 75 wins over this.
 const AP_TRAILS_MAX = 75;
-function capTrails(sc, other) {
-  if (isPinned('trails', other === 'A' ? 'B' : 'A')) return;
+function capTrails(sc, other, self) {
+  if (isPinned('trails', self || (other === 'A' ? 'B' : 'A'))) return;
   const lo = limSpan('trails') ? limSpan('trails')[0] : 0;
   if (lo > AP_TRAILS_MAX) return;
   if (loops[other].tgt.trails > AP_TRAILS_MAX && (sc.trails ?? loopDefaults().trails) > AP_TRAILS_MAX) sc.trails = Math.round(rnd(Math.max(lo, 62), AP_TRAILS_MAX));
@@ -2865,10 +2898,10 @@ function glideLook(k) {
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
-  const other = k === 'A' ? 'B' : 'A';
+  const other = otherLoop(k);
   if (sc.in1 === 'loop' && [loops[other].tgt.in1, loops[other].tgt.in2].includes('loop') && !isPinned('in1', k)) sc.in1 = apRealInput();
   apLimit(sc, k);
-  capTrails(sc, other);
+  capTrails(sc, other, k);
   patchLoop(k, sc, true);
   L.favMix = favMix || null;
 }
@@ -2897,9 +2930,9 @@ function rampStart(k, now, snap) {
     L.tgt[key] = clean;
     if (snap) L.cur[key] = clean;
   }
-  const fk = k === 'A' ? 'xba' : 'xab';
+  const fk = FEED_INTO[k];
   let feed = null;
-  if (!ap.pins.has(fk)) {
+  if (!ap.pins.has(fk) && apOwnsMix(fk)) {
     const clean = nearLim(fk, 0);
     if (mix.tgt[fk] !== clean) { feed = { key: fk, clean, full: mix.tgt[fk] }; mix.tgt[fk] = clean; }
   }
@@ -2910,7 +2943,7 @@ function rampStart(k, now, snap) {
 // between, at its peak for the middle 20%, down over the last 40%, and clean again half a second before the next
 // look is due, staying clean while that look fades in over it.
 function rampTick(now) {
-  for (const k of ['A', 'B']) {
+  for (const k of KEYS) {
     const L = loops[k], R = L.ramp;
     if (!R) continue;
     if (R.gen !== L.gen) { L.ramp = null; continue; }   // another look has gone on this loop since
@@ -2930,10 +2963,10 @@ function rampTick(now) {
 }
 // Whether a slider is being moved by a build-up right now (it then follows closely, the build-up being smooth already)
 const ramping = (p, k) => !!(loops[k].ramp && loops[k].ramp.keys[p]);
-const rampingMix = (p) => ['A', 'B'].some((k) => loops[k].ramp && loops[k].ramp.feed && loops[k].ramp.feed.key === p);
+const rampingMix = (p) => KEYS.some((k) => loops[k].ramp && loops[k].ramp.feed && loops[k].ramp.feed.key === p);
 // A slider moved by hand with Play along leaves the build-up and stays where it's put until the next look
 function rampLet(key, k) {
-  for (const L of [loops.A, loops.B]) if (L.ramp && L.ramp.feed && L.ramp.feed.key === key) L.ramp.feed = null;
+  for (const L of KEYS.map((j) => loops[j])) if (L.ramp && L.ramp.feed && L.ramp.feed.key === key) L.ramp.feed = null;
   if (loops[k] && loops[k].ramp) delete loops[k].ramp.keys[key];
 }
 // Loop k's look as Autopilot picked it: a building look counts at its peak
@@ -2956,6 +2989,16 @@ function apTick(now) {
     apStep(now, false);
   }
 }
+// Which loops get a new look this time. Loops A and B count as one when Autopilot runs both (it swaps between
+// them); any other loop it runs changes in place. Taking turns, one of them goes each time; all at once, every one.
+function apTurn() {
+  const mine = apMine(), slots = [];
+  if (apPair()) slots.push('AB');
+  for (const k of mine) if (!(apPair() && (k === 'A' || k === 'B'))) slots.push(k);
+  if (!apSet.turns || slots.length < 2) return { go: slots, i: 0 };
+  const i = (ap.turnN || 0) % slots.length;
+  return { go: [slots[i]], i };
+}
 function apStep(now, onBeat) {
   const rush = ap.rush;
   ap.next = now + apEverySec() * 1000 * rnd(0.75, 1.25);
@@ -2967,60 +3010,78 @@ function apStep(now, onBeat) {
   const feed = (key) => (ap.pins.has(key) ? mix.tgt[key] : inLim(key, Math.random() < m ? Math.round(rnd(10, Math.min(85, 15 + 80 * m))) : 0));
   const ways = 1 + Math.round(5 * tasteHow());
   let came = null, mixSet = false;
+  const turn = apTurn(), changed = new Set();
   // A narrowed What you see limit means Autopilot can't hide a loop to swap it out, so it moves What you see
   // somewhere inside the limit and changes the loops in place, the same as when What you see is pinned
   const viewLim = limSpan('view');
-  if (!ap.pins.has('view') && !viewLim) {
-    if (v <= 1 || v >= 99) {
-      const hidden = v <= 1 ? 'B' : 'A', shown = hidden === 'A' ? 'B' : 'A';
-      // Still fading away from the last change (a long Fade time): look again in a moment,
-      // rather than swap out a loop that's still on screen
-      const [cA, cB] = weights(mix.cur.view);
-      if ((hidden === 'A' ? cA : cB) > 0.02) { ap.next = now + 1000; ap.quick = 0; return; }
-      // Check each look: the hidden loop only comes in once its look has been tried out and passed
-      if (checking()) {
-        if (!prepReady(hidden, now, rush)) { ap.next = now + 250; ap.quick = 0; apStatus(); return; }
-      } else freshLook(hidden, shown);
-      nudge(shown);
-      ap.cameIn = { k: hidden, at: now, gen: loops[hidden].gen };
-      came = hidden;
-      // Both loops at once or just the new one, and how they feed each other: picked as a whole picture
-      const one = hidden === 'B' ? 100 : 0, opts = [];
-      for (let i = ways; i > 0; i--) opts.push({ view: Math.random() < 0.8 * m ? 50 : one, xab: feed('xab'), xba: feed('xba') });
-      const w = tasteMix(opts, hidden);
-      // Two loops that would add up to white on screen are shown one at a time
-      mix.tgt.view = w.view === 50 && overlayWhite(hidden, shown) > WATCH.white * 0.7 ? one : w.view;
-      mix.tgt.xab = w.xab;
-      mix.tgt.xba = w.xba;
-      mixSet = true;
+  if (turn.go.includes('AB')) {
+    if (!ap.pins.has('view') && !viewLim) {
+      if (v <= 1 || v >= 99) {
+        const hidden = v <= 1 ? 'B' : 'A', shown = hidden === 'A' ? 'B' : 'A';
+        // Still fading away from the last change (a long Fade time): look again in a moment,
+        // rather than swap out a loop that's still on screen
+        const [cA, cB] = weights(mix.cur.view);
+        if ((hidden === 'A' ? cA : cB) > 0.02) { ap.next = now + 1000; ap.quick = 0; return; }
+        // Check each look: the hidden loop only comes in once its look has been tried out and passed
+        if (checking()) {
+          if (!prepReady(hidden, now, rush)) { ap.next = now + 250; ap.quick = 0; apStatus(); return; }
+        } else freshLook(hidden, shown);
+        changed.add(hidden);
+        ap.cameIn = { k: hidden, at: now, gen: loops[hidden].gen };
+        came = hidden;
+        // Both loops at once or just the new one, and how they feed each other: picked as a whole picture
+        const one = hidden === 'B' ? 100 : 0, opts = [];
+        for (let i = ways; i > 0; i--) opts.push({ view: Math.random() < 0.8 * m ? 50 : one, xab: feed('xab'), xba: feed('xba') });
+        const w = tasteMix(opts, hidden);
+        // Two loops that would add up to white on screen are shown one at a time
+        mix.tgt.view = w.view === 50 && overlayWhite(hidden, shown) > WATCH.white * 0.7 ? one : w.view;
+        mix.tgt.xab = w.xab;
+        mix.tgt.xba = w.xba;
+        mixSet = true;
+      } else {
+        mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
+      }
     } else {
-      mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
-      nudge('A'); nudge('B');
+      if (!ap.pins.has('view')) mix.tgt.view = Math.round(rnd(viewLim[0], viewLim[1]));
+      const [wA, wB] = weights(mix.tgt.view);
+      const onScreen = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0);
+      const k = pick(onScreen.length ? onScreen : ['A']);
+      glideLook(k);
+      changed.add(k);
+      ap.cameIn = { k, at: now, gen: loops[k].gen };
+      came = k;
+      // Check each look: once it has faded in, Autopilot looks at it (see glideJudge)
+      ap.glide = checking() ? { k, at: now + (apFadeSec() + 2.5) * 1000 } : null;
     }
-  } else {
-    if (!ap.pins.has('view')) mix.tgt.view = Math.round(rnd(viewLim[0], viewLim[1]));
-    const [wA, wB] = weights(mix.tgt.view);
-    const onScreen = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0);
-    const k = pick(onScreen.length ? onScreen : ['A']);
-    glideLook(k);
-    nudge(k === 'A' ? 'B' : 'A');
-    ap.cameIn = { k, at: now, gen: loops[k].gen };
-    came = k;
-    // Check each look: once it has faded in, Autopilot looks at it (see glideJudge)
-    ap.glide = checking() ? { k, at: now + (apFadeSec() + 2.5) * 1000 } : null;
   }
+  // Every other loop whose turn it is changes in place, gliding into its new look (and what pours into it with it)
+  for (const k of turn.go) {
+    if (k === 'AB') continue;
+    glideLook(k);
+    changed.add(k);
+    if (FEED_INTO[k] && (k === 'C' || k === 'D') && !ap.pins.has(FEED_INTO[k])) mix.tgt[FEED_INTO[k]] = feed(FEED_INTO[k]);
+    if (!came) {
+      came = k;
+      ap.cameIn = { k, at: now, gen: loops[k].gen };
+      if ((k === 'A' || k === 'B') && checking()) ap.glide = { k, at: now + (apFadeSec() + 2.5) * 1000 };
+    }
+  }
+  // The rest of Autopilot's loops drift a little meanwhile
+  for (const k of apMine()) if (!changed.has(k)) nudge(k);
+  ap.turnN = turn.i + 1;
   if (came) lookOnScreen++;
   ap.rush = false;
   // The countdown under the picture counts down to the next look from here
   ap.due = ap.next;
   ap.span = Math.max(1, ap.next - now);
-  // Otherwise What you see is settled already, and only the feeds are picked (as a whole picture again)
-  if (!mixSet) {
+  // Otherwise What you see is settled already, and only the feeds are picked (as a whole picture again), each one
+  // only when Autopilot runs the loop it pours into
+  if (!mixSet && (apRuns('A') || apRuns('B'))) {
     const opts = [];
     for (let i = ways; i > 0; i--) opts.push({ view: mix.tgt.view, fixedView: true, xab: feed('xab'), xba: feed('xba') });
-    const w = tasteMix(opts, came);
-    mix.tgt.xab = w.xab;
-    mix.tgt.xba = w.xba;
+    const w = tasteMix(opts, came === 'A' || came === 'B' ? came : null);
+    if (apRuns('B')) mix.tgt.xab = w.xab;
+    if (apRuns('A')) mix.tgt.xba = w.xba;
   }
   // A 3D world or fractal: clean to start with, building up slowly, a longer stay, and shown on its own
   if (came && rampStart(came, now, mixSet)) {
@@ -3095,7 +3156,7 @@ function nextLook(how) {
   if (frozen) toggleFreeze(false);
   if (!was) setAutopilot(true, true);
   ap.beatWait = null;
-  if (!ap.pins.has('view') && !limSpan('view')) {
+  if (apPair() && !ap.pins.has('view') && !limSpan('view')) {
     if (mix.tgt.view > 1 && mix.tgt.view < 99) mix.tgt.view = Math.random() < 0.5 ? 0 : 100;
     mix.cur.view = mix.tgt.view;
   }
@@ -3105,6 +3166,8 @@ function nextLook(how) {
   if (!was) toast('Autopilot is on, starting with a new look. Press Next look any time to skip ahead.');
 }
 $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
+// For tests/ap_loops_check.py: a way in to Autopilot's loops
+window.__plAp = { loops, ap, apSet, apTurn, step() { ap.quick = 0; apStep(performance.now(), false); } };
 
 /* ================= learn my taste ================= */
 // More like this and Not this (under the picture, keys Y and X) teach Autopilot what you like. A rating is for the
@@ -3507,6 +3570,8 @@ function tastePickBy(items, score) {
 // 1 and 2: a new look for loop k, leaning towards pictures you've liked. Several new looks, often with a loop or two
 // brought back from pictures you liked, and the one that would make the best picture with the other loop is kept.
 function apScene(k) {
+  // Your taste is learned from loops A and B together, so loops C and D get Autopilot's own picks
+  if (k !== 'A' && k !== 'B') return apSceneRaw(k);
   const M = tasteModel(), f = apSet.taste / 100, c = f * M.conf;
   if (!c) return apSceneRaw(k);
   const cands = [];
@@ -4004,6 +4069,7 @@ function syncApUI() {
   $('#apFsKeep').setAttribute('aria-pressed', String(apSet.fsKeep));
   tasteSummary();
   $$('#apTouch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.touch === apSet.touch)));
+  syncApLoops();
   $$('#apInputs button').forEach((b) => {
     const k = b.dataset.apsrc, on = !apSet.off.includes(k), lv = levelOf(apW(k));
     b.setAttribute('aria-pressed', String(on));
@@ -4193,6 +4259,42 @@ wpop.addEventListener('keydown', (e) => {
 document.addEventListener('pointerdown', (e) => { if (!wpop.hidden && !wpop.contains(e.target) && e.target !== wpAnchor && !(wpAnchor && wpAnchor.contains(e.target))) closeWeights(); }, true);
 window.addEventListener('resize', placeWeights);
 document.addEventListener('scroll', placeWeights, true);
+// Loops Autopilot runs: one switch per loop (at least one stays on), and Take turns or All at once
+function syncApLoops() {
+  $$('#apLoops button').forEach((b) => b.setAttribute('aria-pressed', String(apSet.runs.includes(b.dataset.aploop))));
+  $$('#apTurns button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.turns === '1') === apSet.turns)));
+  // While Autopilot runs, each loop tab says whose loop it is
+  for (const k of KEYS) {
+    const el = $('#who' + k);
+    if (!el) continue;
+    const mine = apRuns(k);
+    el.hidden = !ap.on;
+    el.textContent = mine ? 'AUTO' : 'YOU';
+    el.classList.toggle('auto', mine);
+    el.title = mine ? `Autopilot runs loop ${k}` : `Loop ${k} is yours: Autopilot leaves it alone`;
+  }
+  syncPins();
+}
+$$('#apLoops button').forEach((b) => b.addEventListener('click', () => {
+  const k = b.dataset.aploop, on = apSet.runs.includes(k);
+  if (on && apSet.runs.length === 1) { toast('Autopilot needs at least one loop. Switch another one on first, or stop Autopilot.'); return; }
+  apSet.runs = on ? apSet.runs.filter((x) => x !== k) : KEYS.filter((x) => x === k || apSet.runs.includes(x));
+  // A loop handed over to you stops building up, and nothing is tried out of sight unless Autopilot has A and B
+  if (on) loops[k].ramp = null;
+  if (!apPair()) { ap.prep = null; if (ap.glide && !apRuns(ap.glide.k)) ap.glide = null; }
+  ap.turnN = 0;
+  saveAp();
+  syncApUI();
+  if (ap.on && !on) apIntoLimits();
+  const off = !loopOn(k) ? ` (it’s switched off under Loops right now)` : '';
+  toast(on ? `Loop ${k} is yours now${off}. Autopilot leaves it alone.` : `Autopilot runs loop ${k} now${off}.`);
+}));
+$$('#apTurns button').forEach((b) => b.addEventListener('click', () => {
+  apSet.turns = b.dataset.turns === '1';
+  saveAp();
+  syncApUI();
+  toast(apSet.turns ? 'Take turns: one of Autopilot’s loops gets a new look each time.' : 'All at once: every one of Autopilot’s loops gets a new look together.');
+}));
 $$('#apTouch button').forEach((b) => b.addEventListener('click', () => {
   apSet.touch = b.dataset.touch;
   saveAp();
@@ -4206,7 +4308,8 @@ $('#apUnpin').addEventListener('click', () => {
   toast(ap.on ? 'Nothing is pinned now. Autopilot changes everything from its next look.' : 'Nothing is pinned now.');
 });
 $('#apReset').addEventListener('click', () => {
-  for (const k of ['every', 'fade', 'wild', 'mix', 'taste', 'beat', 'check', 'hints', 'touch']) apSet[k] = AP_DEFAULTS[k];
+  for (const k of ['every', 'fade', 'wild', 'mix', 'taste', 'beat', 'check', 'hints', 'touch', 'turns']) apSet[k] = AP_DEFAULTS[k];
+  apSet.runs = [...AP_DEFAULTS.runs];
   apSet.off = [];
   apSet.lim = {};
   apSet.weights = {};
@@ -7519,7 +7622,8 @@ function runLoop(k, xf, brush, f) {
   const otherK = otherLoop(k);
   const otherTex = shownTex(otherK), otherPrev = shownPrev(otherK);
   let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
-  if (drift) {
+  // Under Autopilot, a loop that's yours doesn't drift: it stays exactly as you set it
+  if (drift && !(ap.on && !apRuns(k))) {
     const d = driftT + (37.0 * LOOP_OFF[k]);
     // Flow brings its own motion, so Auto-drift barely zooms or turns a flowing loop.
     // The 3D flights move by themselves, so there Auto-drift only tints.
@@ -7761,7 +7865,8 @@ function eyeTick(now, dt, wA, wB) {
   if (frozen) return;
   if (ap.on) {
     if (got && ap.prep && got === ap.prep.k) prepJudge(now);
-    if (checking() && canTryOut()) {
+    // Looks are only tried out of sight when Autopilot swaps loops A and B (it runs both)
+    if (checking() && canTryOut() && apPair()) {
       const v = mix.tgt.view, P = ap.prep;
       const hidden = v <= 1 ? 'B' : v >= 99 ? 'A' : null;
       // The view moved (or a person moved it) while a look was being tried: try again for the next one
@@ -7799,12 +7904,12 @@ function frame() {
   if (ap.on && !frozen) rampTick(now);
   for (const key of activeKeys()) {
     const L = loops[key];
-    // Autopilot doesn't steer loops C and D, so they always answer their sliders at the hand-moved pace
-    const kl = key === 'A' || key === 'B' ? kLoop : k;
+    // A loop that's yours always answers its sliders at the hand-moved pace
+    const kl = apRuns(key) ? kLoop : k;
     for (const p of LOOP_SMOOTH) L.cur[p] += (L.tgt[p] - L.cur[p]) * (pinned(p, key) || ramping(p, key) ? k : kl);
   }
   for (const p of MIX_SLIDERS) {
-    const own = p === 'showC' || p === 'showD' || p === 'xc' || p === 'xd';
+    const own = !apOwnsMix(p);
     mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (own || pinned(pinKeyOf(p)) || rampingMix(p) ? k : kMix);
   }
   if (ap.on && !frozen && now >= ap.next) apTick(now);

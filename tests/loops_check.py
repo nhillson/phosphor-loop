@@ -101,7 +101,8 @@ def run(c, base, out, problems):
     pg.click('#loopCount button[data-n="4"]')
     c.wait_frames(5, '4 loops again')
 
-    # Autopilot with four loops for a while
+    # Autopilot with four loops for a while, with loop D left to you (so its zoom must stay as set)
+    pg.evaluate("() => document.querySelector(`#apLoops [data-aploop='D']`).click()")
     pg.click('#autopilotBar')
     c.wait_frames(60, 'Autopilot with 4 loops')
     pg.click('#autopilotBar')
@@ -114,6 +115,7 @@ def run(c, base, out, problems):
     pg.click('#tabD')
     c.wait_frames(3, 'tab D')
     expect(pg.text_content('#zoomOut') == 'IN 77', f"tab D shows loop D's zoom ({pg.text_content('#zoomOut')})")
+    pg.evaluate("() => document.querySelector(`#apLoops [data-aploop='D']`).click()")
     pg.click('#loopCount button[data-n="2"]')
     c.wait_frames(5, 'back to 2')
     expect(not pg.is_visible('#tabC') and pg.get_attribute('#editor', 'data-loop') == 'A', 'back to 2 loops, editing loop A')
