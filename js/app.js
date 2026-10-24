@@ -10,7 +10,10 @@ const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 // (under Screen) can draw more lines, up to the screen's own (see wantLines). Local streaming can request a
 // fixed number of lines instead.
 const SIM_H = 576;
-let simW = 768, simH = window.__phosphorCaptureConfig?.renderHeight || SIM_H, simAspect = simW / simH;
+// The stream app's capture mode: the size and speed it streams at. The app can switch it off ("Streaming?" Off),
+// and then the page draws like an ordinary browser window, at the size Picture sharpness picks.
+function capCfg() { const c = window.__phosphorCaptureConfig; return c && !c.off ? c : null; }
+let simW = 768, simH = capCfg()?.renderHeight || SIM_H, simAspect = simW / simH;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -6555,6 +6558,9 @@ const SHARP_KEY = 'phosphor-sharp', SHARP_AUTO_KEY = 'phosphor-sharp-auto';
 const SHARP_MODES = ['auto', 'standard', 'high', 'full'];
 const SHARP_LEVELS = [SIM_H, 720, 900, 1080, 1440];
 const SHARP_MAX_PX = 3.7e6;   // never more than about a 2560 x 1440 picture, so memory stays in hand
+// ...except at Full, which goes up to 4K (3840 x 2160) on a computer with the memory for it
+const FULL_MAX_PX = 8.3e6;
+const maxPx = () => (sharp === 'full' && !sharpLowMem ? FULL_MAX_PX : SHARP_MAX_PX);
 const sharpLowMem = !!APP || (navigator.deviceMemory > 0 && navigator.deviceMemory <= 4);
 let sharp = 'auto';
 try { const v = localStorage.getItem(SHARP_KEY); if (SHARP_MODES.includes(v)) sharp = v; } catch (_) {}
@@ -6565,7 +6571,7 @@ try { const v = +localStorage.getItem(SHARP_AUTO_KEY); if (v > 0 && v <= sharpAu
 let fitLines = SIM_H, fitAspect = 4 / 3;
 // How many lines to draw, for the setting and the size the picture is shown at (never fewer than Standard)
 function wantLines() {
-  const cap = window.__phosphorCaptureConfig;
+  const cap = capCfg();
   if (cap) return cap.renderHeight || SIM_H;
   const top = Math.max(SIM_H, fitLines);
   if (sharp === 'standard') return SIM_H;
@@ -6575,12 +6581,12 @@ function wantLines() {
 }
 function resim(aspect) {
   fitAspect = aspect;
-  const cap = window.__phosphorCaptureConfig;
+  const cap = capCfg();
   let h = Math.max(SIM_H, Math.round(wantLines()));
   const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
   let w = clamp(Math.round(h * aspect / 4) * 4, 256, Math.min(maxTex, cap ? 3840 : Math.round(1600 * h / SIM_H)));
-  if (!cap && h > SIM_H && w * h > SHARP_MAX_PX) {
-    const k = Math.sqrt(SHARP_MAX_PX / (w * h));
+  if (!cap && h > SIM_H && w * h > maxPx()) {
+    const k = Math.sqrt(maxPx() / (w * h));
     h = Math.max(SIM_H, Math.round(h * k)); w = Math.max(256, Math.round(w * k / 4) * 4);
   }
   h = Math.min(h, maxTex);
@@ -6613,7 +6619,7 @@ function sharpSay() {
   note.textContent = sharp === 'auto' ? `Auto: ${simH} lines right now. It sharpens the picture while this computer keeps it smooth, and steps back if it starts to slow down.`
     : sharp === 'standard' ? `${SIM_H} lines, as Phosphor Loop has always drawn it. The lightest on the computer.`
     : sharp === 'high' ? `Up to 1080 lines, like HD video (${simH} at this size). Needs a capable computer, or the picture slows down.`
-    : `As many lines as the screen shows (${simH} at this size). The sharpest, and the hardest on the computer.`;
+    : `As many lines as the screen shows, up to 4K (${simH} at this size). The sharpest, and the hardest on the computer.`;
 }
 $$('#sharp button').forEach((b) => b.addEventListener('click', () => {
   sharp = b.dataset.sharp;
@@ -6621,6 +6627,9 @@ $$('#sharp button').forEach((b) => b.addEventListener('click', () => {
   // Auto measures afresh from where it last settled
   Object.assign(sharpAuto, { ceiling: sharpAuto.top, t0: 0, fast: 0, slow: 0, justUp: false });
   clearTimeout(resimTimer);
+  // Full may draw the screen itself bigger (up to 4K), so measure it again, straight away
+  firstFit = true;
+  fit();
   resim(fitAspect);
   showOSD('SHARPNESS', `${sharp.toUpperCase()} · ${simH} LINES`);
 }));
@@ -6630,7 +6639,7 @@ $$('#sharp button').forEach((b) => b.addEventListener('click', () => {
 // doesn't count. It never goes below Standard.
 function sharpTick(now) {
   const A = sharpAuto;
-  if (sharp !== 'auto' || window.__phosphorCaptureConfig || document.hidden) { A.t0 = 0; return; }
+  if (sharp !== 'auto' || capCfg() || document.hidden) { A.t0 = 0; return; }
   if (A.settle > 0) { A.settle--; A.t0 = 0; return; }
   if (!A.t0) { A.t0 = now; A.frames = 0; return; }
   if (++A.frames < 120) return;
@@ -6678,20 +6687,21 @@ function fit() {
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   let cw, ch, aspect;
-  if (window.__phosphorCaptureConfig) {
-    cw = window.__phosphorCaptureConfig.width;
-    ch = window.__phosphorCaptureConfig.height;
+  if (capCfg()) {
+    cw = capCfg().width;
+    ch = capCfg().height;
     aspect = cw / ch;
   } else if (out) {
     // Draw at the output window's own resolution; this screen shows a scaled preview of the same picture
     const ow = Math.max(1, outWin.innerWidth), oh = Math.max(1, outWin.innerHeight);
-    const odpr = Math.min(outWin.devicePixelRatio || 1, 2, Math.sqrt(6e6 / (ow * oh)));
+    const odpr = Math.min(outWin.devicePixelRatio || 1, 2, Math.sqrt(Math.max(6e6, maxPx()) / (ow * oh)));
     cw = Math.max(1, Math.round(ow * odpr)); ch = Math.max(1, Math.round(oh * odpr));
     if (outCanvas.width !== cw || outCanvas.height !== ch) { outCanvas.width = cw; outCanvas.height = ch; }
     aspect = ow / oh;
   } else {
     // Cap the drawing size so a big 4K full screen stays smooth
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(4.5e6 / (w * h)));
+    const full = maxPx() > SHARP_MAX_PX;
+    const dpr = Math.min(window.devicePixelRatio || 1, full ? 2 : 1.5, Math.sqrt((full ? FULL_MAX_PX : 4.5e6) / (w * h)));
     cw = Math.max(1, Math.round(w * dpr)); ch = Math.max(1, Math.round(h * dpr));
     aspect = w / h;
   }
@@ -7772,7 +7782,7 @@ function eyeTick(now, dt, wA, wB) {
 let captureNextAt = 0;
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
-  const captureFps = window.__phosphorCaptureConfig?.fps;
+  const captureFps = capCfg()?.fps;
   if (captureFps) {
     if (now < captureNextAt - 1) { requestAnimationFrame(frame); return; }
     captureNextAt = Math.max(captureNextAt + 1000 / captureFps, now);
