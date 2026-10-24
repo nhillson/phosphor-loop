@@ -24,8 +24,11 @@ const app = spawn(electron, [root], {
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 global.extraLog = '';
-for (const st of [app.stdout, app.stderr]) st.on('data', (d) => { process.stdout.write(d); global.extraLog = (global.extraLog + d).slice(-6000); });
+// The whole app log is kept too, and published with the other test logs (the Actions log needs a sign-in to read)
+const appLog = fs.createWriteStream(path.join(outDir, 'app-log.txt'));
+for (const st of [app.stdout, app.stderr]) st.on('data', (d) => { process.stdout.write(d); appLog.write(d); global.extraLog = (global.extraLog + d).slice(-6000); });
 app.on('exit', async (code) => {
+  await new Promise((r) => appLog.end(r));
   await new Promise((r) => { server.on('exit', r); setTimeout(() => { server.kill(); r(); }, 10000); });
   let result = {};
   try { result = JSON.parse(fs.readFileSync(path.join(outDir, 'result.json'), 'utf8')); } catch (_) {}

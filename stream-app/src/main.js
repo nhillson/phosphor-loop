@@ -39,10 +39,6 @@ const PLATFORMS = ['twitch', 'kick', 'youtube'];
 if (TEST) app.commandLine.appendSwitch('enable-unsafe-swiftshader');
 // Keep drawing and streaming even when the window is covered or minimized
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
-// ...and even when Windows thinks the window is hidden behind another one (or the screen is locked): Windows'
-// "occlusion" check otherwise pauses drawing there, which would freeze the stream or a recording
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
