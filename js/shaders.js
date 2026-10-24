@@ -745,14 +745,22 @@ const FS_COMPOSITE = `#version 300 es
 precision highp float;
 uniform sampler2D uA, uB, uC, uD;
 uniform float uWA, uWB, uWC, uWD;
+// Recolor: how far round the color wheel each loop's whole picture is turned on screen (radians; A, B, C, D)
+uniform vec4 uRecolor;
 uniform vec2 uSim;
 out vec4 o;
+vec3 turn(vec3 c, float a) {
+  if (a == 0.0) return c;
+  const vec3 k = vec3(0.57735027);
+  float ca = cos(a);
+  return max(c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca), 0.0);
+}
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
-  vec3 a = texture(uA, uv).rgb * uWA;
-  vec3 b = texture(uB, uv).rgb * uWB;
-  vec3 c = uWC > 0.0 ? texture(uC, uv).rgb * uWC : vec3(0.0);
-  vec3 d = uWD > 0.0 ? texture(uD, uv).rgb * uWD : vec3(0.0);
+  vec3 a = turn(texture(uA, uv).rgb, uRecolor.x) * uWA;
+  vec3 b = turn(texture(uB, uv).rgb, uRecolor.y) * uWB;
+  vec3 c = uWC > 0.0 ? turn(texture(uC, uv).rgb, uRecolor.z) * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? turn(texture(uD, uv).rgb, uRecolor.w) * uWD : vec3(0.0);
   o = vec4(1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d), 1.0);
 }`;
 

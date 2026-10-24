@@ -387,6 +387,12 @@
             <div class="ends"><span>Off</span><span>Fast</span></div>
           </div>
           <div class="ctl">
+            <div class="ctl-head"><label for="recolor">Recolor</label><output id="recolorOut" for="recolor"></output></div>
+            <input type="range" id="recolor" class="bipolar" min="-180" max="180" step="1" value="0">
+            <div class="ends"><span>−180°</span><span>Off</span><span>+180°</span></div>
+            <span class="hint">Turns every color of this whole loop round the color wheel by the same amount, so purple can become green, orange or blue while the shapes stay the same. 180 gives the opposite colors. It changes how the loop looks on screen; inside, the loop keeps feeding itself its own colors. Autopilot leaves it where you put it, through every new look.</span>
+          </div>
+          <div class="ctl">
             <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
             <input type="range" id="warp" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wobbly</span></div>

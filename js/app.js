@@ -160,14 +160,14 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, recolor: 0, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
 // The sliders under Effects › Feeds on itself
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'recolor', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'recolor', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -770,6 +770,7 @@ function sliderText(k, v) {
   v = Math.round(v);
   switch (k) {
     case 'zoom': return v > 0 ? `IN ${v}` : v < 0 ? `OUT ${-v}` : 'HOLD';
+    case 'recolor': return v === 0 ? 'OFF' : `${v > 0 ? '+' : '−'}${Math.abs(v)}°`;
     case 'spin': return v > 0 ? `RIGHT ${v}` : v < 0 ? `LEFT ${-v}` : 'HOLD';
     case 'showA': case 'showB': case 'showC': case 'showD': return v === 0 ? 'HIDDEN' : String(v);
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
@@ -1131,6 +1132,8 @@ function patchLoop(k, p, force) {
   L.asInput = !!p.asInput;
   delete n.asInput;
   n.motion = p.motion ?? (force ? false : L.tgt.motion);
+  // Recolor stays through every new look (Autopilot, Surprise); a preset, recipe or Neutral sets it
+  if (!force && !('recolor' in p)) n.recolor = L.tgt.recolor || 0;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
@@ -2078,7 +2081,8 @@ function apOwnsMix(p) {
   return false;
 }
 // Who a control belongs to while Autopilot runs: loop k's setting, or a fader under Loops
-const apOwns = (key, k) => (key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
+// Recolor is always yours: Autopilot never changes it
+const apOwns = (key, k) => (key === 'recolor' ? false : key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
 
 /* ================= autopilot's eye ================= */
 // While Autopilot runs it keeps an eye on the picture. Every few hundredths of a second a tiny 64 x 36 copy is
@@ -7989,6 +7993,8 @@ function frame() {
   set1f(compProg, 'uWB', wB);
   set1f(compProg, 'uWC', W.C);
   set1f(compProg, 'uWD', W.D);
+  { const R = (k) => (loopOn(k) ? clamp(loops[k].cur.recolor || 0, -180, 180) * Math.PI / 180 : 0);
+    const l = U(compProg, 'uRecolor'); if (l) gl.uniform4f(l, R('A'), R('B'), R('C'), R('D')); }
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   eyeTick(now, dt, wA, wB);
 
