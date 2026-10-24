@@ -39,6 +39,10 @@ const PLATFORMS = ['twitch', 'kick', 'youtube'];
 if (TEST) app.commandLine.appendSwitch('enable-unsafe-swiftshader');
 // Keep drawing and streaming even when the window is covered or minimized
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
+// ...and even when Windows thinks the window is hidden behind another one (or the screen is locked): Windows'
+// "occlusion" check otherwise pauses drawing there, which would freeze the stream or a recording
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
@@ -509,6 +513,7 @@ async function recordStart() {
     const info = await siteCall('rec-start', { fps: plan.fps, bitrate: plan.firstBitrate });
     rec.state = 'recording';
     rec.startedAt = Date.now();
+    if (rec.awake == null) rec.awake = powerSaveBlocker.start('prevent-display-sleep');
     log(`Recording ${plan.width}x${plan.height} at ${plan.fps} fps, ${REC_QUALITY[plan.quality].label} (${(plan.bitrate / 1e6).toFixed(0)} Mbps)${live ? ', while live' : ''}; working copy ${info.mimeType} at ${(plan.firstBitrate / 1e6).toFixed(0)} Mbps, sound ${info.sound ? 'on' : 'off ' + info.soundErr}`);
     if (!info.sound) tell('Couldn’t hear this computer’s sound, so the recording is silent. Check that a speaker or headphones are set up in Windows.', 'warn');
     rec.framesAt = await siteCall('frames').catch(() => 0); rec.framesT = Date.now();
@@ -548,6 +553,7 @@ ipcMain.on('rec-done', () => { if (rec.doneWait) rec.doneWait(); });
 async function recordStop(broken) {
   if (rec.state !== 'recording') return;
   rec.state = 'saving'; rec.progress = 0; rec.warned = false;
+  if (rec.awake != null) { powerSaveBlocker.stop(rec.awake); rec.awake = null; }
   clearInterval(rec.timer);
   sendStatus();
   const plan = rec.plan, seconds = (Date.now() - rec.startedAt) / 1000;
