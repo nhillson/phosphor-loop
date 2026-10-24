@@ -639,9 +639,12 @@ ipcMain.handle('save', async (_e, patch) => {
 });
 function captureConfig() {
   // A recording made while off air draws at the recording's own size and speed
-  if (rec.plan && rec.ownSize) return { width: rec.plan.width, height: rec.plan.height, fps: rec.plan.fps, renderHeight: rec.plan.height, off: false };
+  // The build's test computer has no graphics card at all, so there the loops are drawn at a much lower detail (the
+  // picture keeps its full size); otherwise it manages less than a frame a second and every step takes minutes
+  const lines = (h) => (TEST ? Math.min(h, 216) : h);
+  if (rec.plan && rec.ownSize) return { width: rec.plan.width, height: rec.plan.height, fps: rec.plan.fps, renderHeight: lines(rec.plan.height), off: false };
   const q = QUALITY[settings.quality];
-  return { width: q.width, height: q.height, fps: q.fps, renderHeight: q.height, off: !settings.streaming };
+  return { width: q.width, height: q.height, fps: q.fps, renderHeight: lines(q.height), off: !settings.streaming };
 }
 async function resizeSite() {
   const cfg = captureConfig();
@@ -755,7 +758,7 @@ async function runTest() {
     const rs = await recordStart();
     if (!rs.ok) throw new Error('recording did not start');
     if ((await sizeNow())[1] !== 1080) throw new Error('the recording did not draw at its own size');
-    await waitFrames(20);
+    await waitFrames(20, 30000);
     const saved = await recordStop();
     result.recording = { ok: !!(saved && saved.ok), file: saved && saved.output };
     if (!result.recording.ok) throw new Error('the recording could not be saved');
