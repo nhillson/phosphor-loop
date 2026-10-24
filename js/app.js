@@ -6685,7 +6685,8 @@ function wantLines() {
 function resim(aspect) {
   fitAspect = aspect;
   const cap = capCfg();
-  let h = Math.max(SIM_H, Math.round(wantLines()));
+  // The stream app sets the lines itself (its build test asks for fewer than usual, on a computer with no graphics card)
+  let h = cap ? Math.max(120, Math.round(wantLines())) : Math.max(SIM_H, Math.round(wantLines()));
   const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
   let w = clamp(Math.round(h * aspect / 4) * 4, 256, Math.min(maxTex, cap ? 3840 : Math.round(1600 * h / SIM_H)));
   if (!cap && h > SIM_H && w * h > maxPx()) {
