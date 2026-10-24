@@ -899,28 +899,8 @@ $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`GROW ${edit}`, GROW_SIZE_NAME[t.growSize]);
 }));
-// How a fractal's camera moves (see makeDrone): the loop being edited gets the style picked
-const CAM_STYLES = ['glide', 'runner', 'crawler', 'mix'];
-const CAM_NAME = { glide: 'GLIDE', runner: 'RUNNER', crawler: 'CRAWLER', mix: 'MIX IT UP' };
-$$('#cam button').forEach((b) => b.addEventListener('click', () => {
-  takeOver('cam');
-  loops[edit].tgt.cam = b.dataset.cam;
-  syncUI();
-  showOSD(`CAMERA ${edit}`, CAM_NAME[b.dataset.cam]);
-}));
-// Mix it up takes each style in turn: every 16 beats while music plays, otherwise about every 8 seconds.
-// Loop B is one style ahead of loop A, so two fractals on screen at once move differently.
-const camMix = { n: 0, beats: 0 };
-function camMixTick(dt) {
-  const music = snd.analyser && snd.amount > 0 && performance.now() - snd.lastBeat < 2000;
-  camMix.n += music ? Math.max(0, snd.beats - camMix.beats) : dt * 2;
-  camMix.beats = snd.beats;
-}
-function camStyleOf(k) {
-  const c = loops[k].tgt.cam;
-  if (c !== 'mix') return CAM_STYLES.includes(c) ? c : 'glide';
-  return ['glide', 'runner', 'crawler'][(Math.floor(camMix.n / 16) + LOOP_NUM[k]) % 3];
-}
+// A fractal's camera always glides: it wanders and rolls through (Runner, Crawler and Mix it up were removed;
+// looks saved with them glide too)
 const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE'];
 $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
   takeOver('time');
@@ -1097,7 +1077,6 @@ function syncUI() {
   $('#row-fractal').hidden = !frac;
   if (frac) $('#hintFractal').textContent = HINT_3D[frac];
   $$('#fractals button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.world === frac)));
-  $$('#cam button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cam === (t.cam || 'glide'))));
   const otherK = otherLoop(edit);
   $('#xcFrom').textContent = otherLoop('C');
   $('#xcFrom').className = `mini ${otherLoop('C').toLowerCase()}`;
@@ -1183,7 +1162,6 @@ function randomLoop() {
     dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
     grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, growSize: Math.floor(Math.random() * 3),
     time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * 3),
-    cam: pick(CAM_STYLES),
     ...surpriseSelf(),
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
@@ -1879,7 +1857,6 @@ const PINS = {
   split: { name: 'Split lines', fields: ['split'] },
   grow: { name: 'Grow', fields: ['grow', 'growSize'] },
   time: { name: 'Time warp', fields: ['time', 'timeShape'] },
-  cam: { name: 'Camera style', fields: ['cam'] },
   lookup: { name: 'Look-up', fields: ['lookup'] },
   chase: { name: 'Chase', fields: ['chase'] },
   breathe: { name: 'Breathe', fields: ['breathe'] },
@@ -2808,8 +2785,6 @@ function apSceneRaw(k) {
   }
   // Each effect, and a second input, on its own roll (see apOdds), on starter looks and new ones alike
   apFx(sc, w);
-  // A new camera style with every new look (it only shows when a fractal is on)
-  sc.cam = pick(CAM_STYLES);
   if ((!sc.in2 || sc.in2 === 'none') && Math.random() < apOdds(w)) {
     const two = pool.filter((x) => x !== sc.in1);
     if (two.length) { sc.in2 = apPick(two); sc.blend = Math.round(rnd(30, 70)); }
@@ -3321,7 +3296,6 @@ function tasteFeats(L) {
   if (L.in1 === 'wave' || L.in1 === 'shape') f.push(`form:${src}:${L.form}`);
   if (b.fx.includes('grow')) f.push('growsize:' + (L.growSize ?? 1));
   if (b.fx.includes('time')) f.push('timeshape:' + (L.timeShape ?? 0));
-  if (sceneGroup(L.in1) === 'fractal' || sceneGroup(L.in2) === 'fractal') f.push('cam:' + (L.cam || 'glide'), `lk:${src}&cam:${L.cam || 'glide'}`);
   if (L.motion && LIVE.includes(L.in1)) f.push('motion:on');
   if (b.zoom === 'out') f.push('edge:' + (L.edge ? 'fold' : 'dark'));
   if (L.in1 === 'spectro' || L.in2 === 'spectro') f.push('spec:' + (L.specRound ? 'round' : 'scroll'));
@@ -7930,7 +7904,6 @@ function frame() {
   drawMeter();
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
-  camMixTick(frozen ? 0 : dt);
   if (Object.keys(SCENES).some(uses)) {
     const pace = reduceMotion ? 0.45 : 1;
     let surge = 1, glow = 1;
@@ -7947,11 +7920,7 @@ function frame() {
       const step = dt * sc.speed * pace * (1 + (sceneReacts(name) ? surge - 1 : 0) * (sc.kick ?? 1));
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
-      // Runner dips and springs with the beat while React to sound is on
-      if (sc.fly) for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) {
-        const style = camStyleOf(k);
-        droneOf(sc, k).fly(step, { style, drive: style === 'runner' && reacts(k) ? sndPower() * snd.env.beat : 0 });
-      }
+      if (sc.fly) for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step, { style: 'glide', drive: 0 });
       // Mount Ribbit's hikers walk on, the same way
       if (sc.ext) {
         const drive = ribDriven(), ctl = ribControls();
