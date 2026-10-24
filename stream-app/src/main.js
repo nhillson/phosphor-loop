@@ -52,6 +52,9 @@ const DEFAULTS = {
   twitch: { enabled: true, key: '' },
   kick: { enabled: false, server: '', key: '' },
   youtube: { enabled: false, key: '', hevc: true }, // hevc: send YouTube the sharper HEVC format when the card can make it
+  // streaming: Phosphor Loop draws at the stream's size (Picture quality). Off: it draws at the window's own size,
+  // as Phosphor Loop's Picture sharpness picks (up to 4K), for watching or projecting rather than streaming.
+  streaming: true,
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
   tuned: null, // what the sharpness test picked: { variant, label, at, quality, detail, usual, usualDetail, gpu }
 };
@@ -85,7 +88,7 @@ function publicSettings() {
     twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key },
     kick: { enabled: settings.kick.enabled, server: settings.kick.server, hasKey: !!settings.kick.key },
     youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
-    quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
+    streaming: settings.streaming, quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
     autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed,
   };
 }
@@ -118,7 +121,7 @@ let win, site, sleepBlock = null, notice = null, captureInfo = null, probing = n
 
 function fullStatus() {
   const v = streamer.encoder && VARIANTS[streamer.encoder.variant];
-  return { ...streamer.status(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
+  return { ...streamer.status(), streaming: settings.streaming, notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
 }
 function sendStatus() {
   if (!win || win.isDestroyed()) return;
@@ -234,6 +237,15 @@ async function goLive() {
   }
   startingLive = true; tell(''); sendStatus();
   try {
+    // Streaming? was Off: switch it on, so the picture is drawn at the stream's size, and let it settle first
+    if (!settings.streaming) {
+      settings.streaming = true;
+      saveSettings();
+      log('Streaming switched on for going live');
+      await resizeSite();
+      sendStatus();
+      await waitFrames(30);
+    }
     if (probing) await probing;
     if (!(await waitForSite())) { tell('Phosphor Loop didn’t finish loading. Check the internet connection, then try again.', 'warn'); return { ok: false }; }
     const { plan, dests: routed } = await makePlan(dests);
@@ -355,6 +367,7 @@ ipcMain.on('sample-rec', (_e, buf, mime) => { if (tuner) tuner.saveRecording(buf
 async function sharpnessTest({ ids, frames, apply = true } = {}) {
   if (tune.running) return { ok: false };
   if (streamer.live || startingLive) { tell('Stop the stream first, then run the sharpness test.', 'warn'); return { ok: false }; }
+  if (!settings.streaming) { tell('Switch Streaming? on first: the test measures the picture at the stream’s size.', 'warn'); return { ok: false }; }
   tune = { running: true, step: 'Getting ready…', i: 0, n: 0, results: [], summary: '' };
   sendTune(); sendStatus();
   tuner = tuner || new Tuner({ ffmpeg: ffmpegPath(), log, dir: path.join(app.getPath('temp'), 'Phosphor Stream sharpness test') });
@@ -452,8 +465,14 @@ const HELP = {
   youtube: 'https://www.youtube.com/live_dashboard',
 };
 ipcMain.handle('state', () => ({ settings: publicSettings(), status: fullStatus(), quality: QUALITY, tune: publicTune() }));
-ipcMain.handle('save', (_e, patch) => {
-  const before = settings.quality;
+ipcMain.handle('save', async (_e, patch) => {
+  const before = settings.quality, wasStreaming = settings.streaming;
+  if ('streaming' in patch && !patch.streaming && (streamer.live || startingLive)) {
+    // Switching streaming off while live ends the stream first
+    if (startingLive) { tell('Wait until the stream has started (or stop it), then switch Streaming? off.', 'warn'); patch = { ...patch }; delete patch.streaming; }
+    else { await stopLive(); tell('Stream stopped: Streaming? is off.', 'info'); }
+  }
+  if ('streaming' in patch && !tune.running) settings.streaming = !!patch.streaming;
   for (const p of PLATFORMS) {
     if (!patch[p]) continue;
     const cur = settings[p];
@@ -468,12 +487,16 @@ ipcMain.handle('save', (_e, patch) => {
   saveSettings();
   // A new size: tell Phosphor Loop to draw at it. It carries the current picture and every setting across, the
   // same way it does when its window is resized. Only if that isn't possible is the page reloaded.
-  if (settings.quality !== before) resizeSite();
+  if (settings.quality !== before || settings.streaming !== wasStreaming) {
+    if (settings.streaming !== wasStreaming) log(`Streaming? ${settings.streaming ? 'on' : 'off'}`);
+    resizeSite();
+    sendStatus();
+  }
   return publicSettings();
 });
 function captureConfig() {
   const q = QUALITY[settings.quality];
-  return { width: q.width, height: q.height, fps: q.fps, renderHeight: q.height };
+  return { width: q.width, height: q.height, fps: q.fps, renderHeight: q.height, off: !settings.streaming };
 }
 async function resizeSite() {
   const cfg = captureConfig();
@@ -483,7 +506,7 @@ async function resizeSite() {
       const c = window.__phosphorCaptureConfig;
       if (!c) return false;
       try { Object.assign(c, ${JSON.stringify(cfg)}); } catch (_) { return false; }
-      if (c.height !== ${cfg.height} || c.fps !== ${cfg.fps}) return false;
+      if (c.height !== ${cfg.height} || c.fps !== ${cfg.fps} || !!c.off !== ${!!cfg.off}) return false;
       window.dispatchEvent(new Event('resize'));
       return true;
     })()`, true);
@@ -555,7 +578,17 @@ async function runTest() {
     result.qualitySwitch = { better: big, good: small };
     if (big[2] !== 42 || small[2] !== 42) throw new Error('changing quality reloaded the page');
     if (big[1] !== 1080 || small[1] !== 720) throw new Error('changing quality did not change the picture size: ' + JSON.stringify(result.qualitySwitch));
+    // Streaming? off: the page draws at the window's own size instead of the stream's, without reloading
+    settings.streaming = false; await resizeSite(); await waitFrames(30);
+    const free = await sizeNow();
+    result.streamingOff = free;
+    if (free[2] !== 42) throw new Error('switching Streaming? off reloaded the page');
+    if (free[0] === 1280 && free[1] === 720) throw new Error('with Streaming? off the picture stayed at the stream size');
+    // Going live switches it back on by itself
     const r = await goLive();
+    result.streamingAfterGoLive = settings.streaming;
+    if (!settings.streaming) throw new Error('going live did not switch Streaming? on');
+    if ((await sizeNow())[1] !== 720) throw new Error('going live did not bring back the stream size');
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
     const drawn = await waitFrames(frames);
     result.framesWaited = drawn ? frames : 'ceiling';

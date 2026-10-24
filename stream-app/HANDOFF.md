@@ -105,6 +105,7 @@ before every push.
 | 1.1.1 | Sender paced with `-readrate 1`; Kick 7.5 Mbps; bufsize = bitrate; probe 3 s; quality change resizes in place | Nick: "keeps losing connection to Kick". Log: Kick (Amazon IVS) hung up at ~10 s every time, because FFmpeg sent its start-up buffer in a burst (≈1.5× rate) over IVS's 8.5 Mbps cap. The 3 s probe fixes a mid-stream rejoin bug (GOP is 2 s, 1 s probe missed the SPS → "Invalid argument") |
 | 1.2 | AQ off, p7 + multipass fullres, B-frames, no scene-cut; x264 `aq-mode=0:psy-rd=0`; BT.601→709 colour fix; default Better | Nick: "all of the fine detail is being lost". Four parallel investigations (§7) |
 | 1.3 | Sharpness test (never released on its own: CI app test hit the slow runner) | "Burn tokens on sharper video": NVENC was never measured on his real GPU |
+| 1.5 | **Streaming?** switch at the top of the on-air box (settings.streaming, default on). Off: capture config gets `off: true`, and the site (`capCfg()` on main) ignores it, drawing at the window's size by its own Picture sharpness, Full up to 4K. Go live switches it back on; the sharpness test asks for it on; switching it off while live stops the stream | Nick: "only rendering 720 lines on a 4K monitor" (quality Good set 720) |
 | 1.4 | YouTube (RTMPS, HEVC via enhanced RTMP), 1440p/4K qualities, one encode per platform in one FFmpeg, upload/speed warnings | Nick: "stream to YouTube, taking advantage of its high bitrate limit" |
 
 Lessons:

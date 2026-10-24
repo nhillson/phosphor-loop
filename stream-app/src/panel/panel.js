@@ -46,6 +46,7 @@ function renderSettings() {
   }
   if (S.kick.server && !$('#server-kick').value) $('#server-kick').value = S.kick.server;
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) $(`#opt-${k}`).checked = S[k];
+  renderStreaming();
   $('#opt-yt-hevc').checked = !!S.youtube.hevc;
   $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
   $('#qualityHint').innerHTML = '';
@@ -55,6 +56,16 @@ function renderSettings() {
   $('#panel').hidden = S.collapsed; $('#strip').hidden = !S.collapsed;
 }
 
+// Streaming? On: Phosphor Loop draws at the stream's size. Off: at this screen's own size, as Phosphor Loop's
+// Picture sharpness (under Screen) picks, up to 4K.
+function renderStreaming() {
+  const on = status.streaming ?? S.streaming;
+  $('#opt-streaming').checked = !!on;
+  $('#streamingHint').textContent = on
+    ? 'On: the picture is drawn at the stream’s size (Picture quality, below).'
+    : 'Off: the picture is drawn at this screen’s size, up to 4K. Set it in Phosphor Loop under Screen › Picture sharpness (Full is sharpest). Go live switches this on.';
+  $('#panel').classList.toggle('not-streaming', !on);
+}
 const STATE_WORDS = { connecting: 'Connecting…', live: 'Live', retrying: 'Reconnecting…' };
 function renderStatus() {
   const dests = status.destinations || {};
@@ -64,6 +75,7 @@ function renderStatus() {
   if (status.starting) state = 'starting';
   else if (status.live) state = anyLive ? 'live' : (states.includes('retrying') ? 'retrying' : 'starting');
   $('#onair').dataset.state = state;
+  if (S) renderStreaming();
   $('#stripDot').classList.toggle('live', state === 'live');
 
   const title = { off: 'Off air', starting: 'Going live…', live: 'Live', retrying: 'Reconnecting…' }[state];
@@ -197,6 +209,7 @@ $$('[data-show]').forEach((b) => b.addEventListener('click', () => {
   b.textContent = input.type === 'password' ? 'Show' : 'Hide';
 }));
 $$('[data-q]').forEach((b) => b.addEventListener('click', () => { if (!status.live) save({ quality: b.dataset.q }); }));
+$('#opt-streaming').addEventListener('change', (e) => save({ streaming: e.target.checked }));
 for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) {
   $(`#opt-${k}`).addEventListener('change', (e) => save({ [k]: e.target.checked }));
 }

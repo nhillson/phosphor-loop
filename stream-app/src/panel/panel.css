@@ -118,3 +118,9 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent-hi);
 .bars li.usual .bar i { background: #6b5778; }
 .bars li.chosen.usual .bar i { background: var(--accent-hi); }
 .bars li.off .bar i { background: repeating-linear-gradient(135deg, #3a3340 0 4px, transparent 4px 8px); }
+
+/* Streaming? at the top of the on-air box */
+.streaming-toggle { margin-bottom: 12px; }
+.streaming-toggle > span:first-child { display: flex; flex-direction: column; gap: 3px; }
+.streaming-toggle small { font-weight: 400; font-size: 12px; color: var(--muted); line-height: 1.35; }
+.not-streaming #quality, .not-streaming #quality2 { opacity: .55; }
