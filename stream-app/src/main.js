@@ -502,7 +502,7 @@ async function recordStart() {
   try {
     fs.mkdirSync(recDir(), { recursive: true });
     if (!(await waitForSite())) throw new Error('Phosphor Loop isn’t ready yet');
-    if (!live) { await resizeSite(); await waitFrames(20); }
+    if (!live) { await resizeSite(); await waitFrames(TEST ? 5 : 20); }
     rec.temp = path.join(recDir(), `.recording ${Date.now()}.mkv`);
     rec.ws = fs.createWriteStream(rec.temp);
     rec.ws.on('error', (e) => { log('Recording: could not write: ' + e.message); tell('Couldn’t write the recording to the Videos folder (is the disk full?). Stopping.', 'warn'); recordStop(true); });
@@ -700,7 +700,8 @@ async function runTest() {
   const out = process.env.PHOSPHOR_TEST_OUT;
   const frames = +(process.env.PHOSPHOR_TEST_FRAMES || 450);
   const result = { ok: false };
-  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 900000);
+  // The test computer has no graphics card and draws only a frame or two a second, so the whole run gets a long ceiling
+  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 1800000);
   async function finish() {
     clearTimeout(ceiling);
     try { if (out) fs.writeFileSync(out, JSON.stringify(result, null, 2)); } catch (_) {}
@@ -752,7 +753,7 @@ async function runTest() {
     const rs = await recordStart();
     if (!rs.ok) throw new Error('recording did not start');
     if ((await sizeNow())[1] !== 1080) throw new Error('the recording did not draw at its own size');
-    await waitFrames(90);
+    await waitFrames(20);
     const saved = await recordStop();
     result.recording = { ok: !!(saved && saved.ok), file: saved && saved.output };
     if (!result.recording.ok) throw new Error('the recording could not be saved');
