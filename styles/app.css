@@ -450,6 +450,8 @@
 
 
   .ctl { display: grid; gap: 2px; }
+  /* Descriptions shown as hover tooltips instead (see hintsToTips) */
+  .hint.as-tip { display: none !important; }
   .ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .ctl-head label, .ctl-head .lbl { font-weight: 600; font-size: 15px; }
   .mini {

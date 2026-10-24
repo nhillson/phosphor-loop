@@ -361,7 +361,7 @@
             <button class="btn" id="motion" aria-pressed="false"><span class="led"></span>Only movement</button>
             <span class="hint">For camera, phone, screen, video and the other loop: only what moves gets in.</span>
           </div>
-          <p class="hint">You can also drop a picture or video file onto the screen.</p>
+          <p class="hint" id="dropHint">You can also drop a picture or video file onto the screen.</p>
         </div>
 
         <div class="group">
@@ -501,6 +501,16 @@
 
       <section class="group" id="soundGroup" aria-labelledby="h-sound">
         <h2 id="h-sound">React to sound</h2>
+        <div class="ctl">
+          <div class="ctl-head"><span class="lbl" id="sndLoopsLbl">Loops that react</span></div>
+          <div class="chips snd-loops" id="sndLoops" role="group" aria-labelledby="sndLoopsLbl">
+            <button class="chip" data-react="A" aria-pressed="true" title="Whether loop A moves with the sound"><span class="led"></span>Loop <span class="mini a">A</span></button>
+            <button class="chip" data-react="B" aria-pressed="true" title="Whether loop B moves with the sound"><span class="led"></span>Loop <span class="mini b">B</span></button>
+            <button class="chip" data-react="C" data-loop-row="C" aria-pressed="true" title="Whether loop C moves with the sound" hidden><span class="led"></span>Loop <span class="mini c">C</span></button>
+            <button class="chip" data-react="D" data-loop-row="D" aria-pressed="true" title="Whether loop D moves with the sound" hidden><span class="led"></span>Loop <span class="mini d">D</span></button>
+          </div>
+          <span class="hint">Switch a loop off and it ignores the sound while the others keep moving with it.</span>
+        </div>
         <div class="seg seg-2" id="soundSrc" role="group" aria-label="What to listen to">
           <button data-snd="off" aria-pressed="true">Off</button>
           <button data-snd="system" aria-pressed="false">Computer sound</button>
@@ -781,6 +791,7 @@
             <dt>Fader limits</dt><dd>The button under Autopilot settings. Each slider in it has two handles: Autopilot only picks values between them, on both loops (keep Trails between 40 and 90, say). It never moves the handles itself. Mirror is in there too, with its five stops (Off, 2, 4, 6, 8): its handles snap to them, and the stops they sit on count, so lowest 2 and highest 6 means Autopilot uses 2, 4 or 6. Sliders you move by hand and pinned ones can still go anywhere.</dd>
           </dl></div>
           <div class="g-card"><h3>Loops</h3><dl>
+            <dt>Loops that react</dt><dd>At the top of React to sound: one switch per loop. A loop switched off there keeps its own pace whatever the music does, while the loops switched on zoom, spin, change color and so on with it. The hits that shake or flash the whole picture are as strong as the share of the picture that comes from loops that react, so they stop altogether when every loop on screen is switched off. Presets remember these switches.</dd>
             <dt>How many loops and Show</dt><dd>Two loops, A and B, to start with; pick 3 loops or 4 loops under Loops to add loop C, then D. Each loop has its own Show fader: 100 shows it fully, 0 hides it, and loops that are showing are laid over each other. Loops C and D work just like A and B: C and D feed, push and dye each other the way A and B do (with three loops, C takes loop A as its other loop). Autopilot steers loops A and B; loops C and D keep whatever you give them, while Auto-drift keeps them moving. With Spread out controls on, each loop gets a column of its own, side by side (two loops share a column when the screen is too narrow).</dd>
             <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes. The loop being fed has to be on screen and have some Trails; raising a feed brings that loop on screen, and if its Trails are at 0 a note offers to fix it.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>

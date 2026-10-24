@@ -14,6 +14,46 @@ let simW = 768, simH = window.__phosphorCaptureConfig?.renderHeight || SIM_H, si
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+/* ================= hints as hover tooltips ================= */
+// The small grey descriptions under the controls are tucked away and shown as a tooltip when the mouse rests on the
+// control they describe. Lines that report what's happening right now (what's pinned, what Check each look has
+// judged, a loop that isn't on screen, a preset note...) stay on show. A description whose words change later
+// (Pushed by's, say, which names the other loop) keeps its tooltip up to date.
+const HINT_KEEP = ['feedNote', 'hiddenHint', 'vidLoopText', 'limSum', 'apCheckStat', 'apPinList', 'sharpNote', 'shapeNote',
+  'sharedHint', 'adminMsg', 'presetEmpty', 'presetApNote', 'tasteSum', 'micTip', 'loopbackHint', 'tasteAdminNote'];
+// Where a description that isn't inside a control's own box goes
+const HINT_TARGET = { loopsHint: '#h-mix', dropHint: '#inputs' };
+function hintsToTips() {
+  const tips = new Map();
+  for (const h of $$('.panel .hint')) {
+    if (HINT_KEEP.includes(h.id) || h.getAttribute('role') === 'status' || h.querySelector('button, a, input, select')) continue;
+    let t = HINT_TARGET[h.id] ? $(HINT_TARGET[h.id]) : h.closest('.ctl, .dev');
+    if (!t) {
+      t = h.previousElementSibling;
+      while (t && (t.classList.contains('hint') || t.hasAttribute('hidden') || t.getAttribute('role') === 'status')) t = t.previousElementSibling;
+      t = t || h.closest('.group, section');
+    }
+    if (!tips.has(t)) tips.set(t, { own: t.getAttribute('title') || '', hints: [] });
+    tips.get(t).hints.push(h);
+    h.classList.add('as-tip');
+  }
+  const write = (t) => {
+    const T = tips.get(t);
+    const words = T.hints.filter((h) => h.classList.contains('as-tip')).map((h) => h.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const text = [T.own, ...words].filter(Boolean).join('\n\n');
+    if (text) t.setAttribute('title', text); else t.removeAttribute('title');
+  };
+  for (const t of tips.keys()) write(t);
+  // Descriptions whose words change, or that are shown again, update their tooltip
+  const mo = new MutationObserver((recs) => {
+    const seen = new Set();
+    for (const r of recs) { const h = r.target.nodeType === 1 ? r.target.closest('.hint') : r.target.parentElement && r.target.parentElement.closest('.hint'); if (h) seen.add(h); }
+    for (const [t, T] of tips) if (T.hints.some((h) => seen.has(h))) write(t);
+  });
+  for (const T of tips.values()) for (const h of T.hints) mo.observe(h, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+}
+hintsToTips();
 // Inside a Claude artifact the camera, screen sharing and network links are refused, so those inputs hide there.
 const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
 // The Android app (android/ folder) opens this page with a helper called PhosphorApp. It adds what a phone
@@ -1101,7 +1141,11 @@ const snd = {
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
   flux: 0, lastBeat: 0, beats: 0, shakeDir: [1, 0], amount: 60,
   map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true },
+  // Which loops move with the sound (Loops that react, at the top of React to sound)
+  react: { A: true, B: true, C: true, D: true },
 };
+// Whether loop k moves with the sound right now
+const reacts = (k) => !!snd.analyser && snd.react[k] !== false;
 // How hard the picture reacts. The old full strength now sits near 50, and Wild goes well past it.
 const sndPower = () => Math.pow(clamp(snd.amount, 0, 100) / 100, 0.85) * 2.4;
 const sndStatus = $('#sndStatus'), sndRetry = $('#sndRetry'), sndAmt = $('#sndAmt'), micSel = $('#micSel');
@@ -1111,6 +1155,7 @@ const UA = navigator.userAgent || '';
 const noScreenAudio = /Firefox\//.test(UA) || (/Safari\//.test(UA) && !/(Chrome|Chromium|Edg)\//.test(UA));
 const browserName = /Firefox\//.test(UA) ? 'Firefox' : 'Safari';
 if (noScreenAudio) {
+  $('#sndHint').classList.remove('as-tip');
   $('#sndHint').innerHTML = `Computer sound sharing needs Chrome or Edge. In ${browserName}, use <b>Loopback adapter</b> with BlackHole or Stereo Mix to hear this computer, or <b>Microphone</b> to hear the room.`;
 }
 // Inputs that carry the computer's own sound rather than a room microphone
@@ -1279,6 +1324,7 @@ function syncSoundUI() {
   $('#micPick').hidden = snd.src === 'loopback' ? micSel.options.length === 0 : snd.src !== 'mic' || micSel.options.length < 2;
   $('#loopbackHint').hidden = snd.src !== 'loopback';
   $$('#sndMap button').forEach((b) => b.setAttribute('aria-pressed', String(!!snd.map[b.dataset.map])));
+  $$('#sndLoops button').forEach((b) => b.setAttribute('aria-pressed', String(snd.react[b.dataset.react] !== false)));
   sndAmt.value = snd.amount;
   fillTrack(sndAmt);
   $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
@@ -1546,6 +1592,12 @@ sndRetry.addEventListener('click', () => setSound(snd.src === 'off' ? 'system' :
 sndAmt.addEventListener('input', () => { snd.amount = +sndAmt.value; syncSoundUI(); });
 sndAmt.addEventListener('dblclick', () => { snd.amount = 60; syncSoundUI(); });
 $$('#sndMap button').forEach((b) => b.addEventListener('click', () => { snd.map[b.dataset.map] = !snd.map[b.dataset.map]; syncSoundUI(); }));
+$$('#sndLoops button').forEach((b) => b.addEventListener('click', () => {
+  const k = b.dataset.react;
+  snd.react[k] = snd.react[k] === false;
+  syncSoundUI();
+  toast(snd.react[k] ? `Loop ${k} moves with the sound again.` : `Loop ${k} ignores the sound now; the other loops still react.`);
+}));
 syncSoundUI();
 
 // Each band is judged against its own recent level, so quiet and loud songs both move the picture.
@@ -5605,7 +5657,7 @@ function snapshot() {
     mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba, showA: mix.tgt.showA, showB: mix.tgt.showB,
            ...(loopCount > 2 ? { showC: mix.tgt.showC, xc: mix.tgt.xc } : {}), ...(loopCount > 3 ? { showD: mix.tgt.showD, xd: mix.tgt.xd } : {}) },
     adj: clone(adj),
-    snd: { amount: snd.amount, map: clone(snd.map) },
+    snd: { amount: snd.amount, map: clone(snd.map), react: clone(snd.react) },
     drift,
     text: { str: txt.str, style: txt.style },
   };
@@ -5710,6 +5762,9 @@ function loadPreset(pr, quiet) {
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((d.adj && d.adj[src]) || {}) }; });
   syncAdjUI();
   if (d.snd) { if (d.snd.amount != null) snd.amount = d.snd.amount; if (d.snd.map) Object.assign(snd.map, d.snd.map); syncSoundUI(); }
+  // Loops that react: as saved, or every loop for a preset saved before the switches existed
+  snd.react = { A: true, B: true, C: true, D: true, ...((d.snd && d.snd.react) || {}) };
+  syncSoundUI();
   if (typeof d.drift === 'boolean') setDrift(d.drift);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
@@ -7405,7 +7460,7 @@ function runLoop(k, xf, brush, f) {
     }
   }
   let sizeBoost = 0, gainBoost = 1;
-  if (snd.analyser) {
+  if (reacts(k)) {
     const a = sndPower(), E = snd.env, m = snd.map;
     if (m.kick) z += a * (E.low * 45 + E.beat * 45);
     if (m.spin) s += a * E.mid * 60 * (s < 0 ? -1 : 1);
@@ -7686,7 +7741,9 @@ function frame() {
   if (Object.keys(SCENES).some(uses)) {
     const pace = reduceMotion ? 0.45 : 1;
     let surge = 1, glow = 1;
-    if (snd.analyser) {
+    // Only a scene shown by a loop that reacts surges with the music
+    const sceneReacts = (name) => activeKeys().some((k) => reacts(k) && (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name));
+    if (snd.analyser && Object.keys(SCENES).some(sceneReacts)) {
       const a = sndPower(), E = snd.env, m = snd.map;
       if (m.kick) surge *= 1 + a * (E.low * 1.2 + E.beat * 2.5);
       if (m.flash) glow += a * (E.beat * 0.35 + E.low * 0.2);
@@ -7694,13 +7751,13 @@ function frame() {
     for (const name of Object.keys(SCENES)) {
       const sc = SCENES[name];
       if (frozen || !uses(name)) continue;
-      const step = dt * sc.speed * pace * (1 + (surge - 1) * (sc.kick ?? 1));
+      const step = dt * sc.speed * pace * (1 + (sceneReacts(name) ? surge - 1 : 0) * (sc.kick ?? 1));
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
       // Runner dips and springs with the beat while React to sound is on
       if (sc.fly) for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) {
         const style = camStyleOf(k);
-        droneOf(sc, k).fly(step, { style, drive: style === 'runner' && snd.analyser ? sndPower() * snd.env.beat : 0 });
+        droneOf(sc, k).fly(step, { style, drive: style === 'runner' && reacts(k) ? sndPower() * snd.env.beat : 0 });
       }
       // Mount Ribbit's hikers walk on, the same way
       if (sc.ext) {
@@ -7756,8 +7813,12 @@ function frame() {
   set1f(dispProg, 'uStatic', staticAmt);
   // Hits from the music that show at once, on top of what they do inside the loops
   let punch = 0, flash = 0, hueKick = 0, shake = 0;
-  if (snd.analyser) {
-    const a = sndPower(), E = snd.env, m = snd.map, calm = reduceMotion ? 0.4 : 1;
+  // As strong as the share of the picture on screen that comes from loops that react
+  let wAll = 0, wReact = 0;
+  for (const key of activeKeys()) { wAll += W[key]; if (reacts(key)) wReact += W[key]; }
+  const share = wAll > 0 ? wReact / wAll : 0;
+  if (snd.analyser && share > 0) {
+    const a = sndPower() * share, E = snd.env, m = snd.map, calm = reduceMotion ? 0.4 : 1;
     if (m.kick) punch = a * (E.beat * 0.06 + E.low * 0.025) * calm;
     if (m.flash) flash = a * E.beat * 0.3;
     if (m.color) hueKick = a * (E.high * 0.35 + E.beat * 0.3) * (snd.beats % 2 ? 1 : -1);
