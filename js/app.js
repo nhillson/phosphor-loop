@@ -100,22 +100,25 @@ for (const type of ['pointerdown', 'wheel', 'keydown']) document.addEventListene
 document.addEventListener('scroll', tipHide, { capture: true, passive: true });
 
 /* ================= scroll wheel on faders ================= */
-// Rolling the mouse wheel over any fader moves it: one notch is 2 on a 0 to 100 fader (Shift for the finest
-// step). It works as if the fader had been dragged, so everything that listens to the fader follows.
+// Holding Shift and rolling the mouse wheel over any fader moves it: one notch is 2 on a 0 to 100 fader. Without
+// Shift the wheel scrolls the controls as usual. It works as if the fader had been dragged, so everything that
+// listens to the fader follows.
 let wheelAcc = 0, wheelEl = null;
 document.addEventListener('wheel', (e) => {
   const el = e.target;
-  if (!(el instanceof HTMLInputElement) || el.type !== 'range' || el.disabled) return;
+  if (!e.shiftKey || !(el instanceof HTMLInputElement) || el.type !== 'range' || el.disabled) return;
   e.preventDefault();
   if (el !== wheelEl) { wheelEl = el; wheelAcc = 0; }
   // A mouse notch is about 100 pixels (or 3 lines); a trackpad sends many small amounts, which add up to notches
-  const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 300 : e.deltaY;
+  // With Shift held, Windows and some browsers turn the wheel sideways, so whichever way it rolled counts
+  const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  const d = e.deltaMode === 1 ? raw * 33 : e.deltaMode === 2 ? raw * 300 : raw;
   wheelAcc += d;
   const notches = Math.trunc(wheelAcc / 100) || (Math.abs(d) >= 50 ? Math.sign(d) : 0);
   if (!notches) return;
   wheelAcc = Math.abs(d) >= 50 ? 0 : wheelAcc - notches * 100;
   const min = +el.min || 0, max = el.max === '' ? 100 : +el.max, step = el.step === 'any' ? (max - min) / 100 : +el.step || 1;
-  const per = e.shiftKey ? step : Math.max(step, Math.round((max - min) / 50 / step) * step);
+  const per = Math.max(step, Math.round((max - min) / 50 / step) * step);
   const v = Math.min(max, Math.max(min, +el.value - notches * per));
   if (v === +el.value) return;
   el.value = v;
