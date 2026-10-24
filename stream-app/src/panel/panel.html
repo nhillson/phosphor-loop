@@ -14,15 +14,29 @@
   </header>
 
   <section class="onair" id="onair" data-state="off">
-    <label class="toggle streaming-toggle"><span><b>Streaming?</b><small id="streamingHint"></small></span><span class="switch"><input type="checkbox" id="opt-streaming"><span></span></span></label>
-    <div class="air-row">
+    <!-- Two switches, each on its own: streaming to the platforms, and recording a video file. The picture is drawn
+         at whichever size the switched-on ones need (the bigger of the two), or at the screen's own size with neither. -->
+    <div class="air-switch" id="streamRow">
       <span class="dot" aria-hidden="true"></span>
-      <div>
-        <div class="air-title" id="airTitle">Off air</div>
+      <div class="air-text">
+        <div class="air-title"><span class="what">Stream</span> <span id="airTitle">Off air</span></div>
         <div class="air-sub" id="airSub">Ready when you are.</div>
       </div>
+      <label class="switch big"><input type="checkbox" id="streamSw"><span></span><b class="sr">Stream</b></label>
     </div>
-    <button class="golive" id="golive">Go live</button>
+    <div class="air-switch" id="recRow" data-state="idle">
+      <span class="rdot" aria-hidden="true"></span>
+      <div class="air-text">
+        <div class="air-title"><span class="what">Record</span> <span id="recTitle">Off</span></div>
+        <div class="air-sub" id="recSub"></div>
+      </div>
+      <label class="switch big rec"><input type="checkbox" id="recSw"><span></span><b class="sr">Record</b></label>
+    </div>
+    <div class="tune-run" id="recSaving" hidden>
+      <div class="meter" aria-hidden="true"><span id="recBar"></span></div>
+      <small id="recStep">Saving your video…</small>
+    </div>
+    <button class="link discard" id="recDiscard" hidden>Discard this recording</button>
     <p class="notice" id="notice" hidden></p>
   </section>
 
@@ -119,11 +133,6 @@
       <button role="radio" data-rfps="60"><b>60 fps</b><small>smoother motion</small></button>
     </div>
     <p class="hint" id="recHint"></p>
-    <button class="recbtn" id="recBtn"><span class="rdot" aria-hidden="true"></span><span id="recLabel">Record</span></button>
-    <div class="tune-run" id="recSaving" hidden>
-      <div class="meter" aria-hidden="true"><span id="recBar"></span></div>
-      <small id="recStep">Saving your video…</small>
-    </div>
     <button class="link" id="recFolder">Open the recordings folder</button>
   </section>
 

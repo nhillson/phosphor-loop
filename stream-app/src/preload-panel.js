@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('app', {
   openLog: () => ipcRenderer.invoke('open-log'),
   sharpnessTest: () => ipcRenderer.invoke('sharpness-test'),
   record: (on) => ipcRenderer.invoke('record', on),
+  discard: () => ipcRenderer.invoke('record-discard'),
   openRecordings: () => ipcRenderer.invoke('open-recordings'),
   onTune: (fn) => ipcRenderer.on('tune', (_e, t) => fn(t)),
   onStatus: (fn) => ipcRenderer.on('status', (_e, s) => fn(s)),

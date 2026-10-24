@@ -53,9 +53,6 @@ const DEFAULTS = {
   twitch: { enabled: true, key: '' },
   kick: { enabled: false, server: '', key: '' },
   youtube: { enabled: false, key: '', hevc: true }, // hevc: send YouTube the sharper HEVC format when the card can make it
-  // streaming: Phosphor Loop draws at the stream's size (Picture quality). Off: it draws at the window's own size,
-  // as Phosphor Loop's Picture sharpness picks (up to 4K), for watching or projecting rather than streaming.
-  streaming: true,
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
   record: { ...REC_DEFAULTS }, // Record a video: size (2160, 1440 or 1080 lines), quality (youtube, clean, perfect), fps (30 or 60)
   tuned: null, // what the sharpness test picked: { variant, label, at, quality, detail, usual, usualDetail, gpu }
@@ -90,7 +87,7 @@ function publicSettings() {
     twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key },
     kick: { enabled: settings.kick.enabled, server: settings.kick.server, hasKey: !!settings.kick.key },
     youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
-    streaming: settings.streaming, quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
+    quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
     autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed, record: settings.record,
   };
 }
@@ -123,7 +120,7 @@ let win, site, sleepBlock = null, notice = null, captureInfo = null, probing = n
 
 function fullStatus() {
   const v = streamer.encoder && VARIANTS[streamer.encoder.variant];
-  return { ...streamer.status(), streaming: settings.streaming, rec: recStatus(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
+  return { ...streamer.status(), rec: recStatus(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
 }
 function sendStatus() {
   if (!win || win.isDestroyed()) return;
@@ -229,8 +226,7 @@ async function makePlan(dests) {
 let startingLive = false;
 async function goLive() {
   if (streamer.live || startingLive) return { ok: true };
-  if (tune.running) { tell('The sharpness test is still running. Go live once it finishes (a minute or two).', 'warn'); return { ok: false }; }
-  if (rec.state === 'recording' || rec.state === 'starting') { tell('Stop the recording first, then go live. (To record while streaming, go live first, then press Record.)', 'warn'); return { ok: false }; }
+  if (tune.running) { tell('The sharpness test is still running. Switch Stream on once it finishes (a minute or two).', 'warn'); return { ok: false }; }
   const dests = destinations();
   if (!dests.length) {
     const msg = !PLATFORMS.some((p) => settings[p].enabled) ? 'Switch on Twitch, Kick or YouTube first.'
@@ -240,18 +236,15 @@ async function goLive() {
   }
   startingLive = true; tell(''); sendStatus();
   try {
-    // Streaming? was Off: switch it on, so the picture is drawn at the stream's size, and let it settle first
-    if (!settings.streaming) {
-      settings.streaming = true;
-      saveSettings();
-      log('Streaming switched on for going live');
-      await resizeSite();
-      sendStatus();
-      await waitFrames(30);
-    }
+    // The picture is now needed at the stream's size (or a recording's, if that's bigger): let it settle first
+    await resizeSite();
+    sendStatus();
+    await waitFrames(30);
     if (probing) await probing;
     if (!(await waitForSite())) { tell('Phosphor Loop didn’t finish loading. Check the internet connection, then try again.', 'warn'); return { ok: false }; }
     const { plan, dests: routed } = await makePlan(dests);
+    // The picture may be bigger than the stream (a 4K recording running): each platform gets its sharp smaller copy
+    plan.input = drawnSize();
     streamer.start(routed, plan);
     if (settings.autopilotOnLive) siteCall('autopilot').catch(() => {});
     if (sleepBlock === null) sleepBlock = powerSaveBlocker.start('prevent-display-sleep');
@@ -267,6 +260,8 @@ async function stopLive() {
   log('Stopping');
   try { await siteCall('stop'); } catch (_) {}
   streamer.stop();
+  // The picture goes back to a recording's size, or the screen's own
+  resizeSite();
   if (sleepBlock !== null) { powerSaveBlocker.stop(sleepBlock); sleepBlock = null; }
   tell('');
 }
@@ -383,9 +378,11 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
   if (tune.running) return { ok: false };
   if (streamer.live || startingLive) { tell('Stop the stream first, then run the sharpness test.', 'warn'); return { ok: false }; }
   if (rec.state !== 'idle') { tell('Finish the recording first, then run the sharpness test.', 'warn'); return { ok: false }; }
-  if (!settings.streaming) { tell('Switch Streaming? on first: the test measures the picture at the stream’s size.', 'warn'); return { ok: false }; }
   tune = { running: true, step: 'Getting ready…', i: 0, n: 0, results: [], summary: '' };
   sendTune(); sendStatus();
+  // The test measures the picture at the stream's size
+  await resizeSite();
+  await waitFrames(30);
   tuner = tuner || new Tuner({ ffmpeg: ffmpegPath(), log, dir: path.join(app.getPath('temp'), 'Phosphor Stream sharpness test') });
   const q = QUALITY[settings.quality];
   const dests = destinations();
@@ -468,6 +465,7 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
     probing = streamer.probe(settings.tuned && settings.tuned.variant).catch((e) => log('Probe failed: ' + e.message));
     await probing;
     tune.running = false; tune.step = '';
+    resizeSite();
     sendTune(); sendStatus();
   }
   return result;
@@ -475,34 +473,28 @@ async function sharpnessTest({ ids, frames, apply = true } = {}) {
 ipcMain.handle('sharpness-test', () => sharpnessTest());
 
 /* ---------- recording a video file (see record.js) ---------- */
-const rec = { state: 'idle', plan: null, ownSize: false, temp: '', ws: null, startedAt: 0, bytes: 0, progress: 0, last: '', slow: 0,
-  timer: null, doneWait: null, framesAt: 0, framesT: 0, lastSend: 0 };
+const rec = { state: 'idle', plan: null, temp: '', ws: null, startedAt: 0, bytes: 0, progress: 0, last: '', slow: 0,
+  timer: null, doneWait: null, framesAt: 0, framesT: 0, lastSend: 0, awake: null };
 const recDir = () => path.join(app.getPath('videos'), 'Phosphor Loop');
 function recStatus() {
   const p = rec.plan;
   return { state: rec.state, since: rec.startedAt, bytes: rec.bytes, progress: rec.progress, last: rec.last ? path.basename(rec.last) : '',
-    height: p ? p.height : 0, fps: p ? p.fps : 0, live: !!(p && p.live), slow: rec.slow };
+    height: p ? p.height : 0, fps: p ? p.fps : 0, slow: rec.slow };
 }
-// While live, a recording is made at the stream's own size and speed (the page can only draw one size at a time)
-function livePlan() {
-  const q = QUALITY[settings.quality];
-  const size = q.height >= 2160 ? 2160 : q.height >= 1440 ? 1440 : 1080;
-  const p = recPlan({ ...settings.record, size, fps: q.fps });
-  const k = (q.width * q.height) / (p.width * p.height);
-  return { ...p, width: q.width, height: q.height, bitrate: Math.round(p.bitrate * k), live: true };
-}
+// A recording has its own size and speed whether or not the stream is on. The picture is drawn at the bigger of the
+// two (see captureConfig), so a 4K recording stays 4K while the stream gets its own smaller copy.
 async function recordStart() {
   if (rec.state !== 'idle') return { ok: false };
-  if (startingLive) { tell('Wait until the stream has started, then press Record.', 'warn'); return { ok: false }; }
+  if (startingLive) { tell('Wait until the stream has started, then switch Record on.', 'warn'); return { ok: false }; }
   if (tune.running) { tell('The sharpness test is still running. Record once it finishes.', 'warn'); return { ok: false }; }
-  const live = streamer.live;
-  const plan = live ? livePlan() : { ...recPlan(settings.record), live: false };
-  rec.state = 'starting'; rec.plan = plan; rec.ownSize = !live; rec.bytes = 0; rec.progress = 0; rec.slow = 0;
+  const plan = recPlan(settings.record);
+  rec.state = 'starting'; rec.plan = plan; rec.bytes = 0; rec.progress = 0; rec.slow = 0; rec.warned = false;
   tell(''); sendStatus();
   try {
     fs.mkdirSync(recDir(), { recursive: true });
     if (!(await waitForSite())) throw new Error('Phosphor Loop isn’t ready yet');
-    if (!live) { await resizeSite(); await waitFrames(TEST ? 5 : 20); }
+    await redraw();
+    await waitFrames(TEST ? 5 : 20);
     rec.temp = path.join(recDir(), `.recording ${Date.now()}.mkv`);
     rec.ws = fs.createWriteStream(rec.temp);
     rec.ws.on('error', (e) => { log('Recording: could not write: ' + e.message); tell('Couldn’t write the recording to the Videos folder (is the disk full?). Stopping.', 'warn'); recordStop(true); });
@@ -510,7 +502,8 @@ async function recordStart() {
     rec.state = 'recording';
     rec.startedAt = Date.now();
     if (rec.awake == null) rec.awake = powerSaveBlocker.start('prevent-display-sleep');
-    log(`Recording ${plan.width}x${plan.height} at ${plan.fps} fps, ${REC_QUALITY[plan.quality].label} (${(plan.bitrate / 1e6).toFixed(0)} Mbps)${live ? ', while live' : ''}; working copy ${info.mimeType} at ${(plan.firstBitrate / 1e6).toFixed(0)} Mbps, sound ${info.sound ? 'on' : 'off ' + info.soundErr}`);
+    const d = drawnSize();
+    log(`Recording ${plan.width}x${plan.height} at ${plan.fps} fps, ${REC_QUALITY[plan.quality].label} (${(plan.bitrate / 1e6).toFixed(0)} Mbps)${streamer.live ? ', while live' : ''}; picture drawn at ${d.width}x${d.height}; working copy ${info.mimeType} at ${(plan.firstBitrate / 1e6).toFixed(0)} Mbps, sound ${info.sound ? 'on' : 'off ' + info.soundErr}`);
     if (!info.sound) tell('Couldn’t hear this computer’s sound, so the recording is silent. Check that a speaker or headphones are set up in Windows.', 'warn');
     rec.framesAt = await siteCall('frames').catch(() => 0); rec.framesT = Date.now();
     rec.timer = setInterval(recTick, 2000);
@@ -520,7 +513,7 @@ async function recordStart() {
     log('Recording could not start: ' + e.message);
     try { if (rec.ws) rec.ws.destroy(); fs.rmSync(rec.temp, { force: true }); } catch (_) {}
     rec.ws = null; rec.state = 'idle'; rec.plan = null;
-    if (rec.ownSize) { rec.ownSize = false; resizeSite(); }
+    redraw();
     tell('Couldn’t start recording: ' + e.message, 'warn');
     sendStatus();
     return { ok: false };
@@ -546,9 +539,10 @@ async function recTick() {
 }
 ipcMain.on('rec-chunk', (_e, buf) => { if (rec.ws) { rec.ws.write(Buffer.from(buf)); rec.bytes += buf.byteLength; } });
 ipcMain.on('rec-done', () => { if (rec.doneWait) rec.doneWait(); });
-async function recordStop(broken) {
-  if (rec.state !== 'recording') return;
-  rec.state = 'saving'; rec.progress = 0; rec.warned = false;
+// Stops the page's recorder, waits for its last pieces and closes the working file. Then the picture goes back to
+// the size the stream (or the screen) wants. Returns the recording's plan and length.
+async function recHalt(state, broken) {
+  rec.state = state; rec.progress = 0; rec.warned = false;
   if (rec.awake != null) { powerSaveBlocker.stop(rec.awake); rec.awake = null; }
   clearInterval(rec.timer);
   sendStatus();
@@ -561,8 +555,13 @@ async function recordStop(broken) {
   rec.doneWait = null;
   if (rec.ws) await new Promise((r) => rec.ws.end(r));
   rec.ws = null;
-  // Back to the size the stream (or the window) wants
-  if (rec.ownSize) { rec.ownSize = false; resizeSite(); }
+  rec.plan = null;
+  redraw();
+  return { plan, seconds };
+}
+async function recordStop(broken) {
+  if (rec.state !== 'recording') return;
+  const { plan, seconds } = await recHalt('saving', broken);
   const output = outputName(recDir());
   const family = streamer.encoder ? streamer.encoder.id : 'libx264';
   const progress = (p) => { rec.progress = p; if (Date.now() - rec.lastSend > 500) { rec.lastSend = Date.now(); sendStatus(); } };
@@ -585,11 +584,23 @@ async function recordStop(broken) {
     log('Recording could not be finished: ' + problem);
     tell(`Couldn’t finish the video. What was recorded is kept in Videos › Phosphor Loop as “${path.basename(keep)}”.`, 'warn');
   }
-  rec.state = 'idle'; rec.plan = null; rec.progress = 0;
+  rec.state = 'idle'; rec.progress = 0;
   sendStatus();
   return { ok: !problem, output };
 }
+// Discard: stop and throw the recording away, without saving anything
+async function recordDiscard() {
+  if (rec.state !== 'recording') return { ok: false };
+  const { seconds } = await recHalt('discarding', true);
+  try { fs.rmSync(rec.temp, { force: true }); } catch (e) { log('Recording: could not remove the working file: ' + e.message); }
+  log(`Recording discarded (${seconds.toFixed(0)} s)`);
+  rec.state = 'idle';
+  tell('Recording discarded. Nothing was saved.', 'info');
+  sendStatus();
+  return { ok: true };
+}
 ipcMain.handle('record', (_e, on) => (on ? recordStart() : recordStop()));
+ipcMain.handle('record-discard', () => recordDiscard());
 ipcMain.handle('open-recordings', () => {
   try { fs.mkdirSync(recDir(), { recursive: true }); } catch (_) {}
   if (rec.last && fs.existsSync(rec.last)) shell.showItemInFolder(rec.last); else shell.openPath(recDir());
@@ -603,13 +614,7 @@ const HELP = {
 };
 ipcMain.handle('state', () => ({ settings: publicSettings(), status: fullStatus(), quality: QUALITY, tune: publicTune() }));
 ipcMain.handle('save', async (_e, patch) => {
-  const before = settings.quality, wasStreaming = settings.streaming;
-  if ('streaming' in patch && !patch.streaming && (streamer.live || startingLive)) {
-    // Switching streaming off while live ends the stream first
-    if (startingLive) { tell('Wait until the stream has started (or stop it), then switch Streaming? off.', 'warn'); patch = { ...patch }; delete patch.streaming; }
-    else { await stopLive(); tell('Stream stopped: Streaming? is off.', 'info'); }
-  }
-  if ('streaming' in patch && !tune.running) settings.streaming = !!patch.streaming;
+  const before = settings.quality;
   if (patch.record && rec.state === 'idle') {
     const r = patch.record, cur = settings.record;
     if (REC_SIZES[r.size]) cur.size = +r.size;
@@ -630,11 +635,7 @@ ipcMain.handle('save', async (_e, patch) => {
   saveSettings();
   // A new size: tell Phosphor Loop to draw at it. It carries the current picture and every setting across, the
   // same way it does when its window is resized. Only if that isn't possible is the page reloaded.
-  if (settings.quality !== before || settings.streaming !== wasStreaming) {
-    if (settings.streaming !== wasStreaming) log(`Streaming? ${settings.streaming ? 'on' : 'off'}`);
-    resizeSite();
-    sendStatus();
-  }
+  if (settings.quality !== before) { resizeSite(); sendStatus(); }
   return publicSettings();
 });
 function captureConfig() {
@@ -642,9 +643,29 @@ function captureConfig() {
   // The build's test computer has no graphics card at all, so there the loops are drawn at a much lower detail (the
   // picture keeps its full size); otherwise it manages less than a frame a second and every step takes minutes
   const lines = (h) => (TEST ? Math.min(h, 216) : h);
-  if (rec.plan && rec.ownSize) return { width: rec.plan.width, height: rec.plan.height, fps: rec.plan.fps, renderHeight: lines(rec.plan.height), off: false };
+  // What needs the picture: the stream (live, going live, or the sharpness test) and a recording. It's drawn at the
+  // biggest size and fastest speed among them. With neither, it's drawn like an ordinary browser window, at the
+  // screen's size, as Phosphor Loop's own Picture sharpness picks (up to 4K).
   const q = QUALITY[settings.quality];
-  return { width: q.width, height: q.height, fps: q.fps, renderHeight: lines(q.height), off: !settings.streaming };
+  const want = [];
+  if (streamer.live || startingLive || tune.running) want.push(q);
+  if (rec.plan) want.push(rec.plan);
+  if (!want.length) return { width: q.width, height: q.height, fps: q.fps, renderHeight: lines(q.height), off: true };
+  const big = want.reduce((a, b) => (b.height > a.height ? b : a));
+  return { width: big.width, height: big.height, fps: Math.max(...want.map((w) => w.fps)), renderHeight: lines(big.height), off: false };
+}
+const drawnSize = () => { const c = captureConfig(); return { width: c.width, height: c.height }; };
+// After something changed what the picture is needed for: draw it at the new size, and if that changes the size the
+// stream is made from, start its squeeze again from the new size (a second's hiccup for viewers)
+async function redraw() {
+  const was = streamer.live && streamer.plan ? { ...streamer.plan.input } : null;
+  await resizeSite();
+  if (!was) return;
+  const now = drawnSize();
+  if (now.width === was.width && now.height === was.height) return;
+  streamer.plan.input = now;
+  log(`Stream now made from a ${now.width}x${now.height} picture`);
+  streamer.restartEncoder();
 }
 async function resizeSite() {
   const cfg = captureConfig();
@@ -717,29 +738,43 @@ async function runTest() {
     await waitFrames(60);
     result.pageFpsStart = await pageFps();
     log(`Self-test: page drawing ${result.pageFpsStart} frames a second at the start`);
-    // Changing quality must keep the page (and so the look) instead of reloading it
+    // Every size change below must keep the page (and so the look) instead of reloading it
     await site.webContents.executeJavaScript('window.__keepMarker = 42', true);
     const sizeNow = () => site.webContents.executeJavaScript('[window.__phosphorCapture.canvas.width, window.__phosphorCapture.canvas.height, window.__keepMarker || 0]', true);
-    settings.quality = 'better'; await resizeSite(); await waitFrames(30);
-    const big = await sizeNow();
-    settings.quality = 'good'; await resizeSite(); await waitFrames(30);
-    const small = await sizeNow();
-    result.qualitySwitch = { better: big, good: small };
-    if (big[2] !== 42 || small[2] !== 42) throw new Error('changing quality reloaded the page');
-    if (big[1] !== 1080 || small[1] !== 720) throw new Error('changing quality did not change the picture size: ' + JSON.stringify(result.qualitySwitch));
-    // Streaming? off: the page draws at the window's own size instead of the stream's, without reloading
-    settings.streaming = false; await resizeSite(); await waitFrames(30);
-    const free = await sizeNow();
-    result.streamingOff = free;
-    if (free[2] !== 42) throw new Error('switching Streaming? off reloaded the page');
-    if (free[0] === 1280 && free[1] === 720) throw new Error('with Streaming? off the picture stayed at the stream size');
-    // Going live switches it back on by itself
+    const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+    const expect = async (what, want, label) => {
+      const now = await sizeNow();
+      result.sizes = { ...(result.sizes || {}), [label]: now };
+      if (now[2] !== 42) throw new Error(`${what}: the page reloaded`);
+      if (!want(now)) throw new Error(`${what}: picture is ${now[0]}x${now[1]}`);
+      return now;
+    };
+    // Neither streaming nor recording: drawn at the window's own size, not the stream's
+    settings.quality = 'good';
+    await resizeSite(); await waitFrames(10);
+    const free = await expect('nothing on', (n) => !(n[0] === 1280 && n[1] === 720), 'idle');
+    // Stream on: the stream's size
     const r = await goLive();
-    result.streamingAfterGoLive = settings.streaming;
-    if (!settings.streaming) throw new Error('going live did not switch Streaming? on');
-    if ((await sizeNow())[1] !== 720) throw new Error('going live did not bring back the stream size');
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
-    const drawn = await waitFrames(frames);
+    await expect('streaming', (n) => n[1] === 720, 'live');
+    await waitFrames(Math.round(frames / 2));
+    // Record on while streaming, bigger than the stream: drawn at the recording's size, the stream gets a copy
+    settings.record = { size: 1080, quality: 'youtube', fps: 30 };
+    const rs = await recordStart();
+    if (!rs.ok) throw new Error('recording did not start');
+    await expect('recording 1080p while streaming 720p', (n) => n[1] === 1080, 'liveAndRecording');
+    if (!streamer.live) throw new Error('the stream stopped when recording started');
+    if (streamer.plan.input.height !== 1080) throw new Error('the stream is not made from the bigger picture');
+    await waitFrames(20, 30000);
+    const saved = await recordStop();
+    result.recording = { ok: !!(saved && saved.ok), file: saved && saved.output };
+    if (!result.recording.ok) throw new Error('the recording could not be saved');
+    const info = await new Promise((res) => execFile(ffmpegPath(), ['-hide_banner', '-i', saved.output], (_e, _o, se) => res(String(se))));
+    result.recording.info = info.split('\n').filter((l) => /Stream|Duration/.test(l)).map((l) => l.trim()).join(' | ');
+    if (!/Video: h264.*\(tv, bt709[,)].*1920x1080/.test(info) || !/Audio: aac/.test(info)) throw new Error('the recording is not 1080p H.264 labelled BT.709 with AAC sound: ' + result.recording.info);
+    await waitFrames(10);
+    await expect('recording off, still streaming', (n) => n[1] === 720, 'liveAgain');
+    const drawn = await waitFrames(Math.round(frames / 2));
     result.framesWaited = drawn ? frames : 'ceiling';
     const dir = process.env.PHOSPHOR_TEST_SHOTS;
     if (dir) {
@@ -753,19 +788,19 @@ async function runTest() {
     await stopLive();
     await new Promise((res) => setTimeout(res, 6000)); // let the last pieces reach the test server (shutdown, not a picture wait)
     if (dir) fs.writeFileSync(path.join(dir, 'panel-off.png'), (await win.webContents.capturePage()).toPNG());
-    // Recording a video off air: 1080p, YouTube standard, a few seconds, saved as an .mp4 with sound
-    settings.record = { size: 1080, quality: 'youtube', fps: 30 };
-    const rs = await recordStart();
-    if (!rs.ok) throw new Error('recording did not start');
-    if ((await sizeNow())[1] !== 1080) throw new Error('the recording did not draw at its own size');
-    await waitFrames(20, 30000);
-    const saved = await recordStop();
-    result.recording = { ok: !!(saved && saved.ok), file: saved && saved.output };
-    if (!result.recording.ok) throw new Error('the recording could not be saved');
-    const info = await new Promise((r) => execFile(ffmpegPath(), ['-hide_banner', '-i', saved.output], (_e, _o, se) => r(String(se))));
-    result.recording.info = info.split('\n').filter((l) => /Stream|Duration/.test(l)).map((l) => l.trim()).join(' | ');
-    if (!/Video: h264.*\(tv, bt709[,)].*1920x1080/.test(info) || !/Audio: aac/.test(info)) throw new Error('the recording is not 1080p H.264 labelled BT.709 with AAC sound: ' + result.recording.info);
-    if ((await sizeNow())[1] !== 720) throw new Error('after recording, the picture did not go back to the stream size');
+    await waitFrames(10);
+    await expect('stream off', (n) => same(n, free), 'idleAgain');
+    // Record on its own, then Discard: nothing is saved, and the picture goes back to the window's size
+    const before = fs.readdirSync(recDir()).length;
+    if (!(await recordStart()).ok) throw new Error('recording on its own did not start');
+    await expect('recording on its own', (n) => n[1] === 1080, 'recordingAlone');
+    await waitFrames(5, 30000);
+    if (!(await recordDiscard()).ok) throw new Error('discard did not work');
+    const after = fs.readdirSync(recDir()).length;
+    result.discard = { before, after };
+    if (after !== before) throw new Error('discard left a file behind');
+    await waitFrames(10);
+    await expect('after discarding', (n) => same(n, free), 'idleAfterDiscard');
     result.pageFpsBefore = await pageFps();
     // The sharpness test on the real page (this computer has no graphics card, so the NVIDIA setting must fail politely)
     const t = await sharpnessTest({ ids: ['x264-veryfast', 'nv-p7-full'], frames: 30 });

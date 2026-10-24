@@ -119,20 +119,26 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent-hi);
 .bars li.chosen.usual .bar i { background: var(--accent-hi); }
 .bars li.off .bar i { background: repeating-linear-gradient(135deg, #3a3340 0 4px, transparent 4px 8px); }
 
-/* Streaming? at the top of the on-air box */
-.streaming-toggle { margin-bottom: 12px; }
-.streaming-toggle > span:first-child { display: flex; flex-direction: column; gap: 3px; }
-.streaming-toggle small { font-weight: 400; font-size: 12px; color: var(--muted); line-height: 1.35; }
-.not-streaming #quality, .not-streaming #quality2 { opacity: .55; }
-
-/* Record a video */
+/* The Stream and Record switches at the top */
+.air-switch { display: flex; align-items: center; gap: 12px; }
+.air-switch + .air-switch { padding-top: 14px; border-top: 1px solid var(--line); }
+.air-text { flex: 1; min-width: 0; }
+.air-switch .air-title { font-size: 17px; }
+.air-switch .air-title .what { font-weight: 700; }
+.air-switch .air-title span:not(.what) { font-weight: 500; color: var(--muted); }
+.onair[data-state="live"] #airTitle { color: var(--live); }
+.switch.big { width: 52px; height: 28px; }
+.switch.big span { border-radius: 14px; }
+.switch.big span::after { width: 22px; height: 22px; }
+.switch.big input:checked + span::after { transform: translateX(24px); }
+.onair[data-state="live"] #streamSw:checked + span { background: var(--live); }
+#streamRow.confirm .air-sub { color: var(--live); font-weight: 600; }
+.rdot { width: 14px; height: 14px; border-radius: 50%; background: var(--faint); flex: none; }
+#recRow[data-state="recording"] .rdot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+#recRow[data-state="recording"] #recTitle { color: var(--live); }
+#recRow[data-state="saving"] .rdot, #recRow[data-state="starting"] .rdot { background: var(--warn); }
+.switch.rec input:checked + span { background: var(--live); }
+.link.discard { align-self: flex-start; color: var(--muted); }
+.link.discard.armed { color: var(--live); font-weight: 600; }
 #recBlock .seg { margin-bottom: 6px; }
-.recbtn { height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); font-size: 15px; font-weight: 600;
-  display: flex; align-items: center; justify-content: center; gap: 10px; }
-.recbtn:hover:not(:disabled) { border-color: var(--live); }
-.recbtn:disabled { opacity: .6; cursor: default; }
-.recbtn .rdot { width: 14px; height: 14px; border-radius: 50%; background: var(--live); flex: none; }
-.recbtn.on { background: #3a1416; border-color: var(--live); }
-.recbtn.on .rdot { border-radius: 3px; animation: recblink 1.2s steps(2, start) infinite; }
-@keyframes recblink { to { visibility: hidden; } }
 #recFolder { align-self: flex-start; }

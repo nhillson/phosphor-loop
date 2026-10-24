@@ -46,7 +46,6 @@ function renderSettings() {
   }
   if (S.kick.server && !$('#server-kick').value) $('#server-kick').value = S.kick.server;
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) $(`#opt-${k}`).checked = S[k];
-  renderStreaming();
   renderRec();
   $('#opt-yt-hevc').checked = !!S.youtube.hevc;
   $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
@@ -57,49 +56,46 @@ function renderSettings() {
   $('#panel').hidden = S.collapsed; $('#strip').hidden = !S.collapsed;
 }
 
-// Streaming? On: Phosphor Loop draws at the stream's size. Off: at this screen's own size, as Phosphor Loop's
-// Picture sharpness (under Screen) picks, up to 4K.
-function renderStreaming() {
-  const on = status.streaming ?? S.streaming;
-  $('#opt-streaming').checked = !!on;
-  $('#streamingHint').textContent = on
-    ? 'On: the picture is drawn at the stream’s size (Picture quality, below).'
-    : 'Off: the picture is drawn at this screen’s size, up to 4K. Set it in Phosphor Loop under Screen › Picture sharpness (Full is sharpest). Go live switches this on.';
-  $('#panel').classList.toggle('not-streaming', !on);
-}
 /* ---- recording a video ---- */
-// The recording options as chosen, or the stream's own while live (the page draws one size at a time)
+// Its own size, quality and speed, whether or not streaming is on: with both on, the picture is drawn at the bigger
+// of the two sizes and the stream gets a sharp smaller copy
 const REC_MBPS = { youtube: { 2160: 45, 1440: 24, 1080: 12 }, clean: { 2160: 100, 1440: 50, 1080: 30 }, perfect: { 2160: 250, 1440: 130, 1080: 70 } };
+const REC_Q_NAME = { youtube: 'Standard', clean: 'Very clean', perfect: 'Near-perfect' };
 function recSizeText(h) { return h >= 2160 ? '4K' : h + 'p'; }
+let discardArmed = false, discardTimer = 0;
 function renderRec() {
   if (!S) return;
   const r = S.record || { size: 2160, quality: 'clean', fps: 30 };
   const R = status.rec || { state: 'idle' };
   const busy = R.state !== 'idle';
-  $$('[data-rsize]').forEach((b) => { b.setAttribute('aria-checked', String(+b.dataset.rsize === r.size)); b.disabled = busy || !!status.live; });
+  $$('[data-rsize]').forEach((b) => { b.setAttribute('aria-checked', String(+b.dataset.rsize === r.size)); b.disabled = busy; });
   $$('[data-rq]').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.rq === r.quality)); b.disabled = busy; });
-  $$('[data-rfps]').forEach((b) => { b.setAttribute('aria-checked', String(+b.dataset.rfps === r.fps)); b.disabled = busy || !!status.live; });
+  $$('[data-rfps]').forEach((b) => { b.setAttribute('aria-checked', String(+b.dataset.rfps === r.fps)); b.disabled = busy; });
   const mbps = REC_MBPS[r.quality][r.size] * (r.fps > 30 ? 1.5 : 1);
   const gb5 = (mbps + 0.384) * 300 / 8 / 1000;
-  let hint = `${recSizeText(r.size)} at ${r.fps} fps, ${mbps} Mbps: about ${gb5 < 1 ? Math.round(gb5 * 1000) + ' MB' : gb5.toFixed(1) + ' GB'} for 5 minutes, with sound. Saved to Videos › Phosphor Loop.`;
-  if (status.live) {
-    const q = quality[S.quality];
-    hint = `While live, the video is recorded at the stream’s size and speed (${q ? recSizeText(q.height) + ' at ' + q.fps + ' fps' : 'the stream’s'}), in the quality chosen here. For 4K, pick 4K under Picture quality before going live, or record while off air.`;
-  }
-  $('#recHint').textContent = hint;
-  const btn = $('#recBtn');
-  btn.classList.toggle('on', R.state === 'recording');
-  btn.disabled = R.state === 'starting' || R.state === 'saving' || !!status.starting || !!tune.running;
+  const size5 = gb5 < 1 ? Math.round(gb5 * 1000) + ' MB' : gb5.toFixed(1) + ' GB';
+  $('#recHint').textContent = `${recSizeText(r.size)} at ${r.fps} fps, ${mbps} Mbps: about ${size5} for 5 minutes, with sound. Saved to Videos › Phosphor Loop. Works the same with or without streaming.`;
+  // The Record switch at the top
+  const row = $('#recRow'), sw = $('#recSw');
+  row.dataset.state = R.state;
+  sw.checked = R.state === 'recording' || R.state === 'starting';
+  sw.disabled = R.state === 'starting' || R.state === 'saving' || R.state === 'discarding' || !!tune.running;
   const secs = R.since ? Math.max(0, Math.floor((Date.now() - R.since) / 1000)) : 0;
-  const mb = (R.bytes || 0) / 1e6;
-  $('#recLabel').textContent = R.state === 'recording'
-    ? `Stop recording · ${fmtTime(secs * 1000).replace(/^00:/, '')}${R.height ? ' · ' + recSizeText(R.height) : ''}${R.slow ? ` · only ${R.slow} fps!` : ''}`
-    : R.state === 'starting' ? 'Getting ready…' : R.state === 'saving' ? 'Saving…' : 'Record';
+  $('#recTitle').textContent = R.state === 'recording' ? `· ${fmtTime(secs * 1000).replace(/^00:/, '')}`
+    : R.state === 'starting' ? '· getting ready…' : R.state === 'saving' ? '· saving…' : R.state === 'discarding' ? '· discarding…' : 'Off';
+  $('#recSub').textContent = R.state === 'recording'
+    ? `${recSizeText(R.height)} · ${R.fps} fps · ${((R.bytes || 0) / 1e9).toFixed(2)} GB so far${R.slow ? ` · only ${R.slow} fps!` : ''}. Switch off to save.`
+    : `${recSizeText(r.size)}, ${REC_Q_NAME[r.quality]}, ${r.fps} fps (change under Record a video).`;
   $('#recSaving').hidden = R.state !== 'saving';
   if (R.state === 'saving') {
     $('#recBar').style.width = Math.round(4 + 96 * (R.progress || 0)) + '%';
     $('#recStep').textContent = `Saving your video: ${Math.round(100 * (R.progress || 0))}%. Keep the app open until it’s done.`;
   }
+  const disc = $('#recDiscard');
+  disc.hidden = R.state !== 'recording';
+  if (R.state !== 'recording') discardArmed = false;
+  disc.textContent = discardArmed ? 'Click again to throw it away' : 'Discard this recording';
+  disc.classList.toggle('armed', discardArmed);
   $('#recFolder').textContent = R.last ? 'Show the last video in its folder' : 'Open the recordings folder';
 }
 
@@ -112,12 +108,12 @@ function renderStatus() {
   if (status.starting) state = 'starting';
   else if (status.live) state = anyLive ? 'live' : (states.includes('retrying') ? 'retrying' : 'starting');
   $('#onair').dataset.state = state;
-  if (S) { renderStreaming(); renderRec(); }
+  if (S) renderRec();
   $('#stripDot').classList.toggle('live', state === 'live');
 
-  const title = { off: 'Off air', starting: 'Going live…', live: 'Live', retrying: 'Reconnecting…' }[state];
-  $('#airTitle').textContent = state === 'live' ? `Live · ${fmtTime(Date.now() - status.since)}` : title;
-  let sub = 'Ready when you are.';
+  const title = { off: 'Off', starting: '· going live…', live: 'Live', retrying: '· reconnecting…' }[state];
+  $('#airTitle').textContent = state === 'live' ? `· live ${fmtTime(Date.now() - status.since)}` : title;
+  let sub = 'Switch on to go live.';
   if (state === 'starting') sub = 'Connecting to ' + (Object.keys(dests).map((k) => NAMES[k] || k).join(' and ') || 'the platforms') + '…';
   if (state === 'live') {
     sub = status.kbps ? `Sending · ${(status.kbps / 1000).toFixed(1)} Mbps` : 'Sending…';
@@ -126,9 +122,11 @@ function renderStatus() {
   if (state === 'retrying') sub = 'Lost the connection. Trying again by itself.';
   $('#airSub').textContent = sub;
 
-  const btn = $('#golive');
-  if (!btn.classList.contains('confirm')) btn.textContent = status.live ? 'Stop stream' : (status.starting ? 'Going live…' : 'Go live');
-  btn.disabled = !!status.starting;
+  const sw = $('#streamSw');
+  sw.checked = !!status.live || !!status.starting;
+  sw.disabled = !!status.starting;
+  $('#streamRow').classList.toggle('confirm', stopArmed);
+  if (stopArmed) $('#airSub').textContent = 'Click the switch again to stop the stream.';
 
   for (const p of PLATFORMS) {
     const d = dests[p];
@@ -195,21 +193,43 @@ window.app.onTune((t) => { tune = t; renderTune(); renderStatus(); });
 async function save(patch) { S = await window.app.save(patch); renderSettings(); renderStatus(); }
 
 /* ---- events ---- */
-let confirmTimer;
-$('#golive').addEventListener('click', async () => {
-  const btn = $('#golive');
+// The Stream switch: on goes live; off takes two clicks, so a stray click never ends a stream
+let stopArmed = false, stopTimer = 0;
+$('#streamSw').addEventListener('change', async (e) => {
   if (status.live) {
-    // Stopping takes two clicks, so a stray click never ends a stream
-    if (!btn.classList.contains('confirm')) {
-      btn.classList.add('confirm'); btn.textContent = 'Click again to stop';
-      confirmTimer = setTimeout(() => { btn.classList.remove('confirm'); renderStatus(); }, 3000);
+    e.target.checked = true;
+    if (!stopArmed) {
+      stopArmed = true;
+      stopTimer = setTimeout(() => { stopArmed = false; renderStatus(); }, 3000);
+      renderStatus();
       return;
     }
-    clearTimeout(confirmTimer); btn.classList.remove('confirm');
+    clearTimeout(stopTimer); stopArmed = false;
     await window.app.stop();
+    renderStatus();
     return;
   }
   await window.app.goLive();
+  renderStatus();
+});
+// The Record switch: on starts recording, off stops and saves it. Discard (two clicks) throws it away instead.
+$('#recSw').addEventListener('change', async (e) => {
+  const R = status.rec || {};
+  if (e.target.checked && (!R.state || R.state === 'idle')) await window.app.record(true);
+  else if (!e.target.checked && R.state === 'recording') await window.app.record(false);
+  renderRec();
+});
+$('#recDiscard').addEventListener('click', async () => {
+  if (!discardArmed) {
+    discardArmed = true;
+    clearTimeout(discardTimer);
+    discardTimer = setTimeout(() => { discardArmed = false; renderRec(); }, 3000);
+    renderRec();
+    return;
+  }
+  clearTimeout(discardTimer); discardArmed = false;
+  await window.app.discard();
+  renderRec();
 });
 
 for (const p of PLATFORMS) {
@@ -249,13 +269,7 @@ $$('[data-q]').forEach((b) => b.addEventListener('click', () => { if (!status.li
 $$('[data-rsize]').forEach((b) => b.addEventListener('click', () => save({ record: { size: +b.dataset.rsize } })));
 $$('[data-rq]').forEach((b) => b.addEventListener('click', () => save({ record: { quality: b.dataset.rq } })));
 $$('[data-rfps]').forEach((b) => b.addEventListener('click', () => save({ record: { fps: +b.dataset.rfps } })));
-$('#recBtn').addEventListener('click', () => {
-  const R = status.rec || {};
-  if (R.state === 'idle' || !R.state) window.app.record(true);
-  else if (R.state === 'recording') window.app.record(false);
-});
 $('#recFolder').addEventListener('click', () => window.app.openRecordings());
-$('#opt-streaming').addEventListener('change', (e) => save({ streaming: e.target.checked }));
 for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) {
   $(`#opt-${k}`).addEventListener('change', (e) => save({ [k]: e.target.checked }));
 }

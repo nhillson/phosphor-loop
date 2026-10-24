@@ -57,7 +57,8 @@ function finish({ ffmpeg, input, output, plan, family, seconds, onProgress = () 
     const args = ['-hide_banner', '-loglevel', 'error', '-nostats', '-progress', 'pipe:1', '-y',
       ...(plan.height > 1080 && family !== 'libx264' ? ['-hwaccel', 'auto'] : []),
       '-i', input,
-      '-vf', `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt},setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv`,
+      // The picture may have been drawn bigger than the recording (a 4K stream running): shrunk with a sharp filter
+      '-vf', `scale=w=${plan.width}:h=${plan.height}:in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv:flags=lanczos+accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt},setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv`,
       '-r', String(plan.fps), '-fps_mode', 'cfr',
       ...finalArgs(family, plan),
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
