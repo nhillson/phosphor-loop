@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Phosphor Stream</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<aside id="panel" aria-label="Streaming controls">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>Phosphor Stream</div>
+    <button class="icon" id="collapse" title="Hide controls" aria-label="Hide controls">&#x203A;</button>
+  </header>
+
+  <section class="onair" id="onair" data-state="off">
+    <!-- Two switches, each on its own: streaming to the platforms, and recording a video file. The picture is drawn
+         at whichever size the switched-on ones need (the bigger of the two), or at the screen's own size with neither. -->
+    <div class="air-switch" id="streamRow">
+      <span class="dot" aria-hidden="true"></span>
+      <div class="air-text">
+        <div class="air-title"><span class="what">Stream</span> <span id="airTitle">Off air</span></div>
+        <div class="air-sub" id="airSub">Ready when you are.</div>
+      </div>
+      <label class="switch big"><input type="checkbox" id="streamSw"><span></span><b class="sr">Stream</b></label>
+    </div>
+    <div class="air-switch" id="recRow" data-state="idle">
+      <span class="rdot" aria-hidden="true"></span>
+      <div class="air-text">
+        <div class="air-title"><span class="what">Record</span> <span id="recTitle">Off</span></div>
+        <div class="air-sub" id="recSub"></div>
+      </div>
+      <label class="switch big rec"><input type="checkbox" id="recSw"><span></span><b class="sr">Record</b></label>
+    </div>
+    <div class="tune-run" id="recSaving" hidden>
+      <div class="meter" aria-hidden="true"><span id="recBar"></span></div>
+      <small id="recStep">Saving your video…</small>
+    </div>
+    <button class="link discard" id="recDiscard" hidden>Discard this recording</button>
+    <p class="notice" id="notice" hidden></p>
+  </section>
+
+  <section class="block">
+    <h2>Where to stream</h2>
+
+    <div class="dest" id="dest-twitch" data-platform="twitch">
+      <div class="dest-head">
+        <span class="light" aria-hidden="true"></span>
+        <div class="dest-name">Twitch<span class="dest-state" id="state-twitch"></span></div>
+        <label class="switch"><input type="checkbox" id="on-twitch"><span></span><b class="sr">Stream to Twitch</b></label>
+      </div>
+      <div class="dest-body">
+        <div class="saved" id="saved-twitch" hidden>Stream key saved <button class="link" data-change="twitch">Change</button></div>
+        <div class="fields" id="fields-twitch">
+          <label>Stream key
+            <span class="keybox"><input type="password" id="key-twitch" autocomplete="off" spellcheck="false" placeholder="Paste it here"><button class="link show" data-show="key-twitch">Show</button></span>
+          </label>
+          <div class="row"><button class="small primary" data-save="twitch">Save</button><button class="link" data-help="twitch">Where do I find it?</button></div>
+          <p class="how" id="how-twitch" hidden>Your Twitch dashboard just opened in your web browser. Next to <b>Primary Stream key</b>, click <b>Copy</b>, then paste it in the box above and click Save.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dest" id="dest-kick" data-platform="kick">
+      <div class="dest-head">
+        <span class="light" aria-hidden="true"></span>
+        <div class="dest-name">Kick<span class="dest-state" id="state-kick"></span></div>
+        <label class="switch"><input type="checkbox" id="on-kick"><span></span><b class="sr">Stream to Kick</b></label>
+      </div>
+      <div class="dest-body">
+        <div class="saved" id="saved-kick" hidden>Stream key saved <button class="link" data-change="kick">Change</button></div>
+        <div class="fields" id="fields-kick">
+          <label>Server address (Stream URL)
+            <input type="text" id="server-kick" autocomplete="off" spellcheck="false" placeholder="rtmps://…">
+          </label>
+          <label>Stream key
+            <span class="keybox"><input type="password" id="key-kick" autocomplete="off" spellcheck="false" placeholder="Paste it here"><button class="link show" data-show="key-kick">Show</button></span>
+          </label>
+          <div class="row"><button class="small primary" data-save="kick">Save</button><button class="link" data-help="kick">Where do I find these?</button></div>
+          <p class="how" id="how-kick" hidden>Kick’s stream settings just opened in your web browser. Copy the <b>Stream URL</b> into the first box and the <b>Stream Key</b> into the second, then click Save.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="dest" id="dest-youtube" data-platform="youtube">
+      <div class="dest-head">
+        <span class="light" aria-hidden="true"></span>
+        <div class="dest-name">YouTube<span class="dest-state" id="state-youtube"></span></div>
+        <label class="switch"><input type="checkbox" id="on-youtube"><span></span><b class="sr">Stream to YouTube</b></label>
+      </div>
+      <div class="dest-body">
+        <div class="saved" id="saved-youtube" hidden>Stream key saved <button class="link" data-change="youtube">Change</button></div>
+        <div class="fields" id="fields-youtube">
+          <label>Stream key
+            <span class="keybox"><input type="password" id="key-youtube" autocomplete="off" spellcheck="false" placeholder="Paste it here"><button class="link show" data-show="key-youtube">Show</button></span>
+          </label>
+          <div class="row"><button class="small primary" data-save="youtube">Save</button><button class="link" data-help="youtube">Where do I find it?</button></div>
+          <p class="how" id="how-youtube" hidden>YouTube’s live page just opened in your web browser. If it asks, choose <b>Streaming software</b> (or <b>Stream</b>). Next to <b>Stream key</b>, click <b>Copy</b>, then paste it in the box above and click Save. The very first time, YouTube can take up to 24 hours to switch live streaming on for a channel.</p>
+        </div>
+        <label class="mini-toggle"><span>Sharper format (HEVC) when this PC can make it</span><span class="switch"><input type="checkbox" id="opt-yt-hevc"><span></span></span></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>Picture quality</h2>
+    <div class="seg" id="quality" role="radiogroup" aria-label="Picture quality">
+      <button role="radio" data-q="good"><b>Good</b><small>720p</small></button>
+      <button role="radio" data-q="better"><b>Better</b><small>1080p</small></button>
+      <button role="radio" data-q="best"><b>Best</b><small>1080p smooth</small></button>
+    </div>
+    <div class="seg seg2" id="quality2" role="radiogroup" aria-label="Picture quality for YouTube">
+      <button role="radio" data-q="ultra"><b>1440p</b><small>for YouTube</small></button>
+      <button role="radio" data-q="max"><b>4K</b><small>for YouTube</small></button>
+    </div>
+    <p class="hint" id="qualityHint"></p>
+  </section>
+
+  <section class="block" id="recBlock">
+    <h2>Record a video</h2>
+    <div class="seg" id="recSize" role="radiogroup" aria-label="Recording size">
+      <button role="radio" data-rsize="2160"><b>4K</b><small>2160p</small></button>
+      <button role="radio" data-rsize="1440"><b>1440p</b><small>2K</small></button>
+      <button role="radio" data-rsize="1080"><b>1080p</b><small>Full HD</small></button>
+    </div>
+    <div class="seg" id="recQ" role="radiogroup" aria-label="Recording quality">
+      <button role="radio" data-rq="youtube"><b>Standard</b><small>YouTube’s own</small></button>
+      <button role="radio" data-rq="clean"><b>Very clean</b><small>recommended</small></button>
+      <button role="radio" data-rq="perfect"><b>Near-perfect</b><small>very large</small></button>
+    </div>
+    <div class="seg seg2" id="recFps" role="radiogroup" aria-label="Recording frame rate">
+      <button role="radio" data-rfps="30"><b>30 fps</b><small>sharper detail</small></button>
+      <button role="radio" data-rfps="60"><b>60 fps</b><small>smoother motion</small></button>
+    </div>
+    <p class="hint" id="recHint"></p>
+    <button class="link" id="recFolder">Open the recordings folder</button>
+  </section>
+
+  <section class="block" id="tune">
+    <h2>Sharpness test</h2>
+    <p class="hint" id="tuneHint">Tries each encoder setting on 5 seconds of your picture, on this PC’s own graphics card, and keeps the sharpest one this PC can keep up with. Takes a few minutes. Works best on a busy, detailed look.</p>
+    <button class="small primary wide" id="tuneRun">Run the sharpness test</button>
+    <div class="tune-run" id="tuneRunning" hidden>
+      <div class="meter" aria-hidden="true"><span id="tuneBar"></span></div>
+      <small id="tuneStep"></small>
+    </div>
+    <ol class="bars" id="tuneBars" aria-label="Sharpness of each setting (longer bar = sharper)"></ol>
+    <p class="hint" id="tuneSummary"></p>
+  </section>
+
+  <section class="block">
+    <h2>For a computer that streams all day</h2>
+    <label class="toggle"><span>Start when Windows starts</span><span class="switch"><input type="checkbox" id="opt-startWithWindows"><span></span></span></label>
+    <label class="toggle"><span>Go live as soon as the app opens</span><span class="switch"><input type="checkbox" id="opt-goLiveOnOpen"><span></span></span></label>
+    <label class="toggle"><span>Turn on Autopilot when going live</span><span class="switch"><input type="checkbox" id="opt-autopilotOnLive"><span></span></span></label>
+  </section>
+
+  <footer class="foot">
+    <span id="encoder">Checking your graphics card…</span>
+    <button class="link" id="openLog">Log</button>
+  </footer>
+</aside>
+
+<aside id="strip" hidden aria-label="Streaming controls (hidden)">
+  <button class="icon" id="expand" title="Show controls" aria-label="Show controls">&#x2039;</button>
+  <span class="dot" id="stripDot" aria-hidden="true"></span>
+</aside>
+<script src="panel.js"></script>
+</body>
+</html>
