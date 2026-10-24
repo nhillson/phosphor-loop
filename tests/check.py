@@ -167,7 +167,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     fps = 0
     with sync_playwright() as p:
-        b = p.chromium.launch(args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
+        b = p.chromium.launch(executable_path=os.environ.get('CHROME_PATH'), args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
         pg = b.new_page(viewport={'width': 1280, 'height': 800})
         pg.set_default_timeout(FAIL_FAST_MS)
         pg.route(lambda u: u.rstrip('/').endswith(f':{port}') or u.split('?')[0].endswith('/index.html'),

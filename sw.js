@@ -1,8 +1,8 @@
 // Phosphor Loop keeps a copy of itself in the browser, so after one visit it opens without internet.
 // Online, every file is fetched fresh and the copy updated; offline, or on a very slow network, the copy is used.
-const CACHE = 'pl-v2';
+const CACHE = 'pl-v11-smooth-dancer';
 const NATURE = 'pl-nature';   // nature pictures seen so far, or all of them via Show setup; kept when the app updates
-const APP = ['./', 'index.html', 'phone.html', 'qrcode.js', 'icon-180.png', 'icon-192.png', 'nature/pictures.json', 'styles/base.css', 'styles/app.css', 'js/fractal-math.js', 'js/shaders.js', 'js/helpers.js', 'js/recording-formats.js', 'js/output-template.js', 'js/ribbit.js', 'js/app.js'];
+const APP = ['./', 'index.html', 'phone.html', 'qrcode.js', 'icon-180.png', 'icon-192.png', 'nature/pictures.json', 'styles/base.css', 'styles/app.css', 'js/fractal-math.js', 'js/shaders.js', 'js/helpers.js', 'js/recording-formats.js', 'js/output-template.js', 'js/ribbit.js', 'js/app.js', 'js/silhouette.js', 'static/silhouette-mask-v2.mp4', 'js/step-sequencer.js', 'js/spotify.js', 'js/audio/beat-clock.js', 'js/audio/rhythm.js', 'js/audio/rhythm-worklet.js', 'js/audio/tempo-worker.js', 'vendor/essentia/essentia-wasm.es.js', 'vendor/essentia/essentia.js-core.es.js', 'vendor/essentia/LICENSE', 'vendor/essentia/README.md'];
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Michroma&family=VT323&display=swap';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const SLOW_MS = 4000;
@@ -38,6 +38,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (FONT_HOSTS.includes(url.hostname)) { event.respondWith(cacheFirst(req)); return; }
+  if (url.origin === self.location.origin && url.pathname.endsWith('/static/silhouette-mask-v2.mp4')) { event.respondWith(silhouetteVideo(req, url)); return; }
   if (url.origin !== self.location.origin) return;   // the phone link's servers and anything else go straight out
   if (/\/nature\/[^/]+\.jpg$/.test(url.pathname)) { event.respondWith(natureFirst(req, url)); return; }
   event.respondWith(networkFirst(event, req, url));
@@ -93,4 +94,29 @@ function networkFirst(event, req, url) {
     if (hit) return hit;
     return res || network;   // nothing saved yet, so wait for the network after all
   })();
+}
+
+// A cached full matte can answer media byte-range requests even while offline.
+async function silhouetteVideo(req, url) {
+  const key = url.href, cache = await caches.open(CACHE);
+  let full = await cache.match(key);
+  if (!full) {
+    try {
+      full = await fetch(key);
+      if (full.ok && full.status === 200) await cache.put(key, full.clone());
+    } catch (_) { return Response.error(); }
+  }
+  const range = req.headers.get('Range');
+  if (!range || full.status !== 200) return full;
+  const bytes = await full.arrayBuffer(), size = bytes.byteLength;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+  const invalid = () => new Response(null, {status: 416, headers: {'Content-Range': 'bytes */' + size}});
+  if (!match || (!match[1] && !match[2])) return invalid();
+  const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+  const end = match[1] && match[2] ? Math.min(size - 1, Number(match[2])) : size - 1;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= size) return invalid();
+  return new Response(bytes.slice(start, end + 1), {status: 206, headers: {
+    'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes',
+    'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': String(end - start + 1),
+  }});
 }

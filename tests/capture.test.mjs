@@ -30,8 +30,8 @@ test('authenticated ordered delivery preserves exact bytes; rejects retries and 
 });
 test('local server serves app but hides private files and traversal', async t => {
   const p = await fixture(t);
-  for (const path of ['/', '/js/app.js', '/styles/app.css']) assert.equal((await fetch(p.origin + path)).status, 200);
-  for (const path of ['/.git/config', '/.capture-state/audio-route.json', '/captures/show.mp4', '/tools/audio-route.swift', '/js/../package.json', '/js/..%2fpackage.json', '/nature/..%2f.capture-state/audio-route.json']) assert.equal((await fetch(p.origin + path)).status, 404);
+  for (const path of ['/', '/js/app.js', '/styles/app.css', '/js/audio/rhythm-worklet.js', '/js/audio/tempo-worker.js', '/vendor/essentia/essentia-wasm.es.js', '/vendor/essentia/essentia.js-core.es.js']) assert.equal((await fetch(p.origin + path)).status, 200);
+  for (const path of ['/vendor/essentia/private.json', '/vendor/private.json', '/.git/config', '/.capture-state/audio-route.json', '/captures/show.mp4', '/tools/audio-route.swift', '/js/../package.json', '/js/..%2fpackage.json', '/nature/..%2f.capture-state/audio-route.json']) assert.equal((await fetch(p.origin + path)).status, 404);
   assert.equal((await fetch(p.origin + '/chunk/0', {method:'POST',headers:{'X-Capture-Token':p.token, Origin:'https://example.com'},body:'bad'})).status,403);
 });
 test('oversized chunks and encoder failure stop delivery', async t => {

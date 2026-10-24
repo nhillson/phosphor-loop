@@ -33,7 +33,7 @@ export function ffmpegArgs(config) {
 export function createCaptureServer({root, input, liveDir, maxChunkBytes = 8 * 1024 * 1024}) {
   const token = randomBytes(32).toString('hex');
   let sequence = 0, busy = false, failure;
-  const types = {'.html': 'text/html', '.js': 'application/javascript', '.mjs':'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.m3u8':'application/vnd.apple.mpegurl', '.ts':'video/mp2t'};
+  const types = {'.html': 'text/html', '.js': 'application/javascript', '.mjs':'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.m3u8':'application/vnd.apple.mpegurl', '.ts':'video/mp2t', '.mp4':'video/mp4'};
   input.on('error', error => { failure = error; });
   const server = createServer(async (req, res) => {
     const reply = (status, body = '') => { if (!res.destroyed) res.writeHead(status).end(body); };
@@ -77,13 +77,31 @@ export function createCaptureServer({root, input, liveDir, maxChunkBytes = 8 * 1
         return;
       }
       // Serve workstation assets only; never expose local state, credentials, or captures.
-      if (!/^\/(?:index\.html|phone\.html|qrcode\.js|presets\.json|icon-[\w.-]+|(?:js|styles|nature)\/[^\0]+)?$/.test(pathname)) return reply(404);
+      if (!/^\/(?:index\.html|phone\.html|qrcode\.js|presets\.json|icon-[\w.-]+|static\/silhouette-mask(?:-v2)?\.mp4|vendor\/essentia\/(?:essentia-wasm\.es\.js|essentia\.js-core\.es\.js|LICENSE|README\.md)|(?:js|styles|nature)\/[^\0]+)?$/.test(pathname)) return reply(404);
       const file = await realpath(resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname)));
       if (!file.startsWith(resolve(root) + sep)) return reply(403);
       const info = await stat(file);
       if (!info.isFile()) return reply(404);
-      res.writeHead(200, {'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store'});
-      createReadStream(file).on('error', () => res.destroy()).pipe(res);
+      const headers = {'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Content-Length': info.size};
+      // The bundled dancer seeks to beat phase; browsers need byte ranges for reliable MP4 seeking.
+      let start = 0, end = info.size - 1, status = 200;
+      if (extname(file) === '.mp4') {
+        headers['Accept-Ranges'] = 'bytes';
+        if (req.headers.range) {
+          const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+          if (!match || (!match[1] && !match[2])) { res.writeHead(416, {'Content-Range': 'bytes */' + info.size}).end(); return; }
+          start = match[1] ? Number(match[1]) : Math.max(0, info.size - Number(match[2]));
+          end = match[1] ? (match[2] ? Math.min(Number(match[2]), end) : end) : end;
+          if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= info.size) {
+            res.writeHead(416, {'Content-Range': 'bytes */' + info.size}).end(); return;
+          }
+          status = 206; headers['Content-Range'] = `bytes ${start}-${end}/${info.size}`;
+          headers['Content-Length'] = end - start + 1;
+        }
+      }
+      res.writeHead(status, headers);
+      if (req.method === 'HEAD' || info.size === 0) { res.end(); return; }
+      createReadStream(file, {start, end}).on('error', () => res.destroy()).pipe(res);
     } catch { reply(404); }
   });
   server.requestTimeout = 20000;

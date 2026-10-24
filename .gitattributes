@@ -1,0 +1,2 @@
+# Keep vendored upstream distributions unchanged.
+vendor/essentia/* -whitespace

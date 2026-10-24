@@ -25,12 +25,12 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 // a preset note...) stay on show. A description whose words change later (Pushed by's, say, which names the other
 // loop) keeps its tooltip up to date.
 const HINT_KEEP = ['feedNote', 'hiddenHint', 'vidLoopText', 'limSum', 'apCheckStat', 'apPinList', 'sharpNote', 'shapeNote',
-  'sharedHint', 'adminMsg', 'presetEmpty', 'presetApNote', 'tasteSum', 'micTip', 'loopbackHint', 'tasteAdminNote'];
+  'sharedHint', 'adminMsg', 'presetEmpty', 'presetApNote', 'tasteSum', 'micTip', 'loopbackHint', 'tasteAdminNote', 'spotifySetup'];
 // Where a description that isn't inside a control's own box goes
 const HINT_TARGET = { loopsHint: '#h-mix', dropHint: '#in1Lbl' };
 // The rows that open under an input (3D world, Text...) put their description on that input's button
 const ROW_INPUT = { 'row-3d': 'world', 'row-fractal': 'fractal', 'row-spectro': 'spectro', 'row-text': 'text', 'row-picture': 'picture',
-  'row-video': 'video', 'row-camera': 'camera', 'row-screen': 'screen', 'row-phone': 'phone', 'row-loop': 'loop' };
+  'row-silhouette': 'silhouette', 'row-video': 'video', 'row-camera': 'camera', 'row-screen': 'screen', 'row-phone': 'phone', 'row-loop': 'loop' };
 const TIP_DELAY = 1200;
 // The name to hover for a control's box: its label, else the box's first label-like line, else the box itself
 function tipLabel(box) {
@@ -151,15 +151,15 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31 };
-const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, silhouette: 32 };
+const SRC_LABEL = { silhouette: 'Silhouette', wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
+  return { dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
            zoom: 0, spin: 0, trails: 88, color: 10, recolor: 0, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
@@ -462,6 +462,7 @@ gl.useProgram(compProg.p);
 set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1); set1i(compProg, 'uC', 2); set1i(compProg, 'uD', 3);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
+for (const [i, key] of KEYS.entries()) set1i(dispProg, 'uDancer' + key, i + 1);
 // Time warp gets its own program, so a graphics card that can't draw it only loses Time warp
 let twProg = null;
 try {
@@ -601,6 +602,69 @@ function mkVideo() {
   const v = document.createElement('video');
   v.muted = true; v.playsInline = true; v.autoplay = true;
   return v;
+}
+
+/* ================= built-in dancing silhouette ================= */
+const dancers = Object.fromEntries(KEYS.map(k => [k, { player: null, tex: makeSourceTex(), time: -1 }]));
+function dancerTex(k) { return dancers[k].tex; }
+function syncSilhouetteUI() {
+  const t = loops[edit].tgt;
+  $('#silhouetteClock').value = t.dancerClock || 'auto';
+  $('#silhouetteBpm').value = t.dancerBpm || 104;
+  $('#silhouetteBpm').disabled = t.dancerClock !== 'manual';
+  $('#silhouetteSize').value = t.dancerSize || 100; fillTrack($('#silhouetteSize'));
+  $('#silhouetteFX').setAttribute('aria-pressed', String(!!t.dancerFX));
+  $('#silhouetteFX').textContent = `Through loop effects: ${t.dancerFX ? 'On' : 'Off'}`;
+}
+for (const [id, key] of [['silhouetteClock', 'dancerClock'], ['silhouetteBpm', 'dancerBpm'], ['silhouetteSize', 'dancerSize']]) {
+  $('#' + id).addEventListener(id === 'silhouetteSize' ? 'input' : 'change', e => {
+    takeOver('in1'); const value = key === 'dancerClock' ? e.target.value : Number(e.target.value);
+    loops[edit].tgt[key] = key === 'dancerBpm' ? clamp(value || 104, 30, 300) : key === 'dancerSize' ? clamp(value || 100, 25, 150) : value;
+    syncSilhouetteUI();
+  });
+}
+$('#silhouetteFX').addEventListener('click', () => { takeOver('in1'); loops[edit].tgt.dancerFX = !loops[edit].tgt.dancerFX; syncSilhouetteUI(); });
+function silhouetteClock(t, now) {
+  if (t.dancerClock === 'manual') return { beat: now / 60000 * t.dancerBpm, bpm: t.dancerBpm, playing: true, label: 'Manual' };
+  if (showSequence.songDrive && spotify.snapshot?.track && now - spotify.snapshot.receivedAt < 10000) {
+    return { beat: Math.max(0, spotify.position(now) / 1000 - showSequence.offset) * showSequence.bpm / 60,
+      bpm: showSequence.bpm, playing: spotify.snapshot.playing, label: 'Spotify' };
+  }
+  const music = snd.rhythmSample;
+  return music?.gridBeat != null ? { beat: music.gridBeat + music.phase, bpm: music.bpm, playing: true, label: 'Audio' } : null;
+}
+function updateSilhouettes(now) {
+  for (const k of KEYS) {
+    const state = dancers[k], t = loops[k].tgt;
+    const active = loopOn(k) && (t.in1 === 'silhouette' || t.in2 === 'silhouette');
+    if (!active) { state.player?.pause(); continue; }
+    state.player ||= new PhosphorSilhouette();
+    if (frozen) state.player.pause();
+    else state.player.update(silhouetteClock(t, now));
+    const v = state.player.video;
+    if (v.readyState >= 2 && state.time !== v.currentTime && !v.seeking) {
+      uploadTo(state.tex, v); state.time = v.currentTime;
+    }
+    if (k === edit) {
+      const message = frozen ? 'Dancer frozen.' : state.player.status;
+      if ($('#silhouetteStatus').textContent !== message) $('#silhouetteStatus').textContent = message;
+    }
+  }
+}
+function bindCleanSilhouettes(weights) {
+  const sizes = [], opacity = [];
+  for (const [i, k] of KEYS.entries()) {
+    const t = loops[k].tgt, state = dancers[k];
+    gl.activeTexture(gl.TEXTURE0 + i + 1); gl.bindTexture(gl.TEXTURE_2D, state.tex);
+    sizes.push(clamp(t.dancerSize || 100, 25, 150) / 100);
+    const slot = t.in1 === 'silhouette' ? 1 : t.in2 === 'silhouette' ? 2 : 0;
+    const blend = clamp(loops[k].cur.blend, 0, 100) / 100;
+    const slotWeight = t.in2 === 'none' ? 1 : slot === 1 ? Math.min(1, 2 * (1 - blend)) : Math.min(1, 2 * blend);
+    opacity.push(slot && !t.dancerFX && state.time >= 0 ? (weights[k] || 0) * slotWeight : 0);
+  }
+  const sizeUniform = U(dispProg, 'uDancerSizes'), weightUniform = U(dispProg, 'uDancerWeights');
+  if (sizeUniform) gl.uniform4fv(sizeUniform, sizes);
+  if (weightUniform) gl.uniform4fv(weightUniform, opacity);
 }
 
 /* picture */
@@ -802,7 +866,7 @@ function showSlider(k) {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['text', 'Text (your words)'], ['silhouette', 'Dancing silhouette'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -918,6 +982,8 @@ function uses(src) { return activeKeys().some((k) => loops[k].tgt.in1 === src ||
 // browser treats the camera or screen request as something the person asked for.
 function chooseSource(slot, src) {
   takeOver(slot);
+  if (src === 'silhouette' && slot === 'in1' && loops[edit].tgt.in1 !== 'silhouette' && loops[edit].tgt.in2 === 'none')
+    loops[edit].tgt.in2 = loops[edit].tgt.in1; // keep the existing look behind the clean overlay
   loops[edit].tgt[slot] = src;
   if (is3D(src)) lastWorld[sceneGroup(src)] = src;
   if (src === 'camera' && !cam.on) startCamera();
@@ -1062,8 +1128,8 @@ function syncUI() {
   $$('#mirror button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mirror === t.mirror)));
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text']) $('#row-' + s).hidden = !usesHere(s);
-  syncTextUI();
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'silhouette']) $('#row-' + s).hidden = !usesHere(s);
+  syncTextUI(); syncSilhouetteUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#timeShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.tshape === (t.timeShape ?? 0))));
   $$('#specShape button').forEach((b) => b.setAttribute('aria-pressed', String((+b.dataset.round === 1) === !!t.specRound)));
@@ -1191,11 +1257,11 @@ $('#surprise').addEventListener('click', surprise);
 // or to the microphone, splits it into low, mid and high bands plus beats,
 // and nudges both loops with them. Nothing is played back, so there is no echo.
 const snd = {
-  src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null, prevBins: null,
-  rate: 48000, tap: null, appFeed: null,
+  src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null,
+  rate: 48000, tap: null, appFeed: null, rhythm: null, rhythmSample: null, rhythmGrid: null, analysisError: '',
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
-  flux: 0, lastBeat: 0, beats: 0, shakeDir: [1, 0], amount: 60,
+  beats: 0, shakeDir: [1, 0], amount: 60,
   map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true },
   // Which loops move with the sound (Loops that react, at the top of React to sound)
   react: { A: true, B: true, C: true, D: true },
@@ -1291,6 +1357,7 @@ function appSoundPrepare() {
     if (appSnd.ctx !== ctx) { try { node.disconnect(); } catch (_) {} return; }
     node.connect(dest); node.connect(sink);
     appSnd.node = node; appSnd.push = push;
+    startRhythm(ctx, node);
   };
   (async () => {
     if (ctx.audioWorklet && window.AudioWorkletNode) {
@@ -1441,7 +1508,7 @@ function tapFeed(fa, ad) {
   return true;
 }
 function setAnalyser(analyser, rate) {
-  Object.assign(snd, { analyser, rate, bins: new Uint8Array(analyser.frequencyBinCount), prevBins: new Uint8Array(analyser.frequencyBinCount) });
+  Object.assign(snd, { analyser, rate, bins: new Uint8Array(analyser.frequencyBinCount) });
 }
 function dropTap() {
   const t = snd.tap;
@@ -1451,11 +1518,39 @@ function dropTap() {
   try { t.reader.cancel().catch(() => {}); } catch (_) {}
   try { t.copy.stop(); } catch (_) {}
 }
-// The browser's audio engine: slower, but works everywhere
-function useEngine(track) {
+// Tempo runs on the audio clock, independently of the raw-track spectrum and graphics.
+function startRhythm(ctx, source) {
+  if (location.protocol === 'file:') {
+    snd.analysisError = 'BPM tracking needs localhost or HTTPS. Open the local preview.';
+    return;
+  }
+  if (!ctx.audioWorklet || !window.PhosphorRhythm) {
+    snd.analysisError = 'BPM tracking is unavailable in this browser.';
+    return;
+  }
+  snd.rhythm?.stop();
+  const rhythm = snd.rhythm = new window.PhosphorRhythm(ctx, source);
+  rhythm.start().catch(() => {
+    rhythm.stop();
+    if (snd.rhythm === rhythm) {
+      snd.rhythm = null;
+      snd.analysisError = 'BPM tracking could not start. Reconnect audio to try again.';
+    }
+  });
+}
+function soundEngine(track) {
+  if (snd.ctx && snd.source) return { ctx: snd.ctx, source: snd.source };
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = new AC({ latencyHint: 'interactive' });
   const source = ctx.createMediaStreamSource(new MediaStream([track]));
+  Object.assign(snd, { ctx, source });
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  startRhythm(ctx, source);
+  return { ctx, source };
+}
+// The browser's audio engine: slower, but works everywhere
+function useEngine(track) {
+  const { ctx, source } = soundEngine(track);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
   analyser.smoothingTimeConstant = 0.2;   // low, so a kick shows up the moment it lands
@@ -1499,6 +1594,10 @@ function useTap(track) {
   return true;
 }
 function stopSound() {
+  snd.rhythm?.stop();
+  snd.rhythm = null; snd.rhythmSample = null; snd.rhythmGrid = null; snd.analysisError = '';
+  $('#rhythmStatus').textContent = 'Share audio to find BPM.';
+  $('#mBeat').classList.remove('on');
   if (APP) appSoundClose();
   dropTap();
   if (snd.stream) snd.stream.getTracks().forEach((t) => t.stop());
@@ -1512,10 +1611,12 @@ function listen(stream, appRate) {
   const track = stream.getAudioTracks()[0];
   Object.assign(snd, { stream, track });
   if (appRate) { snd.appFeed = makeFastAnalyser(appRate); setAnalyser(snd.appFeed, appRate); }
-  else if (!(canTap && useTap(track))) useEngine(track);
+  else {
+    if (!(canTap && useTap(track))) useEngine(track);
+    else soundEngine(track);
+  }
   snd.avg = { low: 0, mid: 0, high: 0 };
   snd.peak = { low: 0.1, mid: 0.1, high: 0.1 };
-  snd.flux = 0;
   track.addEventListener('ended', () => {
     if (snd.track !== track) return;
     stopSound();
@@ -1657,10 +1758,10 @@ $$('#sndLoops button').forEach((b) => b.addEventListener('click', () => {
 syncSoundUI();
 
 // Each band is judged against its own recent level, so quiet and loud songs both move the picture.
-// Beats come from how suddenly the bass jumps, which still catches the kick when a bass line fills the low end.
+// The pulse follows the estimated BPM grid; band energy still responds immediately.
 function analyzeSound(dt, now) {
   if (!snd.analyser) return;
-  const bins = snd.bins, prev = snd.prevBins;
+  const bins = snd.bins;
   snd.analyser.getByteFrequencyData(bins);
   const hz = snd.rate / snd.analyser.fftSize;
   const span = (lo, hi) => [Math.max(1, Math.floor(lo / hz)), Math.min(bins.length - 1, Math.ceil(hi / hz))];
@@ -1683,21 +1784,16 @@ function analyzeSound(dt, now) {
     const e = snd.env[k];
     snd.env[k] = e + (x - e) * (1 - Math.exp(-dt * (x > e ? 60 : k === 'mid' ? 7 : 10)));
   }
-  // How much the bass rose since the last frame, compared with how much it usually rises
-  const [la, lb] = span(35, 170);
-  let flux = 0;
-  for (let i = la; i <= lb; i++) { const d = bins[i] - prev[i]; if (d > 0) flux += d; }
-  prev.set(bins);
-  // Scaled to a 60-frames-a-second step, so fast and slow screens find the same beats
-  flux = flux / ((lb - la + 1) * 255) * clamp(1 / 60 / dt, 0.4, 2.5);
-  const hit = flux > snd.flux * 3 + 0.04 && raw.low > snd.avg.low * 0.9 && raw.low > 0.02;
-  snd.flux += (flux - snd.flux) * (1 - Math.exp(-dt / (flux > snd.flux ? 1.2 : 0.4)));
-  if (hit && now - snd.lastBeat > 170) {
-    snd.lastBeat = now; snd.env.beat = 1; snd.beats++;
+  const music = snd.rhythmSample = snd.rhythm?.read() || null;
+  const grid = music?.gridBeat ?? null;
+  // Reacquiring after silence starts a new baseline, rather than inventing missed beats.
+  if (grid !== null && snd.rhythmGrid !== null && grid > snd.rhythmGrid) {
+    snd.beats++;
     const a = Math.random() * Math.PI * 2;
     snd.shakeDir = [Math.cos(a), Math.sin(a)];
   }
-  snd.env.beat *= Math.exp(-dt * 7);
+  snd.rhythmGrid = grid;
+  snd.env.beat = music?.bpmBeat || 0;
 }
 const mLow = $('#mLow'), mMid = $('#mMid'), mHigh = $('#mHigh'), mBeat = $('#mBeat');
 let meterTick = 0;
@@ -1707,6 +1803,13 @@ function drawMeter() {
   mMid.style.transform = `scaleY(${snd.env.mid.toFixed(3)})`;
   mHigh.style.transform = `scaleY(${snd.env.high.toFixed(3)})`;
   mBeat.classList.toggle('on', snd.env.beat > 0.45);
+  const music = snd.rhythmSample;
+  const status = snd.analysisError || (music
+    ? (music.bpm ? Math.round(music.bpm) + ' BPM · ' : '') + music.state
+    : snd.rhythm?.error ? 'BPM tracking unavailable. Reconnect audio to try again.'
+    : 'Finding BPM · allow about 12 seconds of music.');
+  const label = $('#rhythmStatus');
+  if (label.textContent !== status) label.textContent = status;
 }
 
 /* ================= spectrograph ================= */
@@ -7648,8 +7751,8 @@ function runLoop(k, xf, brush, f) {
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
   const fly1 = is3D(t.in1) ? t.in1 : null;
   const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
-  const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
-  const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
+  const flyTex1 = t.in1 === 'silhouette' ? dancerTex(k) : fly1 ? draw3D(k, fly1, 0, scale) : null;
+  const flyTex2 = t.in2 === 'silhouette' ? dancerTex(k) : fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -7725,8 +7828,9 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
   set1f(fbProg, 'uXfeed', xf);
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
-  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
-  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  set1f(fbProg, 'uDancerSize', clamp(t.dancerSize || 100, 25, 150) / 100);
+  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : t.in1 === 'silhouette' && !t.dancerFX ? SRC_ID.none : resolveSrc(t.in1, t.motion));
+  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : t.in2 === 'silhouette' && !t.dancerFX ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
   set1f(fbProg, 'uScale', scale);
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
@@ -7863,6 +7967,632 @@ function eyeTick(now, dt, wA, wB) {
   }
 }
 
+/* ================= planned beat sequence ================= */
+const spotify = new PhosphorSpotify();
+const spotifyTimeline = { preview: null, pending: false, signature: '', dragUri: null,
+  visible: lsGet('phosphor-track-timeline-visible') !== '0', resize: null };
+const SHOW_SONGS_KEY = 'phosphor-song-sequences-v1';
+const newShowRecord = () => ({ steps: [], end: 'hold', fade: 2, bpm: 120, offset: 0 });
+const showSequence = {
+  steps: [], engine: new PhosphorStepSequencer(), preparing: false, token: 0,
+  fade: null, prepared: new Map(), retiredClips: new Set(), urls: new Set(), end: 'hold', fadeBeats: 2,
+  records: new Map(), songKey: 'standalone', bpm: 120, offset: 0,
+  song: null, accountId: null, songDrive: false, stopped: false, ready: false,
+  clipboard: null, selected: -1, applied: '', seekVersion: 0, preparingStep: null,
+};
+try {
+  const saved = JSON.parse(localStorage.getItem(SHOW_SONGS_KEY) || 'null');
+  if (saved?.v === 1 && Array.isArray(saved.records)) for (const [key, record] of saved.records) {
+    if (typeof key !== 'string' || !record || !Array.isArray(record.steps)) continue;
+    showSequence.records.set(key, {
+      steps: record.steps.slice(0, 64).filter(s => s && ['look', 'library', 'file'].includes(s.kind))
+        .map(s => ({ ...s, url: undefined, id: s.id || randId(12), beats: clamp(Math.round(Number(s.beats) || 8), 1, 1024) })),
+      end: ['hold', 'loop', 'auto'].includes(record.end) ? record.end : 'hold',
+      fade: [0, 1, 2, 4].includes(record.fade) ? record.fade : 2,
+      bpm: clamp(Number(record.bpm) || 120, 30, 300), offset: clamp(Number(record.offset) || 0, 0, 3600),
+    });
+  }
+  // Keep the earlier global draft as the standalone sequence, never assign it to a song.
+  if (!showSequence.records.has('standalone')) {
+    const old = JSON.parse(localStorage.getItem('phosphor-show-sequence-v1') || 'null');
+    if (old?.v === 1 && Array.isArray(old.steps)) showSequence.records.set('standalone', {
+      ...newShowRecord(), steps: old.steps.slice(0, 64).filter(s => s && ['look', 'library', 'file'].includes(s.kind))
+        .map(s => ({ ...s, url: undefined, id: randId(12), beats: clamp(Math.round(Number(s.beats) || 8), 1, 1024) })),
+    });
+  }
+} catch (_) { /* storage is optional */ }
+const showSeqStatus = message => { $('#showSeqStatus').textContent = message; };
+function rememberShowRecord() {
+  showSequence.records.set(showSequence.songKey, { steps: showSequence.steps, end: showSequence.end,
+    fade: showSequence.fadeBeats, bpm: showSequence.bpm, offset: showSequence.offset });
+}
+function saveShowSequence() {
+  rememberShowRecord();
+  try {
+    localStorage.setItem(SHOW_SONGS_KEY, JSON.stringify({ v: 1,
+      records: [...showSequence.records].map(([key, record]) => [key, { ...record,
+        steps: record.steps.map(({ url, ...step }) => step) }]),
+    }));
+    $('#showSeqSaveStatus').textContent = 'Saved in this browser.';
+  } catch (_) { $('#showSeqSaveStatus').textContent = 'Browser storage is full; your latest changes could not be saved.'; }
+  if (showSequence.songDrive && !showSequence.stopped) void startShowSequence(true);
+}
+function releaseShowVideo(v) {
+  v.pause(); v.removeAttribute('src'); v.load();
+  if (v.sequenceLibraryURL) { URL.revokeObjectURL(v.sequenceLibraryURL); showSequence.urls.delete(v.sequenceLibraryURL); }
+}
+function releaseRetiredShowClips() {
+  for (const v of showSequence.retiredClips) if (v !== vid.video) {
+    releaseShowVideo(v); showSequence.retiredClips.delete(v);
+  }
+}
+function releaseShowClips() {
+  for (const v of showSequence.prepared.values()) {
+    if (v === vid.video) showSequence.retiredClips.add(v);
+    else releaseShowVideo(v);
+  }
+  showSequence.prepared.clear(); releaseRetiredShowClips();
+}
+function stopShowSequence(message = 'Sequence stopped. Holding the current look.', manual = true) {
+  showSequence.token++; showSequence.engine.stop(); showSequence.preparing = false;
+  showSequence.ready = false; showSequence.applied = '';
+  if (manual) showSequence.stopped = true;
+  for (const v of showSequence.prepared.values()) if (v !== vid.video) v.pause();
+  $('#showSeqPlay').disabled = false;
+  renderShowSequence(); showSeqStatus(message);
+}
+function editShowSequence() {
+  // Structural edits restart preparation, then resolve against the current song position.
+  if (showSequence.engine.running || showSequence.preparing || showSequence.ready)
+    stopShowSequence('Saving sequence changes…', false);
+}
+function loadShowRecord(key) {
+  const record = showSequence.records.get(key) || newShowRecord();
+  showSequence.songKey = key; showSequence.steps = record.steps; showSequence.end = record.end;
+  showSequence.fadeBeats = record.fade; showSequence.bpm = record.bpm; showSequence.offset = record.offset;
+  showSequence.selected = -1; showSequence.stopped = false; showSequence.applied = '';
+  $('#showSeqEnd').value = record.end; $('#showSeqFade').value = String(record.fade);
+  $('#showSeqBpm').value = String(record.bpm); $('#showSeqOffset').value = String(record.offset);
+  renderShowSequence();
+}
+function renderShowSequence() {
+  const list = $('#showSeqSteps'); list.textContent = '';
+  showSequence.steps.forEach((step, index) => {
+    const item = document.createElement('li');
+    item.setAttribute('aria-current', showSequence.engine.running && showSequence.engine.index === index ? 'step' : 'false');
+    const nameLabel = document.createElement('label'); nameLabel.textContent = `Step ${index + 1}`;
+    const name = document.createElement('input'); name.type = 'text'; name.className = 'step-name';
+    name.value = step.name; name.maxLength = 80; name.setAttribute('aria-label', `Name for step ${index + 1}`);
+    name.addEventListener('change', () => { step.name = name.value.trim() || `Step ${index + 1}`; saveShowSequence(); });
+    name.addEventListener('focus', () => { showSequence.selected = index; });
+    nameLabel.appendChild(name); item.appendChild(nameLabel);
+    const label = document.createElement('label'); label.textContent = 'Beats ';
+    const beats = document.createElement('input'); beats.type = 'number'; beats.min = '1'; beats.max = '1024'; beats.value = step.beats;
+    beats.setAttribute('aria-label', `Beats for step ${index + 1}`);
+    beats.addEventListener('change', () => {
+      editShowSequence(); step.beats = clamp(Math.round(Number(beats.value) || 8), 1, 1024);
+      saveShowSequence(); renderShowSequence();
+    });
+    label.appendChild(beats); item.appendChild(label);
+    const actions = document.createElement('div'); actions.className = 'dev-actions';
+    for (const [text, offset] of [['↑', -1], ['↓', 1], ['Remove', 0]]) {
+      const b = document.createElement('button'); b.className = 'btn small'; b.textContent = text;
+      b.setAttribute('aria-label', offset ? `Move step ${index + 1} ${offset < 0 ? 'earlier' : 'later'}` : `Remove step ${index + 1}`);
+      b.disabled = offset !== 0 && (index + offset < 0 || index + offset >= showSequence.steps.length);
+      b.addEventListener('click', () => {
+        editShowSequence();
+        if (offset) [showSequence.steps[index], showSequence.steps[index + offset]] = [showSequence.steps[index + offset], step];
+        else {
+          showSequence.steps.splice(index, 1);
+          const prepared = showSequence.prepared.get(step);
+          if (prepared && prepared !== vid.video) releaseShowVideo(prepared);
+          else if (prepared) showSequence.retiredClips.add(prepared);
+          showSequence.prepared.delete(step);
+          // Local URLs may also be referenced by a duplicate, another song, or the internal clipboard.
+        }
+        saveShowSequence(); renderShowSequence();
+      }); actions.appendChild(b);
+    }
+    for (const action of ['Copy', 'Duplicate', 'Paste after']) {
+      const button = document.createElement('button'); button.className = 'btn small'; button.textContent = action;
+      button.setAttribute('aria-label', `${action} step ${index + 1}`);
+      button.disabled = action === 'Paste after' && !showSequence.clipboard;
+      button.addEventListener('click', () => {
+        showSequence.selected = index;
+        if (action === 'Copy') {
+          showSequence.clipboard = JSON.parse(JSON.stringify(step));
+          $('#showSeqPaste').disabled = false;
+          for (const paste of list.querySelectorAll('[data-paste]')) paste.disabled = false;
+          showSeqStatus(`Copied “${step.name}”. Switch songs to paste it there, or paste here.`);
+        } else {
+          if (showSequence.steps.length >= 64) { toast('A sequence can hold up to 64 steps.'); return; }
+          editShowSequence();
+          const copy = JSON.parse(JSON.stringify(action === 'Duplicate' ? step : showSequence.clipboard));
+          copy.id = randId(12); showSequence.steps.splice(index + 1, 0, copy);
+          saveShowSequence(); renderShowSequence();
+        }
+      });
+      if (action === 'Paste after') button.dataset.paste = '1';
+      actions.appendChild(button);
+    }
+    item.appendChild(actions);
+    if (step.kind === 'file' && !step.url) {
+      const hint = document.createElement('p'); hint.className = 'hint'; hint.textContent = 'Re-add this video file before playing.'; item.appendChild(hint);
+    }
+    list.appendChild(item);
+  });
+  $('#showSeqPlay').textContent = showSequence.preparing ? 'Preparing clips…' : showSequence.songDrive ? 'Follow song' : showSequence.engine.running ? 'Restart sequence' : 'Play sequence';
+  $('#showSeqPaste').disabled = !showSequence.clipboard;
+}
+function refreshShowSources() {
+  const select = $('#showSeqSource'), previous = select.value; select.textContent = '';
+  const sources = [
+    ...presets.map(p => ({ value: 'my:' + p.id, name: 'My look · ' + p.name })),
+    ...shared.map(p => ({ value: 'shared:' + p.id, name: 'Shared look · ' + p.name })),
+    ...(clips.list || []).map(c => ({ value: 'clip:' + c.id, name: 'Clip · ' + c.n })),
+  ];
+  for (const source of sources) { const option = document.createElement('option'); option.value = source.value; option.textContent = source.name; select.appendChild(option); }
+  if (sources.some(s => s.value === previous)) select.value = previous;
+  if (!sources.length) { const option = document.createElement('option'); option.textContent = 'Save a look or add video files'; option.value = ''; select.appendChild(option); }
+}
+function addShowStep(step) {
+  if (showSequence.steps.length >= 64) { toast('A sequence can hold up to 64 steps.'); return; }
+  editShowSequence(); showSequence.steps.push({ ...step, id: randId(12), beats: 8 }); saveShowSequence(); renderShowSequence();
+}
+$('#showSeqRefresh').addEventListener('click', async () => {
+  refreshShowSources();
+  if (clipsWanted()) { try { await clipList(true); refreshShowSources(); } catch (_) { showSeqStatus('Looks refreshed. Clip library unavailable; open Phosphor Clips to use library clips.'); } }
+});
+$('#showSeqSource').addEventListener('focus', refreshShowSources);
+$('#showSeqAdd').addEventListener('click', () => {
+  const value = $('#showSeqSource').value, colon = value.indexOf(':'), kind = value.slice(0, colon), id = value.slice(colon + 1);
+  if (kind === 'clip') {
+    const c = (clips.list || []).find(c => c.id === id);
+    if (c) addShowStep({ kind: 'library', name: c.n, clipId: c.id });
+  } else {
+    const p = (kind === 'my' ? presets : shared).find(p => p.id === id);
+    if (p) addShowStep({ kind: 'look', name: p.name, data: JSON.parse(JSON.stringify(p.data)) });
+  }
+});
+$('#showSeqCurrent').addEventListener('click', () => addShowStep({ kind: 'look', name: `Current look ${showSequence.steps.length + 1}`, data: snapshot() }));
+$('#showSeqFiles').addEventListener('click', () => $('#showSeqFile').click());
+$('#showSeqFile').addEventListener('change', e => {
+  for (const file of e.target.files) {
+    const missing = showSequence.steps.find(s => s.kind === 'file' && !s.url && (s.fileName || s.name) === file.name);
+    if (!missing && showSequence.steps.length >= 64) break;
+    const url = URL.createObjectURL(file); showSequence.urls.add(url);
+    if (missing) { editShowSequence(); missing.url = url; }
+    else addShowStep({ kind: 'file', name: file.name, fileName: file.name, url });
+  }
+  saveShowSequence(); renderShowSequence(); e.target.value = '';
+});
+$('#showSeqEnd').value = showSequence.end; $('#showSeqFade').value = String(showSequence.fadeBeats);
+for (const [id, key] of [['showSeqEnd', 'end'], ['showSeqFade', 'fadeBeats']]) $('#' + id).addEventListener('change', e => {
+  editShowSequence(); showSequence[key] = key === 'end' ? e.target.value : Number(e.target.value); saveShowSequence();
+});
+async function prepareShowClip(step, token) {
+  if (showSequence.prepared.has(step)) return;
+  let url = step.url;
+  if (step.kind === 'library') {
+    await clipList();
+    if (!clips.base) throw new Error('Open Phosphor Clips and try again.');
+    const response = await fetch(`${clips.base}/clip/${encodeURIComponent(step.clipId)}`, clipFetchOpts());
+    if (!response.ok) throw new Error(`Clip unavailable: ${step.name}`);
+    url = URL.createObjectURL(await response.blob()); showSequence.urls.add(url);
+  }
+  if (!url) throw new Error(`Re-add video file: ${step.name}`);
+  const v = mkVideo(); v.autoplay = false; v.loop = true; v.preload = 'auto';
+  if (step.kind === 'library') v.sequenceLibraryURL = url;
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`Video took too long to load: ${step.name}`)), 20000);
+      v.addEventListener('loadeddata', () => { clearTimeout(timer); resolve(); }, { once: true });
+      v.addEventListener('error', () => { clearTimeout(timer); reject(new Error(`Cannot play: ${step.name}`)); }, { once: true });
+      v.src = url; v.load();
+    });
+    if (token !== showSequence.token) { releaseShowVideo(v); return; }
+    showSequence.prepared.set(step, v);
+  } catch (error) { releaseShowVideo(v); throw error; }
+}
+async function startShowSequence(songDrive = false) {
+  stopShowSequence('Preparing sequence…', false); showSequence.stopped = false;
+  if (!showSequence.steps.length) {
+    if (songDrive) { showSequence.autopilotMode = 'empty'; setAutopilot(true, true); showSeqStatus('No steps for this song. Autopilot is running.'); }
+    else showSeqStatus('Add a saved look or video first.');
+    return;
+  }
+  showSequence.clipLoop = edit;
+  const token = showSequence.token;
+  showSequence.preparing = true; $('#showSeqPlay').disabled = true; renderShowSequence();
+  try {
+    for (const step of showSequence.steps) if (step.kind === 'look') {
+      const inputs = ['A', 'B', 'C', 'D'].flatMap(k => [step.data?.[k]?.in1, step.data?.[k]?.in2]);
+      for (const source of ['camera', 'screen', 'phone']) if (inputs.includes(source) && !liveActive(source))
+        throw new Error(`Connect ${source} before playing “${step.name}”.`);
+      if (inputs.includes('video') && !vid.on && !showSequence.steps.some(s => s.kind !== 'look'))
+        throw new Error(`Load a video before playing “${step.name}”.`);
+    }
+    for (const step of showSequence.steps) if (step.kind !== 'look') {
+      await prepareShowClip(step, token); if (token !== showSequence.token) return;
+    }
+    if (token !== showSequence.token) return;
+    setAutopilot(false, true); showSequence.autopilotMode = null;
+    showSequence.preparing = false; showSequence.ready = true; $('#showSeqPlay').disabled = false;
+    showSequence.engine.start(showSequence.steps.map(s => s.beats), showSequence.end);
+    renderShowSequence();
+    showSeqStatus(songDrive ? 'Following Spotify song position.' : 'Waiting for the next music beat. Share audio under React to sound.');
+    if (songDrive) showSequenceTick(performance.now());
+  } catch (error) { if (token === showSequence.token) stopShowSequence(error.message, false); }
+}
+$('#showSeqPlay').addEventListener('click', () => void startShowSequence(showSequence.songDrive));
+$('#showSeqStop').addEventListener('click', () => stopShowSequence());
+$('#showSeqPaste').addEventListener('click', () => {
+  if (!showSequence.clipboard || showSequence.steps.length >= 64) return;
+  editShowSequence(); const copy = JSON.parse(JSON.stringify(showSequence.clipboard)); copy.id = randId(12);
+  const at = showSequence.selected < 0 ? showSequence.steps.length : showSequence.selected + 1;
+  showSequence.steps.splice(at, 0, copy); saveShowSequence(); renderShowSequence();
+});
+for (const [id, key] of [['showSeqBpm', 'bpm'], ['showSeqOffset', 'offset']]) $('#' + id).addEventListener('change', e => {
+  editShowSequence();
+  showSequence[key] = key === 'bpm' ? clamp(Number(e.target.value) || 120, 30, 300) : clamp(Number(e.target.value) || 0, 0, 3600);
+  e.target.value = showSequence[key]; saveShowSequence();
+});
+$('#showSeqDetect').addEventListener('click', () => {
+  const bpm = snd.rhythmSample?.bpm;
+  if (!bpm || snd.rhythmSample?.gridBeat == null) { toast('Connect audio under React to sound and wait for BPM lock first.'); return; }
+  $('#showSeqBpm').value = Math.round(bpm * 10) / 10;
+  $('#showSeqBpm').dispatchEvent(new Event('change'));
+});
+function beginShowFade(now, bpm, beats) {
+  if (showSequence.fade) { dropTarget(showSequence.fade.target); showSequence.fade = null; }
+  if (!beats) return;
+  const target = makeTarget(); copyInto(target, comp.tex);
+  showSequence.fade = { target, width: simW, height: simH, at: now, duration: beats * 60000 / bpm };
+}
+function applyShowStep(index, now, bpm, clipSeconds = 0) {
+  const step = showSequence.steps[index];
+  beginShowFade(now, bpm, Math.min(showSequence.fadeBeats, step.beats));
+  if (step.kind === 'look') {
+    // The sequence owns scheduling, even when a saved preset contains Autopilot settings.
+    const data = { ...step.data, ap: null };
+    loadPreset({ id: null, name: step.name, data }, true);
+  } else {
+    const v = showSequence.prepared.get(step);
+    if (!v) throw new Error(`Video is not ready: ${step.name}`);
+    v.currentTime = Number.isFinite(v.duration) && v.duration > 0 ? clipSeconds % v.duration : 0;
+    vid.attach(v, null); releaseRetiredShowClips(); vidUserPaused = false;
+    vidLoopA = vidLoopB = null; loopText(); vidRate = 1; v.playbackRate = 1;
+    clips.ask++; clips.own = true; clipNoCredit();
+    say($('#vidStatus'), `<b>${escapeHTML(step.name)}</b>`);
+    $('#vcr').hidden = false; $('#vidDur').textContent = fmtT(v.duration); vidPlay.textContent = 'Pause';
+    // Clips feed the loop the artist selected before starting the sequence.
+    const targetLoop = loopOn(showSequence.clipLoop) ? showSequence.clipLoop : 'A';
+    loops[targetLoop].tgt.in1 = 'video'; settleDevices(); syncUI();
+    if (!showSequence.songDrive || spotify.snapshot?.playing)
+      v.play().catch(() => stopShowSequence('Video playback was blocked. Press Follow song to retry.'));
+    else v.pause();
+  }
+  renderShowSequence();
+}
+function showSequenceTick(now) {
+  const engine = showSequence.engine;
+  if (showSequence.songDrive) { tickSpotifySequence(now); return; }
+  if (!engine.running) return;
+  if (ap.on) { stopShowSequence('Autopilot took over. Sequence stopped.'); return; }
+  const music = snd.rhythmSample;
+  if (frozen || music?.gridBeat == null) {
+    engine.tick(null); showSeqStatus(frozen ? 'Sequence paused while frozen.' : 'Waiting for music beat lock. Beat count is paused.'); return;
+  }
+  const event = engine.tick(music.gridBeat + music.phase);
+  if (event?.done) {
+    stopShowSequence(event.autopilot ? 'Sequence complete. Autopilot is running.' : 'Sequence complete. Holding the last look.');
+    if (event.autopilot) setAutopilot(true, true);
+    return;
+  }
+  if (event && event.index != null) applyShowStep(event.index, now, music.bpm || 120);
+  if (engine.index >= 0) {
+    const remaining = Math.max(0, Math.ceil(engine.durations[engine.index] - engine.elapsed));
+    const message = `Step ${engine.index + 1}/${showSequence.steps.length} · ${showSequence.steps[engine.index].name} · ${remaining} beats left`;
+    if ($('#showSeqStatus').textContent !== message) showSeqStatus(message);
+  }
+}
+// Blend the previous composite into the new output, so input switches fade too.
+function drawShowFade(now) {
+  const fade = showSequence.fade;
+  if (!fade) return;
+  const alpha = 1 - (now - fade.at) / fade.duration;
+  if (alpha <= 0 || fade.width !== simW || fade.height !== simH) {
+    dropTarget(fade.target); showSequence.fade = null; return;
+  }
+  gl.enable(gl.BLEND); gl.blendColor(0, 0, 0, alpha);
+  gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+  copyInto(comp, fade.target.tex);
+  gl.disable(gl.BLEND);
+}
+function setTrackTimelineVisible(visible) {
+  cancelTimelineResize(); spotifyTimeline.visible = visible; spotifyTimeline.preview = null;
+  try { localStorage.setItem('phosphor-track-timeline-visible', visible ? '1' : '0'); } catch (_) {}
+  drawTrackTimeline(performance.now());
+}
+$('#trackTimelineToggle').addEventListener('click', () => setTrackTimelineVisible(!spotifyTimeline.visible));
+$('#trackTimelineHide').addEventListener('click', () => setTrackTimelineVisible(false));
+$('#trackTimelineShow').addEventListener('click', () => setTrackTimelineVisible(true));
+function cancelTimelineResize() {
+  spotifyTimeline.resize = null; spotifyTimeline.signature = '';
+  $('#trackCheckpoints').classList.remove('resizing');
+}
+function commitTimelineBeats(index, beats) {
+  const step = showSequence.steps[index];
+  if (!step || step.beats === beats) return;
+  editShowSequence(); step.beats = beats; saveShowSequence(); renderShowSequence();
+  $('#trackTimelineStatus').textContent = `${step.name} · ${beats} beats`;
+}
+const checkpointTrack = $('#trackCheckpoints');
+checkpointTrack.addEventListener('pointerdown', e => {
+  const handle = e.target.closest('[data-resize]');
+  if (!handle || e.button !== 0 || spotifyTimeline.pending) return;
+  e.preventDefault(); e.stopPropagation();
+  const index = Number(handle.dataset.index), cycle = Number(handle.dataset.cycle), step = showSequence.steps[index];
+  const rect = checkpointTrack.getBoundingClientRect();
+  const total = showSequence.steps.reduce((sum, s) => sum + s.beats, 0);
+  const prefix = showSequence.steps.slice(0, index).reduce((sum, s) => sum + s.beats, 0);
+  spotifyTimeline.resize = { index, id: step.id, songKey: showSequence.songKey, beats: step.beats,
+    pointerId: e.pointerId, rect, duration: spotify.snapshot.track.durationMs,
+    fixedBeats: cycle * (total - step.beats) + prefix, divisor: cycle + 1 };
+  handle.focus({ preventScroll: true });
+  checkpointTrack.classList.add('resizing'); checkpointTrack.setPointerCapture(e.pointerId);
+});
+checkpointTrack.addEventListener('pointermove', e => {
+  const drag = spotifyTimeline.resize;
+  if (!drag || drag.pointerId !== e.pointerId) return;
+  if (drag.songKey !== showSequence.songKey || showSequence.steps[drag.index]?.id !== drag.id) { cancelTimelineResize(); return; }
+  const beat = ((e.clientX - drag.rect.left) / drag.rect.width * drag.duration - showSequence.offset * 1000) * showSequence.bpm / 60000;
+  drag.beats = clamp(Math.round((beat - drag.fixedBeats) / drag.divisor), 1, 1024);
+  $('#trackTimelineStatus').textContent = `${showSequence.steps[drag.index].name} · ${drag.beats} beats · Release to save`;
+  drawTrackTimeline(performance.now());
+});
+checkpointTrack.addEventListener('pointerup', e => {
+  const drag = spotifyTimeline.resize;
+  if (!drag || drag.pointerId !== e.pointerId) return;
+  const valid = drag.songKey === showSequence.songKey && showSequence.steps[drag.index]?.id === drag.id;
+  cancelTimelineResize();
+  if (checkpointTrack.hasPointerCapture(e.pointerId)) checkpointTrack.releasePointerCapture(e.pointerId);
+  if (valid) commitTimelineBeats(drag.index, drag.beats);
+  drawTrackTimeline(performance.now());
+});
+for (const type of ['pointercancel', 'lostpointercapture']) checkpointTrack.addEventListener(type, () => {
+  if (spotifyTimeline.resize) { cancelTimelineResize(); $('#trackTimelineStatus').textContent = 'Resize cancelled.'; }
+});
+checkpointTrack.addEventListener('keydown', e => {
+  const handle = e.target.closest('[data-resize]');
+  if (e.key === 'Escape' && spotifyTimeline.resize) {
+    e.preventDefault(); e.stopPropagation(); cancelTimelineResize(); $('#trackTimelineStatus').textContent = 'Resize cancelled.'; return;
+  }
+  if (!handle || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+  e.preventDefault(); e.stopPropagation();
+  const index = Number(handle.dataset.index), step = showSequence.steps[index];
+  const delta = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 4 : 1);
+  const beats = e.key === 'Home' ? 1 : e.key === 'End' ? 1024 : clamp(step.beats + delta, 1, 1024);
+  commitTimelineBeats(index, beats); spotifyTimeline.signature = ''; drawTrackTimeline(performance.now());
+  checkpointTrack.querySelector(`[data-resize][data-index="${index}"][data-cycle="${handle.dataset.cycle}"]`)?.focus();
+});
+function drawTrackTimeline(now) {
+  const snapshot = spotify.snapshot, track = snapshot?.track, overlay = $('#trackTimeline');
+  const available = !!track && showSequence.songDrive && track.uri === showSequence.song?.uri;
+  $('#trackTimelineToggle').textContent = spotifyTimeline.visible ? 'Hide scrub bar' : 'Show scrub bar';
+  $('#trackTimelineToggle').setAttribute('aria-pressed', String(spotifyTimeline.visible));
+  $('#trackTimelineShow').hidden = !available || spotifyTimeline.visible;
+  if (!available || !spotifyTimeline.visible) {
+    overlay.hidden = true; $('#screenWrap').classList.remove('with-track-timeline'); spotifyTimeline.preview = null;
+    if (spotifyTimeline.resize) cancelTimelineResize();
+    return;
+  }
+  if (spotifyTimeline.resize && (spotifyTimeline.resize.songKey !== showSequence.songKey || showSequence.steps[spotifyTimeline.resize.index]?.id !== spotifyTimeline.resize.id)) cancelTimelineResize();
+  overlay.hidden = false; $('#screenWrap').classList.add('with-track-timeline');
+  const duration = track.durationMs;
+  const position = spotifyTimeline.preview ?? spotify.position(now) ?? 0;
+  const durations = showSequence.steps.map((s, i) => spotifyTimeline.resize?.index === i ? spotifyTimeline.resize.beats : s.beats);
+  $('#trackTimelineName').textContent = track.name;
+  $('#trackTimelineTime').textContent = `${fmtT(position / 1000)} / ${fmtT(duration / 1000)}`;
+  const slider = $('#trackTimelineScrub');
+  slider.max = String(Math.max(0, duration - 1));
+  if (spotifyTimeline.preview === null) slider.value = String(Math.round(position));
+  slider.setAttribute('aria-valuetext', `${fmtT(position / 1000)} of ${fmtT(duration / 1000)}`);
+  slider.disabled = !spotify.canSeek || spotifyTimeline.pending || !!spotifyTimeline.resize;
+  fillTrack(slider);
+  $('#trackTimelineReconnect').hidden = spotify.canSeek;
+  if (!spotify.canSeek && !spotifyTimeline.resize) $('#trackTimelineStatus').textContent = 'Reconnect Spotify to scrub. Step ends can still be resized.';
+  const signature = JSON.stringify([track.uri, duration, showSequence.bpm, showSequence.offset, showSequence.end,
+    showSequence.steps.map(s => [s.id, s.name, s.beats]), spotify.canSeek, spotifyTimeline.pending]);
+  if (signature !== spotifyTimeline.signature && !spotifyTimeline.resize) {
+    spotifyTimeline.signature = signature;
+    checkpointTrack.textContent = '';
+    const cycleMs = durations.reduce((sum, beats) => sum + beats * 60000 / showSequence.bpm, 0);
+    let cycle = 0, count = 0;
+    if (cycleMs > 0) do {
+      let start = showSequence.offset * 1000 + cycle * cycleMs;
+      for (const [index, step] of showSequence.steps.entries()) {
+        if (start >= duration || count >= 512) break;
+        const region = document.createElement('div'); region.className = 'track-checkpoint';
+        region.dataset.index = index; region.dataset.cycle = cycle;
+        const button = document.createElement('button'); button.type = 'button';
+        button.disabled = !spotify.canSeek || spotifyTimeline.pending;
+        const uri = track.uri;
+        button.addEventListener('click', () => {
+          if (!spotifyTimeline.resize) void seekTrackTimeline(Number(region.dataset.start), uri);
+        });
+        const handle = document.createElement('span'); handle.className = 'track-checkpoint-end';
+        handle.dataset.resize = '1'; handle.dataset.index = index; handle.dataset.cycle = cycle;
+        handle.tabIndex = 0; handle.setAttribute('role', 'slider'); handle.setAttribute('aria-orientation', 'horizontal');
+        handle.setAttribute('aria-valuemin', '1'); handle.setAttribute('aria-valuemax', '1024');
+        handle.setAttribute('aria-label', `Resize step ${index + 1} duration`);
+        handle.addEventListener('click', e => e.stopPropagation());
+        region.append(button, handle); checkpointTrack.appendChild(region);
+        start += step.beats * 60000 / showSequence.bpm; count++;
+      }
+      cycle++;
+    } while (showSequence.end === 'loop' && showSequence.offset * 1000 + cycle * cycleMs < duration && count < 512);
+  }
+  const cycleBeats = durations.reduce((sum, beats) => sum + beats, 0);
+  const prefixes = []; let prefix = 0;
+  for (const beats of durations) { prefixes.push(prefix); prefix += beats; }
+  const located = PhosphorStepSequencer.locate(position, showSequence.bpm, showSequence.offset, durations, showSequence.end);
+  for (const region of checkpointTrack.children) {
+    const index = Number(region.dataset.index), cycle = Number(region.dataset.cycle), step = showSequence.steps[index];
+    const start = showSequence.offset * 1000 + (cycle * cycleBeats + prefixes[index]) * 60000 / showSequence.bpm;
+    const end = start + durations[index] * 60000 / showSequence.bpm;
+    region.hidden = start >= duration;
+    region.dataset.start = start;
+    region.style.left = `${start / duration * 100}%`;
+    region.style.width = `${Math.max(0, Math.min(duration, end) - start) / duration * 100}%`;
+    const button = region.querySelector('button'), handle = region.querySelector('[data-resize]');
+    const text = `${index + 1} ${step.name} · ${durations[index]} beats`;
+    if (button.textContent !== text) button.textContent = text;
+    button.title = `Step ${index + 1}: ${step.name} · ${fmtT(start / 1000)} · ${durations[index]} beats`;
+    button.setAttribute('aria-label', `Seek to ${button.title}`);
+    handle.setAttribute('aria-valuenow', String(durations[index]));
+    handle.setAttribute('aria-valuetext', `${durations[index]} beats`);
+    handle.title = `${step.name}: ${durations[index]} beats. Drag the end to resize; arrow keys adjust by one beat.`;
+    const active = !located.waiting && !located.ended && index === located.index && cycle === located.cycle;
+    region.setAttribute('aria-current', active ? 'step' : 'false');
+  }
+  $('#trackTimelineStep').textContent = !showSequence.steps.length ? 'Autopilot · No sequence steps' : located.waiting ? 'Before sequence start'
+    : located.ended ? (showSequence.end === 'auto' ? 'Sequence ended · Autopilot' : 'Sequence ended · Holding last look')
+    : `Step ${located.index + 1} · ${showSequence.steps[located.index].name} · ${durations[located.index]} beats${showSequence.stopped ? ' · Not following' : ''}`;
+}
+async function seekTrackTimeline(position, uri) {
+  if (spotifyTimeline.pending) return;
+  if (spotify.snapshot?.track?.uri !== uri) {
+    spotifyTimeline.preview = null; $('#trackTimelineStatus').textContent = 'Song changed. Try seeking again.'; return;
+  }
+  spotifyTimeline.pending = true; spotifyTimeline.preview = position;
+  $('#trackTimelineStatus').textContent = 'Seeking…'; drawTrackTimeline(performance.now());
+  try {
+    await spotify.seek(position);
+    $('#trackTimelineStatus').textContent = '';
+  } catch (error) { $('#trackTimelineStatus').textContent = error.message; }
+  finally {
+    spotifyTimeline.pending = false; spotifyTimeline.preview = null; spotifyTimeline.dragUri = null;
+    drawTrackTimeline(performance.now());
+  }
+}
+$('#trackTimelineScrub').addEventListener('pointerdown', () => { spotifyTimeline.dragUri = spotify.snapshot?.track?.uri; });
+$('#trackTimelineScrub').addEventListener('input', e => {
+  spotifyTimeline.dragUri ||= spotify.snapshot?.track?.uri;
+  spotifyTimeline.preview = Number(e.target.value); drawTrackTimeline(performance.now());
+});
+$('#trackTimelineScrub').addEventListener('change', e => {
+  void seekTrackTimeline(Number(e.target.value), spotifyTimeline.dragUri || spotify.snapshot?.track?.uri);
+});
+$('#trackTimelineScrub').addEventListener('pointercancel', () => { spotifyTimeline.preview = null; spotifyTimeline.dragUri = null; });
+$('#trackTimelineReconnect').addEventListener('click', () => $('#spotifyConnect').click());
+
+function tickSpotifySequence(now) {
+  const state = showSequence, snapshot = spotify.snapshot;
+  if (state.stopped || state.preparing || !state.ready || !snapshot?.track || !state.steps.length) return;
+  if (frozen || now - snapshot.receivedAt > 10000) {
+    if (vid.video && uses('video')) vid.video.pause();
+    showSeqStatus(frozen ? 'Sequence paused while frozen.' : 'Spotify playback is stale. Waiting to reconnect…'); return;
+  }
+  if (ap.on && !state.autopilotMode) { stopShowSequence('Autopilot took over. Press Follow song to resume.'); return; }
+  const position = spotify.position(now);
+  const located = PhosphorStepSequencer.locate(position, state.bpm, state.offset, state.steps.map(s => s.beats), state.end);
+  if (located.waiting) {
+    state.engine.index = -1; state.applied = '';
+    showSeqStatus('Waiting for the song’s sequence start offset.'); return;
+  }
+  if (located.ended && state.end === 'auto') {
+    if (state.applied !== 'end-auto') {
+      state.applied = 'end-auto'; state.autopilotMode = 'end'; setAutopilot(true, true);
+      state.engine.index = -1; renderShowSequence(); showSeqStatus('Sequence complete. Autopilot is running.');
+    }
+    return;
+  }
+  const signature = `${located.index}:${located.cycle}:${state.seekVersion}`;
+  if (signature !== state.applied) {
+    state.applied = signature; state.autopilotMode = null;
+    if (ap.on) setAutopilot(false, true);
+    state.engine.index = located.index;
+    try { applyShowStep(located.index, now, state.bpm, located.elapsed * 60 / state.bpm); }
+    catch (error) { stopShowSequence(error.message, false); return; }
+  }
+  if (vid.video && uses('video')) {
+    if (!snapshot.playing) vid.video.pause();
+    else if (vid.video.paused && !vidUserPaused) vid.video.play().catch(() => {});
+  }
+  const remaining = Math.max(0, Math.ceil(state.steps[located.index].beats - located.elapsed));
+  const message = `${snapshot.playing ? 'Playing' : 'Paused'} · Step ${located.index + 1}/${state.steps.length} · ${state.steps[located.index].name} · ${remaining} beats left${located.ended ? ' · Holding last look' : ''}`;
+  if ($('#showSeqStatus').textContent !== message) showSeqStatus(message);
+}
+function spotifySongChanged(snapshot) {
+  const state = showSequence, previous = state.lastPlayback;
+  state.lastPlayback = snapshot;
+  if (!snapshot.track) {
+    if (state.songDrive) {
+      if (vid.video && uses('video')) vid.video.pause();
+      showSeqStatus('No active Spotify music track. Your song sequence is saved.');
+    }
+    return;
+  }
+  const key = JSON.stringify([snapshot.accountId, snapshot.track.uri]);
+  const switched = state.songKey !== key;
+  if (switched) {
+    rememberShowRecord(); stopShowSequence('Loading song sequence…', false); releaseShowClips();
+    state.song = snapshot.track; state.accountId = snapshot.accountId; state.songDrive = true;
+    state.seekVersion++; state.autopilotMode = null;
+    loadShowRecord(key);
+    $('#showSeqSong').textContent = `Sequence for ${snapshot.track.name} — ${snapshot.track.artists.join(', ')}`;
+    void startShowSequence(true);
+  } else {
+    const predicted = previous?.track?.uri === snapshot.track.uri
+      ? previous.progressMs + (previous.playing ? Math.max(0, snapshot.receivedAt - previous.receivedAt) : 0) : snapshot.progressMs;
+    if (Math.abs(predicted - snapshot.progressMs) > 1200 || !previous?.track) {
+      state.seekVersion++;
+      // Replaying the same song starts its sequence again, even after Stop.
+      if (snapshot.progressMs < 1000 && previous?.progressMs > 2000 && state.stopped) void startShowSequence(true);
+    }
+    tickSpotifySequence(performance.now());
+  }
+}
+$('#spotifyClientId').value = spotify.clientId;
+$('#spotifyRedirect').textContent = location.protocol === 'file:' ? 'http://127.0.0.1:8000/' : PhosphorSpotify.redirectUri();
+$('#spotifyConnect').addEventListener('click', async () => {
+  try { await spotify.connect($('#spotifyClientId').value); }
+  catch (error) { $('#spotifyStatus').textContent = error.message; }
+});
+$('#spotifyDisconnect').addEventListener('click', () => spotify.disconnect());
+spotify.addEventListener('status', e => {
+  $('#spotifyStatus').textContent = e.detail.message;
+  $('#spotifyDisconnect').disabled = !e.detail.connected;
+});
+spotify.addEventListener('playback', e => {
+  const snapshot = e.detail;
+  $('#spotifyNow').textContent = snapshot.track ? `Now: ${snapshot.track.name} — ${snapshot.track.artists.join(', ')}` : 'Now: No active music track';
+  spotifySongChanged(snapshot);
+});
+spotify.addEventListener('queue', e => {
+  const queue = e.detail, list = $('#spotifyQueue'); list.textContent = '';
+  $('#spotifyNext').textContent = queue.length ? `Next: ${queue[0].name} — ${queue[0].artists.join(', ')}` : 'Next: No queued track available';
+  for (const track of queue.slice(1)) {
+    const item = document.createElement('li'); item.textContent = `${track.name} — ${track.artists.join(', ')}`; list.appendChild(item);
+  }
+});
+spotify.addEventListener('disconnect', () => {
+  rememberShowRecord(); stopShowSequence('Spotify disconnected. Standalone draft restored.'); releaseShowClips();
+  showSequence.songDrive = false; showSequence.song = null; showSequence.lastPlayback = null; showSequence.autopilotMode = null;
+  loadShowRecord('standalone'); $('#showSeqSong').textContent = 'Standalone sequence'; $('#spotifyNow').textContent = 'Now: —';
+});
+async function initSpotify() {
+  try { await spotify.finishLogin(); if (spotify.token) spotify.start(); }
+  catch (error) { $('#spotifyStatus').textContent = error.message; }
+}
+
+showSequence.clipLoop = edit;
+loadShowRecord('standalone');
+refreshShowSources(); renderShowSequence();
+void initSpotify();
+
+
 let captureNextAt = 0;
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
@@ -7902,6 +8632,9 @@ function frame() {
   packAdj();
   analyzeSound(dt, now);
   drawMeter();
+  showSequenceTick(now);
+  updateSilhouettes(now);
+  drawTrackTimeline(now);
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
   if (Object.keys(SCENES).some(uses)) {
@@ -7965,6 +8698,7 @@ function frame() {
   { const R = (k) => (loopOn(k) ? clamp(loops[k].cur.recolor || 0, -180, 180) * Math.PI / 180 : 0);
     const l = U(compProg, 'uRecolor'); if (l) gl.uniform4f(l, R('A'), R('B'), R('C'), R('D')); }
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  drawShowFade(now);
   eyeTick(now, dt, wA, wB);
 
 
@@ -7988,6 +8722,7 @@ function frame() {
     if (m.color) hueKick = a * (E.high * 0.35 + E.beat * 0.3) * (snd.beats % 2 ? 1 : -1);
     if (m.warp) shake = a * E.beat * calm;
   }
+  bindCleanSilhouettes(W);
   set1f(dispProg, 'uPunch', punch);
   set1f(dispProg, 'uFlash', flash);
   set1f(dispProg, 'uHueKick', hueKick);

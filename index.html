@@ -37,6 +37,13 @@
         <div class="bezel" id="bezel">
           <div class="screen" id="screenWrap">
             <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to draw light."></canvas>
+            <div class="track-timeline" id="trackTimeline" role="group" aria-label="Spotify track timeline" hidden>
+              <div class="track-timeline-head"><strong id="trackTimelineName"></strong><output id="trackTimelineTime" for="trackTimelineScrub">0:00 / 0:00</output><button type="button" class="track-timeline-hide" id="trackTimelineHide" aria-label="Hide scrub bar">Hide</button></div>
+              <div class="track-checkpoints" id="trackCheckpoints" role="group" aria-label="Sequence step checkpoints"></div>
+              <input id="trackTimelineScrub" type="range" min="0" max="1" step="100" value="0" aria-label="Seek Spotify track">
+              <div class="track-timeline-foot"><span id="trackTimelineStep"></span><button type="button" id="trackTimelineReconnect" hidden>Enable scrubbing</button><span id="trackTimelineStatus" role="status"></span></div>
+            </div>
+            <button type="button" class="track-timeline-show" id="trackTimelineShow" hidden>Show scrub bar</button>
             <div class="osd" id="osd" aria-hidden="true"><span class="osd-a"></span><span class="osd-b"></span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
             <div class="tip" id="fsNote" hidden></div>
@@ -78,6 +85,7 @@
         <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         <button class="btn next-look" id="nextLookBar" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
+        <button class="btn" id="trackTimelineToggle" aria-pressed="true">Hide scrub bar</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <button class="btn" id="wideBtn" aria-pressed="false" title="Shrink the picture here to a small preview and spread the controls across the screen, so you can see more of them at once"><span class="led"></span>Spread out controls</button>
@@ -178,6 +186,7 @@
             <button data-src="sparks" aria-pressed="false">Sparks</button>
             <button data-src="ink" aria-pressed="false">Ink</button>
             <button data-src="patchwork" aria-pressed="false" title="Hand-inked tiles that turn, so their lines join into new paths, loops and weaves">Patchwork</button>
+            <button data-src="silhouette" aria-pressed="false" title="A realistic dancing silhouette, beat synced over the picture">Silhouette</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -217,6 +226,15 @@
               </div>
             </div>
             <span class="hint" id="specHint">Low sounds at the bottom, high at the top; the louder, the brighter. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</span>
+          </div>
+
+          <div class="dev" id="row-silhouette" hidden>
+            <span class="dev-status" id="silhouetteStatus" role="status">Built-in dancer · source tempo 104 BPM.</span>
+            <label>Clock <select id="silhouetteClock"><option value="auto">Spotify / audio beat sync</option><option value="manual">Manual BPM</option></select></label>
+            <label>Manual BPM <input id="silhouetteBpm" type="number" min="30" max="300" step="0.1" value="104"></label>
+            <label>Dancer height <input id="silhouetteSize" type="range" min="25" max="150" step="1" value="100"></label>
+            <button class="btn small" id="silhouetteFX" aria-pressed="false">Through loop effects: Off</button>
+            <p class="hint">Clean mode places a solid black dancer over the picture, with no background or effects. Effects mode uses a light mask so trails and color can act on it. The bundled clip is silent.</p>
           </div>
 
           <div class="dev" id="row-text" hidden>
@@ -521,6 +539,7 @@
             <div class="mbar"><i id="mHigh"></i><span>HIGH</span></div>
             <div class="mbeat" id="mBeat">● BEAT</div>
           </div>
+          <p class="hint" id="rhythmStatus" role="status" aria-live="polite">Share audio to find BPM.</p>
           <div class="dev-actions">
             <button class="btn small" id="sndRetry" hidden>Try again</button>
             <button class="btn small" id="sndUseMic" hidden>Use Microphone or Stereo Mix</button>
@@ -548,7 +567,7 @@
             </div>
           </div>
         </div>
-        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else and the picture moves with it. Record keeps the sound too.</p>
+        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else. After about 12 seconds, the picture pulses to its BPM. Low, mid and high sounds react immediately. Record keeps the sound too.</p>
       </section>
 
       <section class="group" id="apGroup" aria-labelledby="h-ap">
@@ -687,6 +706,46 @@
           </div>
           <span class="hint" id="adminMsg">Paste the key you made on GitHub. It stays in this browser only.</span>
         </form>
+      </section>
+
+      <section class="group" id="sequenceGroup" aria-labelledby="h-sequence">
+        <h2 id="h-sequence">Song sequencer</h2>
+        <div class="spotify-connect">
+          <label for="spotifyClientId">Spotify app client ID</label>
+          <input id="spotifyClientId" type="text" autocomplete="off" spellcheck="false" placeholder="Client ID from Spotify developer dashboard">
+          <p class="hint" id="spotifySetup">Register this exact redirect URI in your Spotify app: <code id="spotifyRedirect"></code>. No client secret needed.</p>
+          <div class="dev-actions"><button class="btn small" id="spotifyConnect">Connect Spotify</button><button class="btn small" id="spotifyDisconnect">Disconnect</button></div>
+          <p class="hint" id="spotifyStatus" role="status">Spotify is not connected.</p>
+          <p id="spotifyNow">Now: —</p>
+          <p id="spotifyNext">Next: —</p>
+          <ol id="spotifyQueue" aria-label="Upcoming Spotify tracks"></ol>
+        </div>
+        <h3 id="showSeqSong">Standalone sequence</h3>
+        <div class="dev-actions">
+          <label>Song BPM <input id="showSeqBpm" type="number" min="30" max="300" step="0.1" value="120"></label>
+          <button class="btn small" id="showSeqDetect">Use detected BPM</button>
+          <label>Start offset (seconds) <input id="showSeqOffset" type="number" min="0" max="3600" step="0.1" value="0"></label>
+        </div>
+        <p class="hint">Each Spotify song remembers its own steps and starts automatically. Song BPM and start offset align steps when seeking. Songs with no steps run Autopilot.</p>
+        <div class="dev-actions">
+          <button class="btn small" id="showSeqPlay" title="Resume this song’s sequence at Spotify’s current position. Does not restart or seek Spotify.">Play sequence</button>
+          <button class="btn small" id="showSeqStop">Stop</button>
+          <label>At end <select id="showSeqEnd"><option value="hold">Hold last look</option><option value="loop">Loop sequence</option><option value="auto">Start Autopilot</option></select></label>
+          <label>Fade <select id="showSeqFade"><option value="0">Cut</option><option value="1">1 beat</option><option value="2" selected>2 beats</option><option value="4">4 beats</option></select></label>
+        </div>
+        <div class="dev-actions">
+          <select id="showSeqSource" aria-label="Saved look or library clip"></select>
+          <button class="btn small" id="showSeqRefresh">Refresh choices</button>
+          <button class="btn small" id="showSeqAdd">Add step</button>
+          <button class="btn small" id="showSeqCurrent">Add current look</button>
+          <button class="btn small" id="showSeqPaste" disabled>Paste step</button>
+          <button class="btn small" id="showSeqFiles">Add video files…</button>
+          <input type="file" id="showSeqFile" accept="video/*" multiple hidden>
+        </div>
+        <ol id="showSeqSteps" class="show-seq-steps" aria-label="Sequence steps"></ol>
+        <p class="hint" id="showSeqSaveStatus" role="status">Changes save in this browser.</p>
+        <p class="hint" id="showSeqStatus" role="status" aria-live="polite">Add looks or clips to begin.</p>
+        <p class="hint">Steps save in this browser for each Spotify account and track. Local videos need re-adding after reopening. Copy and paste work between songs. Without Spotify, Play uses the local audio beat tracker.</p>
       </section>
 
       <section class="group" id="presetGroup" aria-labelledby="h-pre">
@@ -853,8 +912,8 @@
             <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works. Listen to picks which input when there’s more than one.</dd>
             <dt>Loopback adapter</dt><dd>Hears the computer through BlackHole, Soundflower, Stereo Mix or another installed loopback input, without screen sharing. Pick the adapter under Listen to. On a Mac, route your output to a multi-output device that includes BlackHole and your speakers or headphones. Allow “microphone” access when the browser asks; that permission also covers loopback adapters. Video sound set to Computer keeps this same sound in recordings.</dd>
             <dt>Stereo Mix (Windows)</dt><dd>Hears the computer’s sound with no screen sharing at all: choose Microphone, then Stereo Mix under Listen to. If it isn’t listed, turn it on once in Windows Settings → System → Sound → More sound settings (Sound Control Panel on Windows 10) → Recording tab → right-click an empty spot → Show Disabled Devices → right-click Stereo Mix → Enable, then reload this page. Some computers don’t have it.</dd>
-            <dt>The meter</dt><dd>Low, Mid and High bars and a BEAT light show what it hears. It adjusts itself to the volume.</dd>
-            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on every kick, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>
+            <dt>BPM and the meter</dt><dd>Low, Mid and High bars respond immediately. After about 12 seconds of music, the BPM readout and BEAT light follow a steady tempo grid. This pulse drives beat effects and Autopilot’s Change on the beat. Pulses stop during silence or when tempo tracking is unavailable. Run from localhost or HTTPS for BPM tracking.</dd>
+            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on the BPM pulse and bass, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>
             <dt>Which browser</dt><dd>Computer sound works in Chrome and Edge. Firefox and Safari don’t pass sound through screen sharing, so use Microphone there (Stereo Mix on Windows hears the computer itself).</dd>
             <dt>Record</dt><dd>Video sound, next to Record, picks what goes into the video: the microphone, this computer’s sound, or both mixed together. Whatever React to sound is already hearing goes straight in, with nothing more to allow.</dd>
           </dl></div>
@@ -1010,6 +1069,11 @@
 <script src="js/recording-formats.js"></script>
 <script src="js/output-template.js"></script>
 <script src="js/ribbit.js"></script>
+<script src="js/audio/beat-clock.js"></script>
+<script src="js/audio/rhythm.js"></script>
+<script src="js/spotify.js"></script>
+<script src="js/step-sequencer.js"></script>
+<script src="js/silhouette.js"></script>
 <script src="js/app.js"></script>
 
 </body>

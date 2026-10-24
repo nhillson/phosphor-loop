@@ -55,6 +55,98 @@ Everything works that way except the phone link: both loops,
 cross-feed, drawing, pictures, video files, your webcam and screen sharing.
 Use Chrome or Edge.
 
+DANCING SILHOUETTE
+  Choose Silhouette under Main input, or as the second input. It is a real
+  dancer extracted from the WebM supplied in static/. Only the dancer is drawn;
+  the colored background and original audio are removed. Picking it as the
+  main input keeps the previous input behind it when the second slot is free.
+  Clean mode is the default: a solid black dancer over the finished picture,
+  unaffected by feedback, color, mirror, flash or shake. Through loop effects
+  switches to a light matte so the ordinary trails, color and warps can act on
+  it. This mode intentionally changes the silhouette's appearance.
+  Clock uses Spotify's saved song BPM/position when connected, or the captured
+  audio beat grid otherwise. Silence/lost beat lock holds the pose. Manual BPM
+  lets you preview without audio, starting at 104 BPM. Set Dancer height to fit.
+  Spotify pause and Freeze stop the dancer. The settings are saved in looks
+  and sequencer steps, separately for each loop.
+  The built-in silent clip is a 16-beat loop (about 9.23 seconds at 104 BPM)
+  edited from full-body shots in the source. It has cuts between dancers,
+  with no blank frames, close-ups or title cards. A higher-resolution matte
+  and light edge smoothing reduce compression artifacts and jagged edges.
+  static/silhouette-mask-v2.mp4 is the processed matte used as transparency by
+  the renderer; tools/silhouette/build.py rebuilds it from the original WebM.
+  Only the processed matte is exposed by the local server or bundled offline.
+  Run npm run silhouette:test for browser and pixel-level checks.
+
+SPOTIFY SONG SEQUENCER
+  Run npm start and open http://127.0.0.1:8000/. In your Spotify developer app,
+  register that exact URL (including the final slash) as a redirect URI and
+  enable Web API. Song sequencer includes the public Client ID supplied for
+  this project; it can be changed in the panel. Press Connect Spotify and sign
+  in. No client secret is needed. Development-mode users must be allowlisted
+  in the Spotify developer dashboard. The app owner needs Spotify Premium.
+
+  The canvas timeline shows elapsed/total track time and each step checkpoint.
+  Drag and release the scrub bar, or click a checkpoint, to seek Spotify.
+  Hide scrub bar hides the overlay; Show scrub bar brings it back. The choice
+  survives reloads. Each step shows its beats: drag its right edge to resize,
+  snapping to whole beats (1–1024). Release saves and shifts following steps;
+  resizing does not seek the song. Escape cancels. Focus an end handle and use
+  left/right arrows for one beat, Shift+arrow for four beats.
+  Existing sessions need Enable scrubbing / reconnect once to grant playback
+  control permission. Spotify seeking requires Premium. Follow song resumes
+  the visual sequence at Spotify's current position; it does not restart music.
+
+  Spotify keeps playing in your existing player. Phosphor Loop reads the
+  current song, play/pause position and queue. Each track gets its own sequence
+  in this browser, separated by Spotify account. Returning songs recall and
+  automatically run their steps; new songs have an empty editor and Autopilot
+  runs until you add steps. Skip switches sequences. Pause/resume and seeking
+  select the corresponding step rather than continuing a separate counter.
+
+  Add saved looks, the current look, library clips or video files. Steps are
+  vertical: name each step, set its beats, move it up/down, copy it, duplicate
+  it or paste after another step. Copy and Paste also work between songs.
+  Look settings are copied, so changing a preset leaves its sequence intact.
+  Each song remembers its BPM and start offset. Default is 120 BPM with zero
+  offset: set these to match the song. Use detected BPM copies the local
+  tracker result after you connect audio under React to sound. Spotify itself
+  does not provide an audio feed or a beat grid here. Variable-tempo songs
+  need a future tempo-map feature for precise alignment.
+
+  Choose Cut or a 1/2/4-beat fade. At sequence end, Hold, Loop, or start
+  Autopilot. Edits save immediately and apply at the current song position.
+  Stop holds the look; Follow song resumes. Spotify metadata updates about
+  every 3 seconds; the queue about every 15 seconds and on track changes.
+  API errors never erase sequences. After 10 seconds without fresh playback
+  state the sequence waits for reconnection. Disconnect removes the sign-in
+  tokens and restores the separate standalone sequence.
+
+  Files must be re-added after reopening; matching original filenames restore
+  missing files even if steps were renamed. Library clips require Phosphor
+  Clips running. Connect live inputs before playing looks that need them.
+  Spotify sign-in lasts within the current tab/session; sequences stay in this
+  browser. Without Spotify, standalone Play uses the captured audio beat grid.
+  Run npm run sequencer:test for scheduling, Spotify and browser checks.
+  SPOTIFY-SEQUENCER.md has the full design and remaining optional features.
+
+BPM TRACKING AND LOCAL PREVIEW
+  Run npm install once, then npm start and open http://127.0.0.1:8000/.
+  Choose Computer sound, Microphone or Loopback adapter under React to sound.
+  Essentia estimates tempo from 12 seconds of music and updates every 4 seconds.
+  A smooth audio-clock beat grid drives the standard pulse and Autopilot's
+  Change on the beat. Band energy still responds immediately. The BPM readout
+  shows acquisition/confidence; silence and unavailable tracking stop pulses.
+  No music is uploaded. The bundled Essentia.js 0.1.3 backend runs locally;
+  its AGPL-3.0 license is in vendor/essentia/LICENSE.
+
+  The preview listens on your home network at port 8000. HOST=127.0.0.1 npm start
+  restricts it to this computer; PORT=8001 npm start changes the port.
+  Browser audio capture and BPM tracking require localhost or HTTPS. Other
+  devices can view the HTTP preview, but need an HTTPS site to capture audio.
+  Double-clicking index.html still opens the visuals, without BPM tracking.
+  npm run rhythm:test checks tempo, pulse timing, silence and reconnects.
+
 TO CONNECT YOUR PHONE, PUT THE FOLDER ONLINE (free, one time, about 5 minutes)
 Phones only allow a web page to use the camera when that page comes from a
 secure web address (https://), so the folder needs to live on the web.

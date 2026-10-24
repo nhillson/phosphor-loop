@@ -2,3 +2,8 @@ node_modules/
 captures/
 .capture-state/
 __pycache__/
+
+# Local source footage and desktop metadata; publish only the processed dancer.
+.DS_Store
+/static/*.webm
+/static/silhouette-mask.mp4
