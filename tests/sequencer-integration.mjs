@@ -40,9 +40,9 @@ try {
  await page.goto(`http://127.0.0.1:${server.address().port}`);
  await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');
  await T(()=>window.__seqTest.spotify.stop());
- assert.equal(await page.locator('#drift').count(),0,'Auto-drift button is gone');
+ assert.equal(await page.locator('#drift').count(),0,'Auto-drift is gone');
  assert.ok(await T(()=>window.__seqTest.ap.on),'a song with no sequence runs Autopilot');
- step('song with no sequence runs Autopilot; Auto-drift button removed');
+ step('song with no sequence runs Autopilot; Auto-drift removed');
 
  // Open the sequencer: the picture gives up height to it
  const before=await page.locator('#screen').boundingBox();

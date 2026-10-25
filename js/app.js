@@ -271,8 +271,6 @@ let edit = 'A';
 // Mount Ribbit's walking keys held down, a jump asked for, and Walk by itself (see ribKey)
 const rib = { held: new Set(), jump: false, auto: lsGet('phosphor-ribbit-walk') !== '0' };
 let activePresetId = null;
-// The slow drift is always on (there's no switch for it any more). Only Neutral stills it, until the next look.
-let drift = true;
 let frozen = false;
 let staticAmt = 0;
 
@@ -1280,7 +1278,6 @@ function patchLoop(k, p, force) {
   if (wOf(mix.tgt, k) > 0.05) lookOnScreen++;
 }
 function applyPatch(c) {
-  drift = true;
   patchLoop('A', c.A);
   patchLoop('B', c.B || B_PARTNER);
   mix.tgt.view = c.view ?? 0;
@@ -1996,7 +1993,6 @@ const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
-  drift = false;
   for (const k of KEYS) loopGrade[k] = null;
   if (frozen) toggleFreeze(false);
   let src = loops.A.tgt.in1;
@@ -2133,14 +2129,6 @@ function limStep(k, v, a, b) {
   if (v < lo) v = lo + (lo - v);
   return Math.round(clamp(v, lo, hi));
 }
-// Auto-drift's sway, folded back inside the limits (a reflection, so it turns at an edge instead of resting on it)
-function limFold(k, v) {
-  const r = limSpan(k);
-  if (!r) return v;
-  if (v > r[1]) v = r[1] - (v - r[1]);
-  if (v < r[0]) v = r[0] + (r[0] - v);
-  return clamp(v, r[0], r[1]);
-}
 // Autopilot settings, kept in this browser. Sliders run 0-100; every and fade map to seconds below.
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
@@ -2152,7 +2140,7 @@ const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT
 const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [],
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
-// Autopilot never changes them, doesn't drift them, and moving their controls neither pins anything nor stops it.
+// Autopilot never changes them, and moving their controls neither pins anything nor stops it.
 // Turns: with more than one loop to run, one gets a new look each time (taking turns) rather than all at once.
 const cleanRuns = (v) => { const r = Array.isArray(v) ? KEYS.filter((k) => v.includes(k)) : []; return r.length ? r : [...AP_DEFAULTS.runs]; };
 // When you move a control while Autopilot runs: pin it ('pin'), just play along without pinning ('play'), or stop
@@ -2611,7 +2599,6 @@ function setAutopilot(on, quiet) {
   ap.turnN = 0;
   syncApLoops();
   if (on) {
-    drift = true;
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
     ap.due = ap.next;
     ap.span = ap.next - performance.now();
@@ -3080,7 +3067,7 @@ function glideLook(k) {
   L.favMix = favMix || null;
 }
 // 3D worlds and Fractals need room to be seen. When Autopilot brings one in, that loop arrives clean (no Trails,
-// Zoom, Spin, color shift, Warp, softness, drift or effects, no second input, nothing fed in from the other loop),
+// Zoom, Spin, color shift, Warp, softness or effects, no second input, nothing fed in from the other loop),
 // is shown on its own and stays about 1 2/3 times as long. Once it has faded in, the look Autopilot picked builds up
 // slowly, peaks in the middle of its stay, and eases back to clean before the next look fades in over it. Check each
 // look still judges the full look out of sight first. Pinned settings stay put, a setting with a fader limit above
@@ -5983,7 +5970,7 @@ const RECIPES = [
     text: 'A blank loop with an eight-way mirror. Every stroke you draw is copied eight times and slowly drifts outward.',
     how: 'NOTHING · MIRROR 8 · TRAILS 97 · ZOOM IN 10',
     sw: 'conic-gradient(from 0deg,#ff4fa3,#ffcf6b,#3bff9a,#3b8bff,#c43bff,#ff4fa3)',
-    patch: { A: { in1: 'none', mirror: 8, trails: 97, zoom: 10, spin: 6, color: 18, blur: 0.1 } }, drift: false },
+    patch: { A: { in1: 'none', mirror: 8, trails: 97, zoom: 10, spin: 6, color: 18, blur: 0.1 } } },
   { name: 'Marbled', after: 'Slide Melt up and down to watch the picture fold into itself.',
     text: 'The picture pushes itself around by its own bright and dark parts, so the echoes fold into each other like marbling.',
     how: 'SHAPE · ZOOM IN 45 · MELT 80 · TRAILS 86',
@@ -6035,7 +6022,7 @@ const RECIPES = [
     text: 'The top of the picture is now and the bottom is a second and a half ago, so when you move, your body bends and stretches like rubber.',
     how: 'CAMERA · TIME WARP TOP TO BOTTOM · NO TRAILS',
     sw: 'repeating-linear-gradient(180deg,#0b1d28 0 4px,#4fd1c5 4px 6px,#ffae3b 6px 7px),linear-gradient(90deg,#0b1d28,#1f5f7a)',
-    patch: { A: { in1: 'camera', size: 100, trails: 0, zoom: 0, color: 0, time: 100, timeShape: 0 } }, drift: false },
+    patch: { A: { in1: 'camera', size: 100, trails: 0, zoom: 0, color: 0, time: 100, timeShape: 0 } } },
   { name: 'Ghost trails', needs: 'camera', after: 'Wave your hands in front of the camera.',
     text: 'Only moving things get in, so waving your hands leaves glowing smears while the still room disappears.',
     how: 'CAMERA · ONLY MOVEMENT · SIZE FULL · TRAILS 95',
@@ -6065,14 +6052,13 @@ const RECIPES = [
     patch: { A: { in1: 'phone', size: 100, trails: 70, color: 4 } } },
   { name: 'Slow drift',
     text: 'Calm and slow. Good for leaving on a second screen or a projector while music plays.',
-    how: 'A WAVE · B SHAPE · BOTH FEEDS 30 · AUTO-DRIFT',
+    how: 'A WAVE · B SHAPE · BOTH FEEDS 30',
     sw: 'linear-gradient(90deg,#0d2238,#1f5f7a 40%,#6fb7b0 75%,#d8e8c8)',
     patch: { A: { in1: 'wave', size: 50, form: 2, zoom: 6, spin: 3, trails: 96, color: 5, warp: 12, mirror: 2, blur: 0.35 },
-             B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xab: 30, xba: 30, view: 50 },
-    drift: true },
+             B: { in1: 'shape', form: 5, zoom: -10, spin: -4, trails: 96, color: 8, mirror: 4, edge: 1, blur: 0.3 }, xab: 30, xba: 30, view: 50 } },
   { name: 'Hands-free show', autopilot: true, after: 'Autopilot is on. Leave it running, or move a slider to pin it where you want it.',
     text: 'Autopilot gives each loop a new look every half minute or so and fades slowly between them. Leave it on a TV or projector.',
-    how: 'AUTOPILOT · AUTO-DRIFT',
+    how: 'AUTOPILOT',
     sw: 'linear-gradient(90deg,#ffae3b,#ff4fa3 35%,#6a2bd9 65%,#4fd1c5)',
     patch: { A: { in1: 'wave', form: 3, zoom: 14, spin: 6, trails: 92, color: 14, mirror: 4, blur: 0.2 } } },
   { name: 'Music visualizer', needs: 'sound', sound: 'system', soundAmount: 70,
@@ -6217,7 +6203,6 @@ function snapshot() {
            ...(loopCount > 2 ? { showC: mix.tgt.showC, xc: mix.tgt.xc } : {}), ...(loopCount > 3 ? { showD: mix.tgt.showD, xd: mix.tgt.xd } : {}) },
     adj: clone(adj),
     snd: { amount: snd.amount, map: clone(snd.map), react: clone(snd.react) },
-    drift,
     text: { str: txt.str, style: txt.style },
     grade: { ...grade },
   };
@@ -6303,7 +6288,6 @@ presetForm.addEventListener('submit', async (e) => {
 });
 
 function loadPreset(pr, quiet) {
-  drift = true;
   for (const k of KEYS) loopGrade[k] = null;
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
@@ -7633,7 +7617,7 @@ function resolveSrc(src, motion) {
 }
 
 let last = performance.now();
-let simT = 0, driftT = 0;
+let simT = 0;
 
 // The Wave input's curve, worked out on the CPU once per loop per frame instead of per pixel
 const wavePts = new Float32Array(81 * 2), waveBoxes = new Float32Array(8 * 4);
@@ -8060,30 +8044,6 @@ function runLoop(k, xf, brush, f) {
   const otherK = otherLoop(k);
   const otherTex = shownTex(otherK), otherPrev = shownPrev(otherK);
   let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
-  // Under Autopilot, a loop that's yours doesn't drift: it stays exactly as you set it
-  if (drift && !(ap.on && !apRuns(k))) {
-    const d = driftT + (37.0 * LOOP_OFF[k]);
-    // Flow brings its own motion, so Auto-drift barely zooms or turns a flowing loop.
-    // The 3D flights move by themselves, so there Auto-drift only tints.
-    const still = is3D(t.in1) ? 0 : 1;
-    const calm = still * Math.max(0, 1 - 1.2 * clamp(c.flow, 0, 100) / 100);
-    // Under Autopilot, How wild sets how far it drifts, and a pinned setting doesn't drift at all
-    const amt = ap.on ? 0.4 + 1.2 * apSet.wild / 100 : 1;
-    const free = (key) => (pinned(key, k) ? 0 : amt);
-    z += 22 * calm * free('zoom') * Math.sin(d * 0.13);
-    s += 26 * calm * free('spin') * Math.sin(d * 0.071 + 1.3);
-    col += 12 * free('color') * (0.5 + 0.5 * Math.sin(d * 0.05));
-    w += 16 * still * free('warp') * (0.5 + 0.5 * Math.sin(d * 0.09 + 2.0));
-    sx += 0.0012 * still * amt * Math.sin(d * 0.11);
-    sy += 0.0012 * still * amt * Math.cos(d * 0.083);
-    // Under Autopilot the sway turns back at the fader limits instead of going past them
-    if (ap.on) {
-      if (!pinned('zoom', k)) z = limFold('zoom', z);
-      if (!pinned('spin', k)) s = limFold('spin', s);
-      if (!pinned('color', k)) col = limFold('color', col);
-      if (!pinned('warp', k)) w = limFold('warp', w);
-    }
-  }
   let sizeBoost = 0, gainBoost = 1;
   if (reacts(k)) {
     const a = sndPower(), E = snd.env, m = snd.map;
@@ -8510,7 +8470,6 @@ function seqRun(on, message) {
   $('#seqPlay').setAttribute('aria-pressed', String(on));
   seq.applied = [null, null, null, null];
   if (on) {
-    drift = true;
     if (ap.on) setAutopilot(false, true);
     seq.apMode = null;
     if (loopCount < seqUsedLoops()) { setLoopCount(seqUsedLoops(), 'load'); syncUI(); }
@@ -9240,7 +9199,6 @@ function frame() {
   followSliders();
   if (lookOnScreen !== ratedLook) syncRated();
   if (!frozen) simT += dt;
-  if (drift && !frozen) driftT += dt;
   staticAmt = Math.max(0, staticAmt - dt * 3);
 
   for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update(subjectModes(name));
