@@ -773,23 +773,15 @@ const FS_COMPOSITE = `#version 300 es
 precision highp float;
 uniform sampler2D uA, uB, uC, uD;
 uniform float uWA, uWB, uWC, uWD;
-// Recolor: how far round the color wheel each loop's whole picture is turned on screen (radians; A, B, C, D)
-uniform vec4 uRecolor;
 uniform vec2 uSim;
 out vec4 o;
-vec3 turn(vec3 c, float a) {
-  if (a == 0.0) return c;
-  const vec3 k = vec3(0.57735027);
-  float ca = cos(a);
-  return max(c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca), 0.0);
-}
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   vec4 A = texture(uA, uv), B = texture(uB, uv), C = texture(uC, uv), D = texture(uD, uv);
-  vec3 a = turn(A.rgb, uRecolor.x) * uWA;
-  vec3 b = turn(B.rgb, uRecolor.y) * uWB;
-  vec3 c = uWC > 0.0 ? turn(C.rgb, uRecolor.z) * uWC : vec3(0.0);
-  vec3 d = uWD > 0.0 ? turn(D.rgb, uRecolor.w) * uWD : vec3(0.0);
+  vec3 a = A.rgb * uWA;
+  vec3 b = B.rgb * uWB;
+  vec3 c = uWC > 0.0 ? C.rgb * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? D.rgb * uWD : vec3(0.0);
   vec3 col = 1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d);
   // A loop's Subject silhouette (where its alpha is below 1) lies over the other loops instead of adding light
   col = mix(col, a, clamp((1.0 - A.a) * uWA, 0.0, 1.0));
@@ -842,6 +834,12 @@ uniform vec4 uDancerSizes, uDancerWeights;
 uniform vec2 uRes;
 uniform float uTime, uStatic, uLines, uFlash, uPunch, uHueKick;
 uniform vec2 uShake;   // the music's jolt: its direction, times how hard
+// Color grading (see "color grading" in app.js): exposure in stops, contrast, gamma, saturation; hue (radians),
+// sepia; red, green and blue gains; uGradeOn is 0 while every slider is at normal
+uniform vec4 uGradeTone;
+uniform vec2 uGradeColor;
+uniform vec3 uGradeRGB;
+uniform float uGradeOn;
 out vec4 o;
 ${COMMON}
 vec3 hueTurn(vec3 c, float a) {
@@ -873,6 +871,15 @@ void main() {
 
   col *= 1.0 + uFlash;
   col = mix(col, vec3(hash(gl_FragCoord.xy * 0.5 + fract(uTime) * 113.0)), uStatic * 0.9);
+  // Color grading: the finished picture only, never fed back into the loops
+  if (uGradeOn > 0.5) {
+    col = max(hueTurn(col, uGradeColor.x), 0.0);
+    col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, uGradeTone.w);
+    vec3 sepia = vec3(dot(col, vec3(0.393, 0.769, 0.189)), dot(col, vec3(0.349, 0.686, 0.168)), dot(col, vec3(0.272, 0.534, 0.131)));
+    col = mix(col, sepia, uGradeColor.y) * uGradeRGB;
+    col = (col * exp2(uGradeTone.x) - 0.5) * uGradeTone.y + 0.5;
+    col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / uGradeTone.z));
+  }
   vec2 e = smoothstep(vec2(0.0), vec2(0.006), cuv) * smoothstep(vec2(1.0), vec2(0.994), cuv);
   col *= e.x * e.y;
   // Clean silhouette is applied after every display effect, including flashes and shake.

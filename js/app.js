@@ -160,14 +160,14 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, recolor: 0, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
 // The sliders under Effects › Feeds on itself
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'recolor', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'recolor', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -829,6 +829,7 @@ const sliderEls = {}, outputs = {};
   outputs[k] = $('#' + k + 'Out');
   const isMix = MIX_SLIDERS.includes(k);
   el.addEventListener('input', () => {
+    markHand(k);
     takeOver(k);
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     showSlider(k);
@@ -836,6 +837,7 @@ const sliderEls = {}, outputs = {};
     if (isMix || k === 'trails') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
+    markHand(k);
     takeOver(k);
     const v = (isMix ? mix.base : loops[edit].base)[k];
     (isMix ? mix.tgt : loops[edit].tgt)[k] = v;
@@ -848,7 +850,6 @@ function sliderText(k, v) {
   v = Math.round(v);
   switch (k) {
     case 'zoom': return v > 0 ? `IN ${v}` : v < 0 ? `OUT ${-v}` : 'HOLD';
-    case 'recolor': return v === 0 ? 'OFF' : `${v > 0 ? '+' : '−'}${Math.abs(v)}°`;
     case 'spin': return v > 0 ? `RIGHT ${v}` : v < 0 ? `LEFT ${-v}` : 'HOLD';
     case 'showA': case 'showB': case 'showC': case 'showD': return v === 0 ? 'HIDDEN' : String(v);
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
@@ -874,6 +875,60 @@ function showSlider(k) {
   const el = sliderEls[k];
   fillTrack(el);
   outputs[k].textContent = sliderText(k, +el.value);
+}
+// While Autopilot runs, the sliders it's changing show where the picture is right now, so they glide with each new
+// look and rise and fall with a 3D world's build-up. A slider being dragged, or moved by hand since this look came
+// in, shows where it was put.
+const handMark = {};
+let heldSlider = null;
+const lookGen = () => KEYS.reduce((n, k) => n + (loops[k].gen || 0), 0);
+function markHand(key) {
+  if (!ap.on) return;
+  if (MIX_SLIDERS.includes(key)) handMark['mix:' + key] = lookGen();
+  else handMark[edit + ':' + key] = loops[edit].gen;
+}
+function sliderShows(key, k) {
+  const isMix = MIX_SLIDERS.includes(key);
+  const t = isMix ? mix.tgt : loops[k].tgt, c = isMix ? mix.cur : loops[k].cur;
+  if (!ap.on || !(isMix ? apOwnsMix(key) : apRuns(k)) || !Number.isFinite(c[key])) return t[key];
+  if (isMix ? handMark['mix:' + key] === lookGen() : handMark[k + ':' + key] === loops[k].gen) return t[key];
+  return c[key];
+}
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target;
+  if (!el.matches || !el.matches('input[type="range"]')) return;
+  const m = el.closest('.mirror');
+  heldSlider = { key: m ? el.dataset.mid : el.id, k: m ? m.dataset.loop : edit };
+}, true);
+for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type, () => { heldSlider = null; }, true);
+// Every frame: sliders (and each loop's column) brought to what they show. When Autopilot stops, they go back to
+// showing the settings themselves.
+let apFollowing = false;
+function followSliders() {
+  if (!ap.on) { if (apFollowing) { apFollowing = false; syncUI(); } return; }
+  apFollowing = true;
+  const isHeld = (key, k) => heldSlider && heldSlider.key === key && (heldSlider.k === k || MIX_SLIDERS.includes(key));
+  for (const key of [...LOOP_SLIDERS, ...MIX_SLIDERS]) {
+    if (isHeld(key, edit)) continue;
+    const el = sliderEls[key], v = String(Math.round(sliderShows(key, edit)));
+    if (el.value !== v) { el.value = v; showSlider(key); }
+  }
+  if (!wideCols || mirroring) return;
+  for (const k of activeKeys()) {
+    const m = wideCols.mirrors[k];
+    if (!m) continue;
+    for (const key of [...LOOP_SLIDERS, ...MIX_SLIDERS]) {
+      if (isHeld(key, k)) continue;
+      const el = m.querySelector(`input[data-mid="${key}"]`);
+      if (!el) continue;
+      const v = String(Math.round(sliderShows(key, k)));
+      if (el.value === v) continue;
+      el.value = v;
+      fillTrack(el);
+      const out = m.querySelector(`[data-mid="${key}Out"]`);
+      if (out) out.textContent = sliderText(key, +v);
+    }
+  }
 }
 
 /* ================= UI: inputs ================= */
@@ -1153,8 +1208,8 @@ function syncVisibility() {
 
 function syncUI() {
   const t = loops[edit].tgt;
-  LOOP_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(t[k]); showSlider(k); });
-  MIX_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(mix.tgt[k]); showSlider(k); });
+  LOOP_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(sliderShows(k, edit)); showSlider(k); });
+  MIX_SLIDERS.forEach((k) => { sliderEls[k].value = Math.round(sliderShows(k, edit)); showSlider(k); });
   $$('#inputs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.src === t.in1 || b.dataset.src === sceneGroup(t.in1))));
   in2Sel.value = t.in2;
   $('#blendCtl').hidden = t.in2 === 'none';
@@ -1214,8 +1269,8 @@ function patchLoop(k, p, force) {
   delete n.asInput;
   n.motion = p.motion ?? (force ? false : L.tgt.motion);
   n.subject = p.subject ?? (force ? 'off' : L.tgt.subject);
-  // Recolor stays through every new look (Autopilot, Surprise); a preset, recipe or Neutral sets it
-  if (!force && !('recolor' in p)) n.recolor = L.tgt.recolor || 0;
+  // Looks saved before Color grading took Recolor's place still carry it; it's left behind
+  delete n.recolor;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
@@ -1959,6 +2014,7 @@ function neutral() {
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((x) => { adj[x] = adjDefaults(); });
   syncAdjUI();
+  setGrade(GRADE_DEF);
   Object.values(LIVE_SRC).forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
@@ -2198,8 +2254,7 @@ function apOwnsMix(p) {
   return false;
 }
 // Who a control belongs to while Autopilot runs: loop k's setting, or a fader under Loops
-// Recolor is always yours: Autopilot never changes it
-const apOwns = (key, k) => (key === 'recolor' ? false : key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
+const apOwns = (key, k) => (key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
 
 /* ================= autopilot's eye ================= */
 // While Autopilot runs it keeps an eye on the picture. Every few hundredths of a second a tiny 64 x 36 copy is
@@ -6169,6 +6224,7 @@ function snapshot() {
     snd: { amount: snd.amount, map: clone(snd.map), react: clone(snd.react) },
     drift,
     text: { str: txt.str, style: txt.style },
+    grade: { ...grade },
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
@@ -6275,6 +6331,8 @@ function loadPreset(pr, quiet) {
   snd.react = { A: true, B: true, C: true, D: true, ...((d.snd && d.snd.react) || {}) };
   syncSoundUI();
   if (typeof d.drift === 'boolean') setDrift(d.drift);
+  // Presets saved before Color grading existed load with it at normal
+  setGrade(d.grade);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
@@ -7166,6 +7224,55 @@ syncShapeUI();
 const outBtn = $('#outBtn');
 // "Spread out controls": the picture here shrinks to a small preview and the controls get the rest of the
 // screen. Works with or without the output window, and is remembered in this browser.
+/* ================= color grading ================= */
+// The finished picture, after every loop is mixed: tone (exposure, contrast, midtones) and color (saturation, hue,
+// red/green/blue, sepia). It's drawn in the display pass only, so it never feeds back into the loops. Autopilot
+// leaves it alone; presets keep it and Neutral puts it back to normal. Slider units: exposure in tenths of a stop,
+// midtones (gamma) and the rest in hundredths, hue in degrees, sepia in percent.
+const GRADE_KEY = 'phosphor-grade-v1';
+const GRADE_DEF = { gExposure: 0, gContrast: 100, gGamma: 100, gSat: 100, gHue: 0, gRed: 100, gGreen: 100, gBlue: 100, gSepia: 0 };
+const grade = { ...GRADE_DEF };
+const gradeEls = {};
+for (const k of Object.keys(GRADE_DEF)) gradeEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
+function gradeText(k, v) {
+  switch (k) {
+    case 'gExposure': return v === 0 ? 'NORMAL' : `${v > 0 ? '+' : '−'}${(Math.abs(v) / 10).toFixed(1)}`;
+    case 'gGamma': return v === 100 ? 'NORMAL' : (v / 100).toFixed(2);
+    case 'gHue': return v === 0 ? 'OFF' : `${v > 0 ? '+' : '−'}${Math.abs(v)}°`;
+    case 'gSepia': return v === 0 ? 'OFF' : `${v}%`;
+    default: return v === 100 ? 'NORMAL' : `${v}%`;
+  }
+}
+// Any saved or loaded grading, made safe: missing or broken values are normal
+function cleanGrade(g) {
+  const out = { ...GRADE_DEF };
+  if (!g || typeof g !== 'object') return out;
+  for (const k of Object.keys(GRADE_DEF)) {
+    const { el } = gradeEls[k];
+    if (Number.isFinite(g[k])) out[k] = clamp(Math.round(g[k]), +el.min, +el.max);
+  }
+  return out;
+}
+function syncGradeUI() {
+  for (const [k, { el, out }] of Object.entries(gradeEls)) { el.value = grade[k]; fillTrack(el); out.textContent = gradeText(k, grade[k]); }
+}
+function saveGrade() { try { localStorage.setItem(GRADE_KEY, JSON.stringify(grade)); } catch (_) {} }
+function setGrade(g) { Object.assign(grade, cleanGrade(g)); syncGradeUI(); saveGrade(); }
+for (const [k, { el, out }] of Object.entries(gradeEls)) {
+  el.addEventListener('input', () => { grade[k] = +el.value; fillTrack(el); out.textContent = gradeText(k, grade[k]); saveGrade(); });
+  el.addEventListener('dblclick', () => setGrade({ ...grade, [k]: GRADE_DEF[k] }));
+}
+$('#gradeReset').addEventListener('click', () => setGrade(GRADE_DEF));
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(GRADE_KEY) || 'null'); } catch (_) {} setGrade(saved); }
+function setGradeUniforms() {
+  const on = Object.keys(GRADE_DEF).some((k) => grade[k] !== GRADE_DEF[k]);
+  set1f(dispProg, 'uGradeOn', on ? 1 : 0);
+  set4f(dispProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, grade.gGamma / 100, grade.gSat / 100);
+  set2f(dispProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
+  set3f(dispProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
+}
+window.__plGrade = { grade, setGrade, snapshot: () => snapshot(), loadPreset: (data) => loadPreset({ id: '', name: '', data }, true) };
+
 const wideBtn = $('#wideBtn'), WIDE_KEY = 'phosphor-wide-controls';
 let wideCtl = (() => { try { return localStorage.getItem(WIDE_KEY) === '1'; } catch (_) { return false; } })();
 function syncWide() {
@@ -8876,6 +8983,7 @@ function frame() {
     mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (own || pinned(pinKeyOf(p)) || rampingMix(p) ? k : kMix);
   }
   if (ap.on && !frozen && now >= ap.next) apTick(now);
+  followSliders();
   if (lookOnScreen !== ratedLook) syncRated();
   if (!frozen) simT += dt;
   if (drift && !frozen) driftT += dt;
@@ -8952,8 +9060,6 @@ function frame() {
   set1f(compProg, 'uWB', wB);
   set1f(compProg, 'uWC', W.C);
   set1f(compProg, 'uWD', W.D);
-  { const R = (k) => (loopOn(k) ? clamp(loops[k].cur.recolor || 0, -180, 180) * Math.PI / 180 : 0);
-    const l = U(compProg, 'uRecolor'); if (l) gl.uniform4f(l, R('A'), R('B'), R('C'), R('D')); }
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   drawShowFade(now);
   eyeTick(now, dt, wA, wB);
@@ -8985,6 +9091,7 @@ function frame() {
   set1f(dispProg, 'uHueKick', hueKick);
   set2f(dispProg, 'uShake', snd.shakeDir[0] * shake, snd.shakeDir[1] * shake);
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
+  setGradeUniforms();
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   if (window.__phosphorCapture?.onFrame) window.__phosphorCapture.onFrame(now);

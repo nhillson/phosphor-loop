@@ -404,12 +404,6 @@
             <div class="ends"><span>Off</span><span>Fast</span></div>
           </div>
           <div class="ctl">
-            <div class="ctl-head"><label for="recolor">Recolor</label><output id="recolorOut" for="recolor"></output></div>
-            <input type="range" id="recolor" class="bipolar" min="-180" max="180" step="1" value="0">
-            <div class="ends"><span>−180°</span><span>Off</span><span>+180°</span></div>
-            <span class="hint">Turns every color of this whole loop round the color wheel by the same amount, so purple can become green, orange or blue while the shapes stay the same. 180 gives the opposite colors. It changes how the loop looks on screen; inside, the loop keeps feeding itself its own colors. Autopilot leaves it where you put it, through every new look.</span>
-          </div>
-          <div class="ctl">
             <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
             <input type="range" id="warp" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wobbly</span></div>
@@ -755,6 +749,68 @@
         </div>
       </section>
 
+      <section class="group" id="gradeGroup" aria-labelledby="h-grade">
+        <h2 id="h-grade">Color grading</h2>
+        <p class="hint">Changes the finished picture, after every loop is mixed together, like a filter over the whole screen. Autopilot leaves it where you put it, presets keep it, and Neutral puts it back to normal. Double-click a slider to put just that one back.</p>
+        <h3 class="subhead">Tone</h3>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gExposure">Exposure</label><output id="gExposureOut" for="gExposure"></output></div>
+          <input type="range" id="gExposure" class="bipolar" min="-30" max="30" step="1" value="0">
+          <div class="ends"><span>Darker</span><span>Normal</span><span>Brighter</span></div>
+          <span class="hint">Brightness of the whole picture. Each step of 1 doubles or halves it, like a camera’s exposure.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gContrast">Contrast</label><output id="gContrastOut" for="gContrast"></output></div>
+          <input type="range" id="gContrast" class="bipolar" min="0" max="200" step="1" value="100">
+          <div class="ends"><span>Flat</span><span>Normal</span><span>Punchy</span></div>
+          <span class="hint">Pushes the darks darker and the lights lighter, or flattens everything toward grey.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gGamma">Midtones</label><output id="gGammaOut" for="gGamma"></output></div>
+          <input type="range" id="gGamma" min="25" max="300" step="1" value="100">
+          <div class="ends"><span>Darker</span><span>Brighter</span></div>
+          <span class="hint">Brightens or darkens the middle shades while the blacks and whites stay put (gamma).</span>
+        </div>
+        <h3 class="subhead">Color</h3>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gSat">Saturation</label><output id="gSatOut" for="gSat"></output></div>
+          <input type="range" id="gSat" class="bipolar" min="0" max="200" step="1" value="100">
+          <div class="ends"><span>Black &amp; white</span><span>Normal</span><span>Vivid</span></div>
+          <span class="hint">How strong the colors are. All the way left is black and white.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gHue">Hue</label><output id="gHueOut" for="gHue"></output></div>
+          <input type="range" id="gHue" class="bipolar" min="-180" max="180" step="1" value="0">
+          <div class="ends"><span>−180°</span><span>Off</span><span>+180°</span></div>
+          <span class="hint">Turns every color round the color wheel by the same amount, so purple can become green, orange or blue while the shapes stay the same. 180 gives the opposite colors.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gRed">Red</label><output id="gRedOut" for="gRed"></output></div>
+          <input type="range" id="gRed" class="bipolar" min="0" max="200" step="1" value="100">
+          <div class="ends"><span>None</span><span>Normal</span><span>Double</span></div>
+          <span class="hint">How much red is in the picture.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gGreen">Green</label><output id="gGreenOut" for="gGreen"></output></div>
+          <input type="range" id="gGreen" class="bipolar" min="0" max="200" step="1" value="100">
+          <div class="ends"><span>None</span><span>Normal</span><span>Double</span></div>
+          <span class="hint">How much green is in the picture.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gBlue">Blue</label><output id="gBlueOut" for="gBlue"></output></div>
+          <input type="range" id="gBlue" class="bipolar" min="0" max="200" step="1" value="100">
+          <div class="ends"><span>None</span><span>Normal</span><span>Double</span></div>
+          <span class="hint">How much blue is in the picture. Lower it for a warmer look.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="gSepia">Sepia</label><output id="gSepiaOut" for="gSepia"></output></div>
+          <input type="range" id="gSepia" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Old photo</span></div>
+          <span class="hint">Blends toward the warm brown of an old photograph.</span>
+        </div>
+        <div class="dev-actions"><button class="btn small" id="gradeReset">Back to normal</button></div>
+      </section>
+
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
         <h2 id="h-shared">Shared presets</h2>
         <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
@@ -1006,6 +1062,7 @@
           <div class="g-card"><h3>Screen and buttons</h3><dl>
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Picture sharpness</dt><dd>How many lines the picture is drawn with; the number shows at the top right. Standard is the 576 lines Phosphor Loop has always used and is the lightest on the computer. High goes up to 1080, like HD video. Full draws as many lines as the screen (or the Output window) shows. Auto, the usual setting, starts where it last settled on this computer, sharpens while the picture stays smooth and steps back if it slows down. Effects keep their size at every setting; only the detail gets finer. Each computer or phone keeps its own choice.</dd>
+            <dt>Color grading</dt><dd>A filter over the finished picture, after every loop is mixed. Exposure, Contrast and Midtones set how bright and punchy it is; Saturation, Hue, Red, Green, Blue and Sepia change its colors. It never feeds back into the loops, Autopilot leaves it alone, presets keep it, and Neutral or Back to normal resets it.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
             <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
