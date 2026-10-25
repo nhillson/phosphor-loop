@@ -537,6 +537,14 @@ public class MainActivity extends Activity {
                 && u.getPath() != null && u.getPath().startsWith(OfflineLoader.SITE_PATH);
     }
 
+    // Spotify's sign-in pages stay inside the app, so Spotify sends you back here (not to the phone's browser)
+    // with the sign-in finished
+    private static boolean isSpotifySignIn(Uri u) {
+        if (u == null || !"https".equals(u.getScheme()) || u.getHost() == null) return false;
+        String h = u.getHost();
+        return h.equals("accounts.spotify.com") || h.equals("challenge.spotify.com") || h.equals("www.spotify.com");
+    }
+
     private void openOutside(Uri u) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE));
@@ -577,7 +585,7 @@ public class MainActivity extends Activity {
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             Uri u = request.getUrl();
             String scheme = u == null ? "" : String.valueOf(u.getScheme());
-            if (isOurs(u) || "about".equals(scheme) || "blob".equals(scheme) || "data".equals(scheme)) return false;
+            if (isOurs(u) || isSpotifySignIn(u) || "about".equals(scheme) || "blob".equals(scheme) || "data".equals(scheme)) return false;
             if (!request.isForMainFrame()) return false;
             openOutside(u);   // links to other sites open in the phone's browser
             return true;

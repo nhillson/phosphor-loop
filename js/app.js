@@ -902,7 +902,8 @@ for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type,
 // showing the settings themselves.
 let apFollowing = false;
 function followSliders() {
-  if (!ap.on) { if (apFollowing) { apFollowing = false; syncUI(); } return; }
+  // The sliders follow whatever is moving them by itself: Autopilot, or the sequencer while it plays
+  if (!ap.on && !seq.running) { if (apFollowing) { apFollowing = false; syncUI(); } return; }
   apFollowing = true;
   const isHeld = (key, k) => heldSlider && heldSlider.key === key && (heldSlider.k === k || MIX_SLIDERS.includes(key));
   for (const key of [...LOOP_SLIDERS, ...MIX_SLIDERS]) {
@@ -8711,8 +8712,9 @@ const SEQ_LUT = (() => {
   return lut;
 })();
 function seqFixView() {
-  const v = seq.view, dur = seqDur();
-  v.minPps = v.vw / dur; v.maxPps = Math.max(v.minPps * 2, 240);
+  const v = seq.view, dur = seqDur(), fitted = Math.abs(v.pps - v.minPps) < 1e-9;
+  v.minPps = v.vw / dur;
+  if (fitted) v.pps = v.minPps;   // showing the whole song keeps showing all of it when its length changes v.maxPps = Math.max(v.minPps * 2, 240);
   v.pps = clamp(v.pps, v.minPps, v.maxPps); v.start = clamp(v.start, 0, Math.max(0, dur - v.vw / v.pps));
 }
 const seqX = (t) => (t - seq.view.start) * seq.view.pps;

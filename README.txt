@@ -64,11 +64,10 @@ DANCING SILHOUETTE
   unaffected by feedback, color, mirror, flash or shake. Through loop effects
   switches to a light matte so the ordinary trails, color and warps can act on
   it. This mode intentionally changes the silhouette's appearance.
-  Clock uses Spotify's saved song BPM/position when connected, or the captured
-  audio beat grid otherwise. Silence/lost beat lock holds the pose. Manual BPM
+  Clock uses the captured audio beat grid. Silence/lost beat lock holds the pose. Manual BPM
   lets you preview without audio, starting at 104 BPM. Set Dancer height to fit.
   Spotify pause and Freeze stop the dancer. The settings are saved in looks
-  and sequencer steps, separately for each loop.
+  and sequencer blocks, separately for each loop.
   The built-in silent clip is a 16-beat loop (about 9.23 seconds at 104 BPM)
   edited from full-body shots in the source. It has cuts between dancers,
   with no blank frames, close-ups or title cards. A higher-resolution matte
@@ -86,49 +85,44 @@ SPOTIFY SONG SEQUENCER
   in. No client secret is needed. Development-mode users must be allowlisted
   in the Spotify developer dashboard. The app owner needs Spotify Premium.
 
-  The canvas timeline shows elapsed/total track time and each step checkpoint.
-  Drag and release the scrub bar, or click a checkpoint, to seek Spotify.
-  Hide scrub bar hides the overlay; Show scrub bar brings it back. The choice
-  survives reloads. Each step shows its beats: drag its right edge to resize,
-  snapping to whole beats (1–1024). Release saves and shifts following steps;
-  resizing does not seek the song. Escape cancels. Focus an end handle and use
-  left/right arrows for one beat, Shift+arrow for four beats.
-  Existing sessions need Enable scrubbing / reconnect once to grant playback
-  control permission. Spotify seeking requires Premium. Follow song resumes
-  the visual sequence at Spotify's current position; it does not restart music.
+  The sequencer sits under the picture: press Sequencer (Hide closes it). The
+  picture shrinks a little to make room. It has four tracks, one per loop
+  (A to D), with looks placed along the song by time. A loop with no block at
+  that moment is blank. Blocks fade in and out (drag the dots on top), and
+  blocks that overlap on a track crossfade for the length of the overlap.
+  Scroll moves along the song; Shift + scroll zooms. Drag a block to move it,
+  also onto another track; drag its ends to resize it. Right-click a block for
+  Copy, Paste, Change over time and Delete. Change over time lets any Loop,
+  Effects or Color grading slider follow a line across the block (drag its
+  dots; double-click the block to add a point). Inside the sequencer, color
+  grading belongs to each loop on its own. Undo and Redo (Ctrl+Z,
+  Ctrl+Shift+Z) cover every edit. + Marker (or M) drops a named section marker.
+  Record look changes writes the chosen loop's looks into its track as the
+  sequence plays. Add current look and Add saved look put a 16-second block at
+  the playhead on the chosen track.
 
   Spotify keeps playing in your existing player. Phosphor Loop reads the
-  current song, play/pause position and queue. Each track gets its own sequence
-  in this browser, separated by Spotify account. Returning songs recall and
-  automatically run their steps; new songs have an empty editor and Autopilot
-  runs until you add steps. Skip switches sequences. Pause/resume and seeking
-  select the corresponding step rather than continuing a separate counter.
+  current song, play/pause position and queue. Each song keeps its own
+  sequence in this browser, separated by Spotify account, and starts it by
+  itself when the song plays; a song with none runs Autopilot. Play and Stop
+  also play and pause Spotify; clicking the timeline moves the song (Spotify
+  Premium). Save sequence keeps named versions of a song's sequence; Load
+  sequence brings one back, or another song's (cut off at this song's end).
+  Without Spotify, Play runs the sequence on its own clock.
 
-  Add saved looks, the current look, library clips or video files. Steps are
-  vertical: name each step, set its beats, move it up/down, copy it, duplicate
-  it or paste after another step. Copy and Paste also work between songs.
-  Look settings are copied, so changing a preset leaves its sequence intact.
-  Each song remembers its BPM and start offset. Default is 120 BPM with zero
-  offset: set these to match the song. Use detected BPM copies the local
-  tracker result after you connect audio under React to sound. Spotify itself
-  does not provide an audio feed or a beat grid here. Variable-tempo songs
-  need a future tempo-map feature for precise alignment.
-
-  Choose Cut or a 1/2/4-beat fade. At sequence end, Hold, Loop, or start
-  Autopilot. Edits save immediately and apply at the current song position.
-  Stop holds the look; Follow song resumes. Spotify metadata updates about
-  every 3 seconds; the queue about every 15 seconds and on track changes.
-  API errors never erase sequences. After 10 seconds without fresh playback
-  state the sequence waits for reconnection. Disconnect removes the sign-in
-  tokens and restores the separate standalone sequence.
-
-  Files must be re-added after reopening; matching original filenames restore
-  missing files even if steps were renamed. Library clips require Phosphor
-  Clips running. Connect live inputs before playing looks that need them.
-  Spotify sign-in lasts within the current tab/session; sequences stay in this
-  browser. Without Spotify, standalone Play uses the captured audio beat grid.
-  Run npm run sequencer:test for scheduling, Spotify and browser checks.
-  SPOTIFY-SEQUENCER.md has the full design and remaining optional features.
+  Above the tracks, the song's spectrograph builds up from what the app hears
+  (connect sound under React to sound) as the song plays, fills its gaps on
+  later listens, and is kept with the song. At end: hold the last look, loop
+  the sequence, or start Autopilot. Sequences from the old beat-counted step
+  list come across once, as blocks on track 1.
+  Stop holds the picture where it is. Spotify metadata updates about every 3
+  seconds; the queue about every 15 seconds and on track changes. API errors
+  never erase sequences. Disconnect removes the sign-in tokens and goes back to
+  the sequencer's own clock. Spotify sign-in lasts within the current
+  tab/session; sequences stay in this browser. Connect live inputs before
+  playing looks that need them.
+  Run npm run sequencer:test for timeline, Spotify and browser checks.
+  SPOTIFY-SEQUENCER.md has the earlier step-list design and Spotify notes.
 
 BPM TRACKING AND LOCAL PREVIEW
   Run npm install once, then npm start and open http://127.0.0.1:8000/.
