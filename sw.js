@@ -1,8 +1,8 @@
 // Phosphor Loop keeps a copy of itself in the browser, so after one visit it opens without internet.
 // Online, every file is fetched fresh and the copy updated; offline, or on a very slow network, the copy is used.
-const CACHE = 'pl-v11-smooth-dancer';
+const CACHE = 'pl-v12-subject';
 const NATURE = 'pl-nature';   // nature pictures seen so far, or all of them via Show setup; kept when the app updates
-const APP = ['./', 'index.html', 'phone.html', 'qrcode.js', 'icon-180.png', 'icon-192.png', 'nature/pictures.json', 'styles/base.css', 'styles/app.css', 'js/fractal-math.js', 'js/shaders.js', 'js/helpers.js', 'js/recording-formats.js', 'js/output-template.js', 'js/ribbit.js', 'js/app.js', 'js/silhouette.js', 'static/silhouette-mask-v2.mp4', 'js/step-sequencer.js', 'js/spotify.js', 'js/audio/beat-clock.js', 'js/audio/rhythm.js', 'js/audio/rhythm-worklet.js', 'js/audio/tempo-worker.js', 'vendor/essentia/essentia-wasm.es.js', 'vendor/essentia/essentia.js-core.es.js', 'vendor/essentia/LICENSE', 'vendor/essentia/README.md'];
+const APP = ['./', 'index.html', 'phone.html', 'qrcode.js', 'icon-180.png', 'icon-192.png', 'nature/pictures.json', 'styles/base.css', 'styles/app.css', 'js/fractal-math.js', 'js/shaders.js', 'js/helpers.js', 'js/recording-formats.js', 'js/output-template.js', 'js/ribbit.js', 'js/app.js', 'js/silhouette.js', 'js/subject.js', 'static/silhouette-mask-v2.mp4', 'js/step-sequencer.js', 'js/spotify.js', 'js/audio/beat-clock.js', 'js/audio/rhythm.js', 'js/audio/rhythm-worklet.js', 'js/audio/tempo-worker.js', 'vendor/essentia/essentia-wasm.es.js', 'vendor/essentia/essentia.js-core.es.js', 'vendor/essentia/LICENSE', 'vendor/essentia/README.md'];
 const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Michroma&family=VT323&display=swap';
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const SLOW_MS = 4000;

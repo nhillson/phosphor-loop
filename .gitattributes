@@ -1,2 +1,3 @@
 # Keep vendored upstream distributions unchanged.
 vendor/essentia/* -whitespace
+vendor/mediapipe/* -whitespace

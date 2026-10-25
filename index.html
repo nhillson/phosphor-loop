@@ -369,6 +369,16 @@
             <button class="btn" id="motion" aria-pressed="false"><span class="led"></span>Only movement</button>
             <span class="hint">For camera, phone, screen, video and the other loop: only what moves gets in.</span>
           </div>
+          <div class="ctl" id="subjectCtl" hidden>
+            <span class="lbl" id="subjectLbl">Subject silhouette</span>
+            <div class="seg seg-4" id="subject" role="group" aria-labelledby="subjectLbl">
+              <button data-subject="off" aria-pressed="true">Off</button>
+              <button data-subject="shadow" aria-pressed="false" title="The person as a solid black shape over the picture">Shadow</button>
+              <button data-subject="glow" aria-pressed="false" title="The person as a white shape on black, for the loop effects to color">Glow</button>
+              <button data-subject="cutout" aria-pressed="false" title="Only the person; the background is taken away">Cutout</button>
+            </div>
+            <span class="hint" id="subjectStatus" role="status">Off: the picture comes in as it is.</span>
+          </div>
           <p class="hint" id="dropHint">You can also drop a picture or video file onto the screen.</p>
         </div>
 
@@ -1074,6 +1084,7 @@
 <script src="js/spotify.js"></script>
 <script src="js/step-sequencer.js"></script>
 <script src="js/silhouette.js"></script>
+<script src="js/subject.js"></script>
 <script src="js/app.js"></script>
 
 </body>
