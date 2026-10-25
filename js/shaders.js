@@ -24,6 +24,7 @@ uniform vec2 uSim;
 uniform float uPxK;   // how many pixels make one Standard-size step (more at a sharper picture), so effects keep their size
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
+uniform float uCutout;   // Subject silhouette: the live inputs carry a see-through surround (alpha) to lay over the rest
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
 uniform float uPush, uPushTurn;   // Pushed by the other loop: the same idea, but the other loop's picture does the pushing
@@ -340,6 +341,7 @@ float specAt(float pitch, float age) {
 // How much of this pixel the spectrograph covers. Its loud parts are laid over the trails rather than added
 // to them as light (see main), so a bass line that never stops can't pile up into white.
 float gSpecA = 0.0;
+float gCutA = -1.0;   // a Subject silhouette input: how solid the person is here (-1 for any other input)
 vec3 specPixel(float level, float fade) {
   gSpecA = smoothstep(0.04, 0.45, level) * fade;
   return specColor(level) * fade;
@@ -408,11 +410,18 @@ vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, f
   if (flip > 0.5) q.x = 1.0 - q.x;
   vec2 e = edgeMask(q);
   vec3 c = grade(sampleSrc(cur, q, id), id);
+  float m = 1.0;
   if (uMotion > 0.5) {
     // Only what changed since the previous frame of this source gets into the loop
     float d = length(c - grade(sampleSrc(prv, q, id), id));
-    float m = smoothstep(0.07, 0.24, d);
+    m = smoothstep(0.07, 0.24, d);
     c = (c * 1.6 + 0.3 * hsv(fract(uTime * 0.05 + d), 0.8, 1.0)) * m;
+  }
+  // Subject silhouette: only the person, with how solid they are here in gCutA (see main)
+  if (uCutout > 0.5 && id >= 5 && id <= 8) {
+    float a = texture(cur, clamp(q, 0.0, 1.0)).a * m * e.x * e.y;
+    gCutA = max(gCutA, a);
+    return c * a;
   }
   return c * e.x * e.y;
 }
@@ -725,16 +734,22 @@ void main() {
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec2 ps = pf + vec2(uSplitOff * side, 0.0);
-  gSpecA = 0.0;
+  gSpecA = 0.0; gCutA = -1.0;
   vec3 s = source(uIn1, ps, uScene1);
-  float specA = gSpecA;
+  float specA = gSpecA, cut1 = gCutA;
   if (uIn2 != 9) {
-    gSpecA = 0.0;
+    gSpecA = 0.0; gCutA = -1.0;
     vec3 s2 = source(uIn2, ps, uScene2);
+    float cut2 = gCutA;
     float w1 = min(1.0, 2.0 * (1.0 - uBlend)), w2 = min(1.0, 2.0 * uBlend);
     specA = max(specA * w1, gSpecA * w2);
-    s = 1.0 - (1.0 - clamp(s * w1, 0.0, 1.0)) * (1.0 - clamp(s2 * w2, 0.0, 1.0));
-  }
+    vec3 a = clamp(s * w1, 0.0, 1.0), b = clamp(s2 * w2, 0.0, 1.0);
+    // A Subject silhouette lies over the other input, which shows all round it; otherwise the two add their light
+    if (cut2 >= 0.0) s = a * (1.0 - cut2 * w2) + b;
+    else if (cut1 >= 0.0) s = b * (1.0 - cut1 * w1) + a;
+    else s = 1.0 - (1.0 - a) * (1.0 - b);
+    specA = max(specA, max(cut1 * w1, cut2 * w2));
+  } else specA = max(specA, cut1);
   s *= uGain;
 
   float bd = sdSeg(pf, uBrush.xy, uBrush.zw);

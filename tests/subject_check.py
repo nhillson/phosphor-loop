@@ -3,7 +3,8 @@
 
 Puts tests/media/person.webm (a man in a yoga pose, from MediaPipe's own test pictures; the sky between his legs counts as middle) in as loop A's Video
 input, then tries Shadow, Glow and Cutout. Each must find the man (a plausible share of the picture, more in the
-middle than at the edges) and get its picture into the loop. Waits by frames, like tests/check.py. About a minute.
+middle than at the edges), leave everything round him see-through (with Trails at 0 and nothing else in, the screen's
+sides go black), and lie over Patchwork as the second input, which must show round him. Waits by frames, like tests/check.py. About a minute.
 
   python3 tests/subject_check.py            pictures go to /tmp/phosphor-subject
 """
@@ -13,7 +14,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from check import (BANNER_JS, FAIL_FAST_MS, START_CEILING_S, Check, Stalled, patched_index, serve)  # noqa: E402
+from check import (BANNER_JS, FAIL_FAST_MS, SLIDER_JS, START_CEILING_S, Check, Stalled, patched_index, serve)  # noqa: E402
 
 CLIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media', 'person.webm')
 LOAD_FRAMES = 600     # the finder (about 11 MB) loads within this many frames
@@ -29,6 +30,14 @@ MASK_JS = """() => {
   }
   return { share: all / (w * h), mid: mid / nm, edge: edge / ne };
 }"""
+
+
+def sides(path):
+    """How bright the outer tenth on each side of a screen picture is (0 to 255)."""
+    from PIL import Image, ImageStat
+    im = Image.open(path).convert('L')
+    w, h = im.size
+    return (ImageStat.Stat(im.crop((0, 0, w // 10, h))).mean[0] + ImageStat.Stat(im.crop((w - w // 10, 0, w, h))).mean[0]) / 2
 
 
 def main():
@@ -64,8 +73,9 @@ def main():
             pg.set_input_files('#vidFile', CLIP)
             pg.wait_for_function('__plSubject.vid.on && __plSubject.loops.A.tgt.in1 === "video"')
             ok(pg.is_visible('#subjectCtl'), 'the Subject silhouette control is not showing with Video chosen')
+            pg.evaluate(SLIDER_JS, ['trails', 0])   # only this frame's input on screen, no echoes
             c.wait_frames(10, 'video playing')
-            c.picture('subject-off')
+            ok(sides(c.picture('subject-off')[0]) > 60, 'the test video is not on screen')
             for mode in ['shadow', 'glow', 'cutout']:
                 pg.click(f'#subject button[data-subject="{mode}"]')
                 ok(pg.get_attribute(f'#subject button[data-subject="{mode}"]', 'aria-pressed') == 'true',
@@ -81,10 +91,17 @@ def main():
                 print(f'{mode}: man is {m["share"]:.0%} of the picture; middle {m["mid"]:.2f}, edges {m["edge"]:.2f}')
                 ok(0.03 < m['share'] < 0.5, f'{mode}: the outline covers {m["share"]:.0%} of the picture')
                 ok(m['mid'] > 0.3 and m['edge'] < 0.1, f'{mode}: the outline is not on the man (middle {m["mid"]:.2f}, edges {m["edge"]:.2f})')
-                c.wait_frames(60, f'{mode} running')
+                c.wait_frames(30, f'{mode} running')
                 path, mean = c.picture('subject-' + mode)
-                ok(mean > 3, f'{mode}: black picture')
-                print('  picture:', path)
+                ok(sides(path) < 8, f'{mode}: the beach still shows round the man ({path})')
+                if mode != 'shadow':
+                    ok(mean > 3, f'{mode}: black picture')
+                pg.select_option('#in2', 'patchwork')
+                c.wait_frames(30, f'{mode} over Patchwork')
+                path, mean = c.picture(f'subject-{mode}-over-patchwork')
+                ok(sides(path) > 40, f'{mode}: Patchwork does not show round the man ({path})')
+                print('  pictures:', path.replace('-over-patchwork', ''), 'and', path)
+                pg.select_option('#in2', 'none')
             pg.click('#subject button[data-subject="off"]')
             c.wait_frames(10, 'back to Off')
         except Stalled as e:

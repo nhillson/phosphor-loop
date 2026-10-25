@@ -66,18 +66,19 @@
         return true;
       } finally { res.close(); }
     }
-    // The finished picture for one look: Shadow (a black figure over the picture), Glow (a white figure on black)
-    // or Cutout (only the person, on black). Draw it into a texture straight away; the next look reuses the canvas.
+    // The finished picture for one look: Shadow (a black figure), Glow (a white figure) or Cutout (the person as
+    // they are). Everything around the person is see-through, so the loop lays the figure over the other input and
+    // the trails (see uCutout in js/shaders.js). Draw it into a texture straight away; the next look reuses the canvas.
     render(mode, video) {
       const g = this.og, w = this.out.width, h = this.out.height;
       g.globalCompositeOperation = 'source-over';
       g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-      if (mode === 'shadow') { g.drawImage(video, 0, 0, w, h); g.drawImage(this.black, 0, 0, w, h); }
-      else if (mode === 'glow') { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.drawImage(this.white, 0, 0, w, h); }
+      g.clearRect(0, 0, w, h);
+      if (mode === 'shadow') g.drawImage(this.black, 0, 0, w, h);
+      else if (mode === 'glow') g.drawImage(this.white, 0, 0, w, h);
       else {
-        g.clearRect(0, 0, w, h); g.drawImage(video, 0, 0, w, h);
+        g.drawImage(video, 0, 0, w, h);
         g.globalCompositeOperation = 'destination-in'; g.drawImage(this.white, 0, 0, w, h);
-        g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
         g.globalCompositeOperation = 'source-over';
       }
       return this.out;

@@ -7796,6 +7796,8 @@ function runLoop(k, xf, brush, f) {
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(fbProg.p);
   const [V, C, S, P] = [vid, cam, scr, pho].map((s) => s.texFor(t.subject));
+  // The see-through surround only once every live input here has its outlines; until then the plain picture
+  set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !LIVE_SRC[n] || LIVE_SRC[n].texFor(t.subject) !== LIVE_SRC[n]) ? 1 : 0);
   const texs = [src.tex, otherTex, picTex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
                 flyTex1 || src.tex, flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
