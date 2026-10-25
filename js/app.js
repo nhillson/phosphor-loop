@@ -8735,7 +8735,8 @@ function seqDrawStatic() {
       if (b - a <= 0.05) continue;
       const xf = document.createElement('div'); xf.className = 'seq-xf';
       xf.style.left = seqX(a) + 'px'; xf.style.width = (b - a) * pps + 'px';
-      if ((b - a) * pps > 70) xf.textContent = `crossfade ${r1(b - a)} s`;
+      xf.title = `Crossfade ${r1(b - a)} s`;
+      if ((b - a) * pps > 70) { const lb = document.createElement('span'); lb.textContent = `crossfade ${r1(b - a)} s`; xf.appendChild(lb); }
       seqLaneEls[ti].appendChild(xf);
     }
   }
