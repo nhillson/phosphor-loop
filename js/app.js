@@ -5684,6 +5684,209 @@ phoOff.addEventListener('click', () => {
   phoneGone('Phone disconnected.');
 });
 
+/* ================= shapes ================= */
+// Shapes laid over everything (js/shapes.js): made and changed under Shapes, dropped or flung on the picture.
+// The controls change the shape last clicked, and set up the next one added.
+const shapes = new PhosphorShapes.World();
+let shapeProg = null, shapeRT = null, shapeRTSize = '', shapeSel = 0, shapeSelAt = -1e9, shapeSw = { n: 0 }, shapeSig = '';
+const shapeTpl = { ...PhosphorShapes.DEFAULTS };
+const SHAPE_SLIDERS = { size: '#shapeSize', gravity: '#shapeGravity', swallow: '#shapeSwallow', disk: '#shapeDisk', tilt: '#shapeTilt' };
+const shapeLabel = (s) => (s.wire ? 'Wireframe ' : '') + PhosphorShapes.KINDS.find((k) => k.id === s.kind).label.toLowerCase();
+const shapeCur = () => { const s = shapes.byId(shapeSel); return s && !s.dying ? s : null; };
+function shapeText(k, v) {
+  v = Math.round(v);
+  if (k === 'gravity') return v === 0 ? 'NONE' : String(v);
+  if (k === 'swallow') return v === 0 ? 'LENS' : v === 100 ? 'SWALLOW' : String(v);
+  if (k === 'disk') return v === 0 ? 'NONE' : String(v);
+  if (k === 'tilt') return `${v}°`;
+  return String(v);
+}
+function shapeSyncUI() {
+  const s = shapeCur() || shapeTpl;
+  $('#shapeKind').value = s.kind;
+  $$('#shapeWire button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.wire === '1') === !!s.wire)));
+  $$('#shapeMove button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.wander === '1') === !!s.wander)));
+  $('#shapeColor').value = s.color;
+  for (const [k, sel] of Object.entries(SHAPE_SLIDERS)) {
+    const el = $(sel);
+    el.value = Math.round(s[k]); fillTrack(el);
+    $(sel + 'Out').textContent = shapeText(k, s[k]);
+  }
+  const n = shapes.count, cur = shapeCur();
+  $('#shapeRemove').disabled = !cur;
+  $('#shapeClear').disabled = !n;
+  $('#shapeAdd').disabled = n >= PhosphorShapes.MAX;
+  $('#shapeStatus').textContent = !n ? 'No shapes yet. Click Add shape, or drag it onto the picture.'
+    : `${n} shape${n > 1 ? 's' : ''} on the picture${n >= PhosphorShapes.MAX ? ' (the most there can be)' : ''}. ` +
+      (cur ? `The controls are changing the ${shapeLabel(cur)}.` : 'Click one on the picture to change it.');
+  shapeSig = `${n}|${shapeSel}|${cur ? cur.size + '|' + cur.gravity : ''}`;
+}
+function pickShape(id) { shapeSel = id; shapeSelAt = performance.now(); shapeSyncUI(); }
+function shapeSet(k, v) {
+  shapeTpl[k] = v;
+  const s = shapeCur();
+  if (s) { s[k] = v; shapeSelAt = performance.now(); }
+  shapeSyncUI();
+}
+function addShape(x, y, opts) {
+  const s = shapes.add({ ...shapeTpl, ...opts }, x, y);
+  if (!s) { toast('There can be eight shapes at most. Remove one first.'); return null; }
+  if (!opts || !opts.byAp) pickShape(s.id); else shapeSyncUI();
+  return s;
+}
+$('#shapeKind').addEventListener('change', (e) => shapeSet('kind', e.target.value));
+$$('#shapeWire button').forEach((b) => b.addEventListener('click', () => shapeSet('wire', b.dataset.wire === '1')));
+$$('#shapeMove button').forEach((b) => b.addEventListener('click', () => shapeSet('wander', b.dataset.wander === '1')));
+$('#shapeColor').addEventListener('input', (e) => shapeSet('color', e.target.value));
+for (const [k, sel] of Object.entries(SHAPE_SLIDERS)) $(sel).addEventListener('input', (e) => shapeSet(k, +e.target.value));
+$('#shapeRemove').addEventListener('click', () => { if (shapeCur()) shapes.remove(shapeSel); shapeSel = 0; shapeSyncUI(); });
+$('#shapeClear').addEventListener('click', () => { shapes.clear(); shapeSel = 0; shapeSyncUI(); });
+// Add shape: a click puts it somewhere on the picture; dragged onto the picture, it lands where it's let go
+{
+  const btn = $('#shapeAdd');
+  let down = null, ghost = null;
+  const overCanvas = (e) => { const r = canvas.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+  btn.addEventListener('pointerdown', (e) => {
+    if (btn.disabled || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    down = { x: e.clientX, y: e.clientY, moved: false };
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  btn.addEventListener('pointermove', (e) => {
+    if (!down) return;
+    if (!down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) {
+      down.moved = true;
+      ghost = document.createElement('div'); ghost.className = 'shape-ghost'; document.body.appendChild(ghost);
+    }
+    if (ghost) { ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; }
+  });
+  const end = (e, cancel) => {
+    if (!down) return;
+    const d = down; down = null;
+    if (ghost) { ghost.remove(); ghost = null; }
+    if (cancel) return;
+    if (!d.moved) addShape();
+    else if (overCanvas(e)) { const p = pointerToP(e, canvas); addShape(p[0], p[1]); }
+  };
+  btn.addEventListener('pointerup', (e) => end(e, false));
+  btn.addEventListener('pointercancel', (e) => end(e, true));
+  // From the keyboard
+  btn.addEventListener('click', (e) => { if (e.detail === 0) addShape(); });
+}
+// Autopilot may now and then add a shape of its own, fling one, or take away one it added
+const SHAPE_AP_KEY = 'phosphor-shapes-ap';
+let shapeAp = true, shapeApNext = 0;
+try { shapeAp = localStorage.getItem(SHAPE_AP_KEY) !== '0'; } catch (_) {}
+$('#shapeAp').setAttribute('aria-pressed', String(shapeAp));
+$('#shapeAp').addEventListener('click', () => {
+  shapeAp = !shapeAp;
+  $('#shapeAp').setAttribute('aria-pressed', String(shapeAp));
+  try { localStorage.setItem(SHAPE_AP_KEY, shapeAp ? '1' : '0'); } catch (_) {}
+});
+function shapeApTick(now) {
+  if (!ap.on || !shapeAp || frozen) { shapeApNext = 0; return; }
+  if (!shapeApNext) { shapeApNext = now + rnd(8000, 20000); return; }
+  if (now < shapeApNext) return;
+  shapeApNext = now + rnd(15000, 45000);
+  const live = shapes.list.filter((s) => !s.dying), mine = live.filter((s) => s.byAp);
+  const acts = [];
+  if (mine.length < 2 && live.length < 6) acts.push(['add', mine.length ? 0.6 : 1.2]);
+  if (live.length) acts.push(['fling', 1]);
+  if (mine.length) acts.push(['remove', mine.length >= 2 ? 0.8 : 0.3]);
+  const act = wpick(acts);
+  if (act === 'add') {
+    const c = hsv(Math.random(), rnd(0.4, 0.9), rnd(0.15, 0.9)).map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+    addShape(undefined, undefined, { byAp: true, wander: true, kind: pick(PhosphorShapes.KINDS).id, wire: Math.random() < 0.3, color: '#' + c,
+      size: rnd(25, 65), gravity: rnd(30, 85), swallow: rnd(15, 85), disk: rnd(25, 80), tilt: rnd(55, 85) });
+  } else if (act === 'fling') {
+    const s = pick(live.filter((x) => !shapes.held || shapes.held.s !== x));
+    if (s) { const a = Math.random() * Math.PI * 2, v = rnd(0.6, 1.6); s.vx = Math.cos(a) * v; s.vy = Math.sin(a) * v; s.head = a; }
+  } else if (act === 'remove') {
+    shapes.remove(mine.sort((a, b) => a.born - b.born)[0].id);
+  }
+}
+// Each frame: they move on (unless the picture is frozen), and the controls catch up with merges and Autopilot
+function shapesTick(now, dt) {
+  if (!frozen) shapes.step(dt, simAspect);
+  shapeApTick(now);
+  if (shapes.merged) { if (shapes.merged.from === shapeSel) shapeSel = shapes.merged.into; shapes.merged = null; }
+  const cur = shapeCur();
+  if (shapeSel && !cur) shapeSel = 0;
+  if (shapeSig !== `${shapes.count}|${shapeSel}|${cur ? cur.size + '|' + cur.gravity : ''}`) shapeSyncUI();
+}
+// Drawn over the finished picture, before the screen's own effects. Nothing is drawn while there are none.
+// Each shape is drawn into its own tile by a shader made for its kind (made the first time one is shown), then
+// one pass lays the tiles over the picture.
+const shapeTileProgs = {};
+let shapeAtlas = null, shapeFailed = false;
+function shapeTileProg(kind, wire) {
+  const key = kind + (wire ? 'w' : '');
+  if (!(key in shapeTileProgs)) {
+    try { shapeTileProgs[key] = program(PhosphorShapes.tileFS(kind, wire, useFloat)); }
+    catch (err) { shapeTileProgs[key] = null; if (!shapeFailed) toast('Some shapes can’t be drawn on this graphics card.'); shapeFailed = true; }
+  }
+  return shapeTileProgs[key];
+}
+function makeShapeAtlas() {
+  const W = PhosphorShapes.TMAX * PhosphorShapes.MAX, H = PhosphorShapes.TMAX;
+  const col = makeTarget(W, H), from = makeTarget(W, H);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, col.fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, from.tex, 0);
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  gl.deleteFramebuffer(from.fbo);
+  return { fbo: col.fbo, col: col.tex, from: from.tex, ok };
+}
+function drawShapes(now) {
+  if (!shapes.list.length || shapeProg === false) return null;
+  if (!shapeProg) {
+    try { shapeProg = program(PhosphorShapes.FS); shapeAtlas = makeShapeAtlas(); if (!shapeAtlas.ok) throw new Error('shape tiles'); }
+    catch (err) { shapeProg = false; toast('Shapes can’t be drawn on this graphics card.'); return null; }
+  }
+  const size = `${simW}x${simH}`;
+  if (!shapeRT || shapeRTSize !== size) { if (shapeRT) dropTarget(shapeRT); shapeRT = makeTarget(); shapeRTSize = size; }
+  const held = shapes.held && shapes.held.s.id === shapeSel;
+  const glow = held ? 1 : clamp(1 - (now - shapeSelAt - 1500) / 800, 0, 1);
+  const P = shapes.pack(shapeSel, glow, simH);
+  const TM = PhosphorShapes.TMAX;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, shapeAtlas.fbo);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, comp.tex);
+  for (let i = 0; i < P.n; i++) {
+    const prog = shapeTileProg(P.kinds[i][0], P.kinds[i][1]), T = P.E[i * 4 + 3];
+    gl.viewport(i * TM, 0, T, T);
+    if (!prog) { gl.enable(gl.SCISSOR_TEST); gl.scissor(i * TM, 0, T, T); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.disable(gl.SCISSOR_TEST); continue; }
+    gl.useProgram(prog.p);
+    set1i(prog, 'uPic', 0);
+    set2f(prog, 'uSim', simW, simH);
+    set2f(prog, 'uOrigin', i * TM, 0);
+    for (const [name, arr] of [['uA', P.A], ['uB', P.B], ['uC', P.C], ['uE', P.E]]) { const l = U(prog, name); if (l) gl.uniform4fv(l, arr.subarray(i * 4, i * 4 + 4)); }
+    const lr = U(prog, 'uR'); if (lr) gl.uniformMatrix3fv(lr, false, P.R.subarray(i * 9, i * 9 + 9));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, shapeRT.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(shapeProg.p);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, shapeAtlas.col);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, shapeAtlas.from);
+  set1i(shapeProg, 'uPic', 0); set1i(shapeProg, 'uTileCol', 1); set1i(shapeProg, 'uTileFrom', 2);
+  set2f(shapeProg, 'uSim', simW, simH);
+  set1f(shapeProg, 'uTime', simT);
+  set1f(shapeProg, 'uFloat', useFloat ? 1 : 0);
+  set1i(shapeProg, 'uN', P.n);
+  for (const [name, arr] of [['uA', P.A], ['uB', P.B], ['uC', P.C], ['uE', P.E]]) { const l = U(shapeProg, name + '[0]'); if (l) gl.uniform4fv(l, arr); }
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE0);
+  return shapeRT;
+}
+// A shape under the mouse shows a hand
+function shapeHover(e, el) {
+  if (e.buttons) return;
+  const p = pointerToP(e, el);
+  el.style.cursor = shapes.hit(p[0], p[1]) ? 'grab' : '';
+}
+window.__plShapes = { shapes, addShape, pickShape, get sel() { return shapeSel; }, apSoon() { shapeApNext = 1; } };   // for tests/shapes_check.py
+shapeSyncUI();
+
 /* ================= drawing on the screen ================= */
 let drawing = false, pCur = null, pPrev = null;
 function pointerToP(e, el = canvas) {
@@ -5694,15 +5897,26 @@ function pointerToP(e, el = canvas) {
 }
 function startDraw(e, el) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  drawing = true;
   try { el.setPointerCapture(e.pointerId); } catch (_) {}
-  pCur = pointerToP(e, el); pPrev = pCur;
+  const p = pointerToP(e, el);
   hideTip();
   if (frozen) toggleFreeze(false);
   e.preventDefault();
+  // On a shape, it's picked up (and flung when let go) instead of drawn on
+  const hit = shapes.hit(p[0], p[1]);
+  if (hit) { shapes.grab(hit, p[0], p[1], performance.now()); pickShape(hit.id); el.style.cursor = 'grabbing'; return; }
+  drawing = true;
+  pCur = p; pPrev = pCur;
 }
-function moveDraw(e, el) { if (drawing) pCur = pointerToP(e, el); }
-function endDraw() { drawing = false; }
+function moveDraw(e, el) {
+  if (shapes.held) { const p = pointerToP(e, el); shapes.drag(p[0], p[1], performance.now()); }
+  else if (drawing) pCur = pointerToP(e, el);
+  else shapeHover(e, el);
+}
+function endDraw(e) {
+  drawing = false;
+  if (shapes.held) { shapes.release(performance.now()); if (e && e.target) e.target.style.cursor = ''; }
+}
 canvas.addEventListener('pointerdown', (e) => startDraw(e, canvas));
 canvas.addEventListener('pointermove', (e) => moveDraw(e, canvas));
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => canvas.addEventListener(ev, endDraw));
@@ -7902,6 +8116,8 @@ function runLoop(k, xf, brush, f) {
   }
   set4f(fbProg, 'uBrush', b[0], b[1], b[2], b[3]);
   set1f(fbProg, 'uBrushOn', on);
+  set1i(fbProg, 'uSwN', shapeSw.n);
+  if (shapeSw.n) { const l = U(fbProg, 'uSw[0]'); if (l) gl.uniform4fv(l, shapeSw.S); }
   const bc = hsv(((simT * 0.15) + (0.5 * LOOP_OFF[k])) % 1, 0.65, 1);
   set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -8673,6 +8889,7 @@ function frame() {
   drawMeter();
   showSequenceTick(now);
   updateSilhouettes(now);
+  shapesTick(now, dt);
   drawTrackTimeline(now);
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
@@ -8707,6 +8924,7 @@ function frame() {
   const wA = W.A, wB = W.B;
   const f = dt * 60;
   if (!frozen) {
+    shapeSw = shapes.packSwallow(f);
     let brush = null;
     if (drawing && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
     // A hidden loop also runs while Check each look is trying a look out on it, and while a loop that's running
@@ -8739,12 +8957,12 @@ function frame() {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   drawShowFade(now);
   eyeTick(now, dt, wA, wB);
-
+  const shown = drawShapes(now) || comp;
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.useProgram(dispProg.p);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, comp.tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shown.tex);
   set2f(dispProg, 'uRes', canvas.width, canvas.height);
   set1f(dispProg, 'uTime', (now - t0) / 1000);
   set1f(dispProg, 'uStatic', staticAmt);

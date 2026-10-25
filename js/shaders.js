@@ -52,6 +52,7 @@ uniform vec4 uBrush;
 uniform vec3 uBrushCol;
 out vec4 o;
 ${COMMON}
+${window.PhosphorShapes.SWALLOW}
 float sdSeg(vec2 p, vec2 a, vec2 b) {
   vec2 pa = p - a, ba = b - a;
   float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
@@ -700,6 +701,9 @@ void main() {
   if (uMelt > 0.0) q += meltAt(q, asp);
   if (uPush > 0.0) q += pushAt(q, asp);
   if (uLook > 0.0) q = lookAt(q, asp);
+  // Shapes that swallow: the picture round them is pulled in and wound round, and what reaches them is gone
+  float eaten = 1.0;
+  if (uSwN > 0) q += swallow(p, eaten);
   // Split lines: every other line of pixels slides left, the lines between slide right
   float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
   q.x += uSplit * side;
@@ -731,7 +735,7 @@ void main() {
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   if (uDye > 0.0) fb = dyeBy(fb, pf, asp);
   fb = max(hueRot(fb, uHue), 0.0);
-  fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
+  fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside * eaten;
 
   vec2 ps = pf + vec2(uSplitOff * side, 0.0);
   gSpecA = 0.0; gCutA = -1.0;

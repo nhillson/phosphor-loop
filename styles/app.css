@@ -361,6 +361,14 @@
   .chip[aria-pressed="true"] .led { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }
   .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .quick-actions .btn { padding-inline: 8px; }
+  /* shapes */
+  .ctl.shape-color { display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+  .shape-color input[type="color"] { width: 64px; height: 32px; padding: 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--raise); cursor: pointer; }
+  #shapeAdd { cursor: grab; touch-action: none; }
+  .shape-ghost {
+    position: fixed; z-index: 1000; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+    pointer-events: none; border: 2px dashed var(--amber); box-shadow: 0 0 18px var(--amber-glow);
+  }
   .seg { display: grid; gap: 6px; }
   .seg-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

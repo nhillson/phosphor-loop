@@ -35,6 +35,9 @@ file don't rebuild the app.
 4e. **Subject silhouette** (Inputs › Subject silhouette: Shadow / Glow / Cutout on Video, Camera, Screen, Phone; MediaPipe in
    `vendor/mediapipe`, code in `js/subject.js`): `python3 tests/subject_check.py` (about a minute). It feeds
    `tests/media/person.webm` in and reaches into the app through `window.__plSubject`.
+4f. **Shapes** (the Shapes section: 2D/3D shapes over everything, with gravity, lens/swallow and an accretion disk;
+   code in `js/shapes.js`, glue under "shapes" in js/app.js): `python3 tests/shapes_check.py` (about 3 minutes). It
+   takes a picture of every kind, flings, drops, merges and clears, and reaches into the app through `window.__plShapes`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

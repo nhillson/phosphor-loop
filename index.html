@@ -522,6 +522,73 @@
         </div>
       </section>
 
+      <section class="group" id="shapesGroup" aria-labelledby="h-shapes">
+        <h2 id="h-shapes">Shapes</h2>
+        <div class="ctl">
+          <label for="shapeKind" class="lbl">Shape</label>
+          <select id="shapeKind">
+            <optgroup label="Flat">
+              <option value="circle">Circle</option><option value="triangle">Triangle</option><option value="square">Square</option>
+              <option value="star">Star</option><option value="hexagon">Hexagon</option>
+            </optgroup>
+            <optgroup label="Solid">
+              <option value="sphere" selected>Sphere</option><option value="cube">Cube</option><option value="pyramid">Pyramid</option>
+              <option value="diamond">Diamond</option>
+            </optgroup>
+            <optgroup label="Rings">
+              <option value="donut">Donut</option><option value="planet">Ringed planet</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="seg seg-2" id="shapeWire" role="group" aria-label="Solid or wireframe">
+          <button data-wire="0" aria-pressed="true">Solid</button>
+          <button data-wire="1" aria-pressed="false">Wireframe</button>
+        </div>
+        <div class="ctl shape-color">
+          <label for="shapeColor" class="lbl">Colour</label>
+          <input type="color" id="shapeColor" value="#202024">
+        </div>
+        <div class="seg seg-2" id="shapeMove" role="group" aria-label="How it moves">
+          <button data-wander="1" aria-pressed="true" title="It drifts about by itself">Wander</button>
+          <button data-wander="0" aria-pressed="false" title="It stays where you put it">Stay put</button>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="shapeSize">Size</label><output id="shapeSizeOut" for="shapeSize"></output></div>
+          <input type="range" id="shapeSize" min="0" max="100" step="1" value="45">
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="shapeGravity">Gravity</label><output id="shapeGravityOut" for="shapeGravity"></output></div>
+          <input type="range" id="shapeGravity" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>None</span><span>Black hole</span></div>
+          <span class="hint">How hard it pulls on the picture and on the other shapes.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="shapeSwallow">Lens or swallow</label><output id="shapeSwallowOut" for="shapeSwallow"></output></div>
+          <input type="range" id="shapeSwallow" min="0" max="100" step="1" value="40">
+          <div class="ends"><span>Bends the view</span><span>Swallows the trails</span></div>
+          <span class="hint">To the left, the pull bends the view like a lens and leaves the picture as it was. To the right, it drags the picture’s own pixels in, so the trails swirl into it.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="shapeDisk">Disk</label><output id="shapeDiskOut" for="shapeDisk"></output></div>
+          <input type="range" id="shapeDisk" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>None</span><span>Wide</span></div>
+          <span class="hint">The glowing ring of the picture’s own pixels swirling in. It passes behind and in front of the shape.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="shapeTilt">Disk tilt</label><output id="shapeTiltOut" for="shapeTilt"></output></div>
+          <input type="range" id="shapeTilt" min="0" max="88" step="1" value="75">
+          <div class="ends"><span>Face on</span><span>Edge on</span></div>
+        </div>
+        <div class="quick-actions shape-actions">
+          <button class="btn" id="shapeAdd" title="Click to add it somewhere on the picture, or drag it onto the picture to put it where you let go">+ Add shape</button>
+          <button class="btn" id="shapeRemove" disabled>Remove this one</button>
+          <button class="btn" id="shapeClear" disabled>Clear all shapes</button>
+        </div>
+        <p class="hint" id="shapeStatus" role="status">No shapes yet. Click Add shape, or drag it onto the picture.</p>
+        <div class="chips"><button class="chip" id="shapeAp" aria-pressed="true" title="While Autopilot runs it may now and then add a shape, fling one, or take away one it added"><span class="led"></span>Autopilot may add and fling shapes</button></div>
+        <span class="hint">Drag a shape on the picture to move it, or drag and let go to fling it. Click one to change it here.</span>
+      </section>
+
       <section class="group" id="soundGroup" aria-labelledby="h-sound">
         <h2 id="h-sound">React to sound</h2>
         <div class="ctl">
@@ -916,6 +983,16 @@
             <dt>Fractal fold</dt><dd>Instead of a plain zoom, every frame folds the picture through the formula behind the Mandelbrot set, so anything that comes in grows into fractal flowers, spirals and lace. The fractal slowly changes shape by itself; Zoom and Spin reshape it too. Low mixes a little of it into the usual tunnel.</dd>
             <dt>Crystal</dt><dd>The picture cracks into ten pieces centred on its brightest spots. Each piece turns and zooms in its own way, like a broken mirror, and the cracks move as the light does.</dd>
           </dl></div>
+          <div class="g-card"><h3>Shapes</h3><dl>
+            <dt>Add shape</dt><dd>Click it and a shape appears somewhere on the picture, or drag it onto the picture and let go where you want it. Up to eight shapes, flat (circle, triangle, square, star, hexagon), solid (sphere, cube, pyramid, diamond) or rings (donut, ringed planet), solid or as glowing wireframes. They lie over everything, whichever loops are showing.</dd>
+            <dt>On the picture</dt><dd>Drag a shape to move it; drag fast and let go to fling it. Click one to change it with the controls. They bounce off the edges of the screen.</dd>
+            <dt>Wander or Stay put</dt><dd>A wandering shape drifts about by itself and is pulled by the others' gravity, so it can fall into orbit; when two touch they merge into one bigger shape with both their pulls. A shape left to stay put stays where you put it (until flung), but still pulls the others.</dd>
+            <dt>Gravity</dt><dd>How hard it pulls, from none to a black hole.</dd>
+            <dt>Lens or swallow</dt><dd>To the left the pull bends the view round the shape like a lens, leaving the picture as it was. To the right it drags the picture's own pixels in, so the trails swirl into it and vanish.</dd>
+            <dt>Disk and Disk tilt</dt><dd>The accretion disk: the picture's own colours whirling round the shape, brighter on the side coming towards you. Tilted nearly edge on, its far side shows bent up over the top of the shape, like the black hole in Interstellar.</dd>
+            <dt>Clear all shapes</dt><dd>Takes every shape away. Clear on the bar below the picture wipes the trails but leaves the shapes.</dd>
+            <dt>Autopilot may add and fling shapes</dt><dd>While Autopilot runs it now and then adds a shape of its own, flings one, or takes away one it added. It never takes away yours.</dd>
+          </dl></div>
           <div class="g-card"><h3>React to sound</h3><dl>
             <dt>Computer sound</dt><dd>Listens to whatever this computer is playing: Spotify, YouTube, games. Chrome asks what to share: on the Entire Screen tab pick any screen (with two monitors, Screen 1 or Screen 2 both give the whole computer’s sound) and switch on Also share system audio. For Spotify in a browser tab, pick that tab and switch on Also share tab audio.</dd>
             <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works. Listen to picks which input when there’s more than one.</dd>
@@ -1073,6 +1150,7 @@
 </div>
 
 <script src="js/fractal-math.js"></script>
+<script src="js/shapes.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/helpers.js"></script>
 <script src="js/recording-formats.js"></script>

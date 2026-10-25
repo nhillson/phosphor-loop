@@ -29,6 +29,7 @@ FILES = {
     'js/step-sequencer.js': 'application/javascript',
     'js/silhouette.js': 'application/javascript',
     'js/subject.js': 'application/javascript',
+    'js/shapes.js': 'application/javascript',
     'static/silhouette-mask-v2.mp4': 'video/mp4',
     'js/app.js': 'application/javascript',
     'js/audio/beat-clock.js': 'application/javascript',
