@@ -40,6 +40,14 @@ def sides(path):
     return (ImageStat.Stat(im.crop((0, 0, w // 10, h))).mean[0] + ImageStat.Stat(im.crop((w - w // 10, 0, w, h))).mean[0]) / 2
 
 
+def box(path, x0, y0, x1, y1):
+    """How bright a part of a screen picture is (0 to 255); the corners as fractions of its width and height."""
+    from PIL import Image, ImageStat
+    im = Image.open(path).convert('L')
+    w, h = im.size
+    return ImageStat.Stat(im.crop((int(x0 * w), int(y0 * h), int(x1 * w), int(y1 * h)))).mean[0]
+
+
 def main():
     out = os.path.join(tempfile.gettempdir(), 'phosphor-subject')
     os.makedirs(out, exist_ok=True)
@@ -102,6 +110,17 @@ def main():
                 ok(sides(path) > 40, f'{mode}: Patchwork does not show round the man ({path})')
                 print('  pictures:', path.replace('-over-patchwork', ''), 'and', path)
                 pg.select_option('#in2', 'none')
+            # Loop A's Shadow lies over loop B too: with both on screen, the man's middle stays dark
+            pg.click('#subject button[data-subject="shadow"]')
+            pg.click('#tabB'); pg.click('#inputs button[data-src="patchwork"]'); pg.click('#tabA')   # fills loop B's screen
+            pg.evaluate(SLIDER_JS, ['showB', 100])
+            c.wait_frames(40, 'shadow over loop B')
+            path, _ = c.picture('subject-shadow-over-loop-b')
+            middle, whole = box(path, 0.47, 0.5, 0.53, 0.7), box(path, 0, 0, 1, 1)
+            print(f'shadow over loop B: middle {middle:.0f}, whole picture {whole:.0f}  ({path})')
+            ok(whole > 8, 'loop B does not show')
+            ok(middle < 12, f'loop B shows through the shadow ({path})')
+            pg.evaluate(SLIDER_JS, ['showB', 0])
             pg.click('#subject button[data-subject="off"]')
             c.wait_frames(10, 'back to Off')
         except Stalled as e:

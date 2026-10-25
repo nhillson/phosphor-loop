@@ -748,8 +748,10 @@ void main() {
     if (cut2 >= 0.0) s = a * (1.0 - cut2 * w2) + b;
     else if (cut1 >= 0.0) s = b * (1.0 - cut1 * w1) + a;
     else s = 1.0 - (1.0 - a) * (1.0 - b);
-    specA = max(specA, max(cut1 * w1, cut2 * w2));
-  } else specA = max(specA, cut1);
+    cut1 = max(cut1 * w1, cut2 * w2);
+  }
+  float cover = max(cut1, 0.0);
+  specA = max(specA, cover);
   s *= uGain;
 
   float bd = sdSeg(pf, uBrush.xy, uBrush.zw);
@@ -759,7 +761,9 @@ void main() {
   vec3 outc = 1.0 - (1.0 - fb) * (1.0 - s);
   // Where the spectrograph is loud it shows as itself over the trails; where it's quiet the trails show through
   if (specA > 0.0) outc = mix(outc, s, specA);
-  o = vec4(outc, 1.0);
+  // Alpha: 1 less how much a Subject silhouette covers this spot this frame, so on screen it lies over the
+  // other loops too (see FS_COMPOSITE)
+  o = vec4(outc, 1.0 - cover);
 }`;
 
 const FS_COMPOSITE = `#version 300 es
@@ -778,11 +782,18 @@ vec3 turn(vec3 c, float a) {
 }
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
-  vec3 a = turn(texture(uA, uv).rgb, uRecolor.x) * uWA;
-  vec3 b = turn(texture(uB, uv).rgb, uRecolor.y) * uWB;
-  vec3 c = uWC > 0.0 ? turn(texture(uC, uv).rgb, uRecolor.z) * uWC : vec3(0.0);
-  vec3 d = uWD > 0.0 ? turn(texture(uD, uv).rgb, uRecolor.w) * uWD : vec3(0.0);
-  o = vec4(1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d), 1.0);
+  vec4 A = texture(uA, uv), B = texture(uB, uv), C = texture(uC, uv), D = texture(uD, uv);
+  vec3 a = turn(A.rgb, uRecolor.x) * uWA;
+  vec3 b = turn(B.rgb, uRecolor.y) * uWB;
+  vec3 c = uWC > 0.0 ? turn(C.rgb, uRecolor.z) * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? turn(D.rgb, uRecolor.w) * uWD : vec3(0.0);
+  vec3 col = 1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d);
+  // A loop's Subject silhouette (where its alpha is below 1) lies over the other loops instead of adding light
+  col = mix(col, a, clamp((1.0 - A.a) * uWA, 0.0, 1.0));
+  col = mix(col, b, clamp((1.0 - B.a) * uWB, 0.0, 1.0));
+  if (uWC > 0.0) col = mix(col, c, clamp((1.0 - C.a) * uWC, 0.0, 1.0));
+  if (uWD > 0.0) col = mix(col, d, clamp((1.0 - D.a) * uWD, 0.0, 1.0));
+  o = vec4(col, 1.0);
 }`;
 
 // Time warp: each part of a loop's picture comes from a different moment. The loop's recent frames are kept
@@ -805,18 +816,19 @@ void main() {
   else if (uShape < 1.5) d = uv.x;             // the left is now, the right is longest ago
   else d = min(1.0, length((uv - 0.5) * vec2(asp, 1.0)) / (0.5 * length(vec2(asp, 1.0))));   // the middle is now
   float age = d * uSpan;                       // seconds ago
-  vec3 now = texture(uNow, uv).rgb;
-  if (uFilled < 1.0) { o = vec4(now, 1.0); return; }
+  vec4 nowA = texture(uNow, uv);   // its alpha: where a Subject silhouette is now (see FS_FEEDBACK)
+  vec3 now = nowA.rgb;
+  if (uFilled < 1.0) { o = vec4(now, nowA.a); return; }
   // The newest kept frame is uSince old; between it and now, blend the two
   float j = (age - uSince) * uRate;
   if (j <= 0.0) {
     float a = uSince > 0.0 ? clamp(age / uSince, 0.0, 1.0) : 1.0;
-    o = vec4(mix(now, kept(0.0, uv), a), 1.0);
+    o = vec4(mix(now, kept(0.0, uv), a), nowA.a);
     return;
   }
   j = min(j, uFilled - 1.0);
   float j0 = floor(j);
-  o = vec4(mix(kept(j0, uv), kept(min(j0 + 1.0, uFilled - 1.0), uv), j - j0), 1.0);
+  o = vec4(mix(kept(j0, uv), kept(min(j0 + 1.0, uFilled - 1.0), uv), j - j0), nowA.a);
 }`;
 
 const FS_DISPLAY = `#version 300 es
