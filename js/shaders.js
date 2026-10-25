@@ -701,9 +701,8 @@ void main() {
   if (uMelt > 0.0) q += meltAt(q, asp);
   if (uPush > 0.0) q += pushAt(q, asp);
   if (uLook > 0.0) q = lookAt(q, asp);
-  // Shapes that swallow: the picture round them is pulled in and wound round, and what reaches them is gone
-  float eaten = 1.0;
-  if (uSwN > 0) q += swallow(p, eaten);
+  // Shapes that swallow: the picture round them is pulled in and wound round
+  if (uSwN > 0) q += swallow(p);
   // Split lines: every other line of pixels slides left, the lines between slide right
   float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
   q.x += uSplit * side;
@@ -735,7 +734,7 @@ void main() {
   if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
   if (uDye > 0.0) fb = dyeBy(fb, pf, asp);
   fb = max(hueRot(fb, uHue), 0.0);
-  fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside * eaten;
+  fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
   vec2 ps = pf + vec2(uSplitOff * side, 0.0);
   gSpecA = 0.0; gCutA = -1.0;

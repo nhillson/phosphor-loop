@@ -237,66 +237,82 @@ vec4 shape(vec2 p, out vec2 from) {
   mat3 M = uR;
   vec3 n = vec3(0.0, sin(tilt), -cos(tilt));
   vec3 e1 = vec3(1.0, 0.0, 0.0), e2 = cross(e1, n);
-  // The light starts where it first comes within reach of the shape
-  float h2 = dot(q, q);
-  vec3 pos = vec3(q, -sqrt(max((rb + 0.4) * (rb + 0.4) - h2, 0.0))), dir = vec3(0.0, 0.0, 1.0);
-  float G = 1.5 * g;
-  vec3 col = vec3(0.0); float al = 0.0, glow = 0.0, minR = 1e5;
-  bool hit = false, gone = false;
   vec3 cl = uC.rgb;
-  for (int s = 0; s < 90; s++) {
-    float r = length(pos);
-    minR = min(minR, r);
-    float dt = clamp(0.11 * r * r / (r + 1.5), 0.035, 0.7);
-    if (r < 1.75) {
-      float m, dd = body(M * pos, m);
-      if (wire) glow += exp(-max(dd, 0.0) * 22.0) * dt * 1.2;
+  // The shape itself is seen straight on, never bent or magnified (so no dark hole grows round it); only the disk
+  // and the picture behind it are bent by its pull. zb: how deep into the scene the shape is here.
+  float zb = 1e5, glow = 0.0;
+  vec3 bodyCol = vec3(0.0);
+  if (rq < 1.75) {
+    vec3 sp = vec3(q, -1.8);
+    for (int k = 0; k < 64; k++) {
+      float m, dd = body(M * sp, m);
+      float st = max(dd * 0.9, 0.004);
+      if (wire) glow += exp(-max(dd, 0.0) * 22.0) * min(st, 0.1) * 1.2;
       if (dd < 0.003) {
         // Lit from the upper left, with the picture round it shining on its edges
         const float e = 0.004;
-        vec3 bp = M * pos;
+        vec3 bp = M * sp;
         float m2;
         vec3 nb = normalize(vec3(
           body(bp + vec3(e, 0, 0), m2) - body(bp - vec3(e, 0, 0), m2),
           body(bp + vec3(0, e, 0), m2) - body(bp - vec3(0, e, 0), m2),
           body(bp + vec3(0, 0, e), m2) - body(bp - vec3(0, 0, e), m2)));
-        vec3 N = transpose(M) * nb, V = -dir;
+        vec3 N = transpose(M) * nb, V = vec3(0.0, 0.0, -1.0);
         vec3 L = normalize(vec3(-0.5, 0.65, -0.6));
         vec3 base = m > 1.5 ? mix(cl, vec3(0.85, 0.8, 0.7), 0.45) : cl;
         float dif = max(dot(N, L), 0.0);
         float spec = pow(max(dot(reflect(-L, N), V), 0.0), 28.0);
         float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-        vec3 env = pic(c + R * (pos.xy + N.xy * 1.2));
-        vec3 sh = wire ? cl * 1.3 + vec3(0.25) * dif
+        vec3 env = pic(c + R * (sp.xy + N.xy * 1.2));
+        bodyCol = wire ? cl * 1.3 + vec3(0.25) * dif
                        : base * (0.1 + 0.9 * dif) + vec3(0.55) * spec + env * rim * 1.1 + base * env * 0.25;
-        col += (1.0 - al) * sh;
-        al = 1.0; hit = true;
+        zb = sp.z;
         break;
       }
-      dt = min(dt, max(dd * 0.9, 0.003));
+      sp.z += st;
+      if (sp.z > 1.8) break;
     }
-    // Light that gets this close never comes out again (closer in than any shape's face, so none shows a hole)
-    if (r < 0.08 * sqrt(g)) { gone = true; break; }
-    vec3 acc = -G * h2 * pos / (r * r * r * r * r);
+  }
+  // The light past it: starts where it first comes within reach of the shape, and is bent by the pull
+  float h2 = dot(q, q);
+  vec3 pos = vec3(q, -sqrt(max((rb + 0.4) * (rb + 0.4) - h2, 0.0))), dir = vec3(0.0, 0.0, 1.0);
+  float G = 1.5 * g;
+  vec3 col = vec3(0.0); float al = 0.0, minR = 1e5;
+  bool hit = zb < 1e4;
+  for (int s = 0; s < 90; s++) {
+    float r = length(pos);
+    minR = min(minR, r);
+    float dt = clamp(0.11 * r * r / (r + 1.5), 0.035, 0.7);
+    // The pull softens close in, so light passing near the middle bends but always comes out again
+    float r2 = r * r + 0.5;
+    vec3 acc = -G * h2 * pos / (r2 * r2 * sqrt(r2));
     vec3 np = pos + dir * dt;
     dir = normalize(dir + acc * dt);
     float a0 = dot(pos, n), a1 = dot(np, n);
     if (dsz > 0.0 && a0 * a1 < 0.0) {
       vec3 hp = mix(pos, np, a0 / (a0 - a1));
-      vec4 dk = disk(hp, e1, e2, c, R, dsz, g, uE.x, uE.y, dir);
-      col += (1.0 - al) * dk.rgb;
-      al += (1.0 - al) * dk.a;
-      if (al > 0.98) break;
+      // Only the disk in front of the shape shows over it; behind, the shape covers it
+      if (hp.z < zb) {
+        vec4 dk = disk(hp, e1, e2, c, R, dsz, g, uE.x, uE.y, dir);
+        col += (1.0 - al) * dk.rgb;
+        al += (1.0 - al) * dk.a;
+        if (al > 0.98) break;
+      }
     }
     pos = np;
+    if (hit && pos.z > zb) break;
     if (r > rb + 0.5 && dot(pos, dir) > 0.0) break;
   }
   if (wire) { col += (1.0 - al) * cl * min(glow, 1.5) * 0.6; al = max(al, min(glow * 0.3, 0.6)); }
-  if (gone || hit) { from = q; return vec4(col, 1.0); }
-  // A thin ring of light hugging the edge of the shadow
-  if (g > 0.05) col += (1.0 - al) * mix(cl, vec3(1.0), 0.6) * 0.22 * g * exp(-max(minR - 1.1, 0.0) * 6.0);
-  float t = max(D - pos.z, 0.0) / max(dir.z, 0.15);
-  vec2 marched = mix(q, pos.xy + dir.xy * t, lens);
+  if (hit) { from = q; return vec4(col + (1.0 - al) * bodyCol, 1.0); }
+  // A thin ring of light round the shape, where the light bending past it bunches up
+  if (g > 0.05) col += (1.0 - al) * mix(cl, vec3(1.0), 0.6) * 0.22 * g * exp(-abs(minR - 1.3) * 8.0);
+  // Light bent nearly sideways would pick up the picture from far away and turn into speckle: how far the bend
+  // reaches is held to a few shape radii
+  float t = max(D - pos.z, 0.0) / max(dir.z, 0.5);
+  vec2 bend = pos.xy + dir.xy * t - q;
+  bend *= 3.0 / max(3.0, length(bend));
+  vec2 marched = q + bend * lens;
   from = mix(marched, lensQ, smoothstep(rb - 0.3, rb + 0.4, rq));
   return vec4(col, al);
 }
@@ -356,11 +372,11 @@ void main() {
 
 // ---------- what each loop's feedback pass adds, so a shape swallows the trails ----------
 // Each spot takes its colour from a little further out and a little round, so the picture is pulled in and wound
-// round the shape, and what reaches the shape itself is gone.
+// round the shape, squeezing in towards its middle.
 const SWALLOW = `
 uniform int uSwN;
 uniform vec4 uSw[${MAX}];   // where (x, y), radius, how far it pulls this frame (its sign the way it turns)
-vec2 swallow(vec2 p, inout float eaten) {
+vec2 swallow(vec2 p) {
   vec2 off = vec2(0.0);
   for (int i = 0; i < ${MAX}; i++) {
     if (i >= uSwN) break;
@@ -370,7 +386,6 @@ vec2 swallow(vec2 p, inout float eaten) {
     float k = min(abs(s.w) * R * R / (r * r + 0.3 * R * R), r * 0.25);
     vec2 u = d / r;
     off += u * k + vec2(-u.y, u.x) * sign(s.w) * k * 1.6;
-    eaten *= mix(1.0, smoothstep(R * 0.5, R * 1.05, r), min(abs(s.w) * 200.0, 1.0));
   }
   return off;
 }`;
