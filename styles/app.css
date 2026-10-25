@@ -71,6 +71,8 @@
 
   .monitor { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 14px; min-height: 0; min-width: 0; }
   .stage { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; }
+  /* With the sequencer open the picture gives up height to it, but never shrinks below a usable preview */
+  .monitor:has(> .seq:not([hidden])) .stage { min-height: 220px; }
   .stage:fullscreen { background: #000; padding: 0; }
   .stage:-webkit-full-screen { background: #000; }
   .stage:fullscreen .bezel { padding: 0; border-radius: 0; background: #000; box-shadow: none; }
@@ -179,7 +181,7 @@
   }
   .screen-msg { font-family: var(--f-body); font-size: 16px; color: var(--ink); background: #080708; }
 
-  .transport { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .transport { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
   .transport .spacer { width: 12px; }
 
   .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; min-height: 22px; font-size: 13px; color: var(--faint); }
@@ -520,7 +522,7 @@
   .rate .thumb { width: 18px; height: 18px; flex: none; }
   /* The small strip under the picture: More like this, Not this, and how long this look has left */
   .taste-strip {
-    width: fit-content; max-width: 100%; margin-inline: auto; gap: 6px; padding: 5px 6px;
+    width: fit-content; max-width: 100%; margin-inline: auto 0; gap: 6px; padding: 5px 6px;
     border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.025);
   }
   .taste-strip .btn { min-height: 34px; padding: 5px 12px; }
@@ -874,46 +876,114 @@
     .wpop { left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); top: auto; width: auto; max-height: 70vh; }
   }
 
-.show-seq-steps { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; list-style: none; min-width: 0; }
-.show-seq-steps li { border: 1px solid var(--line); padding: 10px; border-radius: 6px; min-width: 0; }
-.show-seq-steps li[aria-current="step"] { border-color: var(--amber); background: var(--press-1); }
-.show-seq-steps .step-name { display: block; width: 100%; min-width: 0; margin: 4px 0 8px; }
-.show-seq-steps input[type="number"], #showSeqBpm, #showSeqOffset { width: 76px; }
-.show-seq-steps .dev-actions { margin-top: 8px; }
 .spotify-connect { padding: 10px; margin: 10px 0; border: 1px solid var(--line); border-radius: 6px; }
 #spotifyClientId { width: 100%; min-width: 0; margin-top: 6px; }
 #spotifySetup { overflow-wrap: anywhere; }
-#spotifyNow, #spotifyNext, #showSeqSong { overflow-wrap: anywhere; }
+#spotifyNow, #spotifyNext { overflow-wrap: anywhere; }
 #spotifyQueue { padding-left: 20px; font-size: 12px; }
 #sequenceGroup .dev-actions { flex-wrap: wrap; }
-#showSeqSource { max-width: 100%; min-width: 0; }
 
-.track-timeline { position: absolute; z-index: 5; left: 12px; right: 12px; bottom: 12px; padding: 10px 12px 7px; border: 1px solid rgba(220,210,235,.28); border-radius: 9px; background: rgba(15,12,21,.88); color: #f6f0fa; box-shadow: 0 4px 20px #0006; font: 12px/1.4 var(--f-ui, sans-serif); }
-.track-timeline[hidden] { display: none; }
-.track-timeline-head, .track-timeline-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.track-timeline-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.track-timeline-head output { flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.track-checkpoints { position: relative; height: 32px; margin: 9px 7px 0; border-radius: 3px; background: #ffffff0d; overflow: hidden; }
-.track-checkpoints .track-checkpoint { position: absolute; top: 0; height: 32px; min-width: 0; }
-.track-checkpoints button { position: relative; width: 100%; top: 0; height: 24px; padding: 2px 4px; border: 0; border-left: 2px solid #c2a3dc; border-radius: 0; background: #75538e66; color: #eee4f6; font: inherit; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.track-checkpoint[aria-current="step"] button { background: #cbb9e5; color: #21172c; border-left-color: #fff; }
-.track-checkpoints button:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
-.track-timeline input[type="range"] { display: block; width: 100%; height: 22px; margin: 0; --amber: #d9c3ee; }
-.track-timeline-foot { min-height: 18px; color: #c8bcd3; font-size: 11px; flex-wrap: wrap; }
-.track-timeline-foot button { padding: 1px 6px; font: inherit; color: #fff; background: #604477; border: 1px solid #b99acf; border-radius: 3px; cursor: pointer; }
-.track-timeline-foot button[hidden] { display: none; }
-#trackTimelineStatus:empty { display: none; }
-@media (max-width: 600px) { .track-timeline { left: 5px; right: 5px; bottom: 5px; padding: 6px 7px 4px; font-size: 11px; } }
+/* ---------- sequencer under the picture: four tracks (loops A to D) of looks placed by time ---------- */
+.seq { --seq-head: 190px; flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); min-width: 0; }
+.seq[hidden] { display: none; }
+.seq-head, .seq-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.seq .btn.small { min-height: 30px; padding: 4px 10px; font-size: 13px; }
+.seq-head h2 { margin: 0; font: 12px/1 var(--f-display); letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+.seq-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.seq-song { flex: 1 1 180px; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.seq-song span { color: var(--dim); }
+.seq-clock { font: 20px/1 var(--f-osd); color: var(--osd); font-variant-numeric: tabular-nums; }
+.seq-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); }
+.seq-in { background: var(--well); border: 1px solid var(--line); border-radius: 5px; padding: 5px 8px; font: 14px var(--f-body); color: var(--ink); }
+.seq-vsep { width: 1px; height: 24px; background: var(--line); }
+.seq-tools { font-size: 14px; color: var(--dim); }
+.seq-tools b { color: var(--ink); font-weight: 600; }
+.seq-note { margin: 0; flex: 1 1 200px; min-width: 0; color: var(--loop-a-ink); font-size: 13px; line-height: 1.3; }
+.seq-save { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.seq-save[hidden] { display: none; }
+.seq-save input { width: min(260px, 60vw); }
+.btn.seq-recbtn[aria-pressed="true"] .led { background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); }
+.seq .btn:disabled { opacity: .45; cursor: default; }
 
-.track-timeline input[type="range"]::-webkit-slider-runnable-track { height: 4px; }
-.track-timeline input[type="range"]::-moz-range-track { height: 4px; }
-.track-timeline input[type="range"]::-webkit-slider-thumb { width: 12px; height: 14px; margin-top: -5px; border-radius: 3px; background: #e9dafa; }
-.track-timeline input[type="range"]::-moz-range-thumb { width: 12px; height: 14px; border-radius: 3px; background: #e9dafa; }
-.screen.with-track-timeline > .tip { bottom: 130px; }
+.seq-menuwrap { position: relative; }
+.seq-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 220px; max-height: min(420px, 60vh); overflow-y: auto; padding: 6px; border-radius: 6px; background: var(--raise); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 2px; }
+.seq-menu[hidden] { display: none; }
+.seq-menu.fixed { position: fixed; top: auto; left: auto; }
+.seq-menu .mh { font-size: 12px; color: var(--dim); padding: 2px 8px 4px; }
+.seq-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+.seq-menu button { text-align: left; padding: 7px 8px; border: 0; border-radius: 4px; background: none; cursor: pointer; font: 14px var(--f-body); color: var(--ink); display: flex; justify-content: space-between; gap: 16px; }
+.seq-menu button kbd { font: 12px var(--f-body); color: var(--dim); }
+.seq-menu button:hover:not(:disabled), .seq-menu button:focus-visible { background: var(--press-1); color: var(--press-ink); }
+.seq-menu button:disabled { opacity: .45; cursor: default; }
+.seq-menu button[aria-checked="true"]::after { content: "\2713"; color: var(--loop-a-ink); }
 
-.track-checkpoint-end { position: absolute; right: 0; top: 16px; bottom: 0; width: 10px; max-width: 100%; cursor: ew-resize; touch-action: none; background: #e8d7ff44; border-right: 2px solid #f3e9ff; z-index: 2; }
-.track-checkpoint-end:hover, .track-checkpoint-end:focus-visible { background: #e8d7ffaa; outline: 2px solid #fff; outline-offset: -2px; }
-.track-checkpoint button { padding-right: 11px; }
-.track-checkpoints.resizing, .track-checkpoints.resizing * { cursor: ew-resize; user-select: none; }
-.track-timeline-hide { padding: 2px 6px; flex-shrink: 0; font: inherit; color: #eee4f6; border: 1px solid #baa3cc66; border-radius: 3px; background: #ffffff14; cursor: pointer; }
-.track-timeline-head strong { flex: 1; }
+.seq-tl { display: flex; gap: 8px; min-width: 0; }
+.seq-heads .seq-card { gap: 8px; padding: 0 8px; font-size: 13px; }
+.seq-heads, .seq-view-col { display: flex; flex-direction: column; gap: 4px; }
+.seq-heads { flex: none; width: var(--seq-head); }
+.seq-view-col { flex: 1 1 auto; min-width: 0; }
+.seq-h-ruler { height: 18px; } .seq-h-marks { height: 18px; } .seq-h-spec { height: 48px; } .seq-h-lane { height: 40px; } .seq-h-ov { height: 10px; }
+.seq-card { display: flex; align-items: center; gap: 10px; box-sizing: border-box; padding: 0 10px; border-radius: 5px; border: 1px solid var(--line); background: var(--raise); text-align: left; font: 14px/1.2 var(--f-body); color: var(--ink); min-width: 0; }
+.seq-card b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seq-card small { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.seq-txt { min-width: 0; }
+.seq-song-card { background: var(--panel); color: var(--loop-a-ink); }
+.seq-song-card b { color: var(--ink); }
+button.seq-card { cursor: pointer; }
+.seq-card[aria-pressed="true"] { border-color: var(--loop-a-ink); background: var(--press-1); }
+.seq-card.off { opacity: .55; }
+.seq-num { flex: none; width: 22px; height: 22px; border-radius: 4px; font: 600 13px/22px var(--f-body); text-align: center; color: var(--well); }
+.seq-mini { font-size: 12px; color: var(--dim); display: flex; align-items: center; padding-left: 10px; }
+
+.seq-view { position: relative; display: flex; flex-direction: column; gap: 4px; overflow: hidden; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
+.seq-view.dragging { cursor: grabbing; }
+.seq-lanes { display: flex; flex-direction: column; gap: 4px; }
+.seq-ruler { position: relative; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--line); }
+.seq-ruler .tk { position: absolute; bottom: 0; width: 1px; height: 5px; background: var(--line); }
+.seq-ruler .tk.major { height: 9px; background: var(--dim); }
+.seq-ruler .lb { position: absolute; top: 0; transform: translateX(3px); white-space: nowrap; }
+.seq-marks { position: relative; }
+.seq-mk { position: absolute; top: 0; height: 18px; box-sizing: border-box; padding: 0 7px 0 6px; border-left: 2px solid var(--loop-a-ink); border-radius: 0 4px 4px 0; background: var(--press-1); color: var(--press-ink); font-size: 12px; line-height: 18px; white-space: nowrap; cursor: ew-resize; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.seq-mk input { width: 110px; height: 16px; font: 12px var(--f-body); padding: 0 4px; border: 1px solid var(--loop-a-ink); border-radius: 3px; background: var(--well); color: var(--ink); }
+.seq-spec-wrap { position: relative; }
+.seq-spec { display: block; width: 100%; border-radius: 5px; background: var(--well); }
+.seq-unheard { position: absolute; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--dim); white-space: nowrap; pointer-events: none; padding-left: 10px; }
+.seq-unheard[hidden] { display: none; }
+.seq-lane { position: relative; border-radius: 5px; background: var(--well); }
+.seq-lane.off { background: repeating-linear-gradient(135deg, var(--well) 0 6px, #141216 6px 12px); }
+.seq-grid { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.seq-grid i { position: absolute; top: 40px; bottom: 0; width: 1px; background: rgba(228,218,232,.06); }
+.seq-grid i.m { top: 22px; background: rgba(213,132,245,.35); }
+
+.seq-blk { position: absolute; top: 3px; bottom: 3px; box-sizing: border-box; border-radius: 4px; font-size: 13px; line-height: 1.2; border: 1px solid; font-variant-numeric: tabular-nums; cursor: move; color: var(--ink); }
+.seq-blk.sel { box-shadow: 0 0 0 2px var(--press-ink); z-index: 2; }
+.seq-blk.rec { border-style: dashed; border-color: var(--tally) !important; }
+.seq-blk .t { position: absolute; left: 7px; right: 7px; top: 3px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.seq-blk .t small { display: block; color: var(--dim); font-size: 11px; }
+.seq-blk .fi, .seq-blk .fo { position: absolute; top: 0; bottom: 0; background: rgba(14,13,15,.6); pointer-events: none; }
+.seq-blk .fi { left: 0; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.seq-blk .fo { right: 0; clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.seq-blk .eg { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.seq-blk .eg.l { left: -2px; } .seq-blk .eg.r { right: -2px; }
+.seq-blk .fh { display: none; position: absolute; top: -6px; width: 11px; height: 11px; margin-left: -6px; border-radius: 50%; background: var(--press-ink); border: 2px solid var(--well); box-sizing: border-box; cursor: ew-resize; z-index: 2; }
+.seq-blk:hover .fh, .seq-blk.sel .fh { display: block; }
+.seq-blk svg.auto { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.seq-blk .dot { position: absolute; width: 9px; height: 9px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid var(--well); box-sizing: border-box; cursor: grab; z-index: 1; }
+.seq-blk .atag { position: absolute; right: 6px; bottom: 2px; font-size: 11px; color: var(--osd); pointer-events: none; white-space: nowrap; overflow: hidden; max-width: 90%; }
+.seq-xf { position: absolute; top: 3px; bottom: 3px; z-index: 3; pointer-events: none; border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(242,217,252,.28) 0 4px, transparent 4px 8px); border: 1px dashed var(--press-ink); box-sizing: border-box; display: flex; align-items: flex-end; justify-content: center; font-size: 11px; color: var(--press-ink); overflow: hidden; white-space: nowrap; }
+.seq-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--press-ink); box-shadow: 0 0 6px rgba(242,217,252,.6); pointer-events: none; z-index: 4; }
+.seq-playhead::before { content: ""; position: absolute; top: 0; left: -5px; border: 6px solid transparent; border-top-color: var(--press-ink); }
+.seq-ov { position: relative; border-radius: 7px; background: var(--well); border: 1px solid var(--line); cursor: pointer; touch-action: none; }
+.seq-thumb { position: absolute; top: 1px; bottom: 1px; border-radius: 6px; background: var(--raise-2); border: 1px solid var(--dim); box-sizing: border-box; cursor: grab; min-width: 12px; }
+.seq-ovmark { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--press-ink); pointer-events: none; }
+.seq-insp { font-size: 12px; color: var(--dim); display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: center; min-height: 16px; }
+.seq-insp b { color: var(--ink); font-weight: 600; }
+.seq-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 14px; font-size: 13px; color: var(--dim); }
+.seq-foot kbd { font: 12px/1 var(--f-body); color: var(--ink); padding: 2px 5px; border-radius: 3px; border: 1px solid var(--line); background: var(--raise); }
+.seq-zoomread { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .seq { --seq-head: 44px; }
+  .seq-card { padding: 0; justify-content: center; }
+  .seq-card .seq-txt, .seq-song-card svg, .seq-mini { display: none; }
+  .seq-song-card::after { content: "\266A"; }
+}

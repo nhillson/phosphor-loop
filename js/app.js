@@ -271,7 +271,8 @@ let edit = 'A';
 // Mount Ribbit's walking keys held down, a jump asked for, and Walk by itself (see ribKey)
 const rib = { held: new Set(), jump: false, auto: lsGet('phosphor-ribbit-walk') !== '0' };
 let activePresetId = null;
-let drift = !reduceMotion;
+// The slow drift is always on (there's no switch for it any more). Only Neutral stills it, until the next look.
+let drift = true;
 let frozen = false;
 let staticAmt = 0;
 
@@ -640,10 +641,6 @@ for (const [id, key] of [['silhouetteClock', 'dancerClock'], ['silhouetteBpm', '
 $('#silhouetteFX').addEventListener('click', () => { takeOver('in1'); loops[edit].tgt.dancerFX = !loops[edit].tgt.dancerFX; syncSilhouetteUI(); });
 function silhouetteClock(t, now) {
   if (t.dancerClock === 'manual') return { beat: now / 60000 * t.dancerBpm, bpm: t.dancerBpm, playing: true, label: 'Manual' };
-  if (showSequence.songDrive && spotify.snapshot?.track && now - spotify.snapshot.receivedAt < 10000) {
-    return { beat: Math.max(0, spotify.position(now) / 1000 - showSequence.offset) * showSequence.bpm / 60,
-      bpm: showSequence.bpm, playing: spotify.snapshot.playing, label: 'Spotify' };
-  }
   const music = snd.rhythmSample;
   return music?.gridBeat != null ? { beat: music.gridBeat + music.phase, bpm: music.bpm, playing: true, label: 'Audio' } : null;
 }
@@ -1282,6 +1279,7 @@ function patchLoop(k, p, force) {
   if (wOf(mix.tgt, k) > 0.05) lookOnScreen++;
 }
 function applyPatch(c) {
+  drift = true;
   patchLoop('A', c.A);
   patchLoop('B', c.B || B_PARTNER);
   mix.tgt.view = c.view ?? 0;
@@ -1997,7 +1995,8 @@ const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
-  setDrift(false);
+  drift = false;
+  for (const k of KEYS) loopGrade[k] = null;
   if (frozen) toggleFreeze(false);
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
@@ -2611,7 +2610,7 @@ function setAutopilot(on, quiet) {
   ap.turnN = 0;
   syncApLoops();
   if (on) {
-    setDrift(true);
+    drift = true;
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
     ap.due = ap.next;
     ap.span = ap.next - performance.now();
@@ -4696,10 +4695,6 @@ function toggleFreeze(force) {
 freezeBtn.addEventListener('click', () => toggleFreeze());
 function clearScreen() { clearTargets(); burst(); }
 $('#clear').addEventListener('click', clearScreen);
-const driftBtn = $('#drift');
-function setDrift(on) { drift = on; driftBtn.setAttribute('aria-pressed', String(on)); }
-setDrift(drift);
-driftBtn.addEventListener('click', () => setDrift(!drift));
 
 const fullBtn = $('#full');
 const fsEnabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
@@ -6141,7 +6136,6 @@ function applyRecipe(r) {
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((p.adj && p.adj[src]) || {}) }; });
   syncAdjUI();
-  if (typeof r.drift === 'boolean') setDrift(r.drift);
   closeGuide();
   setEdit('A');
   // Start any device right here, inside the click, so the browser lets it ask for permission
@@ -6308,6 +6302,8 @@ presetForm.addEventListener('submit', async (e) => {
 });
 
 function loadPreset(pr, quiet) {
+  drift = true;
+  for (const k of KEYS) loopGrade[k] = null;
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
   // A preset saved with three or four loops brings them back; any other is a look for two loops
@@ -6330,7 +6326,6 @@ function loadPreset(pr, quiet) {
   // Loops that react: as saved, or every loop for a preset saved before the switches existed
   snd.react = { A: true, B: true, C: true, D: true, ...((d.snd && d.snd.react) || {}) };
   syncSoundUI();
-  if (typeof d.drift === 'boolean') setDrift(d.drift);
   // Presets saved before Color grading existed load with it at normal
   setGrade(d.grade);
   // Start any camera, screen or phone the preset uses, right here inside the click
@@ -7232,6 +7227,8 @@ const outBtn = $('#outBtn');
 const GRADE_KEY = 'phosphor-grade-v1';
 const GRADE_DEF = { gExposure: 0, gContrast: 100, gGamma: 100, gSat: 100, gHue: 0, gRed: 100, gGreen: 100, gBlue: 100, gSepia: 0 };
 const grade = { ...GRADE_DEF };
+// Each loop's own grading while the sequencer plays (null: none), drawn when the loops are mixed (see FS_COMPOSITE)
+const loopGrade = { A: null, B: null, C: null, D: null };
 const gradeEls = {};
 for (const k of Object.keys(GRADE_DEF)) gradeEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
 function gradeText(k, v) {
@@ -8332,587 +8329,841 @@ function eyeTick(now, dt, wA, wB) {
 
 /* ================= planned beat sequence ================= */
 const spotify = new PhosphorSpotify();
-const spotifyTimeline = { preview: null, pending: false, signature: '', dragUri: null,
-  visible: lsGet('phosphor-track-timeline-visible') !== '0', resize: null };
-const SHOW_SONGS_KEY = 'phosphor-song-sequences-v1';
-const newShowRecord = () => ({ steps: [], end: 'hold', fade: 2, bpm: 120, offset: 0 });
-const showSequence = {
-  steps: [], engine: new PhosphorStepSequencer(), preparing: false, token: 0,
-  fade: null, prepared: new Map(), retiredClips: new Set(), urls: new Set(), end: 'hold', fadeBeats: 2,
-  records: new Map(), songKey: 'standalone', bpm: 120, offset: 0,
-  song: null, accountId: null, songDrive: false, stopped: false, ready: false,
-  clipboard: null, selected: -1, applied: '', seekVersion: 0, preparingStep: null,
+
+/* ================= sequencer under the picture ================= */
+// Four tracks, one per loop (A to D). Blocks are placed by time along the song; each carries one loop's look, fades
+// in and out, crossfades with a block it overlaps on its track, and can change sliders over its length. A track
+// with nothing on it at that moment leaves its loop blank. Each Spotify song keeps its own sequence (and named
+// versions of it) in localStorage, and its spectrograph, built up from what the app hears, in IndexedDB.
+const TL = window.PhosphorTimeline;
+const SEQ_KEY = 'phosphor-song-timelines-v2', SEQ_OLD_KEY = 'phosphor-song-sequences-v1';
+const SEQ_OPEN_KEY = 'phosphor-sequencer-open';
+const SEQ_TRACK = [
+  { color: '#8b1ab8', fill: 'rgba(139,26,184,.38)', ink: '#fff' },
+  { color: '#4fd1c5', fill: 'rgba(79,209,197,.22)' },
+  { color: '#f0a030', fill: 'rgba(240,160,48,.22)' },
+  { color: '#5b8cff', fill: 'rgba(91,140,255,.22)' },
+];
+// Every slider a block can change over its length. "show" and "feed" are the loop's own Show and Feed faders;
+// the g… ones are its color grading, which in the sequencer belongs to each loop on its own.
+const SEQ_SLIDERS = [
+  ['Loop', [['show', 'Show'], ['feed', 'Feed into other loop'], ['blend', 'Blend'], ['size', 'Input size']]],
+  ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['warp', 'Warp'], ['flow', 'Flow'],
+    ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
+    ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal']]],
+  ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
+    ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
+];
+const SEQ_NAME = Object.fromEntries(SEQ_SLIDERS.flatMap(([, list]) => list));
+const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1'];
+// A slider's range, from the control itself
+function seqRange(key) {
+  const el = key === 'show' ? $('#showA') : key === 'feed' ? $('#xab') : $('#' + key);
+  return el ? [Number(el.min), Number(el.max)] : [0, 100];
+}
+const fmtSeq = (t, tenths) => {
+  t = Math.max(0, t);
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return m + ':' + (tenths ? s.toFixed(1).padStart(4, '0') : String(Math.floor(s)).padStart(2, '0'));
+};
+const r1 = (v) => Math.round(v * 10) / 10;
+const inputName = (k) => SRC_LABEL[k] || 'Nothing';
+
+const seq = {
+  records: new Map(), key: 'standalone', rec: TL.newRecord(), song: null, accountId: null, lastPlayback: null,
+  running: false, apMode: null, applied: [null, null, null, null], xin: [false, false, false, false],
+  local: { pos: 0, at: 0, playing: false }, t: 0, playing: false, live: false,
+  selTrack: 0, selId: null, clip: null, undo: [], redo: [],
+  view: { start: 0, pps: 1, minPps: 1, maxPps: 240, vw: 600 }, dirty: true, specDirty: true, lastDraw: 0,
+  spec: null, recording: false, recBlock: null, recBefore: null, recGen: 0, drag: null,
 };
 try {
-  const saved = JSON.parse(localStorage.getItem(SHOW_SONGS_KEY) || 'null');
-  if (saved?.v === 1 && Array.isArray(saved.records)) for (const [key, record] of saved.records) {
-    if (typeof key !== 'string' || !record || !Array.isArray(record.steps)) continue;
-    showSequence.records.set(key, {
-      steps: record.steps.slice(0, 64).filter(s => s && ['look', 'library', 'file'].includes(s.kind))
-        .map(s => ({ ...s, url: undefined, id: s.id || randId(12), beats: clamp(Math.round(Number(s.beats) || 8), 1, 1024) })),
-      end: ['hold', 'loop', 'auto'].includes(record.end) ? record.end : 'hold',
-      fade: [0, 1, 2, 4].includes(record.fade) ? record.fade : 2,
-      bpm: clamp(Number(record.bpm) || 120, 30, 300), offset: clamp(Number(record.offset) || 0, 0, 3600),
-    });
-  }
-  // Keep the earlier global draft as the standalone sequence, never assign it to a song.
-  if (!showSequence.records.has('standalone')) {
-    const old = JSON.parse(localStorage.getItem('phosphor-show-sequence-v1') || 'null');
-    if (old?.v === 1 && Array.isArray(old.steps)) showSequence.records.set('standalone', {
-      ...newShowRecord(), steps: old.steps.slice(0, 64).filter(s => s && ['look', 'library', 'file'].includes(s.kind))
-        .map(s => ({ ...s, url: undefined, id: randId(12), beats: clamp(Math.round(Number(s.beats) || 8), 1, 1024) })),
-    });
+  const saved = JSON.parse(localStorage.getItem(SEQ_KEY) || 'null');
+  if (saved?.v === 2 && Array.isArray(saved.records)) {
+    for (const [key, rec] of saved.records) if (typeof key === 'string') seq.records.set(key, TL.normalize(rec));
+  } else {
+    // Sequences from the beat-counted step list come across once, as blocks on track 1
+    const old = JSON.parse(localStorage.getItem(SEQ_OLD_KEY) || 'null');
+    if (old?.v === 1 && Array.isArray(old.records)) for (const [key, record] of old.records) {
+      if (typeof key === 'string' && record?.steps?.length) seq.records.set(key, TL.fromSteps(record));
+    }
   }
 } catch (_) { /* storage is optional */ }
-const showSeqStatus = message => { $('#showSeqStatus').textContent = message; };
-function rememberShowRecord() {
-  showSequence.records.set(showSequence.songKey, { steps: showSequence.steps, end: showSequence.end,
-    fade: showSequence.fadeBeats, bpm: showSequence.bpm, offset: showSequence.offset });
-}
-function saveShowSequence() {
-  rememberShowRecord();
+const seqNote = (msg) => { $('#seqNote').textContent = msg; };
+function seqSave() {
+  seq.records.set(seq.key, seq.rec);
   try {
-    localStorage.setItem(SHOW_SONGS_KEY, JSON.stringify({ v: 1,
-      records: [...showSequence.records].map(([key, record]) => [key, { ...record,
-        steps: record.steps.map(({ url, ...step }) => step) }]),
-    }));
-    $('#showSeqSaveStatus').textContent = 'Saved in this browser.';
-  } catch (_) { $('#showSeqSaveStatus').textContent = 'Browser storage is full; your latest changes could not be saved.'; }
-  if (showSequence.songDrive && !showSequence.stopped) void startShowSequence(true);
+    localStorage.setItem(SEQ_KEY, JSON.stringify({ v: 2, records: [...seq.records].filter(([, r]) => r.blocks.length || r.markers.length || r.versions.length) }));
+  } catch (_) { seqNote('Browser storage is full; your latest sequence changes could not be saved.'); }
 }
-function releaseShowVideo(v) {
-  v.pause(); v.removeAttribute('src'); v.load();
-  if (v.sequenceLibraryURL) { URL.revokeObjectURL(v.sequenceLibraryURL); showSequence.urls.delete(v.sequenceLibraryURL); }
+// How long the song is: Spotify's length, or (without a song) a little past the last block
+function seqDur() {
+  if (seq.song) return Math.max(1, seq.song.durationMs / 1000);
+  return Math.max(240, Math.ceil((TL.lastEnd(seq.rec) + 30) / 10) * 10);
 }
-function releaseRetiredShowClips() {
-  for (const v of showSequence.retiredClips) if (v !== vid.video) {
-    releaseShowVideo(v); showSequence.retiredClips.delete(v);
-  }
-}
-function releaseShowClips() {
-  for (const v of showSequence.prepared.values()) {
-    if (v === vid.video) showSequence.retiredClips.add(v);
-    else releaseShowVideo(v);
-  }
-  showSequence.prepared.clear(); releaseRetiredShowClips();
-}
-function stopShowSequence(message = 'Sequence stopped. Holding the current look.', manual = true) {
-  showSequence.token++; showSequence.engine.stop(); showSequence.preparing = false;
-  showSequence.ready = false; showSequence.applied = '';
-  if (manual) showSequence.stopped = true;
-  for (const v of showSequence.prepared.values()) if (v !== vid.video) v.pause();
-  $('#showSeqPlay').disabled = false;
-  renderShowSequence(); showSeqStatus(message);
-}
-function editShowSequence() {
-  // Structural edits restart preparation, then resolve against the current song position.
-  if (showSequence.engine.running || showSequence.preparing || showSequence.ready)
-    stopShowSequence('Saving sequence changes…', false);
-}
-function loadShowRecord(key) {
-  const record = showSequence.records.get(key) || newShowRecord();
-  showSequence.songKey = key; showSequence.steps = record.steps; showSequence.end = record.end;
-  showSequence.fadeBeats = record.fade; showSequence.bpm = record.bpm; showSequence.offset = record.offset;
-  showSequence.selected = -1; showSequence.stopped = false; showSequence.applied = '';
-  $('#showSeqEnd').value = record.end; $('#showSeqFade').value = String(record.fade);
-  $('#showSeqBpm').value = String(record.bpm); $('#showSeqOffset').value = String(record.offset);
-  renderShowSequence();
-}
-function renderShowSequence() {
-  const list = $('#showSeqSteps'); list.textContent = '';
-  showSequence.steps.forEach((step, index) => {
-    const item = document.createElement('li');
-    item.setAttribute('aria-current', showSequence.engine.running && showSequence.engine.index === index ? 'step' : 'false');
-    const nameLabel = document.createElement('label'); nameLabel.textContent = `Step ${index + 1}`;
-    const name = document.createElement('input'); name.type = 'text'; name.className = 'step-name';
-    name.value = step.name; name.maxLength = 80; name.setAttribute('aria-label', `Name for step ${index + 1}`);
-    name.addEventListener('change', () => { step.name = name.value.trim() || `Step ${index + 1}`; saveShowSequence(); });
-    name.addEventListener('focus', () => { showSequence.selected = index; });
-    nameLabel.appendChild(name); item.appendChild(nameLabel);
-    const label = document.createElement('label'); label.textContent = 'Beats ';
-    const beats = document.createElement('input'); beats.type = 'number'; beats.min = '1'; beats.max = '1024'; beats.value = step.beats;
-    beats.setAttribute('aria-label', `Beats for step ${index + 1}`);
-    beats.addEventListener('change', () => {
-      editShowSequence(); step.beats = clamp(Math.round(Number(beats.value) || 8), 1, 1024);
-      saveShowSequence(); renderShowSequence();
-    });
-    label.appendChild(beats); item.appendChild(label);
-    const actions = document.createElement('div'); actions.className = 'dev-actions';
-    for (const [text, offset] of [['↑', -1], ['↓', 1], ['Remove', 0]]) {
-      const b = document.createElement('button'); b.className = 'btn small'; b.textContent = text;
-      b.setAttribute('aria-label', offset ? `Move step ${index + 1} ${offset < 0 ? 'earlier' : 'later'}` : `Remove step ${index + 1}`);
-      b.disabled = offset !== 0 && (index + offset < 0 || index + offset >= showSequence.steps.length);
-      b.addEventListener('click', () => {
-        editShowSequence();
-        if (offset) [showSequence.steps[index], showSequence.steps[index + offset]] = [showSequence.steps[index + offset], step];
-        else {
-          showSequence.steps.splice(index, 1);
-          const prepared = showSequence.prepared.get(step);
-          if (prepared && prepared !== vid.video) releaseShowVideo(prepared);
-          else if (prepared) showSequence.retiredClips.add(prepared);
-          showSequence.prepared.delete(step);
-          // Local URLs may also be referenced by a duplicate, another song, or the internal clipboard.
-        }
-        saveShowSequence(); renderShowSequence();
-      }); actions.appendChild(b);
-    }
-    for (const action of ['Copy', 'Duplicate', 'Paste after']) {
-      const button = document.createElement('button'); button.className = 'btn small'; button.textContent = action;
-      button.setAttribute('aria-label', `${action} step ${index + 1}`);
-      button.disabled = action === 'Paste after' && !showSequence.clipboard;
-      button.addEventListener('click', () => {
-        showSequence.selected = index;
-        if (action === 'Copy') {
-          showSequence.clipboard = JSON.parse(JSON.stringify(step));
-          $('#showSeqPaste').disabled = false;
-          for (const paste of list.querySelectorAll('[data-paste]')) paste.disabled = false;
-          showSeqStatus(`Copied “${step.name}”. Switch songs to paste it there, or paste here.`);
-        } else {
-          if (showSequence.steps.length >= 64) { toast('A sequence can hold up to 64 steps.'); return; }
-          editShowSequence();
-          const copy = JSON.parse(JSON.stringify(action === 'Duplicate' ? step : showSequence.clipboard));
-          copy.id = randId(12); showSequence.steps.splice(index + 1, 0, copy);
-          saveShowSequence(); renderShowSequence();
-        }
-      });
-      if (action === 'Paste after') button.dataset.paste = '1';
-      actions.appendChild(button);
-    }
-    item.appendChild(actions);
-    if (step.kind === 'file' && !step.url) {
-      const hint = document.createElement('p'); hint.className = 'hint'; hint.textContent = 'Re-add this video file before playing.'; item.appendChild(hint);
-    }
-    list.appendChild(item);
-  });
-  $('#showSeqPlay').textContent = showSequence.preparing ? 'Preparing clips…' : showSequence.songDrive ? 'Follow song' : showSequence.engine.running ? 'Restart sequence' : 'Play sequence';
-  $('#showSeqPaste').disabled = !showSequence.clipboard;
-}
-function refreshShowSources() {
-  const select = $('#showSeqSource'), previous = select.value; select.textContent = '';
-  const sources = [
-    ...presets.map(p => ({ value: 'my:' + p.id, name: 'My look · ' + p.name })),
-    ...shared.map(p => ({ value: 'shared:' + p.id, name: 'Shared look · ' + p.name })),
-    ...(clips.list || []).map(c => ({ value: 'clip:' + c.id, name: 'Clip · ' + c.n })),
-  ];
-  for (const source of sources) { const option = document.createElement('option'); option.value = source.value; option.textContent = source.name; select.appendChild(option); }
-  if (sources.some(s => s.value === previous)) select.value = previous;
-  if (!sources.length) { const option = document.createElement('option'); option.textContent = 'Save a look or add video files'; option.value = ''; select.appendChild(option); }
-}
-function addShowStep(step) {
-  if (showSequence.steps.length >= 64) { toast('A sequence can hold up to 64 steps.'); return; }
-  editShowSequence(); showSequence.steps.push({ ...step, id: randId(12), beats: 8 }); saveShowSequence(); renderShowSequence();
-}
-$('#showSeqRefresh').addEventListener('click', async () => {
-  refreshShowSources();
-  if (clipsWanted()) { try { await clipList(true); refreshShowSources(); } catch (_) { showSeqStatus('Looks refreshed. Clip library unavailable; open Phosphor Clips to use library clips.'); } }
-});
-$('#showSeqSource').addEventListener('focus', refreshShowSources);
-$('#showSeqAdd').addEventListener('click', () => {
-  const value = $('#showSeqSource').value, colon = value.indexOf(':'), kind = value.slice(0, colon), id = value.slice(colon + 1);
-  if (kind === 'clip') {
-    const c = (clips.list || []).find(c => c.id === id);
-    if (c) addShowStep({ kind: 'library', name: c.n, clipId: c.id });
-  } else {
-    const p = (kind === 'my' ? presets : shared).find(p => p.id === id);
-    if (p) addShowStep({ kind: 'look', name: p.name, data: JSON.parse(JSON.stringify(p.data)) });
-  }
-});
-$('#showSeqCurrent').addEventListener('click', () => addShowStep({ kind: 'look', name: `Current look ${showSequence.steps.length + 1}`, data: snapshot() }));
-$('#showSeqFiles').addEventListener('click', () => $('#showSeqFile').click());
-$('#showSeqFile').addEventListener('change', e => {
-  for (const file of e.target.files) {
-    const missing = showSequence.steps.find(s => s.kind === 'file' && !s.url && (s.fileName || s.name) === file.name);
-    if (!missing && showSequence.steps.length >= 64) break;
-    const url = URL.createObjectURL(file); showSequence.urls.add(url);
-    if (missing) { editShowSequence(); missing.url = url; }
-    else addShowStep({ kind: 'file', name: file.name, fileName: file.name, url });
-  }
-  saveShowSequence(); renderShowSequence(); e.target.value = '';
-});
-$('#showSeqEnd').value = showSequence.end; $('#showSeqFade').value = String(showSequence.fadeBeats);
-for (const [id, key] of [['showSeqEnd', 'end'], ['showSeqFade', 'fadeBeats']]) $('#' + id).addEventListener('change', e => {
-  editShowSequence(); showSequence[key] = key === 'end' ? e.target.value : Number(e.target.value); saveShowSequence();
-});
-async function prepareShowClip(step, token) {
-  if (showSequence.prepared.has(step)) return;
-  let url = step.url;
-  if (step.kind === 'library') {
-    await clipList();
-    if (!clips.base) throw new Error('Open Phosphor Clips and try again.');
-    const response = await fetch(`${clips.base}/clip/${encodeURIComponent(step.clipId)}`, clipFetchOpts());
-    if (!response.ok) throw new Error(`Clip unavailable: ${step.name}`);
-    url = URL.createObjectURL(await response.blob()); showSequence.urls.add(url);
-  }
-  if (!url) throw new Error(`Re-add video file: ${step.name}`);
-  const v = mkVideo(); v.autoplay = false; v.loop = true; v.preload = 'auto';
-  if (step.kind === 'library') v.sequenceLibraryURL = url;
-  try {
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Video took too long to load: ${step.name}`)), 20000);
-      v.addEventListener('loadeddata', () => { clearTimeout(timer); resolve(); }, { once: true });
-      v.addEventListener('error', () => { clearTimeout(timer); reject(new Error(`Cannot play: ${step.name}`)); }, { once: true });
-      v.src = url; v.load();
-    });
-    if (token !== showSequence.token) { releaseShowVideo(v); return; }
-    showSequence.prepared.set(step, v);
-  } catch (error) { releaseShowVideo(v); throw error; }
-}
-async function startShowSequence(songDrive = false) {
-  stopShowSequence('Preparing sequence…', false); showSequence.stopped = false;
-  if (!showSequence.steps.length) {
-    if (songDrive) { showSequence.autopilotMode = 'empty'; setAutopilot(true, true); showSeqStatus('No steps for this song. Autopilot is running.'); }
-    else showSeqStatus('Add a saved look or video first.');
-    return;
-  }
-  showSequence.clipLoop = edit;
-  const token = showSequence.token;
-  showSequence.preparing = true; $('#showSeqPlay').disabled = true; renderShowSequence();
-  try {
-    for (const step of showSequence.steps) if (step.kind === 'look') {
-      const inputs = ['A', 'B', 'C', 'D'].flatMap(k => [step.data?.[k]?.in1, step.data?.[k]?.in2]);
-      for (const source of ['camera', 'screen', 'phone']) if (inputs.includes(source) && !liveActive(source))
-        throw new Error(`Connect ${source} before playing “${step.name}”.`);
-      if (inputs.includes('video') && !vid.on && !showSequence.steps.some(s => s.kind !== 'look'))
-        throw new Error(`Load a video before playing “${step.name}”.`);
-    }
-    for (const step of showSequence.steps) if (step.kind !== 'look') {
-      await prepareShowClip(step, token); if (token !== showSequence.token) return;
-    }
-    if (token !== showSequence.token) return;
-    setAutopilot(false, true); showSequence.autopilotMode = null;
-    showSequence.preparing = false; showSequence.ready = true; $('#showSeqPlay').disabled = false;
-    showSequence.engine.start(showSequence.steps.map(s => s.beats), showSequence.end);
-    renderShowSequence();
-    showSeqStatus(songDrive ? 'Following Spotify song position.' : 'Waiting for the next music beat. Share audio under React to sound.');
-    if (songDrive) showSequenceTick(performance.now());
-  } catch (error) { if (token === showSequence.token) stopShowSequence(error.message, false); }
-}
-$('#showSeqPlay').addEventListener('click', () => void startShowSequence(showSequence.songDrive));
-$('#showSeqStop').addEventListener('click', () => stopShowSequence());
-$('#showSeqPaste').addEventListener('click', () => {
-  if (!showSequence.clipboard || showSequence.steps.length >= 64) return;
-  editShowSequence(); const copy = JSON.parse(JSON.stringify(showSequence.clipboard)); copy.id = randId(12);
-  const at = showSequence.selected < 0 ? showSequence.steps.length : showSequence.selected + 1;
-  showSequence.steps.splice(at, 0, copy); saveShowSequence(); renderShowSequence();
-});
-for (const [id, key] of [['showSeqBpm', 'bpm'], ['showSeqOffset', 'offset']]) $('#' + id).addEventListener('change', e => {
-  editShowSequence();
-  showSequence[key] = key === 'bpm' ? clamp(Number(e.target.value) || 120, 30, 300) : clamp(Number(e.target.value) || 0, 0, 3600);
-  e.target.value = showSequence[key]; saveShowSequence();
-});
-$('#showSeqDetect').addEventListener('click', () => {
-  const bpm = snd.rhythmSample?.bpm;
-  if (!bpm || snd.rhythmSample?.gridBeat == null) { toast('Connect audio under React to sound and wait for BPM lock first.'); return; }
-  $('#showSeqBpm').value = Math.round(bpm * 10) / 10;
-  $('#showSeqBpm').dispatchEvent(new Event('change'));
-});
-function beginShowFade(now, bpm, beats) {
-  if (showSequence.fade) { dropTarget(showSequence.fade.target); showSequence.fade = null; }
-  if (!beats) return;
-  const target = makeTarget(); copyInto(target, comp.tex);
-  showSequence.fade = { target, width: simW, height: simH, at: now, duration: beats * 60000 / bpm };
-}
-function applyShowStep(index, now, bpm, clipSeconds = 0) {
-  const step = showSequence.steps[index];
-  beginShowFade(now, bpm, Math.min(showSequence.fadeBeats, step.beats));
-  if (step.kind === 'look') {
-    // The sequence owns scheduling, even when a saved preset contains Autopilot settings.
-    const data = { ...step.data, ap: null };
-    loadPreset({ id: null, name: step.name, data }, true);
-  } else {
-    const v = showSequence.prepared.get(step);
-    if (!v) throw new Error(`Video is not ready: ${step.name}`);
-    v.currentTime = Number.isFinite(v.duration) && v.duration > 0 ? clipSeconds % v.duration : 0;
-    vid.attach(v, null); releaseRetiredShowClips(); vidUserPaused = false;
-    vidLoopA = vidLoopB = null; loopText(); vidRate = 1; v.playbackRate = 1;
-    clips.ask++; clips.own = true; clipNoCredit();
-    say($('#vidStatus'), `<b>${escapeHTML(step.name)}</b>`);
-    $('#vcr').hidden = false; $('#vidDur').textContent = fmtT(v.duration); vidPlay.textContent = 'Pause';
-    // Clips feed the loop the artist selected before starting the sequence.
-    const targetLoop = loopOn(showSequence.clipLoop) ? showSequence.clipLoop : 'A';
-    loops[targetLoop].tgt.in1 = 'video'; settleDevices(); syncUI();
-    if (!showSequence.songDrive || spotify.snapshot?.playing)
-      v.play().catch(() => stopShowSequence('Video playback was blocked. Press Follow song to retry.'));
-    else v.pause();
-  }
-  renderShowSequence();
-}
-function showSequenceTick(now) {
-  const engine = showSequence.engine;
-  if (showSequence.songDrive) { tickSpotifySequence(now); return; }
-  if (!engine.running) return;
-  if (ap.on) { stopShowSequence('Autopilot took over. Sequence stopped.'); return; }
-  const music = snd.rhythmSample;
-  if (frozen || music?.gridBeat == null) {
-    engine.tick(null); showSeqStatus(frozen ? 'Sequence paused while frozen.' : 'Waiting for music beat lock. Beat count is paused.'); return;
-  }
-  const event = engine.tick(music.gridBeat + music.phase);
-  if (event?.done) {
-    stopShowSequence(event.autopilot ? 'Sequence complete. Autopilot is running.' : 'Sequence complete. Holding the last look.');
-    if (event.autopilot) setAutopilot(true, true);
-    return;
-  }
-  if (event && event.index != null) applyShowStep(event.index, now, music.bpm || 120);
-  if (engine.index >= 0) {
-    const remaining = Math.max(0, Math.ceil(engine.durations[engine.index] - engine.elapsed));
-    const message = `Step ${engine.index + 1}/${showSequence.steps.length} · ${showSequence.steps[engine.index].name} · ${remaining} beats left`;
-    if ($('#showSeqStatus').textContent !== message) showSeqStatus(message);
-  }
-}
-// Blend the previous composite into the new output, so input switches fade too.
-function drawShowFade(now) {
-  const fade = showSequence.fade;
-  if (!fade) return;
-  const alpha = 1 - (now - fade.at) / fade.duration;
-  if (alpha <= 0 || fade.width !== simW || fade.height !== simH) {
-    dropTarget(fade.target); showSequence.fade = null; return;
-  }
-  gl.enable(gl.BLEND); gl.blendColor(0, 0, 0, alpha);
-  gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
-  copyInto(comp, fade.target.tex);
-  gl.disable(gl.BLEND);
-}
-function setTrackTimelineVisible(visible) {
-  cancelTimelineResize(); spotifyTimeline.visible = visible; spotifyTimeline.preview = null;
-  try { localStorage.setItem('phosphor-track-timeline-visible', visible ? '1' : '0'); } catch (_) {}
-  drawTrackTimeline(performance.now());
-}
-$('#trackTimelineToggle').addEventListener('click', () => setTrackTimelineVisible(!spotifyTimeline.visible));
-$('#trackTimelineHide').addEventListener('click', () => setTrackTimelineVisible(false));
-function cancelTimelineResize() {
-  spotifyTimeline.resize = null; spotifyTimeline.signature = '';
-  $('#trackCheckpoints').classList.remove('resizing');
-}
-function commitTimelineBeats(index, beats) {
-  const step = showSequence.steps[index];
-  if (!step || step.beats === beats) return;
-  editShowSequence(); step.beats = beats; saveShowSequence(); renderShowSequence();
-  $('#trackTimelineStatus').textContent = `${step.name} · ${beats} beats`;
-}
-const checkpointTrack = $('#trackCheckpoints');
-checkpointTrack.addEventListener('pointerdown', e => {
-  const handle = e.target.closest('[data-resize]');
-  if (!handle || e.button !== 0 || spotifyTimeline.pending) return;
-  e.preventDefault(); e.stopPropagation();
-  const index = Number(handle.dataset.index), cycle = Number(handle.dataset.cycle), step = showSequence.steps[index];
-  const rect = checkpointTrack.getBoundingClientRect();
-  const total = showSequence.steps.reduce((sum, s) => sum + s.beats, 0);
-  const prefix = showSequence.steps.slice(0, index).reduce((sum, s) => sum + s.beats, 0);
-  spotifyTimeline.resize = { index, id: step.id, songKey: showSequence.songKey, beats: step.beats,
-    pointerId: e.pointerId, rect, duration: spotify.snapshot.track.durationMs,
-    fixedBeats: cycle * (total - step.beats) + prefix, divisor: cycle + 1 };
-  handle.focus({ preventScroll: true });
-  checkpointTrack.classList.add('resizing'); checkpointTrack.setPointerCapture(e.pointerId);
-});
-checkpointTrack.addEventListener('pointermove', e => {
-  const drag = spotifyTimeline.resize;
-  if (!drag || drag.pointerId !== e.pointerId) return;
-  if (drag.songKey !== showSequence.songKey || showSequence.steps[drag.index]?.id !== drag.id) { cancelTimelineResize(); return; }
-  const beat = ((e.clientX - drag.rect.left) / drag.rect.width * drag.duration - showSequence.offset * 1000) * showSequence.bpm / 60000;
-  drag.beats = clamp(Math.round((beat - drag.fixedBeats) / drag.divisor), 1, 1024);
-  $('#trackTimelineStatus').textContent = `${showSequence.steps[drag.index].name} · ${drag.beats} beats · Release to save`;
-  drawTrackTimeline(performance.now());
-});
-checkpointTrack.addEventListener('pointerup', e => {
-  const drag = spotifyTimeline.resize;
-  if (!drag || drag.pointerId !== e.pointerId) return;
-  const valid = drag.songKey === showSequence.songKey && showSequence.steps[drag.index]?.id === drag.id;
-  cancelTimelineResize();
-  if (checkpointTrack.hasPointerCapture(e.pointerId)) checkpointTrack.releasePointerCapture(e.pointerId);
-  if (valid) commitTimelineBeats(drag.index, drag.beats);
-  drawTrackTimeline(performance.now());
-});
-for (const type of ['pointercancel', 'lostpointercapture']) checkpointTrack.addEventListener(type, () => {
-  if (spotifyTimeline.resize) { cancelTimelineResize(); $('#trackTimelineStatus').textContent = 'Resize cancelled.'; }
-});
-checkpointTrack.addEventListener('keydown', e => {
-  const handle = e.target.closest('[data-resize]');
-  if (e.key === 'Escape' && spotifyTimeline.resize) {
-    e.preventDefault(); e.stopPropagation(); cancelTimelineResize(); $('#trackTimelineStatus').textContent = 'Resize cancelled.'; return;
-  }
-  if (!handle || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
-  e.preventDefault(); e.stopPropagation();
-  const index = Number(handle.dataset.index), step = showSequence.steps[index];
-  const delta = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 4 : 1);
-  const beats = e.key === 'Home' ? 1 : e.key === 'End' ? 1024 : clamp(step.beats + delta, 1, 1024);
-  commitTimelineBeats(index, beats); spotifyTimeline.signature = ''; drawTrackTimeline(performance.now());
-  checkpointTrack.querySelector(`[data-resize][data-index="${index}"][data-cycle="${handle.dataset.cycle}"]`)?.focus();
-});
-function drawTrackTimeline(now) {
-  const snapshot = spotify.snapshot, track = snapshot?.track, overlay = $('#trackTimeline');
-  const available = !!track && showSequence.songDrive && track.uri === showSequence.song?.uri;
-  $('#trackTimelineToggle').textContent = spotifyTimeline.visible ? 'Hide scrub bar' : 'Show scrub bar';
-  $('#trackTimelineToggle').setAttribute('aria-pressed', String(spotifyTimeline.visible));
-  if (!available || !spotifyTimeline.visible) {
-    overlay.hidden = true; $('#screenWrap').classList.remove('with-track-timeline'); spotifyTimeline.preview = null;
-    if (spotifyTimeline.resize) cancelTimelineResize();
-    return;
-  }
-  if (spotifyTimeline.resize && (spotifyTimeline.resize.songKey !== showSequence.songKey || showSequence.steps[spotifyTimeline.resize.index]?.id !== spotifyTimeline.resize.id)) cancelTimelineResize();
-  overlay.hidden = false; $('#screenWrap').classList.add('with-track-timeline');
-  const duration = track.durationMs;
-  const position = spotifyTimeline.preview ?? spotify.position(now) ?? 0;
-  const durations = showSequence.steps.map((s, i) => spotifyTimeline.resize?.index === i ? spotifyTimeline.resize.beats : s.beats);
-  $('#trackTimelineName').textContent = track.name;
-  $('#trackTimelineTime').textContent = `${fmtT(position / 1000)} / ${fmtT(duration / 1000)}`;
-  const slider = $('#trackTimelineScrub');
-  slider.max = String(Math.max(0, duration - 1));
-  if (spotifyTimeline.preview === null) slider.value = String(Math.round(position));
-  slider.setAttribute('aria-valuetext', `${fmtT(position / 1000)} of ${fmtT(duration / 1000)}`);
-  slider.disabled = !spotify.canSeek || spotifyTimeline.pending || !!spotifyTimeline.resize;
-  fillTrack(slider);
-  $('#trackTimelineReconnect').hidden = spotify.canSeek;
-  if (!spotify.canSeek && !spotifyTimeline.resize) $('#trackTimelineStatus').textContent = 'Reconnect Spotify to scrub. Step ends can still be resized.';
-  const signature = JSON.stringify([track.uri, duration, showSequence.bpm, showSequence.offset, showSequence.end,
-    showSequence.steps.map(s => [s.id, s.name, s.beats]), spotify.canSeek, spotifyTimeline.pending]);
-  if (signature !== spotifyTimeline.signature && !spotifyTimeline.resize) {
-    spotifyTimeline.signature = signature;
-    checkpointTrack.textContent = '';
-    const cycleMs = durations.reduce((sum, beats) => sum + beats * 60000 / showSequence.bpm, 0);
-    let cycle = 0, count = 0;
-    if (cycleMs > 0) do {
-      let start = showSequence.offset * 1000 + cycle * cycleMs;
-      for (const [index, step] of showSequence.steps.entries()) {
-        if (start >= duration || count >= 512) break;
-        const region = document.createElement('div'); region.className = 'track-checkpoint';
-        region.dataset.index = index; region.dataset.cycle = cycle;
-        const button = document.createElement('button'); button.type = 'button';
-        button.disabled = !spotify.canSeek || spotifyTimeline.pending;
-        const uri = track.uri;
-        button.addEventListener('click', () => {
-          if (!spotifyTimeline.resize) void seekTrackTimeline(Number(region.dataset.start), uri);
-        });
-        const handle = document.createElement('span'); handle.className = 'track-checkpoint-end';
-        handle.dataset.resize = '1'; handle.dataset.index = index; handle.dataset.cycle = cycle;
-        handle.tabIndex = 0; handle.setAttribute('role', 'slider'); handle.setAttribute('aria-orientation', 'horizontal');
-        handle.setAttribute('aria-valuemin', '1'); handle.setAttribute('aria-valuemax', '1024');
-        handle.setAttribute('aria-label', `Resize step ${index + 1} duration`);
-        handle.addEventListener('click', e => e.stopPropagation());
-        region.append(button, handle); checkpointTrack.appendChild(region);
-        start += step.beats * 60000 / showSequence.bpm; count++;
-      }
-      cycle++;
-    } while (showSequence.end === 'loop' && showSequence.offset * 1000 + cycle * cycleMs < duration && count < 512);
-  }
-  const cycleBeats = durations.reduce((sum, beats) => sum + beats, 0);
-  const prefixes = []; let prefix = 0;
-  for (const beats of durations) { prefixes.push(prefix); prefix += beats; }
-  const located = PhosphorStepSequencer.locate(position, showSequence.bpm, showSequence.offset, durations, showSequence.end);
-  for (const region of checkpointTrack.children) {
-    const index = Number(region.dataset.index), cycle = Number(region.dataset.cycle), step = showSequence.steps[index];
-    const start = showSequence.offset * 1000 + (cycle * cycleBeats + prefixes[index]) * 60000 / showSequence.bpm;
-    const end = start + durations[index] * 60000 / showSequence.bpm;
-    region.hidden = start >= duration;
-    region.dataset.start = start;
-    region.style.left = `${start / duration * 100}%`;
-    region.style.width = `${Math.max(0, Math.min(duration, end) - start) / duration * 100}%`;
-    const button = region.querySelector('button'), handle = region.querySelector('[data-resize]');
-    const text = `${index + 1} ${step.name} · ${durations[index]} beats`;
-    if (button.textContent !== text) button.textContent = text;
-    button.title = `Step ${index + 1}: ${step.name} · ${fmtT(start / 1000)} · ${durations[index]} beats`;
-    button.setAttribute('aria-label', `Seek to ${button.title}`);
-    handle.setAttribute('aria-valuenow', String(durations[index]));
-    handle.setAttribute('aria-valuetext', `${durations[index]} beats`);
-    handle.title = `${step.name}: ${durations[index]} beats. Drag the end to resize; arrow keys adjust by one beat.`;
-    const active = !located.waiting && !located.ended && index === located.index && cycle === located.cycle;
-    region.setAttribute('aria-current', active ? 'step' : 'false');
-  }
-  $('#trackTimelineStep').textContent = !showSequence.steps.length ? 'Autopilot · No sequence steps' : located.waiting ? 'Before sequence start'
-    : located.ended ? (showSequence.end === 'auto' ? 'Sequence ended · Autopilot' : 'Sequence ended · Holding last look')
-    : `Step ${located.index + 1} · ${showSequence.steps[located.index].name} · ${durations[located.index]} beats${showSequence.stopped ? ' · Not following' : ''}`;
-}
-async function seekTrackTimeline(position, uri) {
-  if (spotifyTimeline.pending) return;
-  if (spotify.snapshot?.track?.uri !== uri) {
-    spotifyTimeline.preview = null; $('#trackTimelineStatus').textContent = 'Song changed. Try seeking again.'; return;
-  }
-  spotifyTimeline.pending = true; spotifyTimeline.preview = position;
-  $('#trackTimelineStatus').textContent = 'Seeking…'; drawTrackTimeline(performance.now());
-  try {
-    await spotify.seek(position);
-    $('#trackTimelineStatus').textContent = '';
-  } catch (error) { $('#trackTimelineStatus').textContent = error.message; }
-  finally {
-    spotifyTimeline.pending = false; spotifyTimeline.preview = null; spotifyTimeline.dragUri = null;
-    drawTrackTimeline(performance.now());
-  }
-}
-$('#trackTimelineScrub').addEventListener('pointerdown', () => { spotifyTimeline.dragUri = spotify.snapshot?.track?.uri; });
-$('#trackTimelineScrub').addEventListener('input', e => {
-  spotifyTimeline.dragUri ||= spotify.snapshot?.track?.uri;
-  spotifyTimeline.preview = Number(e.target.value); drawTrackTimeline(performance.now());
-});
-$('#trackTimelineScrub').addEventListener('change', e => {
-  void seekTrackTimeline(Number(e.target.value), spotifyTimeline.dragUri || spotify.snapshot?.track?.uri);
-});
-$('#trackTimelineScrub').addEventListener('pointercancel', () => { spotifyTimeline.preview = null; spotifyTimeline.dragUri = null; });
-$('#trackTimelineReconnect').addEventListener('click', () => $('#spotifyConnect').click());
 
-function tickSpotifySequence(now) {
-  const state = showSequence, snapshot = spotify.snapshot;
-  if (state.stopped || state.preparing || !state.ready || !snapshot?.track || !state.steps.length) return;
-  if (frozen || now - snapshot.receivedAt > 10000) {
-    if (vid.video && uses('video')) vid.video.pause();
-    showSeqStatus(frozen ? 'Sequence paused while frozen.' : 'Spotify playback is stale. Waiting to reconnect…'); return;
-  }
-  if (ap.on && !state.autopilotMode) { stopShowSequence('Autopilot took over. Press Follow song to resume.'); return; }
-  const position = spotify.position(now);
-  const located = PhosphorStepSequencer.locate(position, state.bpm, state.offset, state.steps.map(s => s.beats), state.end);
-  if (located.waiting) {
-    state.engine.index = -1; state.applied = '';
-    showSeqStatus('Waiting for the song’s sequence start offset.'); return;
-  }
-  if (located.ended && state.end === 'auto') {
-    if (state.applied !== 'end-auto') {
-      state.applied = 'end-auto'; state.autopilotMode = 'end'; setAutopilot(true, true);
-      state.engine.index = -1; renderShowSequence(); showSeqStatus('Sequence complete. Autopilot is running.');
-    }
-    return;
-  }
-  const signature = `${located.index}:${located.cycle}:${state.seekVersion}`;
-  if (signature !== state.applied) {
-    state.applied = signature; state.autopilotMode = null;
-    if (ap.on) setAutopilot(false, true);
-    state.engine.index = located.index;
-    try { applyShowStep(located.index, now, state.bpm, located.elapsed * 60 / state.bpm); }
-    catch (error) { stopShowSequence(error.message, false); return; }
-  }
-  if (vid.video && uses('video')) {
-    if (!snapshot.playing) vid.video.pause();
-    else if (vid.video.paused && !vidUserPaused) vid.video.play().catch(() => {});
-  }
-  const remaining = Math.max(0, Math.ceil(state.steps[located.index].beats - located.elapsed));
-  const message = `${snapshot.playing ? 'Playing' : 'Paused'} · Step ${located.index + 1}/${state.steps.length} · ${state.steps[located.index].name} · ${remaining} beats left${located.ended ? ' · Holding last look' : ''}`;
-  if ($('#showSeqStatus').textContent !== message) showSeqStatus(message);
+/* ---------- undo / redo (for this song, this visit) ---------- */
+const seqSnap = () => JSON.stringify({ blocks: seq.rec.blocks, markers: seq.rec.markers });
+function seqRestore(s) {
+  const o = JSON.parse(s); seq.rec.blocks = o.blocks; seq.rec.markers = o.markers;
+  if (!seq.rec.blocks.some((b) => b.id === seq.selId)) seq.selId = null;
 }
-function spotifySongChanged(snapshot) {
-  const state = showSequence, previous = state.lastPlayback;
-  state.lastPlayback = snapshot;
-  if (!snapshot.track) {
-    if (state.songDrive) {
-      if (vid.video && uses('video')) vid.video.pause();
-      showSeqStatus('No active Spotify music track. Your song sequence is saved.');
+function seqCommit(before) {
+  if (before !== seqSnap()) { seq.undo.push(before); if (seq.undo.length > 200) seq.undo.shift(); seq.redo.length = 0; seqSave(); }
+  seqUndoUI(); seq.dirty = true;
+}
+function seqChange(fn) { const before = seqSnap(); fn(); seqCommit(before); }
+function seqUndoUI() { $('#seqUndo').disabled = !seq.undo.length; $('#seqRedo').disabled = !seq.redo.length; }
+function seqUndo() { if (!seq.undo.length) return; seq.redo.push(seqSnap()); seqRestore(seq.undo.pop()); seqSave(); seqUndoUI(); seq.dirty = true; seqNote('Undone.'); }
+function seqRedo() { if (!seq.redo.length) return; seq.undo.push(seqSnap()); seqRestore(seq.redo.pop()); seqSave(); seqUndoUI(); seq.dirty = true; seqNote('Redone.'); }
+$('#seqUndo').addEventListener('click', seqUndo);
+$('#seqRedo').addEventListener('click', seqRedo);
+
+/* ---------- the song's spectrograph, built from what the app hears ---------- */
+const SPEC_SEQ_RATE = 20, SPEC_SEQ_BANDS = 28;
+const seqSpecDB = (() => {
+  let db = null;
+  const open = () => db ||= new Promise((res, rej) => {
+    const r = indexedDB.open('phosphor-song-spectrographs', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('s');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  const run = async (mode, fn) => {
+    const d = await open();
+    return new Promise((res, rej) => { const tx = d.transaction('s', mode), q = fn(tx.objectStore('s')); tx.oncomplete = () => res(q?.result); tx.onerror = () => rej(tx.error); });
+  };
+  return { get: (k) => run('readonly', (s) => s.get(k)), put: (k, v) => run('readwrite', (s) => s.put(v, k)) };
+})();
+function seqSpecFor(key, dur) {
+  const n = Math.ceil(dur * SPEC_SEQ_RATE);
+  const sp = { key, n, data: new Uint8Array(n * SPEC_SEQ_BANDS), heard: new Uint8Array(n), changed: false, savedAt: 0 };
+  if (key !== 'standalone') seqSpecDB.get(key).then((v) => {
+    if (seq.spec !== sp || !v?.data) return;
+    const len = Math.min(n, v.heard.length);
+    for (let i = 0; i < len; i++) if (v.heard[i] && !sp.heard[i]) {
+      sp.heard[i] = 1; sp.data.set(v.data.subarray(i * SPEC_SEQ_BANDS, (i + 1) * SPEC_SEQ_BANDS), i * SPEC_SEQ_BANDS);
+    }
+    seq.specDirty = true;
+  }).catch(() => {});
+  return sp;
+}
+function seqSpecStore(force) {
+  const sp = seq.spec;
+  if (!sp || !sp.changed || sp.key === 'standalone' || (!force && performance.now() - sp.savedAt < 5000)) return;
+  sp.changed = false; sp.savedAt = performance.now();
+  seqSpecDB.put(sp.key, { data: sp.data, heard: sp.heard }).catch(() => {});
+}
+// Each twentieth of a second of song that plays with sound connected fills in a column (gaps fill on a later listen)
+let seqSpecEdges = null, seqSpecLast = -1;
+function seqSpecCapture(t) {
+  const sp = seq.spec;
+  if (!sp || !snd.analyser || !snd.bins || !seq.playing) { seqSpecLast = -1; return; }
+  const i = Math.floor(t * SPEC_SEQ_RATE);
+  if (i < 0 || i >= sp.n || i === seqSpecLast) return;
+  const bins = snd.bins, hz = snd.rate / snd.analyser.fftSize;
+  if (!seqSpecEdges || seqSpecEdges.hz !== hz) {
+    const e = [];
+    for (let b = 0; b <= SPEC_SEQ_BANDS; b++) e.push(clamp(Math.round(30 * Math.pow(16000 / 30, b / SPEC_SEQ_BANDS) / hz), 1, bins.length - 1));
+    seqSpecEdges = { hz, e };
+  }
+  const e = seqSpecEdges.e, row = new Uint8Array(SPEC_SEQ_BANDS);
+  for (let b = 0; b < SPEC_SEQ_BANDS; b++) {
+    let v = 0;
+    for (let j = e[b]; j <= Math.max(e[b], e[b + 1] - 1); j++) if (bins[j] > v) v = bins[j];
+    row[b] = v;
+  }
+  // A short jump forward (a dropped frame) fills the columns in between; a seek doesn't
+  const from = seqSpecLast >= 0 && i > seqSpecLast && i - seqSpecLast < 6 ? seqSpecLast + 1 : i;
+  for (let k = from; k <= i; k++) { sp.data.set(row, k * SPEC_SEQ_BANDS); sp.heard[k] = 1; }
+  seqSpecLast = i; sp.changed = true; seq.specDirty = true;
+  seqSpecStore(false);
+}
+
+/* ---------- which song, and where in it ---------- */
+function seqPos(now) {
+  const s = spotify.snapshot;
+  if (seq.song && s?.track && s.track.uri === seq.song.uri && now - s.receivedAt < 10000)
+    return { t: spotify.position(now) / 1000, playing: !!s.playing, live: true };
+  const L = seq.local;
+  return { t: L.playing ? L.pos + (now - L.at) / 1000 : L.pos, playing: L.playing, live: false };
+}
+function seqLoadSong(key, song) {
+  seqStopRec();
+  seqSpecStore(true);
+  if (seq.key !== key) seq.records.set(seq.key, seq.rec);
+  seq.key = key; seq.song = song || null;
+  seq.rec = seq.records.get(key) || TL.newRecord();
+  seq.undo.length = 0; seq.redo.length = 0; seqUndoUI();
+  seq.selId = null; seq.applied = [null, null, null, null];
+  seq.spec = seqSpecFor(key, seqDur());
+  $('#seqEnd').value = seq.rec.end;
+  $('#seqSong').innerHTML = song
+    ? `<b>${escapeHTML(song.name)}</b> <span>· ${escapeHTML(song.artists.join(', '))}</span>`
+    : '<b>No song</b> <span>· its own clock (connect Spotify under Song sequencer to follow a song)</span>';
+  const v = seq.view; v.start = 0; v.pps = v.minPps = v.vw / seqDur();
+  seq.dirty = seq.specDirty = true;
+}
+function seqUsedLoops() { return seq.rec.blocks.reduce((m, b) => Math.max(m, b.track + 1), 2); }
+function seqRun(on, message) {
+  seq.running = on;
+  $('#seqPlay').setAttribute('aria-pressed', String(on));
+  seq.applied = [null, null, null, null];
+  if (on) {
+    drift = true;
+    if (ap.on) setAutopilot(false, true);
+    seq.apMode = null;
+    if (loopCount < seqUsedLoops()) { setLoopCount(seqUsedLoops(), 'load'); syncUI(); }
+  } else {
+    if (seq.apMode) { seq.apMode = null; }
+    seqStopRec();
+  }
+  if (message) seqNote(message);
+}
+async function seqPlay() {
+  if (seq.song && spotify.snapshot?.track?.uri === seq.song.uri) {
+    seqRun(true, spotify.snapshot.playing ? 'Following the song in Spotify.' : 'Following the song. Press play in Spotify to start it.');
+    if (!spotify.snapshot.playing && spotify.canSeek) {
+      try { await spotify.api('/me/player/play', true, { method: 'PUT' }); } catch (_) { /* Spotify's own play button still works */ }
     }
     return;
   }
-  const key = JSON.stringify([snapshot.accountId, snapshot.track.uri]);
-  const switched = state.songKey !== key;
-  if (switched) {
-    rememberShowRecord(); stopShowSequence('Loading song sequence…', false); releaseShowClips();
-    state.song = snapshot.track; state.accountId = snapshot.accountId; state.songDrive = true;
-    state.seekVersion++; state.autopilotMode = null;
-    loadShowRecord(key);
-    $('#showSeqSong').textContent = `Sequence for ${snapshot.track.name} — ${snapshot.track.artists.join(', ')}`;
-    void startShowSequence(true);
-  } else {
-    const predicted = previous?.track?.uri === snapshot.track.uri
-      ? previous.progressMs + (previous.playing ? Math.max(0, snapshot.receivedAt - previous.receivedAt) : 0) : snapshot.progressMs;
-    if (Math.abs(predicted - snapshot.progressMs) > 1200 || !previous?.track) {
-      state.seekVersion++;
-      // Replaying the same song starts its sequence again, even after Stop.
-      if (snapshot.progressMs < 1000 && previous?.progressMs > 2000 && state.stopped) void startShowSequence(true);
+  const L = seq.local;
+  if (L.pos >= seqDur()) L.pos = 0;
+  L.at = performance.now(); L.playing = true;
+  seqRun(true, seq.rec.blocks.length ? 'Playing the sequence on its own clock.' : 'Playing. Add a look to a track to see it come in.');
+}
+async function seqStop() {
+  const L = seq.local;
+  if (L.playing) { L.pos += (performance.now() - L.at) / 1000; L.playing = false; }
+  seqRun(false, 'Stopped. The picture holds where it is.');
+  if (seq.song && spotify.snapshot?.playing && spotify.canSeek) {
+    try { await spotify.api('/me/player/pause', true, { method: 'PUT' }); } catch (_) { /* pause it in Spotify */ }
+  }
+}
+$('#seqPlay').addEventListener('click', () => { if (seq.running) void seqStop(); else void seqPlay(); });
+$('#seqStop').addEventListener('click', () => { void seqStop(); if (!seq.song) { seq.local.pos = 0; seq.dirty = true; } });
+function seqSeek(t) {
+  t = clamp(t, 0, seqDur());
+  if (seq.song && spotify.snapshot?.track?.uri === seq.song.uri) {
+    if (!spotify.canSeek) { seqNote('Reconnect Spotify (Song sequencer › Connect Spotify) to move the song from here.'); return; }
+    spotify.seek(t * 1000).catch((err) => seqNote(err.message));
+  } else { seq.local.pos = t; seq.local.at = performance.now(); }
+  seq.applied = [null, null, null, null]; seq.dirty = true;
+}
+$('#seqEnd').addEventListener('change', (e) => { seq.rec.end = e.target.value; seqSave(); });
+
+/* ---------- playing the blocks onto the loops ---------- */
+const SEQ_SKIP = new Set(['in1', 'in2', 'blend']);
+function seqApplyTrack(k, x, now) {
+  const K = KEYS[k], L = loops[K], T = L.tgt;
+  if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); return; }
+  const sig = x.other ? `${x.other.id}>${x.main.id}` : x.main.id;
+  if (seq.applied[k] !== sig) {
+    const wasCross = (seq.applied[k] || '').includes('>');
+    patchLoop(K, x.other ? x.other.look : x.main.look, true);
+    seq.xin[k] = false;
+    // Over a crossfade the outgoing input fades into the incoming one through Blend
+    if (x.other && x.main.look.in1 !== T.in1 && T.in2 === 'none') { T.in2 = x.main.look.in1; seq.xin[k] = true; }
+    if (wasCross && !x.other) L.cur.blend = T.blend;
+    seq.applied[k] = sig;
+    const used = [T.in1, T.in2];
+    if (used.includes('camera') && !cam.on) startCamera();
+    if (used.includes('screen') && !scr.on) startScreen(true);
+    settleDevices();
+    if (K === edit) syncUI();
+  }
+  if (x.other) {
+    const a = x.other.look, b = x.main.look, w = x.w, d = loopDefaults();
+    for (const p of LOOP_SMOOTH) if (!SEQ_SKIP.has(p)) {
+      const va = Number.isFinite(a[p]) ? a[p] : d[p], vb = Number.isFinite(b[p]) ? b[p] : d[p];
+      T[p] = va + (vb - va) * w;
     }
-    tickSpotifySequence(performance.now());
+    for (const p of Object.keys(b)) if (!LOOP_SMOOTH.includes(p) && !SEQ_SKIP.has(p) && typeof b[p] !== 'object') T[p] = w >= 0.5 ? b[p] : (a[p] ?? d[p]);
+    if (seq.xin[k]) T.blend = w * 100;
+    else if (Number.isFinite(a.blend) && Number.isFinite(b.blend)) T.blend = a.blend + (b.blend - a.blend) * w;
+  }
+  // Change lines: on the block coming in, and (during a crossfade) the one going out, weighted by the crossfade
+  let show = 100, feed = null;
+  const vals = {};
+  const take = (blk, u, wt) => {
+    for (const au of blk.autos) {
+      const [lo, hi] = seqRange(au.key), v = lo + (hi - lo) * TL.autoValue(au.pts, u);
+      if (!(au.key in vals)) vals[au.key] = { sum: 0, wt: 0 };
+      vals[au.key].sum += v * wt; vals[au.key].wt += wt;
+    }
+  };
+  take(x.main, x.u, x.other ? x.w : 1);
+  if (x.other) take(x.other, x.uOther, 1 - x.w);
+  const grade = {};
+  for (const [key, { sum, wt }] of Object.entries(vals)) {
+    if (wt <= 0) continue;
+    const v = sum / wt;
+    if (key === 'show') show = v;
+    else if (key === 'feed') feed = v;
+    else if (key in GRADE_DEF) grade[key] = v;
+    else if (key in T) T[key] = v;
+  }
+  mix.tgt[SHOW[K]] = clamp(show, 0, 100) * x.show;
+  if (feed !== null) mix.tgt[FEED_INTO[otherLoop(K)]] = feed;
+  seqGrade(K, Object.keys(grade).length ? grade : null);
+}
+// Color grading inside the sequencer is each loop's own (see loopGrade); null puts that loop back to normal
+function seqGrade(K, g) { loopGrade[K] = g; }
+
+function seqTick(now) {
+  const p = seqPos(now);
+  seq.t = p.t; seq.playing = p.playing; seq.live = p.live;
+  if (seq.local.playing && !p.live && p.t >= seqDur()) { seq.local.pos = seqDur(); seq.local.playing = false; seq.playing = false; }
+  if (!frozen) seqSpecCapture(p.t);
+  if (seq.recording) seqRecTick(p);
+  if (seq.running && !frozen) {
+    if (ap.on && !seq.apMode) seqRun(false, 'Autopilot took over, so the sequence stopped. Press Play to go back to it.');
+    else {
+      const r = TL.resolve(seq.rec, p.t);
+      if (r.autopilot) {
+        if (seq.apMode !== 'end') { seq.apMode = 'end'; setAutopilot(true, true); seqNote('The sequence has ended, so Autopilot is running.'); }
+      } else {
+        if (seq.apMode === 'end') { seq.apMode = null; setAutopilot(false, true); }
+        if (!seq.apMode) for (let k = 0; k < TL.TRACKS; k++) {
+          if (!loopOn(KEYS[k])) continue;
+          if (seq.recording && k === seq.selTrack) continue;   // you're playing this loop by hand
+          seqApplyTrack(k, r.tracks[k], now);
+        }
+      }
+    }
+  }
+  if (!$('#seq').hidden) seqDraw(now);
+}
+
+/* ---------- record look changes ---------- */
+function seqRecTick(p) {
+  const K = KEYS[seq.selTrack], L = loops[K];
+  if (!seq.running || !p.playing) { seqStopRec(true); return; }
+  const t = p.t;
+  if (seq.recBlock && (L.gen !== seq.recGen || t < seq.recBlock.a)) seqStopRec(true);
+  if (!seq.recBlock) {
+    seq.recBefore ||= seqSnap();
+    seq.recGen = L.gen;
+    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: 'Recording…', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0 });
+    seq.recBlock.rec = true;
+    seq.rec.blocks.push(seq.recBlock);
+  }
+  seq.recBlock.b = Math.max(seq.recBlock.a + TL.MIN_LEN, r1(t));
+  // Slider moves during a look are kept: the block holds the look as it is when it ends
+  if (L.gen === seq.recGen) seq.recBlock.look = { ...L.tgt };
+  seq.dirty = true;
+}
+// Closes the block being recorded; keepGoing leaves recording on, ready for the next look
+function seqStopRec(keepGoing) {
+  const blk = seq.recBlock;
+  if (blk) {
+    delete blk.rec; blk.label = 'Recorded look';
+    seq.recBlock = null;
+  }
+  if (!keepGoing && seq.recBefore) {
+    const before = seq.recBefore; seq.recBefore = null; seqCommit(before);
+    if (seq.recording) seqNote('Recorded. Drag, trim or undo it like any other block.');
+  }
+  if (!keepGoing && seq.recording) { seq.recording = false; $('#seqRec').setAttribute('aria-pressed', 'false'); }
+  seq.dirty = true;
+}
+$('#seqRec').addEventListener('click', () => {
+  if (seq.recording) { seqStopRec(); return; }
+  seq.recording = true; $('#seqRec').setAttribute('aria-pressed', 'true');
+  seqNote(`Recording into track ${seq.selTrack + 1} (loop ${KEYS[seq.selTrack]}) while the sequence plays: change that loop’s look and each change becomes a new block.${seq.running ? '' : ' Press Play to start.'}`);
+});
+
+/* ---------- the track cards on the left ---------- */
+const seqCards = [], seqLaneEls = [];
+function seqSelectTrack(i) {
+  seq.selTrack = i;
+  seqCards.forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
+  $('#seqSelName').textContent = `track ${i + 1} · loop ${KEYS[i]}`;
+}
+for (let i = 0; i < TL.TRACKS; i++) {
+  const tr = SEQ_TRACK[i], card = document.createElement('button');
+  card.className = 'seq-card seq-h-lane'; card.type = 'button';
+  card.innerHTML = `<span class="seq-num" style="background:${tr.color};${tr.ink ? 'color:' + tr.ink : ''}">${i + 1}</span><span class="seq-txt"><b>Loop ${KEYS[i]}</b><small></small></span>`;
+  card.addEventListener('click', () => { seqSelectTrack(i); if (loopOn(KEYS[i])) setEdit(KEYS[i]); });
+  seqCards.push(card); $('#seqHeads').appendChild(card);
+  const lane = document.createElement('div'); lane.className = 'seq-lane seq-h-lane'; lane.dataset.track = i;
+  seqLaneEls.push(lane); $('#seqLanes').appendChild(lane);
+}
+{ const sp = document.createElement('div'); sp.className = 'seq-h-ov'; $('#seqHeads').appendChild(sp); }
+// A card says what its loop is showing now
+function seqCardText() {
+  seqCards.forEach((c, i) => {
+    const K = KEYS[i], on = loopOn(K), small = c.querySelector('small');
+    const txt = on ? `${inputName(loops[K].tgt.in1)}${seq.rec.blocks.some((b) => b.track === i) ? '' : ' · no blocks yet'}` : 'Off · a block here turns it on';
+    if (small.textContent !== txt) small.textContent = txt;
+    c.classList.toggle('off', !on); seqLaneEls[i].classList.toggle('off', !on);
+  });
+}
+
+/* ---------- drawing the timeline ---------- */
+const seqView = $('#seqView'), seqLanes = $('#seqLanes'), seqSpecCv = $('#seqSpec');
+const SEQ_LUT = (() => {
+  const stops = [[14, 13, 15], [67, 31, 81], [139, 26, 184], [213, 132, 245], [246, 236, 250]], lut = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const p = i / 255 * (stops.length - 1), k = Math.min(stops.length - 2, Math.floor(p)), u = p - k;
+    for (let c = 0; c < 3; c++) lut[i * 3 + c] = stops[k][c] + (stops[k + 1][c] - stops[k][c]) * u;
+  }
+  return lut;
+})();
+function seqFixView() {
+  const v = seq.view, dur = seqDur();
+  v.minPps = v.vw / dur; v.maxPps = Math.max(v.minPps * 2, 240);
+  v.pps = clamp(v.pps, v.minPps, v.maxPps); v.start = clamp(v.start, 0, Math.max(0, dur - v.vw / v.pps));
+}
+const seqX = (t) => (t - seq.view.start) * seq.view.pps;
+function seqDrawStatic() {
+  seqFixView();
+  const v = seq.view, pps = v.pps, end = v.start + v.vw / pps, dur = seqDur();
+  const steps = [0.5, 1, 2, 5, 10, 15, 30, 60], step = steps.find((s) => s * pps >= 64) || 60;
+  const minor = step / (step >= 10 && step % 5 === 0 ? 5 : 2);
+  let rh = ''; const gh = [];
+  for (let t = Math.floor(v.start / minor) * minor; t <= Math.min(end, dur) + minor; t += minor) {
+    const px = seqX(t); if (px < -60 || px > v.vw + 2) continue;
+    const major = Math.abs(t / step - Math.round(t / step)) < 1e-6;
+    rh += `<span class="tk${major ? ' major' : ''}" style="left:${px}px"></span>`;
+    if (major) { rh += `<span class="lb" style="left:${px}px">${fmtSeq(t, step < 1)}</span>`; gh.push(`<i style="left:${px}px"></i>`); }
+  }
+  $('#seqRuler').innerHTML = rh;
+  // markers
+  const marks = $('#seqMarks'); marks.textContent = '';
+  for (const m of seq.rec.markers) {
+    const x = seqX(m.t); if (x < -160 || x > v.vw) continue;
+    const el = document.createElement('div'); el.className = 'seq-mk'; el.dataset.id = m.id;
+    el.style.left = x + 'px'; el.textContent = m.name; el.title = `${m.name} · ${fmtSeq(m.t, true)} · drag to move, double-click to rename, right-click to delete`;
+    marks.appendChild(el); gh.push(`<i class="m" style="left:${x}px"></i>`);
+  }
+  $('#seqGrid').innerHTML = gh.join('');
+  // blocks
+  seqLaneEls.forEach((l) => { l.textContent = ''; });
+  for (const bl of seq.rec.blocks) {
+    const tr = SEQ_TRACK[bl.track], w = (bl.b - bl.a) * pps, x = seqX(bl.a);
+    if (x > v.vw + 4 || x + w < -4) continue;
+    const el = document.createElement('div');
+    el.className = 'seq-blk' + (bl.id === seq.selId ? ' sel' : '') + (bl.rec ? ' rec' : '');
+    el.dataset.id = bl.id;
+    el.style.left = x + 'px'; el.style.width = Math.max(3, w) + 'px';
+    el.style.background = tr.fill; el.style.borderColor = tr.color;
+    let html = '';
+    if (bl.fin > 0) html += `<div class="fi" style="width:${bl.fin * pps}px"></div>`;
+    if (bl.fout > 0) html += `<div class="fo" style="width:${bl.fout * pps}px"></div>`;
+    if (bl.autos.length) {
+      html += '<svg class="auto" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + bl.autos.map((au, ai) =>
+        `<polyline points="${au.pts.map(([u, val]) => `${u * 100},${100 - val * 100}`).join(' ')}" fill="none" stroke="${SEQ_LINES[ai % 4]}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`).join('') + '</svg>';
+      if (bl.id === seq.selId || w > 120) bl.autos.forEach((au, ai) => {
+        html += au.pts.map(([u, val], pi) => `<span class="dot" data-h="pt" data-a="${ai}" data-p="${pi}" title="${SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
+      });
+      if (w > 90) html += `<span class="atag">${bl.autos.map((au) => SEQ_NAME[au.key] || au.key).join(' · ')}</span>`;
+    }
+    if (w > 34) html += `<span class="t">${escapeHTML(bl.label)}<small>${fmtSeq(bl.a)}–${fmtSeq(bl.b)}</small></span>`;
+    html += '<div class="eg l" data-h="l"></div><div class="eg r" data-h="r"></div>';
+    if (w > 24) html += `<div class="fh" data-h="fin" style="left:${bl.fin * pps}px" title="Fade in ${r1(bl.fin)} s"></div><div class="fh" data-h="fout" style="left:${w - bl.fout * pps}px" title="Fade out ${r1(bl.fout)} s"></div>`;
+    el.innerHTML = html;
+    el.title = `${bl.label} · ${fmtSeq(bl.a, true)}–${fmtSeq(bl.b, true)}`;
+    seqLaneEls[bl.track].appendChild(el);
+  }
+  // crossfades where blocks on one track overlap
+  for (let ti = 0; ti < TL.TRACKS; ti++) {
+    const own = seq.rec.blocks.filter((b) => b.track === ti).sort((p, q) => p.a - q.a);
+    for (let i = 0; i < own.length; i++) for (let j = i + 1; j < own.length && own[j].a < own[i].b; j++) {
+      const a = Math.max(own[i].a, own[j].a), b = Math.min(own[i].b, own[j].b);
+      if (b - a <= 0.05) continue;
+      const xf = document.createElement('div'); xf.className = 'seq-xf';
+      xf.style.left = seqX(a) + 'px'; xf.style.width = (b - a) * pps + 'px';
+      if ((b - a) * pps > 70) xf.textContent = `crossfade ${r1(b - a)} s`;
+      seqLaneEls[ti].appendChild(xf);
+    }
+  }
+  const z = pps / v.minPps;
+  $('#seqZoom').textContent = `Zoom ${z < 10 ? z.toFixed(1).replace(/\.0$/, '') : Math.round(z)}× · ${fmtSeq(v.start)}–${fmtSeq(Math.min(dur, end))}`;
+  $('#seqThumb').style.left = (v.start / dur * 100) + '%';
+  $('#seqThumb').style.width = Math.min(100, (v.vw / pps) / dur * 100) + '%';
+  seqInspector(); seqCardText();
+}
+function seqDrawSpec() {
+  const v = seq.view, sp = seq.spec, dpr = window.devicePixelRatio || 1;
+  const W = Math.max(1, Math.round(v.vw * dpr)), H = Math.max(1, Math.round(seqSpecCv.clientHeight * dpr));
+  if (seqSpecCv.width !== W || seqSpecCv.height !== H) { seqSpecCv.width = W; seqSpecCv.height = H; }
+  const ctx = seqSpecCv.getContext('2d'), img = ctx.createImageData(W, H), px = img.data, B = SPEC_SEQ_BANDS;
+  let firstUnheard = -1;
+  for (let cx = 0; cx < W; cx++) {
+    const t = v.start + (cx / dpr) / v.pps, si = Math.floor(t * SPEC_SEQ_RATE), ok = sp && si >= 0 && si < sp.n, h = ok && sp.heard[si];
+    if (ok && !h && firstUnheard < 0) firstUnheard = cx / dpr;
+    for (let cy = 0; cy < H; cy++) {
+      const o = (cy * W + cx) * 4;
+      if (!h) { const s = ((cx + cy) / dpr | 0) % 8 < 1; px[o] = s ? 32 : 20; px[o + 1] = s ? 28 : 18; px[o + 2] = s ? 34 : 22; px[o + 3] = 255; continue; }
+      const b = Math.min(B - 1, Math.floor((1 - cy / H) * B)), li = sp.data[si * B + b] * 3;
+      px[o] = SEQ_LUT[li]; px[o + 1] = SEQ_LUT[li + 1]; px[o + 2] = SEQ_LUT[li + 2]; px[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const un = $('#seqUnheard');
+  un.hidden = firstUnheard < 0 || firstUnheard > v.vw - 160;
+  un.style.left = Math.max(0, firstUnheard) + 'px';
+}
+function seqDraw(now) {
+  const v = seq.view;
+  // While playing, the view pages along with the playhead (unless you're dragging something)
+  if (seq.playing && !seq.drag && (seq.t > v.start + v.vw / v.pps - 2 / v.pps || seq.t < v.start)) { v.start = seq.t - (v.vw / v.pps) * 0.1; seq.dirty = seq.specDirty = true; }
+  if (seq.dirty) { seq.dirty = false; seqDrawStatic(); seq.specDirty = true; }
+  if (seq.specDirty && now - seq.lastDraw > 250) { seq.specDirty = false; seq.lastDraw = now; seqDrawSpec(); }
+  const dur = seqDur(), phx = seqX(Math.min(seq.t, dur)), ph = $('#seqPh');
+  ph.style.display = phx < -2 || phx > v.vw + 2 ? 'none' : '';
+  ph.style.left = phx + 'px';
+  $('#seqOvMark').style.left = (Math.min(seq.t, dur) / dur * 100) + '%';
+  const clock = `${fmtSeq(Math.min(seq.t, dur), true)} / ${fmtSeq(dur)}`;
+  if ($('#seqClock').textContent !== clock) $('#seqClock').textContent = clock;
+  if (now - (seq.cardAt || 0) > 500) { seq.cardAt = now; seqCardText(); }
+}
+function seqInspector() {
+  const bl = seq.rec.blocks.find((b) => b.id === seq.selId), el = $('#seqInsp');
+  if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
+  el.innerHTML = `<b>${escapeHTML(bl.label)}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
+    (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
+}
+function seqMeasure() {
+  const v = seq.view, zoom = v.pps / (v.minPps || 1);
+  v.vw = seqView.clientWidth || 600;
+  v.minPps = v.vw / seqDur(); v.pps = v.minPps * zoom;
+  seq.dirty = seq.specDirty = true; seq.lastDraw = 0;
+}
+new ResizeObserver(seqMeasure).observe(seqView);
+
+/* ---------- scrolling and zooming ---------- */
+seqView.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const v = seq.view, unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? v.vw : 1;
+  const d = (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * unit;
+  if (e.shiftKey || e.ctrlKey) {
+    const mx = e.clientX - seqView.getBoundingClientRect().left, at = v.start + mx / v.pps;
+    v.pps = clamp(v.pps * Math.exp(-d * 0.002), v.minPps, v.maxPps); v.start = at - mx / v.pps;
+  } else v.start += d / v.pps;
+  seq.dirty = true;
+}, { passive: false });
+seqView.addEventListener('keydown', (e) => {
+  const v = seq.view, k = e.key;
+  if (k === 'ArrowLeft' || k === 'ArrowRight') v.start += (k === 'ArrowLeft' ? -1 : 1) * v.vw * 0.15 / v.pps;
+  else if (k === '+' || k === '=' || k === '-') { const at = v.start + v.vw / 2 / v.pps; v.pps *= k === '-' ? 1 / 1.4 : 1.4; seqFixView(); v.start = at - v.vw / 2 / v.pps; }
+  else return;
+  e.preventDefault(); e.stopPropagation(); seq.dirty = true;
+});
+$('#seqFit').addEventListener('click', () => { seq.view.pps = seq.view.minPps; seq.view.start = 0; seq.dirty = true; });
+{
+  let ovDrag = null;
+  const ov = $('#seqOv');
+  ov.addEventListener('pointerdown', (e) => {
+    const r = ov.getBoundingClientRect(), v = seq.view;
+    if (e.target !== $('#seqThumb')) v.start = (e.clientX - r.left) / r.width * seqDur() - v.vw / v.pps / 2;
+    ovDrag = { x: e.clientX, start: v.start, w: r.width }; ov.setPointerCapture(e.pointerId); seq.dirty = true;
+  });
+  ov.addEventListener('pointermove', (e) => { if (ovDrag) { seq.view.start = ovDrag.start + (e.clientX - ovDrag.x) / ovDrag.w * seqDur(); seq.dirty = true; } });
+  ov.addEventListener('pointerup', () => { ovDrag = null; });
+}
+
+/* ---------- dragging: blocks (move, ends, fades, change-line points), markers, or the view itself ---------- */
+const seqTrackAtY = (y) => clamp(Math.floor((y - seqLanes.getBoundingClientRect().top) / (seqLaneEls[0].offsetHeight + 4)), 0, TL.TRACKS - 1);
+const seqBlock = (id) => seq.rec.blocks.find((b) => b.id === id);
+seqView.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  seqCloseCtx();
+  const blkEl = e.target.closest('.seq-blk'), mkEl = e.target.closest('.seq-mk');
+  if (mkEl && e.target.tagName === 'INPUT') return;
+  const d = { x: e.clientX, y: e.clientY, start: seq.view.start, moved: false, before: seqSnap() };
+  if (blkEl) {
+    const bl = seqBlock(blkEl.dataset.id); if (!bl || bl.rec) return;
+    d.kind = e.target.dataset.h || 'move'; d.bl = bl; d.orig = JSON.parse(JSON.stringify(bl));
+    if (d.kind === 'pt') { const r = blkEl.getBoundingClientRect(); d.w = r.width; d.h = r.height; d.ai = +e.target.dataset.a; d.pi = +e.target.dataset.p; }
+    seq.selId = bl.id; seqSelectTrack(bl.track); seq.dirty = true;
+  } else if (mkEl) {
+    d.kind = 'marker'; d.m = seq.rec.markers.find((m) => m.id === mkEl.dataset.id); d.orig = { t: d.m.t };
+  } else d.kind = 'pan';
+  seq.drag = d;
+  seqView.setPointerCapture(e.pointerId);
+});
+seqView.addEventListener('pointermove', (e) => {
+  const d = seq.drag; if (!d) return;
+  const dx = e.clientX - d.x;
+  if (!d.moved && Math.abs(dx) < 4 && Math.abs(e.clientY - d.y) < 4) return;
+  d.moved = true;
+  const pps = seq.view.pps, dt = dx / pps, o = d.orig, bl = d.bl, dur = seqDur();
+  if (d.kind === 'pan') { seqView.classList.add('dragging'); seq.view.start = d.start - dt; }
+  else if (d.kind === 'marker') d.m.t = r1(clamp(o.t + dt, 0, dur));
+  else if (d.kind === 'move') {
+    const len = o.b - o.a; bl.a = r1(clamp(o.a + dt, 0, Math.max(0, dur - len))); bl.b = r1(bl.a + len); bl.track = seqTrackAtY(e.clientY);
+  } else if (d.kind === 'l') bl.a = r1(clamp(o.a + dt, 0, o.b - TL.MIN_LEN));
+  else if (d.kind === 'r') bl.b = r1(clamp(o.b + dt, o.a + TL.MIN_LEN, dur));
+  else if (d.kind === 'fin') bl.fin = r1(clamp(o.fin + dt, 0, bl.b - bl.a - bl.fout));
+  else if (d.kind === 'fout') bl.fout = r1(clamp(o.fout - dt, 0, bl.b - bl.a - bl.fin));
+  else if (d.kind === 'pt') {
+    const pts = bl.autos[d.ai].pts, [u0, v0] = o.autos[d.ai].pts[d.pi], i = d.pi;
+    const lo = i === 0 ? 0 : pts[i - 1][0], hi = i === pts.length - 1 ? 1 : pts[i + 1][0];
+    const u = i === 0 ? 0 : i === pts.length - 1 ? 1 : clamp(u0 + dx / d.w, lo, hi);
+    pts[i] = [u, clamp(v0 - (e.clientY - d.y) / d.h, 0, 1)];
+  }
+  if (bl) { const len = bl.b - bl.a; bl.fin = Math.min(bl.fin, len); bl.fout = Math.min(bl.fout, len - bl.fin); }
+  seq.dirty = true;
+});
+seqView.addEventListener('pointerup', (e) => {
+  const d = seq.drag; if (!d) return;
+  seq.drag = null; seqView.classList.remove('dragging');
+  if (d.kind === 'pan' && !d.moved) {
+    seq.selId = null; seq.dirty = true;
+    seqSeek(seq.view.start + (e.clientX - seqView.getBoundingClientRect().left) / seq.view.pps);
+  } else if (d.moved && d.kind !== 'pan') {
+    if (d.bl) { seq.rec.blocks = seq.rec.blocks.map((b) => (b === d.bl ? TL.cleanBlock(b) : b)); seq.selId = d.bl.id; seqSelectTrack(d.bl.track); }
+    seqCommit(d.before);
+  }
+});
+seqView.addEventListener('pointercancel', () => { const d = seq.drag; if (d && d.kind !== 'pan') { seqRestore(d.before); seq.dirty = true; } seq.drag = null; });
+// Double-click a block to add a point to its newest change line; a marker to rename it
+seqView.addEventListener('dblclick', (e) => {
+  const mkEl = e.target.closest('.seq-mk');
+  if (mkEl) { seqRenameMarker(mkEl); return; }
+  const el = e.target.closest('.seq-blk'); if (!el || e.target.dataset.h) return;
+  const bl = seqBlock(el.dataset.id); if (!bl) return;
+  if (!bl.autos.length) { seqNote('Right-click the block and pick Change over time first.'); return; }
+  const r = el.getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
+  const au = bl.autos[bl.autos.length - 1];
+  seqChange(() => { au.pts.push([u, val]); au.pts.sort((p, q) => p[0] - q[0]); });
+  seqNote(`Added a point to ${SEQ_NAME[au.key] || au.key}. Drag it to set the value.`);
+});
+function seqRenameMarker(el) {
+  const m = seq.rec.markers.find((x) => x.id === el.dataset.id); if (!m) return;
+  const before = seqSnap(), inp = document.createElement('input');
+  el.textContent = ''; inp.value = m.name; inp.maxLength = 40; inp.setAttribute('aria-label', 'Marker name');
+  el.appendChild(inp); inp.focus(); inp.select();
+  inp.addEventListener('keydown', (k) => { if (k.key === 'Enter') inp.blur(); if (k.key === 'Escape') { inp.value = m.name; inp.blur(); } k.stopPropagation(); });
+  inp.addEventListener('blur', () => { if (inp.value.trim()) m.name = inp.value.trim().slice(0, 40); seqCommit(before); }, { once: true });
+}
+
+/* ---------- right-click menu ---------- */
+const seqCtx = document.createElement('div');
+seqCtx.className = 'seq-menu fixed'; seqCtx.setAttribute('role', 'menu'); seqCtx.hidden = true;
+document.body.appendChild(seqCtx);
+function seqCloseCtx() { seqCtx.hidden = true; }
+function seqPlaceCtx(x, y) {
+  seqCtx.hidden = false;
+  const r = seqCtx.getBoundingClientRect();
+  seqCtx.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
+  seqCtx.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+  seqCtx.querySelector('button:not(:disabled)')?.focus();
+}
+function seqOpenCtx(x, y, items) {
+  seqCtx.innerHTML = '';
+  for (const it of items) {
+    if (it === '-') { seqCtx.appendChild(document.createElement('hr')); continue; }
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem');
+    b.innerHTML = `<span>${escapeHTML(it.label)}</span>${it.key ? `<kbd>${it.key}</kbd>` : ''}`; b.disabled = !!it.disabled;
+    b.addEventListener('click', () => { seqCloseCtx(); it.run(); });
+    seqCtx.appendChild(b);
+  }
+  seqPlaceCtx(x, y);
+}
+function seqCopy(bl) { seq.clip = JSON.parse(JSON.stringify(bl)); seqNote(`Copied “${bl.label}”. Paste puts a copy at the playhead, or right-click a spot to paste there.`); }
+function seqPaste(track, t) {
+  if (!seq.clip) return;
+  const len = seq.clip.b - seq.clip.a, dur = seqDur(), a = r1(clamp(t, 0, Math.max(0, dur - Math.min(len, dur))));
+  const nb = TL.cleanBlock({ ...JSON.parse(JSON.stringify(seq.clip)), id: TL.id(), track, a, b: Math.min(dur, a + len) });
+  seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
+  seqNote(`Pasted “${nb.label}” on track ${track + 1} at ${fmtSeq(a, true)}.`);
+}
+function seqDelete(bl) {
+  seqChange(() => { seq.rec.blocks = seq.rec.blocks.filter((b) => b.id !== bl.id); });
+  seq.selId = null; seqNote(`Deleted “${bl.label}”. Undo brings it back.`);
+}
+function seqPickSlider(bl, x, y) {
+  seqCtx.innerHTML = '';
+  for (const [group, list] of SEQ_SLIDERS) {
+    const h = document.createElement('div'); h.className = 'mh'; h.textContent = group; seqCtx.appendChild(h);
+    for (const [key, name] of list) {
+      const has = bl.autos.find((au) => au.key === key);
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitemcheckbox'); b.setAttribute('aria-checked', String(!!has)); b.textContent = name;
+      b.addEventListener('click', () => {
+        seqCloseCtx();
+        seqChange(() => {
+          if (has) bl.autos = bl.autos.filter((au) => au !== has);
+          else {
+            // The line starts at the block's own value for that slider
+            const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
+            const v = clamp((cur - lo) / ((hi - lo) || 1), 0, 1);
+            bl.autos.push({ key, pts: [[0, v], [1, v]] });
+          }
+        });
+        seqNote(has ? `${name} no longer changes in “${bl.label}”.` : `${name} now changes over “${bl.label}”. Drag the dots to shape it, double-click the block to add a point.`);
+      });
+      seqCtx.appendChild(b);
+    }
+  }
+  seqPlaceCtx(x, y);
+}
+seqView.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const blkEl = e.target.closest('.seq-blk'), laneEl = e.target.closest('.seq-lane'), mkEl = e.target.closest('.seq-mk');
+  const t = seq.view.start + (e.clientX - seqView.getBoundingClientRect().left) / seq.view.pps;
+  if (mkEl) {
+    const m = seq.rec.markers.find((x) => x.id === mkEl.dataset.id); if (!m) return;
+    seqOpenCtx(e.clientX, e.clientY, [
+      { label: 'Rename', run: () => seqRenameMarker(mkEl) },
+      { label: 'Delete marker', run: () => seqChange(() => { seq.rec.markers = seq.rec.markers.filter((x) => x !== m); }) },
+    ]);
+  } else if (blkEl) {
+    const bl = seqBlock(blkEl.dataset.id); if (!bl) return;
+    seq.selId = bl.id; seqSelectTrack(bl.track); seq.dirty = true;
+    seqOpenCtx(e.clientX, e.clientY, [
+      { label: 'Copy', key: 'Ctrl+C', run: () => seqCopy(bl) },
+      { label: 'Paste here', key: 'Ctrl+V', disabled: !seq.clip, run: () => seqPaste(bl.track, t) },
+      '-',
+      { label: `Change over time…${bl.autos.length ? ` (${bl.autos.length})` : ''}`, run: () => seqPickSlider(bl, e.clientX, e.clientY) },
+      '-',
+      { label: 'Delete', key: 'Del', run: () => seqDelete(bl) },
+    ]);
+  } else if (laneEl) {
+    const track = +laneEl.dataset.track; seqSelectTrack(track);
+    seqOpenCtx(e.clientX, e.clientY, [{ label: seq.clip ? `Paste “${seq.clip.label}” here` : 'Paste here (copy a block first)', key: 'Ctrl+V', disabled: !seq.clip, run: () => seqPaste(track, t) }]);
+  }
+});
+document.addEventListener('pointerdown', (e) => {
+  if (!seqCtx.hidden && !seqCtx.contains(e.target)) seqCloseCtx();
+  if (!e.target.closest('.seq-menuwrap')) seqCloseMenus();
+});
+seqCtx.addEventListener('keydown', (e) => { if (e.key === 'Escape') { seqCloseCtx(); seqView.focus(); } });
+
+/* ---------- keys while the sequencer is open ---------- */
+document.addEventListener('keydown', (e) => {
+  if ($('#seq').hidden || e.target.closest?.('input, select, textarea')) return;
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase(), bl = seqBlock(seq.selId);
+  if (k === 'escape') { seqCloseCtx(); seqCloseMenus(); return; }
+  if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) seqRedo(); else seqUndo(); }
+  else if (mod && k === 'y') { e.preventDefault(); seqRedo(); }
+  else if (mod && k === 'c' && bl && !getSelection()?.toString()) { e.preventDefault(); seqCopy(bl); }
+  else if (mod && k === 'v' && seq.clip) { e.preventDefault(); seqPaste(seq.selTrack, seq.t); }
+  else if ((k === 'delete' || k === 'backspace') && bl) { e.preventDefault(); seqDelete(bl); }
+  else if (!mod && !e.altKey && k === 'm') { e.preventDefault(); seqAddMarker(); }
+});
+
+/* ---------- adding looks, markers ---------- */
+function seqPlace(label, look) {
+  const dur = seqDur(), a = r1(clamp(seq.t, 0, dur)), b = r1(Math.min(dur, a + 16));
+  if (b - a < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
+  const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)) });
+  seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
+  seqNote(`Added “${label}” to track ${seq.selTrack + 1} at ${fmtSeq(a, true)}. Drag its ends to change how long it plays.`);
+}
+$('#seqAddCurrent').addEventListener('click', () => {
+  const K = KEYS[seq.selTrack];
+  const n = seq.rec.blocks.filter((b) => b.label.startsWith('Current look')).length + 1;
+  seqPlace(`Current look ${n}`, loopOn(K) ? loops[K].tgt : loops[edit].tgt);
+});
+function seqAddMarker() {
+  const m = { id: TL.id(), t: r1(clamp(seq.t, 0, seqDur())), name: `Marker ${seq.rec.markers.length + 1}` };
+  seqChange(() => seq.rec.markers.push(m)); seqNote(`Marker added at ${fmtSeq(m.t, true)}. Double-click it to rename.`);
+}
+$('#seqMarker').addEventListener('click', seqAddMarker);
+
+// Drop-down menus: Add saved look, Load sequence
+const seqMenus = [[$('#seqAddSaved'), $('#seqSavedMenu')], [$('#seqLoad'), $('#seqLoadMenu')]];
+function seqCloseMenus() { seqMenus.forEach(([b, m]) => { m.hidden = true; b.setAttribute('aria-expanded', 'false'); }); }
+function seqMenuItem(menu, label, run) {
+  const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.textContent = label;
+  b.addEventListener('click', () => { seqCloseMenus(); run(); });
+  menu.appendChild(b);
+}
+function seqBuildSaved(menu) {
+  menu.innerHTML = '';
+  const K = KEYS[seq.selTrack];
+  const lists = [['My presets', presets], ['Shared presets', shared]];
+  let any = false;
+  for (const [title, list] of lists) {
+    if (!list?.length) continue;
+    const h = document.createElement('div'); h.className = 'mh'; h.textContent = title; menu.appendChild(h);
+    for (const p of list) {
+      const look = p.data?.[K] || p.data?.A; if (!look) continue;
+      any = true; seqMenuItem(menu, p.name, () => seqPlace(p.name, look));
+    }
+  }
+  if (!any) { const h = document.createElement('div'); h.className = 'mh'; h.textContent = 'No saved looks yet. Save one under My presets.'; menu.appendChild(h); }
+}
+function seqBuildLoad(menu) {
+  menu.innerHTML = '<div class="mh">Versions of this song</div>';
+  if (!seq.rec.versions.length) { const h = document.createElement('div'); h.className = 'mh'; h.textContent = 'None yet. Save sequence keeps one.'; menu.appendChild(h); }
+  for (const ver of seq.rec.versions) seqMenuItem(menu, ver.name, () => seqLoadVersion(ver));
+  // Another song's sequence can be loaded too; it is cut off at this song's end
+  const others = [...seq.records].filter(([k, r]) => k !== seq.key && r.blocks.length);
+  if (others.length) {
+    const h = document.createElement('div'); h.className = 'mh'; h.textContent = 'Other songs'; menu.appendChild(h);
+    for (const [, r] of others.slice(0, 30)) seqMenuItem(menu, r.title || 'Another song', () => seqLoadVersion({ name: r.title || 'another song', blocks: r.blocks, markers: r.markers }));
+  }
+}
+seqMenus.forEach(([btn, menu]) => {
+  btn.addEventListener('click', () => {
+    const open = menu.hidden; seqCloseMenus();
+    if (!open) return;
+    if (menu.id === 'seqLoadMenu') seqBuildLoad(menu); else seqBuildSaved(menu);
+    menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); menu.querySelector('button')?.focus();
+  });
+  menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { seqCloseMenus(); btn.focus(); } });
+});
+
+/* ---------- save / load versions of this song's sequence ---------- */
+$('#seqSave').addEventListener('click', () => {
+  $('#seqSaveForm').hidden = false;
+  $('#seqSaveName').value = `Version ${seq.rec.versions.length + 1}`;
+  $('#seqSaveName').focus(); $('#seqSaveName').select();
+});
+$('#seqSaveCancel').addEventListener('click', () => { $('#seqSaveForm').hidden = true; $('#seqSave').focus(); });
+$('#seqSaveName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); $('#seqSaveCancel').click(); } });
+$('#seqSaveForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('#seqSaveName').value.trim().slice(0, 60) || `Version ${seq.rec.versions.length + 1}`;
+  const i = seq.rec.versions.findIndex((x) => x.name.toLowerCase() === name.toLowerCase());
+  const entry = { name, saved: Date.now(), ...JSON.parse(seqSnap()) };
+  if (i >= 0) seq.rec.versions[i] = entry;
+  else { seq.rec.versions.unshift(entry); seq.rec.versions.length = Math.min(seq.rec.versions.length, TL.MAX_VERSIONS); }
+  seqSave(); $('#seqSaveForm').hidden = true;
+  seqNote(`Saved “${name}” as a version of this song.${i >= 0 ? ' It replaced the older one with that name.' : ' Load sequence brings it back.'}`);
+});
+function seqLoadVersion(ver) {
+  const fresh = TL.cutToLength(TL.normalize({ blocks: ver.blocks, markers: ver.markers }), seqDur());
+  seqChange(() => {
+    seq.rec.blocks = fresh.blocks.map((b) => ({ ...b, id: TL.id() }));
+    seq.rec.markers = fresh.markers.map((m) => ({ ...m, id: TL.id() }));
+  });
+  seq.selId = null; seq.applied = [null, null, null, null];
+  seqNote(`Loaded “${ver.name}”.${fresh.cut ? ` ${fresh.cut} block${fresh.cut > 1 ? 's were' : ' was'} cut off at the end of the song.` : ''} Undo goes back to what you had.`);
+}
+
+/* ---------- show / hide ---------- */
+function seqSetOpen(open, save) {
+  $('#seq').hidden = !open;
+  $('#seqBtn').setAttribute('aria-pressed', String(open));
+  if (open) { seqMeasure(); seqDraw(performance.now()); } else { seqCloseCtx(); seqCloseMenus(); }
+  if (save) lsSet(SEQ_OPEN_KEY, open ? '1' : '0');
+  // The picture gives up some height for the panel
+  window.dispatchEvent(new Event('resize'));
+}
+$('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
+$('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });
+
+/* ---------- Spotify: which song is playing ---------- */
+function spotifySongChanged(snapshot) {
+  const previous = seq.lastPlayback;
+  seq.lastPlayback = snapshot;
+  if (!snapshot.track) return;
+  const key = JSON.stringify([snapshot.accountId, snapshot.track.uri]);
+  if (seq.key !== key) {
+    const wasRunning = seq.running || seq.apMode === 'empty';
+    if (seq.apMode === 'empty') { seq.apMode = null; }
+    seqLoadSong(key, snapshot.track);
+    seq.rec.title = `${snapshot.track.name} — ${snapshot.track.artists.join(', ')}`;
+    // A song with a sequence starts it by itself; a song with none runs Autopilot
+    if (seq.rec.blocks.length) seqRun(true, 'This song has a sequence; it’s playing.');
+    else if (wasRunning || ap.on || !previous) { seqRun(false); seq.apMode = 'empty'; setAutopilot(true, true); seqNote('No sequence for this song yet, so Autopilot is running. Add looks to start one.'); }
+  } else if (previous?.track && Math.abs(snapshot.progressMs - (previous.progressMs + (previous.playing ? snapshot.receivedAt - previous.receivedAt : 0))) > 1200) {
+    seq.applied = [null, null, null, null];
   }
 }
 $('#spotifyClientId').value = spotify.clientId;
@@ -8939,18 +9190,19 @@ spotify.addEventListener('queue', e => {
   }
 });
 spotify.addEventListener('disconnect', () => {
-  rememberShowRecord(); stopShowSequence('Spotify disconnected. Standalone draft restored.'); releaseShowClips();
-  showSequence.songDrive = false; showSequence.song = null; showSequence.lastPlayback = null; showSequence.autopilotMode = null;
-  loadShowRecord('standalone'); $('#showSeqSong').textContent = 'Standalone sequence'; $('#spotifyNow').textContent = 'Now: —';
+  seqRun(false); seq.lastPlayback = null; if (seq.apMode === 'empty') seq.apMode = null;
+  seqLoadSong('standalone', null); $('#spotifyNow').textContent = 'Now: —';
+  seqNote('Spotify disconnected. The sequencer runs on its own clock now.');
 });
 async function initSpotify() {
   try { await spotify.finishLogin(); if (spotify.token) spotify.start(); }
   catch (error) { $('#spotifyStatus').textContent = error.message; }
 }
+addEventListener('pagehide', () => seqSpecStore(true));
 
-showSequence.clipLoop = edit;
-loadShowRecord('standalone');
-refreshShowSources(); renderShowSequence();
+seqLoadSong('standalone', null);
+seqSelectTrack(0);
+seqSetOpen(lsGet(SEQ_OPEN_KEY) === '1', false);
 void initSpotify();
 
 
@@ -8995,10 +9247,9 @@ function frame() {
   packAdj();
   analyzeSound(dt, now);
   drawMeter();
-  showSequenceTick(now);
+  seqTick(now);
   updateSilhouettes(now);
   shapesTick(now, dt);
-  drawTrackTimeline(now);
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
   if (Object.keys(SCENES).some(uses)) {
@@ -9060,8 +9311,14 @@ function frame() {
   set1f(compProg, 'uWB', wB);
   set1f(compProg, 'uWC', W.C);
   set1f(compProg, 'uWD', W.D);
+  for (const k of KEYS) {
+    const g = loopGrade[k] ? { ...GRADE_DEF, ...loopGrade[k] } : null;
+    set3f(compProg, 'uGC' + k, g ? g.gHue * Math.PI / 180 : 0, g ? g.gSepia / 100 : 0, g ? 1 : 0);
+    if (!g) continue;
+    set4f(compProg, 'uGT' + k, g.gExposure / 10, g.gContrast / 100, Math.max(0.05, g.gGamma / 100), g.gSat / 100);
+    set3f(compProg, 'uGR' + k, g.gRed / 100, g.gGreen / 100, g.gBlue / 100);
+  }
   gl.drawArrays(gl.TRIANGLES, 0, 3);
-  drawShowFade(now);
   eyeTick(now, dt, wA, wB);
   const shown = drawShapes(now) || comp;
 

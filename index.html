@@ -37,12 +37,6 @@
         <div class="bezel" id="bezel">
           <div class="screen" id="screenWrap">
             <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to draw light."></canvas>
-            <div class="track-timeline" id="trackTimeline" role="group" aria-label="Spotify track timeline" hidden>
-              <div class="track-timeline-head"><strong id="trackTimelineName"></strong><output id="trackTimelineTime" for="trackTimelineScrub">0:00 / 0:00</output><button type="button" class="track-timeline-hide" id="trackTimelineHide" aria-label="Hide scrub bar">Hide</button></div>
-              <div class="track-checkpoints" id="trackCheckpoints" role="group" aria-label="Sequence step checkpoints"></div>
-              <input id="trackTimelineScrub" type="range" min="0" max="1" step="100" value="0" aria-label="Seek Spotify track">
-              <div class="track-timeline-foot"><span id="trackTimelineStep"></span><button type="button" id="trackTimelineReconnect" hidden>Enable scrubbing</button><span id="trackTimelineStatus" role="status"></span></div>
-            </div>
             <div class="osd" id="osd" aria-hidden="true"><span class="osd-a"></span><span class="osd-b"></span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
             <div class="tip" id="fsNote" hidden></div>
@@ -73,18 +67,81 @@
         </div>
       </div>
 
+      <section class="seq" id="seq" aria-label="Sequencer" hidden>
+        <div class="seq-head">
+          <h2>Sequencer</h2>
+          <div class="seq-grp">
+            <button class="btn small" id="seqPlay" aria-pressed="false" title="Run the sequence: each track plays its blocks on its loop"><span class="led"></span><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>Play</button>
+            <button class="btn small" id="seqStop" title="Stop the sequence and hold the picture"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="1" fill="currentColor"/></svg>Stop</button>
+          </div>
+          <div class="seq-song" id="seqSong"><b>No song</b> <span>· its own clock</span></div>
+          <output class="seq-clock" id="seqClock">0:00.0 / 4:00</output>
+          <label class="seq-field">At end <select class="seq-in" id="seqEnd"><option value="hold">Hold last look</option><option value="loop">Loop sequence</option><option value="auto">Start Autopilot</option></select></label>
+          <div class="seq-grp">
+            <button class="btn small" id="seqSave" title="Keep this song’s sequence as a named version">Save sequence</button>
+            <span class="seq-menuwrap">
+              <button class="btn small" id="seqLoad" aria-haspopup="menu" aria-expanded="false" aria-controls="seqLoadMenu">Load sequence<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+              <div class="seq-menu" id="seqLoadMenu" role="menu" hidden></div>
+            </span>
+          </div>
+          <span class="seq-grp"><span class="seq-zoomread" id="seqZoom">Zoom 1×</span><button class="btn small" id="seqFit">Whole song</button></span>
+          <button class="btn small" id="seqHide" aria-controls="seq">Hide<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        </div>
+        <form class="seq-save" id="seqSaveForm" hidden>
+          <label class="seq-field" for="seqSaveName">Save as</label>
+          <input class="seq-in" id="seqSaveName" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+          <button class="btn small" type="submit">Save</button>
+          <button class="btn small" type="button" id="seqSaveCancel">Cancel</button>
+        </form>
+        <div class="seq-tools">
+          <span>Add to <b id="seqSelName">track 1 · loop A</b> at the playhead:</span>
+          <button class="btn small" id="seqAddCurrent" title="This loop’s look as it is now">+ Add current look</button>
+          <span class="seq-menuwrap">
+            <button class="btn small" id="seqAddSaved" aria-haspopup="menu" aria-expanded="false" aria-controls="seqSavedMenu">+ Add saved look<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+            <div class="seq-menu" id="seqSavedMenu" role="menu" hidden></div>
+          </span>
+          <span class="seq-vsep" aria-hidden="true"></span>
+          <button class="btn small" id="seqMarker" title="Add a section marker at the playhead (key M, works while playing)">+ Marker</button>
+          <button class="btn small seq-recbtn" id="seqRec" aria-pressed="false" title="While the sequence plays, the look you have on the chosen loop is written into its track"><span class="led"></span>Record look changes</button>
+          <span class="seq-vsep" aria-hidden="true"></span>
+          <div class="seq-grp">
+            <button class="btn small" id="seqUndo" disabled title="Undo (Ctrl+Z)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5 3L2 6l3 3M2.5 6H9a3 3 0 010 6H6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Undo</button>
+            <button class="btn small" id="seqRedo" disabled title="Redo (Ctrl+Shift+Z)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M9 3l3 3-3 3M11.5 6H5a3 3 0 000 6h3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Redo</button>
+          </div>
+          <p class="seq-note" id="seqNote" role="status" aria-live="polite"></p>
+        </div>
+        <div class="seq-tl">
+          <div class="seq-heads" id="seqHeads">
+            <div class="seq-h-ruler" aria-hidden="true"></div>
+            <div class="seq-h-marks seq-mini">Sections</div>
+            <div class="seq-card seq-song-card seq-h-spec"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 16v-3M7 18V8M11 17V4M15 18v-8M19 15v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="seq-txt"><b>Song</b><small>Spectrograph · saved with song</small></span></div>
+          </div>
+          <div class="seq-view-col">
+            <div class="seq-view" id="seqView" tabindex="0" title="Scroll moves along the song · Shift + scroll zooms · drag a block to move it (also to another track), its ends to resize, the top dots to fade · double-click a block to add a point to its change line · right-click for more" aria-label="Sequencer timeline. Scroll to move through the song, Shift and scroll to zoom. Arrow keys move, plus and minus zoom.">
+              <div class="seq-grid" id="seqGrid" aria-hidden="true"></div>
+              <div class="seq-ruler seq-h-ruler" id="seqRuler" aria-hidden="true"></div>
+              <div class="seq-marks seq-h-marks" id="seqMarks" aria-label="Section markers"></div>
+              <div class="seq-spec-wrap seq-h-spec"><canvas class="seq-spec seq-h-spec" id="seqSpec" role="img" aria-label="Spectrograph of the song as heard so far: low sounds at the bottom, high at the top, louder is brighter. Parts not heard yet are dark."></canvas><span class="seq-unheard" id="seqUnheard" hidden>Not heard yet · fills in when this part plays with sound connected</span></div>
+              <div class="seq-lanes" id="seqLanes"></div>
+              <div class="seq-playhead" id="seqPh" aria-hidden="true"></div>
+            </div>
+            <div class="seq-ov seq-h-ov" id="seqOv" aria-label="Whole song; drag the handle to move"><div class="seq-thumb" id="seqThumb"></div><div class="seq-ovmark" id="seqOvMark"></div></div>
+          </div>
+        </div>
+        <div class="seq-insp" id="seqInsp" aria-live="polite"></div>
+      </section>
+
       <div class="transport taste-strip" id="tasteStrip" role="group" aria-label="Rate this look">
         <button class="btn rate rate-up" id="rateUp" title="More like this (key Y): Autopilot learns you like the look on screen and brings more like it" aria-label="More like this"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg></button>
         <button class="btn rate rate-down" id="rateDown" title="Not this (key X): skips to the next look, and Autopilot learns to steer away from looks like it" aria-label="Not this"><svg class="thumb" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.2 7.2h2.6v7.3H1.2z" fill="currentColor"/><path d="M5 14.5V7.4l2.9-5c.3-.6 1-.8 1.6-.5.7.3 1 1 .8 1.7l-.7 2.7h3.6c.9 0 1.6.9 1.4 1.8l-1.2 5.3c-.2.7-.8 1.1-1.4 1.1z" fill="currentColor"/></svg></button>
         <span class="look-clock off" id="lookClock" title="How long until Autopilot’s next new look"><span class="ring" aria-hidden="true"></span><span id="lookClockText"><span class="lc-l">Autopilot off</span><span class="lc-s">Off</span></span></span>
       </div>
       <div class="transport">
+        <button class="btn" id="seqBtn" aria-pressed="false" aria-controls="seq" title="Show or hide the sequencer under the picture"><span class="led"></span>Sequencer</button>
         <button class="btn" id="freeze" aria-pressed="false"><span class="led"></span>Freeze</button>
         <button class="btn" id="clear">Clear</button>
-        <button class="btn" id="drift" aria-pressed="true" title="Slowly moves the settings by themselves"><span class="led"></span>Auto-drift</button>
         <button class="btn" id="autopilotBar" aria-pressed="false" title="Changes the settings slowly by itself (key P)"><span class="led"></span>Autopilot</button>
         <button class="btn next-look" id="nextLookBar" title="Autopilot’s next new look, right now (key L). Starts Autopilot if it’s off."><svg class="skip" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1.2 7 6l-6 4.8zM7.4 1.2 13.4 6l-6 4.8z" fill="currentColor"/><rect x="13.6" y="1.2" width="1.7" height="9.6" rx=".5" fill="currentColor"/></svg>Next look</button>
-        <button class="btn" id="trackTimelineToggle" aria-pressed="true">Hide scrub bar</button>
         <button class="btn" id="full">Full screen</button>
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <button class="btn" id="wideBtn" aria-pressed="false" title="Shrink the picture here to a small preview and spread the controls across the screen, so you can see more of them at once"><span class="led"></span>Spread out controls</button>
@@ -852,32 +909,7 @@
           <p id="spotifyNext">Next: —</p>
           <ol id="spotifyQueue" aria-label="Upcoming Spotify tracks"></ol>
         </div>
-        <h3 id="showSeqSong">Standalone sequence</h3>
-        <div class="dev-actions">
-          <label>Song BPM <input id="showSeqBpm" type="number" min="30" max="300" step="0.1" value="120"></label>
-          <button class="btn small" id="showSeqDetect">Use detected BPM</button>
-          <label>Start offset (seconds) <input id="showSeqOffset" type="number" min="0" max="3600" step="0.1" value="0"></label>
-        </div>
-        <p class="hint">Each Spotify song remembers its own steps and starts automatically. Song BPM and start offset align steps when seeking. Songs with no steps run Autopilot.</p>
-        <div class="dev-actions">
-          <button class="btn small" id="showSeqPlay" title="Resume this song’s sequence at Spotify’s current position. Does not restart or seek Spotify.">Play sequence</button>
-          <button class="btn small" id="showSeqStop">Stop</button>
-          <label>At end <select id="showSeqEnd"><option value="hold">Hold last look</option><option value="loop">Loop sequence</option><option value="auto">Start Autopilot</option></select></label>
-          <label>Fade <select id="showSeqFade"><option value="0">Cut</option><option value="1">1 beat</option><option value="2" selected>2 beats</option><option value="4">4 beats</option></select></label>
-        </div>
-        <div class="dev-actions">
-          <select id="showSeqSource" aria-label="Saved look or library clip"></select>
-          <button class="btn small" id="showSeqRefresh">Refresh choices</button>
-          <button class="btn small" id="showSeqAdd">Add step</button>
-          <button class="btn small" id="showSeqCurrent">Add current look</button>
-          <button class="btn small" id="showSeqPaste" disabled>Paste step</button>
-          <button class="btn small" id="showSeqFiles">Add video files…</button>
-          <input type="file" id="showSeqFile" accept="video/*" multiple hidden>
-        </div>
-        <ol id="showSeqSteps" class="show-seq-steps" aria-label="Sequence steps"></ol>
-        <p class="hint" id="showSeqSaveStatus" role="status">Changes save in this browser.</p>
-        <p class="hint" id="showSeqStatus" role="status" aria-live="polite">Add looks or clips to begin.</p>
-        <p class="hint">Steps save in this browser for each Spotify account and track. Local videos need re-adding after reopening. Copy and paste work between songs. Without Spotify, Play uses the local audio beat tracker.</p>
+        <p class="hint">The sequencer itself is under the picture: press <b>Sequencer</b> there. Each Spotify song keeps its own sequence and spectrograph in this browser, and its sequence starts by itself when the song plays.</p>
       </section>
 
       <section class="group" id="presetGroup" aria-labelledby="h-pre">
@@ -998,7 +1030,7 @@
           <div class="g-card"><h3>Loops</h3><dl>
             <dt>Tooltips and the mouse wheel</dt><dd>Rest the mouse on a control’s name for a little over a second and a description of it pops up. Hold Shift and roll the mouse wheel over any fader to move it, 2 a notch on a 0 to 100 fader. Without Shift the wheel just scrolls the controls.</dd>
             <dt>Loops that react</dt><dd>At the top of React to sound, and still showing when that section is folded: one switch per loop. A loop switched off there keeps its own pace whatever the music does, while the loops switched on zoom, spin, change color and so on with it. The hits that shake or flash the whole picture are as strong as the share of the picture that comes from loops that react, so they stop altogether when every loop on screen is switched off. Presets remember these switches.</dd>
-            <dt>How many loops and Show</dt><dd>Two loops, A and B, to start with; pick 3 loops or 4 loops under Loops to add loop C, then D. Each loop has its own Show fader: 100 shows it fully, 0 hides it, and loops that are showing are laid over each other. Loops C and D work just like A and B: C and D feed, push and dye each other the way A and B do (with three loops, C takes loop A as its other loop). Autopilot steers loops A and B; loops C and D keep whatever you give them, while Auto-drift keeps them moving. With Spread out controls on, each loop gets a column of its own, side by side (two loops share a column when the screen is too narrow).</dd>
+            <dt>How many loops and Show</dt><dd>Two loops, A and B, to start with; pick 3 loops or 4 loops under Loops to add loop C, then D. Each loop has its own Show fader: 100 shows it fully, 0 hides it, and loops that are showing are laid over each other. Loops C and D work just like A and B: C and D feed, push and dye each other the way A and B do (with three loops, C takes loop A as its other loop). Autopilot steers loops A and B; loops C and D keep whatever you give them, while a slow drift keeps them moving. With Spread out controls on, each loop gets a column of its own, side by side (two loops share a column when the screen is too narrow).</dd>
             <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes. The loop being fed has to be on screen and have some Trails; raising a feed brings that loop on screen, and if its Trails are at 0 a note offers to fix it.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
           </dl></div>
@@ -1064,7 +1096,7 @@
             <dt>Picture sharpness</dt><dd>How many lines the picture is drawn with; the number shows at the top right. Standard is the 576 lines Phosphor Loop has always used and is the lightest on the computer. High goes up to 1080, like HD video. Full draws as many lines as the screen (or the Output window) shows. Auto, the usual setting, starts where it last settled on this computer, sharpens while the picture stays smooth and steps back if it slows down. Effects keep their size at every setting; only the detail gets finer. Each computer or phone keeps its own choice.</dd>
             <dt>Color grading</dt><dd>A filter over the finished picture, after every loop is mixed. Exposure, Contrast and Midtones set how bright and punchy it is; Saturation, Hue, Red, Green, Blue and Sepia change its colors. It never feeds back into the loops, Autopilot leaves it alone, presets keep it, and Neutral or Back to normal resets it.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
-            <dt>Auto-drift</dt><dd>Slowly moves the settings for you. Good for leaving it running.</dd>
+            <dt>Sequencer</dt><dd>Opens the sequencer under the picture: four tracks, one for each loop (A to D), where you place looks by time along the song. A loop with no block at that moment goes blank. Blocks fade in and out, blocks that overlap on a track crossfade, and any loop, effect or color grading slider can change over a block. Scroll moves along the song and Shift + scroll zooms. Above the tracks, a spectrograph of the song builds up as it plays and is saved with it.</dd>
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
             <dt>Spread out controls</dt><dd>Press it and the picture shrinks to a small preview at the top left, and the controls spread out in columns across the rest of the screen, so you can see many more of them at once. It works with or without the Output window. Press it again for the big picture. Phosphor Loop remembers your choice.</dd>
@@ -1110,7 +1142,7 @@
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
           <dt>The screen went white</dt><dd>Autopilot keeps it from turning white by itself. When you’re steering, lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
-          <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin, or turn on Auto-drift.</dd>
+          <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
           <dt>The output window didn’t open</dt><dd>The browser blocked it. Click the blocked pop-up icon at the right of the address bar, choose to always allow pop-ups for this page, then press Output window again.</dd>
           <dt>The picture doesn’t react to music</dt><dd>Check that the Low, Mid and High bars move. With Computer sound, share again and make sure Also share system audio is switched on under the screen you pick (or Also share tab audio for a browser tab). If that switch never appears, use Microphone with Stereo Mix instead. Then raise Amount.</dd>
@@ -1216,7 +1248,7 @@
 <script src="js/audio/beat-clock.js"></script>
 <script src="js/audio/rhythm.js"></script>
 <script src="js/spotify.js"></script>
-<script src="js/step-sequencer.js"></script>
+<script src="js/timeline.js"></script>
 <script src="js/silhouette.js"></script>
 <script src="js/subject.js"></script>
 <script src="js/app.js"></script>

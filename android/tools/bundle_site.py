@@ -26,7 +26,7 @@ FILES = {
     'js/output-template.js': 'application/javascript',
     'js/ribbit.js': 'application/javascript',
     'js/spotify.js': 'application/javascript',
-    'js/step-sequencer.js': 'application/javascript',
+    'js/timeline.js': 'application/javascript',
     'js/silhouette.js': 'application/javascript',
     'js/subject.js': 'application/javascript',
     'js/shapes.js': 'application/javascript',

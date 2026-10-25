@@ -774,14 +774,29 @@ precision highp float;
 uniform sampler2D uA, uB, uC, uD;
 uniform float uWA, uWB, uWC, uWD;
 uniform vec2 uSim;
+// Each loop's own color grading, set by the sequencer (the display pass grades the whole picture after this):
+// tone (exposure in stops, contrast, gamma, saturation), then hue (radians), sepia and on (0 or 1), then RGB gains
+uniform vec4 uGTA, uGTB, uGTC, uGTD;
+uniform vec3 uGCA, uGCB, uGCC, uGCD, uGRA, uGRB, uGRC, uGRD;
 out vec4 o;
+vec3 lgrade(vec3 col, vec4 t, vec3 c, vec3 g) {
+  if (c.z < 0.5) return col;
+  const vec3 k = vec3(0.57735027);
+  float ca = cos(c.x);
+  col = max(col * ca + cross(k, col) * sin(c.x) + k * dot(k, col) * (1.0 - ca), 0.0);
+  col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, t.w);
+  vec3 sepia = vec3(dot(col, vec3(0.393, 0.769, 0.189)), dot(col, vec3(0.349, 0.686, 0.168)), dot(col, vec3(0.272, 0.534, 0.131)));
+  col = mix(col, sepia, c.y) * g;
+  col = (col * exp2(t.x) - 0.5) * t.y + 0.5;
+  return pow(clamp(col, 0.0, 1.0), vec3(1.0 / t.z));
+}
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   vec4 A = texture(uA, uv), B = texture(uB, uv), C = texture(uC, uv), D = texture(uD, uv);
-  vec3 a = A.rgb * uWA;
-  vec3 b = B.rgb * uWB;
-  vec3 c = uWC > 0.0 ? C.rgb * uWC : vec3(0.0);
-  vec3 d = uWD > 0.0 ? D.rgb * uWD : vec3(0.0);
+  vec3 a = lgrade(A.rgb, uGTA, uGCA, uGRA) * uWA;
+  vec3 b = lgrade(B.rgb, uGTB, uGCB, uGRB) * uWB;
+  vec3 c = uWC > 0.0 ? lgrade(C.rgb, uGTC, uGCC, uGRC) * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? lgrade(D.rgb, uGTD, uGCD, uGRD) * uWD : vec3(0.0);
   vec3 col = 1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d);
   // A loop's Subject silhouette (where its alpha is below 1) lies over the other loops instead of adding light
   col = mix(col, a, clamp((1.0 - A.a) * uWA, 0.0, 1.0));
