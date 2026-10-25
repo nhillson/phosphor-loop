@@ -92,7 +92,9 @@ try {
  await page.keyboard.press('ArrowLeft');
  assert.equal(await page.evaluate(()=>window.__showTest.showSequence.steps[0].beats),8);
  await page.locator('#trackTimelineHide').click();assert.equal(await page.locator('#trackTimeline').isVisible(),false);
- await page.locator('#trackTimelineShow').click();assert.equal(await page.locator('#trackTimeline').isVisible(),true);
+ // Hidden means hidden: nothing is left over the picture; the transport button brings it back
+ assert.equal(await page.locator('#screenWrap button:visible').count(),0);
+ await page.locator('#trackTimelineToggle').click();assert.equal(await page.locator('#trackTimeline').isVisible(),true);
 
 
 
@@ -120,7 +122,7 @@ try {
  assert.equal(await page.locator('[aria-label="Name for step 1"]').inputValue(),'Intro');
  assert.equal(await page.evaluate(()=>window.__showTest.showSequence.engine.index),0);
  assert.equal(await page.locator('#trackTimeline').isVisible(),false);
- await page.locator('#trackTimelineShow').click();
+ await page.locator('#trackTimelineToggle').click();
 
  account='account-two';await page.evaluate(()=>{window.__showTest.spotify.accountId=null;});await poll();
  assert.equal(await page.locator('#showSeqSteps li').count(),0);assert.ok(await page.evaluate(()=>window.__showTest.ap.on));

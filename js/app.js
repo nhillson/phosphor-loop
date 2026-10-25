@@ -8354,7 +8354,6 @@ function setTrackTimelineVisible(visible) {
 }
 $('#trackTimelineToggle').addEventListener('click', () => setTrackTimelineVisible(!spotifyTimeline.visible));
 $('#trackTimelineHide').addEventListener('click', () => setTrackTimelineVisible(false));
-$('#trackTimelineShow').addEventListener('click', () => setTrackTimelineVisible(true));
 function cancelTimelineResize() {
   spotifyTimeline.resize = null; spotifyTimeline.signature = '';
   $('#trackCheckpoints').classList.remove('resizing');
@@ -8419,7 +8418,6 @@ function drawTrackTimeline(now) {
   const available = !!track && showSequence.songDrive && track.uri === showSequence.song?.uri;
   $('#trackTimelineToggle').textContent = spotifyTimeline.visible ? 'Hide scrub bar' : 'Show scrub bar';
   $('#trackTimelineToggle').setAttribute('aria-pressed', String(spotifyTimeline.visible));
-  $('#trackTimelineShow').hidden = !available || spotifyTimeline.visible;
   if (!available || !spotifyTimeline.visible) {
     overlay.hidden = true; $('#screenWrap').classList.remove('with-track-timeline'); spotifyTimeline.preview = null;
     if (spotifyTimeline.resize) cancelTimelineResize();

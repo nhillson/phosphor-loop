@@ -909,5 +909,3 @@
 .track-checkpoints.resizing, .track-checkpoints.resizing * { cursor: ew-resize; user-select: none; }
 .track-timeline-hide { padding: 2px 6px; flex-shrink: 0; font: inherit; color: #eee4f6; border: 1px solid #baa3cc66; border-radius: 3px; background: #ffffff14; cursor: pointer; }
 .track-timeline-head strong { flex: 1; }
-.track-timeline-show { position: absolute; z-index: 5; left: 12px; bottom: 12px; padding: 6px 10px; font-size: 12px; background: #100c17dd; color: #eee4f6; border: 1px solid #baa3cc88; border-radius: 5px; cursor: pointer; line-height: 1.4; }
-.track-timeline-show[hidden] { display: none; }

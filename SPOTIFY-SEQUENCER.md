@@ -208,7 +208,7 @@ Follow song resumes the visual sequence at Spotify’s existing playback positio
 
 ## Hide and resize controls (implemented follow-up)
 
-- Hide scrub bar is available on the overlay and in the transport. A small Show scrub bar control remains over the canvas when hidden, including in full screen. Visibility is remembered in this browser independently of song sequences.
+- Hide scrub bar is available on the overlay and in the transport. When hidden, nothing is left over the canvas; the transport's Show scrub bar button brings it back. Visibility is remembered in this browser independently of song sequences.
 - Step regions show their beat duration, with full names/counts in tooltips and accessible labels. The active step’s beat count also appears below the bar so narrow regions remain readable.
 - Drag a step’s right edge to resize it. The preview snaps to whole beats from 1 to 1024, displays the candidate count, and shifts later regions. Release saves that count to the song and updates the vertical editor. Other steps retain their durations.
 - Escape, a cancelled pointer gesture, hiding the bar, or a song switch cancels an unfinished resize. Dragging a boundary never sends a Spotify seek request.
