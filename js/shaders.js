@@ -15,6 +15,25 @@ vec3 hsv(float h, float s, float v) {
   vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
   return v * mix(vec3(1.0), k, s);
 }
+// Posterize: red, green and blue each snapped to n even steps from black to white (n is 2 or more, and may be
+// between whole numbers while the slider glides). On screen each color goes to its nearest step; inside a loop
+// (down = 1) it goes to the step below, so trails still fade away, a step at a time, instead of sticking.
+vec3 posterize(vec3 c, float n, float down) {
+  float m = max(n - 1.0, 1.0);
+  return floor(clamp(c, 0.0, 1.0) * m + 0.5 - 0.5 * down) / m;
+}
+// Color grading (see "color grading" in app.js): tone t (exposure in stops, contrast, gamma, saturation), color c
+// (hue in radians, sepia) and red, green and blue gains g
+vec3 gradeCol(vec3 col, vec4 t, vec2 c, vec3 g) {
+  const vec3 k = vec3(0.57735027);
+  float ca = cos(c.x);
+  col = max(col * ca + cross(k, col) * sin(c.x) + k * dot(k, col) * (1.0 - ca), 0.0);
+  col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, t.w);
+  vec3 sepia = vec3(dot(col, vec3(0.393, 0.769, 0.189)), dot(col, vec3(0.349, 0.686, 0.168)), dot(col, vec3(0.272, 0.534, 0.131)));
+  col = mix(col, sepia, c.y) * g;
+  col = (col * exp2(t.x) - 0.5) * t.y + 0.5;
+  return pow(clamp(col, 0.0, 1.0), vec3(1.0 / t.z));
+}
 `;
 
 const FS_FEEDBACK = `#version 300 es
@@ -50,6 +69,12 @@ uniform vec4 uAdjB[11];  // per input: cut-out level
 uniform vec2 uShift;
 uniform vec4 uBrush;
 uniform vec3 uBrushCol;
+// Color filters set to work inside the loop (see "color filters" in app.js): Posterize's steps (0: not here) and
+// how far the Color grading goes this frame (0: not here), with the grading itself
+uniform float uPoster, uGradeK;
+uniform vec4 uGradeTone;
+uniform vec2 uGradeColor;
+uniform vec3 uGradeRGB;
 out vec4 o;
 ${COMMON}
 ${window.PhosphorShapes.SWALLOW}
@@ -764,6 +789,10 @@ void main() {
   vec3 outc = 1.0 - (1.0 - fb) * (1.0 - s);
   // Where the spectrograph is loud it shows as itself over the trails; where it's quiet the trails show through
   if (specA > 0.0) outc = mix(outc, s, specA);
+  // Color filters inside the loop land on what the loop keeps, so it feeds itself the filtered picture next frame.
+  // The grading only goes part of the way each frame; all of it every frame would pile up within a blink.
+  if (uGradeK > 0.0) outc = mix(outc, gradeCol(outc, uGradeTone, uGradeColor, uGradeRGB), uGradeK);
+  if (uPoster > 0.0) outc = posterize(outc, uPoster, 1.0);
   // Alpha: 1 less how much a Subject silhouette covers this spot this frame, so on screen it lies over the
   // other loops too (see FS_COMPOSITE)
   o = vec4(outc, 1.0 - cover);
@@ -778,25 +807,19 @@ uniform vec2 uSim;
 // tone (exposure in stops, contrast, gamma, saturation), then hue (radians), sepia and on (0 or 1), then RGB gains
 uniform vec4 uGTA, uGTB, uGTC, uGTD;
 uniform vec3 uGCA, uGCB, uGCC, uGCD, uGRA, uGRB, uGRC, uGRD;
+// Each loop's Posterize while it's set to work on screen: how many steps (A, B, C, D; 0 for none)
+uniform vec4 uPoster;
 out vec4 o;
-vec3 lgrade(vec3 col, vec4 t, vec3 c, vec3 g) {
-  if (c.z < 0.5) return col;
-  const vec3 k = vec3(0.57735027);
-  float ca = cos(c.x);
-  col = max(col * ca + cross(k, col) * sin(c.x) + k * dot(k, col) * (1.0 - ca), 0.0);
-  col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, t.w);
-  vec3 sepia = vec3(dot(col, vec3(0.393, 0.769, 0.189)), dot(col, vec3(0.349, 0.686, 0.168)), dot(col, vec3(0.272, 0.534, 0.131)));
-  col = mix(col, sepia, c.y) * g;
-  col = (col * exp2(t.x) - 0.5) * t.y + 0.5;
-  return pow(clamp(col, 0.0, 1.0), vec3(1.0 / t.z));
-}
+${COMMON}
+vec3 post(vec3 c, float n) { return n > 0.0 ? posterize(c, n, 0.0) : c; }
+vec3 lgrade(vec3 col, vec4 t, vec3 c, vec3 g) { return c.z < 0.5 ? col : gradeCol(col, t, c.xy, g); }
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   vec4 A = texture(uA, uv), B = texture(uB, uv), C = texture(uC, uv), D = texture(uD, uv);
-  vec3 a = lgrade(A.rgb, uGTA, uGCA, uGRA) * uWA;
-  vec3 b = lgrade(B.rgb, uGTB, uGCB, uGRB) * uWB;
-  vec3 c = uWC > 0.0 ? lgrade(C.rgb, uGTC, uGCC, uGRC) * uWC : vec3(0.0);
-  vec3 d = uWD > 0.0 ? lgrade(D.rgb, uGTD, uGCD, uGRD) * uWD : vec3(0.0);
+  vec3 a = post(lgrade(A.rgb, uGTA, uGCA, uGRA), uPoster.x) * uWA;
+  vec3 b = post(lgrade(B.rgb, uGTB, uGCB, uGRB), uPoster.y) * uWB;
+  vec3 c = uWC > 0.0 ? post(lgrade(C.rgb, uGTC, uGCC, uGRC), uPoster.z) * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? post(lgrade(D.rgb, uGTD, uGCD, uGRD), uPoster.w) * uWD : vec3(0.0);
   vec3 col = 1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d);
   // A loop's Subject silhouette (where its alpha is below 1) lies over the other loops instead of adding light
   col = mix(col, a, clamp((1.0 - A.a) * uWA, 0.0, 1.0));
@@ -886,15 +909,9 @@ void main() {
 
   col *= 1.0 + uFlash;
   col = mix(col, vec3(hash(gl_FragCoord.xy * 0.5 + fract(uTime) * 113.0)), uStatic * 0.9);
-  // Color grading: the finished picture only, never fed back into the loops
-  if (uGradeOn > 0.5) {
-    col = max(hueTurn(col, uGradeColor.x), 0.0);
-    col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, uGradeTone.w);
-    vec3 sepia = vec3(dot(col, vec3(0.393, 0.769, 0.189)), dot(col, vec3(0.349, 0.686, 0.168)), dot(col, vec3(0.272, 0.534, 0.131)));
-    col = mix(col, sepia, uGradeColor.y) * uGradeRGB;
-    col = (col * exp2(uGradeTone.x) - 0.5) * uGradeTone.y + 0.5;
-    col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / uGradeTone.z));
-  }
+  // Color grading set to work on screen: the finished picture only, never fed back into the loops (set to work
+  // inside the loops, it's drawn in each loop instead and uGradeOn is 0 here)
+  if (uGradeOn > 0.5) col = gradeCol(col, uGradeTone, uGradeColor, uGradeRGB);
   vec2 e = smoothstep(vec2(0.0), vec2(0.006), cuv) * smoothstep(vec2(1.0), vec2(0.994), cuv);
   col *= e.x * e.y;
   // Clean silhouette is applied after every display effect, including flashes and shake.

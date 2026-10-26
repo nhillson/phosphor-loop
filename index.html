@@ -465,6 +465,16 @@
             <div class="ends"><span>Off</span><span>Fast</span></div>
           </div>
           <div class="ctl">
+            <div class="ctl-head"><label for="poster">Posterize</label><output id="posterOut" for="poster"></output></div>
+            <input type="range" id="poster" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Two steps</span></div>
+            <div class="seg seg-2" id="posterWhere" role="group" aria-label="Where Posterize works">
+              <button data-pin="0" aria-pressed="true">On screen</button>
+              <button data-pin="1" aria-pressed="false">Inside the loop</button>
+            </div>
+            <span class="hint">Flattens this loop’s colors into a few solid bands, like a screen print or a poster. Further right, fewer bands. On screen lays it over the loop like a lens, and the trails underneath stay smooth. Inside the loop, the loop feeds on the banded picture, so trails fade in steps and the bands harden into flat blobs. Autopilot leaves it where you put it, through every new look.</span>
+          </div>
+          <div class="ctl">
             <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
             <input type="range" id="warp" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wobbly</span></div>
@@ -813,6 +823,11 @@
       <section class="group" id="gradeGroup" aria-labelledby="h-grade">
         <h2 id="h-grade">Color grading</h2>
         <p class="hint">Changes the finished picture, after every loop is mixed together, like a filter over the whole screen. Autopilot leaves it where you put it, presets keep it, and Neutral puts it back to normal. Double-click a slider to put just that one back.</p>
+        <div class="seg seg-2" id="gradeWhere" role="group" aria-label="Where Color grading works">
+          <button data-gin="0" aria-pressed="true">On screen</button>
+          <button data-gin="1" aria-pressed="false">Inside the loops</button>
+        </div>
+        <p class="hint">On screen lays the grading over the finished picture like a lens. Inside the loops, every loop feeds on the graded picture, so the grading builds up frame after frame: small amounts go a long way (a little Hue keeps the colors turning, a little Contrast pushes everything to bold darks and lights). Shapes aren’t graded then.</p>
         <h3 class="subhead">Tone</h3>
         <div class="ctl">
           <div class="ctl-head"><label for="gExposure">Exposure</label><output id="gExposureOut" for="gExposure"></output></div>
@@ -1056,6 +1071,7 @@
             <dt>Spin</dt><dd>Twists every echo. Small amounts make spirals.</dd>
             <dt>Trails</dt><dd>How long echoes last. High is dreamy, low is snappy, and None turns the feedback off.</dd>
             <dt>Color shift</dt><dd>Moves each echo a little further round the rainbow.</dd>
+            <dt>Posterize</dt><dd>Flattens the loop's colors into a few solid bands, like a poster. On screen lays it over the loop; Inside the loop makes the loop feed on the bands, so its trails fade in steps.</dd>
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Flow</dt><dd>Slow currents curl the echoes into threads and swirls, like ink in water. Works best with Trails high.</dd>
             <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>

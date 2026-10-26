@@ -7,6 +7,7 @@ ceiling, and a page that stops drawing ends the check at once, so a broken build
                                                then a quick workout (Surprise, Autopilot, Neutral, tabs, Clear)
   python3 tests/check.py --shot "Marbled"      also takes a picture of a Guide recipe after --frames frames
   python3 tests/check.py --shot "Currents|push=0|view=50"   ...with sliders changed after the recipe
+  python3 tests/check.py --shot "Bloom|poster=70|click=#posterWhere [data-pin='1']"   ...and a button pressed
 
 Options: --frames N (frames before each picture, default 120), --res H (test picture height, default 216),
 --out DIR (where pictures go, default <temp>/phosphor-check), --skip-workout.
@@ -139,11 +140,14 @@ def run(c, a, base, problems):
             problems.append(f'no Guide recipe called "{name}"')
             continue
         for kv in sets:
-            k, v = kv.split('=')
-            pg.evaluate(SLIDER_JS, [k.strip(), float(v)])
+            k, v = kv.split('=', 1)
+            if k.strip() == 'click':
+                pg.click(v.strip(), timeout=FAIL_FAST_MS)
+            else:
+                pg.evaluate(SLIDER_JS, [k.strip(), float(v)])
         pg.click('#clear')
         shot_fps = c.wait_frames(a.frames, f'recipe {name}')
-        fname = '_'.join([name.replace(' ', '_').replace('/', '-')] + [s.replace('=', '') for s in sets])
+        fname = '_'.join([name.replace(' ', '_').replace('/', '-')] + [re.sub(r'[^\w-]', '', s) for s in sets])
         path, lit = c.picture(fname)
         print(f'  picture: {path}  ({a.frames} frames at {shot_fps:.1f} a second, brightness {lit:.0f})')
     return fps

@@ -160,14 +160,16 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
+// Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
+const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
 // The sliders under Effects › Feeds on itself
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -854,6 +856,7 @@ function sliderText(k, v) {
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
     case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
     case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal': return v === 0 ? 'OFF' : String(v);
+    case 'poster': return v === 0 ? 'OFF' : `${Math.round(posterSteps(v))} STEPS`;
     // How far back the far edge reaches
     case 'time': return v === 0 ? 'OFF' : `${twSpan(v).toFixed(1)} SEC`;
     default: return String(v);
@@ -1051,6 +1054,15 @@ $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`GROW ${edit}`, GROW_SIZE_NAME[t.growSize]);
 }));
+// Posterize works on screen (the loop keeps its smooth picture) or inside the loop (it feeds on the stepped one)
+$$('#posterWhere button').forEach((b) => b.addEventListener('click', () => {
+  const t = loops[edit].tgt;
+  t.posterIn = b.dataset.pin === '1';
+  // Picking where with Posterize off turns it on, so the button always shows something
+  if (!(t.poster > 0)) t.poster = 50;
+  syncUI();
+  showOSD(`POSTERIZE ${edit}`, t.posterIn ? 'INSIDE THE LOOP' : 'ON SCREEN');
+}));
 // A fractal's camera always glides: it wanders and rolls through (Runner, Crawler and Mix it up were removed;
 // looks saved with them glide too)
 const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE'];
@@ -1219,6 +1231,7 @@ function syncUI() {
   for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'silhouette']) $('#row-' + s).hidden = !usesHere(s);
   syncTextUI(); syncSilhouetteUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
+  $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
   $$('#timeShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.tshape === (t.timeShape ?? 0))));
   $$('#specShape button').forEach((b) => b.setAttribute('aria-pressed', String((+b.dataset.round === 1) === !!t.specRound)));
   const fly = [t.in1, t.in2].find((s) => sceneGroup(s) === 'world');
@@ -1271,6 +1284,9 @@ function patchLoop(k, p, force) {
   n.subject = p.subject ?? (force ? 'off' : L.tgt.subject);
   // Looks saved before Color grading took Recolor's place still carry it; it's left behind
   delete n.recolor;
+  // Posterize, and where it works, stay through every new look (Autopilot, Surprise); a preset, recipe or Neutral sets them
+  if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
+  if (!force && !('posterIn' in p)) n.posterIn = !!L.tgt.posterIn;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
@@ -2246,7 +2262,8 @@ function apOwnsMix(p) {
   return false;
 }
 // Who a control belongs to while Autopilot runs: loop k's setting, or a fader under Loops
-const apOwns = (key, k) => (key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
+// Posterize is always yours: Autopilot never changes it
+const apOwns = (key, k) => (key === 'poster' ? false : key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
 
 /* ================= autopilot's eye ================= */
 // While Autopilot runs it keeps an eye on the picture. Every few hundredths of a second a tiny 64 x 36 copy is
@@ -7327,10 +7344,12 @@ function cleanGrade(g) {
     const { el } = gradeEls[k];
     if (Number.isFinite(g[k])) out[k] = clamp(Math.round(g[k]), +el.min, +el.max);
   }
+  out.gInside = !!g.gInside;
   return out;
 }
 function syncGradeUI() {
   for (const [k, { el, out }] of Object.entries(gradeEls)) { el.value = grade[k]; fillTrack(el); out.textContent = gradeText(k, grade[k]); }
+  $$('#gradeWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.gin === '1') === !!grade.gInside)));
 }
 function saveGrade() { try { localStorage.setItem(GRADE_KEY, JSON.stringify(grade)); } catch (_) {} }
 function setGrade(g) { Object.assign(grade, cleanGrade(g)); syncGradeUI(); saveGrade(); }
@@ -7339,13 +7358,30 @@ for (const [k, { el, out }] of Object.entries(gradeEls)) {
   el.addEventListener('dblclick', () => setGrade({ ...grade, [k]: GRADE_DEF[k] }));
 }
 $('#gradeReset').addEventListener('click', () => setGrade(GRADE_DEF));
+$$('#gradeWhere button').forEach((b) => b.addEventListener('click', () => {
+  setGrade({ ...grade, gInside: b.dataset.gin === '1' });
+  showOSD('COLOR GRADING', grade.gInside ? 'INSIDE THE LOOPS' : 'ON SCREEN');
+}));
 { let saved = null; try { saved = JSON.parse(localStorage.getItem(GRADE_KEY) || 'null'); } catch (_) {} setGrade(saved); }
+const gradeOn = () => Object.keys(GRADE_DEF).some((k) => grade[k] !== GRADE_DEF[k]);
 function setGradeUniforms() {
-  const on = Object.keys(GRADE_DEF).some((k) => grade[k] !== GRADE_DEF[k]);
-  set1f(dispProg, 'uGradeOn', on ? 1 : 0);
+  set1f(dispProg, 'uGradeOn', gradeOn() && !grade.gInside ? 1 : 0);
   set4f(dispProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, grade.gGamma / 100, grade.gSat / 100);
   set2f(dispProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(dispProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
+}
+/* ================= color filters ================= */
+// Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
+// loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
+// tenth of the way each sixtieth of a second (f: how many sixtieths this frame is), so it builds up at the same
+// pace at any frame rate instead of piling up at once.
+function setLoopGradeUniforms(f) {
+  const on = grade.gInside && gradeOn();
+  set1f(fbProg, 'uGradeK', on ? 1 - Math.pow(0.9, f) : 0);
+  if (!on) return;
+  set4f(fbProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, Math.max(0.05, grade.gGamma / 100), grade.gSat / 100);
+  set2f(fbProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
+  set3f(fbProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
 }
 window.__plGrade = { grade, setGrade, snapshot: () => snapshot(), loadPreset: (data) => loadPreset({ id: '', name: '', data }, true) };
 
@@ -8225,6 +8261,9 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uGrow', Math.min(0.2, Math.pow(clamp(c.grow, 0, 100) / 100, 1.2) * GROW_K * f));
   set1f(fbProg, 'uGrowR', GROW_R[t.growSize] ?? GROW_R[1]);
   set1f(fbProg, 'uGrowTurn', Math.random() * 6.2831853);
+  // Color filters set to work inside this loop (see "color filters")
+  set1f(fbProg, 'uPoster', t.posterIn && c.poster > 0.5 ? posterSteps(c.poster) : 0);
+  setLoopGradeUniforms(f);
   set1f(fbProg, 'uAspText', textAspect);
   set1f(fbProg, 'uMirror', t.mirror);
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
@@ -8403,7 +8442,7 @@ const SEQ_TRACK = [
 // the g… ones are its color grading, which in the sequencer belongs to each loop on its own.
 const SEQ_SLIDERS = [
   ['Loop', [['show', 'Show'], ['feed', 'Feed into other loop'], ['blend', 'Blend'], ['size', 'Input size']]],
-  ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['warp', 'Warp'], ['flow', 'Flow'],
+  ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
@@ -9397,6 +9436,8 @@ function frame() {
   set1f(compProg, 'uWB', wB);
   set1f(compProg, 'uWC', W.C);
   set1f(compProg, 'uWD', W.D);
+  { const P = (k) => { const L = loops[k]; return loopOn(k) && !L.tgt.posterIn && L.cur.poster > 0.5 ? posterSteps(L.cur.poster) : 0; };
+    set4f(compProg, 'uPoster', P('A'), P('B'), P('C'), P('D')); }
   for (const k of KEYS) {
     const g = loopGrade[k] ? { ...GRADE_DEF, ...loopGrade[k] } : null;
     set3f(compProg, 'uGC' + k, g ? g.gHue * Math.PI / 180 : 0, g ? g.gSepia / 100 : 0, g ? 1 : 0);
