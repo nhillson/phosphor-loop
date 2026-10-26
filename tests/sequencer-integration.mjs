@@ -104,6 +104,29 @@ try {
  await page.click('#seqLoad');await page.locator('#seqLoadMenu button',{hasText:'Main'}).click();await frames(2);
  assert.equal(await T(()=>window.__seqTest.seq.rec.blocks.length),3);
  step('save sequence and load it back');
+ // Add current look: no made-up name; the block shows its input. Rename it, then save it to My presets.
+ await page.locator('button.seq-card').nth(0).click();
+ await page.click('#seqAddCurrent');await frames(2);
+ const added=await T(()=>{const {seq}=window.__seqTest;return seq.rec.blocks.find(b=>b.id===seq.selId);});
+ assert.equal(added.label,'');
+ const shown=await page.locator(`.seq-blk[data-id="${added.id}"]`).getAttribute('title');
+ assert.ok(!/Current look/.test(shown)&&/^[A-Z]/.test(shown),'it shows what its loop shows: '+shown);
+ await page.locator(`.seq-blk[data-id="${added.id}"]`).click({button:'right',position:{x:10,y:10}});
+ await page.locator('.seq-menu.fixed > button',{hasText:'Rename'}).click();
+ await page.fill('#seqAskIn','Opening glow');await page.keyboard.press('Enter');await frames(2);
+ assert.equal(await T(id=>window.__seqTest.seq.rec.blocks.find(b=>b.id===id).label,added.id),'Opening glow');
+ await page.locator(`.seq-blk[data-id="${added.id}"]`).click({button:'right',position:{x:10,y:10}});
+ await page.locator('.seq-menu.fixed > button',{hasText:'Save to My presets'}).click();
+ assert.equal(await page.inputValue('#seqAskIn'),'Opening glow');
+ await page.keyboard.press('Enter');await frames(2);
+ const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('phosphor-presets-v1')||localStorage.getItem('phosphor-presets')||'[]'));
+ assert.ok(JSON.stringify(saved).includes('Opening glow'),'the look is in My presets');
+ await page.click('#seqAddSaved');
+ assert.ok(await page.locator('#seqSavedMenu button',{hasText:'Opening glow'}).count(),'and Add saved look offers it');
+ await page.keyboard.press('Escape');
+ await page.locator(`.seq-blk[data-id="${added.id}"]`).click({position:{x:10,y:10}});await page.keyboard.press('Delete');await frames(2);
+ assert.ok(!(await T(id=>window.__seqTest.seq.rec.blocks.some(b=>b.id===id),added.id)));
+ step('current looks come in unnamed; rename a block; save its look to My presets');
 
  // Spectrograph: what the app hears while the song plays fills it in, and is kept for the song
  await T(()=>{const {snd}=window.__seqTest;snd.analyser={fftSize:2048,frequencyBinCount:1024,getByteFrequencyData:b=>b.fill(200)};snd.rate=48000;snd.bins=new Uint8Array(1024).fill(200);});
@@ -143,10 +166,33 @@ try {
  await page.click('#seqRec');await frames(6);
  await T(()=>{window.__seqTest.loops.B.gen++;});await frames(6);
  await page.click('#seqRec');await frames(2);
- const recd=await T(()=>window.__seqTest.seq.rec.blocks.filter(b=>b.label==='Recorded look').map(b=>[b.track,b.a<b.b]));
- if(recd.length<2||!recd.every(([t,ok])=>t===1&&ok))console.log(await T(()=>({blocks:window.__seqTest.seq.rec.blocks.map(b=>[b.label,b.track,b.a,b.b]),running:window.__seqTest.seq.running,playing:window.__seqTest.seq.playing,t:window.__seqTest.seq.t,rec:window.__seqTest.seq.recording})));
- assert.ok(recd.length>=2,'one block per look');assert.ok(recd.every(([t,ok])=>t===1&&ok));
+ const recd=await T(()=>window.__seqTest.seq.rec.blocks.filter(b=>b.a>=129&&!b.rec).map(b=>[b.track,b.a<b.b,b.label]));
+ if(recd.length<2||!recd.every(([t,ok,label])=>t===1&&ok&&label===''))console.log(await T(()=>({blocks:window.__seqTest.seq.rec.blocks.map(b=>[b.label,b.track,b.a,b.b]),running:window.__seqTest.seq.running,playing:window.__seqTest.seq.playing,t:window.__seqTest.seq.t,rec:window.__seqTest.seq.recording})));
+ assert.ok(recd.length>=2,'one block per look');assert.ok(recd.every(([t,ok,label])=>t===1&&ok&&label===''),'recorded blocks go on track 2, unnamed');
  step('record look changes writes blocks onto the chosen track');
+
+ // Sizing by hand: the bar between picture and controls, then the picture's corner; both are remembered
+ await page.click('#seqHide');await frames(2);
+ const split=await page.locator('#deckSplit').boundingBox();
+ await page.mouse.move(split.x+3,split.y+300);await page.mouse.down();await page.mouse.move(split.x-117,split.y+300,{steps:4});await page.mouse.up();await frames(3);
+ const side=await page.evaluate(()=>document.querySelector('.panel').getBoundingClientRect().width);
+ assert.ok(Math.abs(side-500)<12,'controls about 120 px wider: '+side);
+ const corner=await page.locator('.rz-c').boundingBox(),c0=await page.locator('#screen').boundingBox();
+ await page.mouse.move(corner.x+10,corner.y+10);await page.mouse.down();await page.mouse.move(corner.x-190,corner.y-90,{steps:5});await page.mouse.up();await frames(3);
+ const c1=await page.locator('#screen').boundingBox(),btns=await page.locator('#tasteStrip').boundingBox();
+ assert.ok(Math.abs(c0.width-200-c1.width)<6&&Math.abs(c0.height-100-c1.height)<6,`picture resized by its corner: ${c0.width}x${c0.height} -> ${c1.width}x${c1.height}`);
+ assert.ok(btns.y<c1.y+c1.height+60,'the buttons move up under the smaller picture');
+ const right=await page.locator('.rz-r').boundingBox();
+ await page.mouse.move(right.x+6,right.y+right.height/2);await page.mouse.down();await page.mouse.move(right.x+46,right.y+right.height/2,{steps:3});await page.mouse.up();await frames(3);
+ const c2=await page.locator('#screen').boundingBox();
+ assert.ok(Math.abs(c2.width-c1.width-40)<6&&Math.abs(c2.height-c1.height)<2,'the right edge changes width only');
+ await page.reload();await page.waitForFunction(()=>window.__seqTest?.seq);await frames(4);
+ const c3=await page.locator('#screen').boundingBox();
+ assert.ok(Math.abs(c3.width-c2.width)<3&&Math.abs(c3.height-c2.height)<3,'sizes are remembered');
+ await page.dblclick('.rz-c');await page.dblclick('#deckSplit');await frames(3);
+ const c4=await page.locator('#screen').boundingBox();
+ assert.ok(c4.width>c3.width,'double-click goes back to filling the space');
+ step('drag to size the controls and the picture; remembered; double-click resets');
 
  assert.deepEqual(errors,[]);
  console.log('PASS');

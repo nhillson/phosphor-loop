@@ -99,7 +99,15 @@ SPOTIFY SONG SEQUENCER
   Ctrl+Shift+Z) cover every edit. + Marker (or M) drops a named section marker.
   Record look changes writes the chosen loop's looks into its track as the
   sequence plays. Add current look and Add saved look put a 16-second block at
-  the playhead on the chosen track.
+  the playhead on the chosen track. A block shows what its loop shows until
+  you name it (right-click › Rename…); right-click › Save to My presets…
+  keeps its look as a preset.
+
+SIZING THE PICTURE AND THE CONTROLS
+  Drag the right edge, bottom edge or corner of the picture's frame to size
+  it; drag the bar between the picture and the controls to size the controls.
+  The rest of the page follows. Remembered in this browser; double-click a
+  handle or the bar to go back to the automatic size.
 
   Spotify keeps playing in your existing player. Phosphor Loop reads the
   current song, play/pause position and queue. Each song keeps its own

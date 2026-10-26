@@ -56,6 +56,9 @@
               <p class="hint">Type a name, or press Enter to keep this one.</p>
             </form>
           </div>
+          <div class="rz rz-r" data-rz="r" title="Drag to change the picture’s width. Double-click to let it fill the space again."></div>
+          <div class="rz rz-b" data-rz="b" title="Drag to change the picture’s height. Double-click to let it fill the space again."></div>
+          <div class="rz rz-c" data-rz="rb" title="Drag to change the picture’s size. Double-click to let it fill the space again."></div>
         </div>
         <button class="fs-exit" id="fsExit" hidden><span class="x" aria-hidden="true">✕</span>Exit full screen <kbd>Esc</kbd></button>
         <!-- Full screen during a taste session: a small timer at the bottom middle, and the two rating buttons beside it
@@ -167,6 +170,7 @@
         <p class="toast" id="toast" role="status" aria-live="polite"></p>
       </div>
     </section>
+    <div class="deck-split" id="deckSplit" role="separator" aria-orientation="vertical" aria-label="Controls width" tabindex="0" title="Drag to make the controls wider or narrower. Double-click to put it back."></div>
 
     <aside class="panel" aria-label="Controls">
     <div class="panel-in">
@@ -1096,7 +1100,8 @@
             <dt>Picture sharpness</dt><dd>How many lines the picture is drawn with; the number shows at the top right. Standard is the 576 lines Phosphor Loop has always used and is the lightest on the computer. High goes up to 1080, like HD video. Full draws as many lines as the screen (or the Output window) shows. Auto, the usual setting, starts where it last settled on this computer, sharpens while the picture stays smooth and steps back if it slows down. Effects keep their size at every setting; only the detail gets finer. Each computer or phone keeps its own choice.</dd>
             <dt>Color grading</dt><dd>A filter over the finished picture, after every loop is mixed. Exposure, Contrast and Midtones set how bright and punchy it is; Saturation, Hue, Red, Green, Blue and Sepia change its colors. It never feeds back into the loops, Autopilot leaves it alone, presets keep it, and Neutral or Back to normal resets it.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
-            <dt>Sequencer</dt><dd>Opens the sequencer under the picture: four tracks, one for each loop (A to D), where you place looks by time along the song. A loop with no block at that moment goes blank. Blocks fade in and out, blocks that overlap on a track crossfade, and any loop, effect or color grading slider can change over a block. Scroll moves along the song and Shift + scroll zooms. Above the tracks, a spectrograph of the song builds up as it plays and is saved with it.</dd>
+            <dt>Sizing the picture and the controls</dt><dd>Drag the right edge, the bottom edge or the corner of the picture’s frame to make it wider, taller or both; everything below moves to fit, and making it wider than there’s room for narrows the controls. Drag the bar between the picture and the controls to make the controls wider or narrower. Your sizes are remembered in this browser; double-click a handle or the bar to go back to the automatic size.</dd>
+            <dt>Sequencer</dt><dd>Opens the sequencer under the picture: four tracks, one for each loop (A to D), where you place looks by time along the song. A loop with no block at that moment goes blank. Blocks fade in and out, blocks that overlap on a track crossfade (right-click one to rename it or save its look to My presets), and any loop, effect or color grading slider can change over a block. Scroll moves along the song and Shift + scroll zooms. Above the tracks, a spectrograph of the song builds up as it plays and is saved with it.</dd>
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
             <dt>Output window</dt><dd>Opens the picture in its own window for a projector or second screen. Drag it over and double-click it to fill that screen. The controls stay here, and you can draw on the projected picture too.</dd>
             <dt>Spread out controls</dt><dd>Press it and the picture shrinks to a small preview at the top left, and the controls spread out in columns across the rest of the screen, so you can see many more of them at once. It works with or without the Output window. Press it again for the big picture. Phosphor Loop remembers your choice.</dd>

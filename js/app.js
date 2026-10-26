@@ -278,6 +278,10 @@ let staticAmt = 0;
 const canvas = $('#screen');
 const stage = $('#stage');
 const bezel = $('#bezel');
+// Sizes set by hand (see "sizing the picture and the controls by hand"): the controls' width (side), the picture
+// column's width with Spread out controls on (mon), and the picture's own width and height (cw, ch), in CSS pixels
+const LAYOUT_KEY = 'phosphor-layout-v1';
+const layout = (() => { try { const v = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } })();
 const screenWrap = $('#screenWrap');
 const osd = $('#osd');
 const tip = $('#tip');
@@ -7150,12 +7154,14 @@ function fit() {
   const bz = getComputedStyle(bezel);
   const padX = parseFloat(bz.paddingLeft) + parseFloat(bz.paddingRight);
   const padY = parseFloat(bz.paddingTop) + parseFloat(bz.paddingBottom);
-  const availW = Math.max(160, Math.floor(sr.width - padX));
+  // A size set by hand with the handles on the frame is the space the picture fits into
+  const own = !narrow && !fs && layout.cw && layout.ch;
+  const availW = Math.max(160, Math.floor(own ? Math.min(sr.width - padX, layout.cw) : sr.width - padX));
   const out = outputOpen();
   const want = out ? outWin.innerWidth / Math.max(1, outWin.innerHeight) : SHAPES[shape];
   let availH = narrow
     ? Math.round(want ? Math.min(window.innerHeight * 0.62, availW / want) : window.innerHeight * 0.58)
-    : Math.max(120, Math.floor(sr.height - padY));
+    : own ? layout.ch : Math.max(120, Math.floor(sr.height - padY));
   let w = availW, h = availH;
   if (want) { w = Math.floor(Math.min(availW, availH * want)); h = Math.floor(w / want); }
   canvas.style.width = w + 'px';
@@ -7197,6 +7203,94 @@ $$('#shape button').forEach((b) => b.addEventListener('click', () => {
 }));
 function syncShapeUI() { $$('#shape button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.shape === shape))); }
 syncShapeUI();
+
+/* ================= sizing the picture and the controls by hand ================= */
+// Drag the right edge, bottom edge or corner of the picture's frame to size it; drag the bar between the picture
+// and the controls to make the controls wider or narrower. Everything else moves to fit, and it's remembered in
+// this browser. Double-click a handle to go back to the automatic size.
+const deck = $('.deck'), deckSplit = $('#deckSplit');
+function applyLayout() {
+  for (const [key, v] of [['--side-w', layout.side], ['--mon-w', layout.mon]]) {
+    if (v) deck.style.setProperty(key, v + 'px'); else deck.style.removeProperty(key);
+  }
+  stage.classList.toggle('sized', !!(layout.cw && layout.ch) && !narrowMQ.matches);
+}
+function saveLayout() { lsSet(LAYOUT_KEY, JSON.stringify(layout)); }
+const wideOn = () => document.body.classList.contains('wide-ctl') && !narrowMQ.matches;
+// Widths the controls can take: never so narrow they're unusable, never so wide the picture has no room
+function setControlsWidth(px) {
+  const W = deck.clientWidth;
+  if (wideOn()) layout.mon = Math.round(clamp(W - px - 7, 220, Math.max(220, W - 420)));
+  else layout.side = Math.round(clamp(px, 260, Math.max(260, W - 360)));
+  applyLayout();
+}
+const controlsWidth = () => (wideOn() ? deck.clientWidth - (layout.mon || 320) - 7 : layout.side || 380);
+function relayout() { fit(); window.dispatchEvent(new Event('resize')); }
+let relayoutQueued = false;
+function relayoutSoon() { if (!relayoutQueued) { relayoutQueued = true; requestAnimationFrame(() => { relayoutQueued = false; relayout(); }); } }
+function dragWith(e, el, cursorClass, move, done) {
+  e.preventDefault();
+  el.setPointerCapture?.(e.pointerId);
+  el.classList.add('dragging'); document.body.classList.add('resizing', cursorClass);
+  const onMove = (ev) => { move(ev); relayoutSoon(); };
+  const onUp = () => {
+    el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onUp);
+    el.classList.remove('dragging'); document.body.classList.remove('resizing', cursorClass);
+    saveLayout(); relayout(); done?.();
+  };
+  el.addEventListener('pointermove', onMove); el.addEventListener('pointerup', onUp); el.addEventListener('pointercancel', onUp);
+}
+deckSplit.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const r = deck.getBoundingClientRect();
+  // The controls are on the right in both layouts, so their width is from the bar to the right edge
+  dragWith(e, deckSplit, 'cols', (ev) => setControlsWidth(r.right - ev.clientX - 3));
+});
+deckSplit.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  setControlsWidth(controlsWidth() + (e.key === 'ArrowLeft' ? 20 : -20)); saveLayout(); relayout();
+});
+deckSplit.addEventListener('dblclick', () => {
+  if (wideOn()) delete layout.mon; else delete layout.side;
+  applyLayout(); saveLayout(); relayout();
+  toast('Controls back to their usual width.');
+});
+// The picture's own handles. Making it wider than there's room for takes the room from the controls.
+for (const h of $$('.rz')) {
+  const kind = h.dataset.rz;
+  h.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const c0 = canvas.getBoundingClientRect(), d0 = deck.getBoundingClientRect();
+    const bz = getComputedStyle(bezel), padX = parseFloat(bz.paddingLeft) + parseFloat(bz.paddingRight);
+    const mon = $('.monitor'), ms = getComputedStyle(mon), monPad = parseFloat(ms.paddingLeft) + parseFloat(ms.paddingRight);
+    // A fixed shape (4:3 or 16:9) can't be stretched one way only, so sizing by hand fills the box you draw
+    if (shape !== 'fill' && !outputOpen()) {
+      shape = 'fill'; lsSet('phosphor-shape', shape); syncShapeUI();
+      toast('Screen shape is now Fill the space, so the picture can take any size you drag it to.');
+    }
+    layout.cw = Math.round(c0.width); layout.ch = Math.round(c0.height); applyLayout();
+    dragWith(e, h, `rz-${kind}-on`, (ev) => {
+      if (kind.includes('r')) {
+        const w = Math.max(160, Math.round(c0.width + ev.clientX - e.clientX));
+        // Room the picture's column has for it at most, leaving the controls at least their narrowest
+        const room = d0.width - 7 - (wideOn() ? 420 : 260) - monPad - padX;
+        layout.cw = Math.min(w, Math.max(160, Math.round(room)));
+        const need = layout.cw + padX + monPad;
+        if (wideOn()) { if (need > (layout.mon || 320)) { layout.mon = Math.round(need); } }
+        else if (d0.width - 7 - (layout.side || 380) < need) layout.side = Math.round(d0.width - 7 - need);
+      }
+      if (kind.includes('b')) layout.ch = Math.max(90, Math.round(c0.height + ev.clientY - e.clientY));
+      applyLayout();
+    });
+  });
+  h.addEventListener('dblclick', () => {
+    delete layout.cw; delete layout.ch; applyLayout(); saveLayout(); relayout();
+    toast('The picture fills the space again.');
+  });
+}
+applyLayout();
+narrowMQ.addEventListener?.('change', () => { applyLayout(); fit(); });
 
 /* ================= output window ================= */
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
@@ -8329,6 +8423,8 @@ const fmtSeq = (t, tenths) => {
 };
 const r1 = (v) => Math.round(v * 10) / 10;
 const inputName = (k) => SRC_LABEL[k] || 'Nothing';
+// A block's name: the one you gave it, or else what its loop shows
+const seqName = (bl) => (bl.rec ? 'Recording…' : bl.label || inputName(bl.look?.in1));
 
 const seq = {
   records: new Map(), key: 'standalone', rec: TL.newRecord(), song: null, accountId: null, lastPlayback: null,
@@ -8604,7 +8700,7 @@ function seqRecTick(p) {
   if (!seq.recBlock) {
     seq.recBefore ||= seqSnap();
     seq.recGen = L.gen;
-    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: 'Recording…', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0 });
+    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0 });
     seq.recBlock.rec = true;
     seq.rec.blocks.push(seq.recBlock);
   }
@@ -8617,7 +8713,7 @@ function seqRecTick(p) {
 function seqStopRec(keepGoing) {
   const blk = seq.recBlock;
   if (blk) {
-    delete blk.rec; blk.label = 'Recorded look';
+    delete blk.rec;
     seq.recBlock = null;
   }
   if (!keepGoing && seq.recBefore) {
@@ -8720,11 +8816,11 @@ function seqDrawStatic() {
       });
       if (w > 90) html += `<span class="atag">${bl.autos.map((au) => SEQ_NAME[au.key] || au.key).join(' · ')}</span>`;
     }
-    if (w > 34) html += `<span class="t">${escapeHTML(bl.label)}<small>${fmtSeq(bl.a)}–${fmtSeq(bl.b)}</small></span>`;
+    if (w > 34) html += `<span class="t">${escapeHTML(seqName(bl))}<small>${fmtSeq(bl.a)}–${fmtSeq(bl.b)}</small></span>`;
     html += '<div class="eg l" data-h="l"></div><div class="eg r" data-h="r"></div>';
     if (w > 24) html += `<div class="fh" data-h="fin" style="left:${bl.fin * pps}px" title="Fade in ${r1(bl.fin)} s"></div><div class="fh" data-h="fout" style="left:${w - bl.fout * pps}px" title="Fade out ${r1(bl.fout)} s"></div>`;
     el.innerHTML = html;
-    el.title = `${bl.label} · ${fmtSeq(bl.a, true)}–${fmtSeq(bl.b, true)}`;
+    el.title = `${seqName(bl)} · ${fmtSeq(bl.a, true)}–${fmtSeq(bl.b, true)}`;
     seqLaneEls[bl.track].appendChild(el);
   }
   // crossfades where blocks on one track overlap
@@ -8784,7 +8880,7 @@ function seqDraw(now) {
 function seqInspector() {
   const bl = seq.rec.blocks.find((b) => b.id === seq.selId), el = $('#seqInsp');
   if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
-  el.innerHTML = `<b>${escapeHTML(bl.label)}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
+  el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
 }
 function seqMeasure() {
@@ -8925,17 +9021,42 @@ function seqOpenCtx(x, y, items) {
   }
   seqPlaceCtx(x, y);
 }
-function seqCopy(bl) { seq.clip = JSON.parse(JSON.stringify(bl)); seqNote(`Copied “${bl.label}”. Paste puts a copy at the playhead, or right-click a spot to paste there.`); }
+// A small name box in the menu's place, for Rename and Save to My presets
+function seqAsk(x, y, title, value, placeholder, done) {
+  seqCtx.innerHTML = '';
+  const form = document.createElement('form'); form.className = 'seq-ask';
+  form.innerHTML = `<label class="mh" for="seqAskIn">${escapeHTML(title)}</label><input class="seq-in" id="seqAskIn" type="text" maxlength="40" autocomplete="off" spellcheck="false"><div class="seq-grp"><button class="btn small" type="submit">Save</button><button class="btn small" type="button">Cancel</button></div>`;
+  const inp = form.querySelector('input'); inp.value = value; inp.placeholder = placeholder;
+  form.addEventListener('submit', (ev) => { ev.preventDefault(); seqCloseCtx(); done(inp.value.trim().slice(0, 40)); });
+  form.querySelector('button[type=button]').addEventListener('click', seqCloseCtx);
+  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); seqCloseCtx(); } ev.stopPropagation(); });
+  seqCtx.appendChild(form); seqPlaceCtx(x, y); inp.focus(); inp.select();
+}
+// A block's look joins My presets, as a one-loop look (it loads onto loop A, like any preset made from one loop)
+function seqSaveLook(bl, name) {
+  const data = { v: 1, A: JSON.parse(JSON.stringify(bl.look)),
+    mix: { view: 0, xab: 0, xba: 0, showA: 100, showB: 0 }, grade: { ...GRADE_DEF } };
+  const existing = presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) { existing.data = data; existing.saved = Date.now(); }
+  else presets.push({ id: 'p' + Date.now().toString(36) + randId(4), name, thumb: '', data, saved: Date.now() });
+  if (presets.length > 60) presets = presets.slice(-60);
+  const ok = writePresets();
+  renderPresets();
+  if (!bl.label) seqChange(() => { bl.label = name; });
+  seqNote(!ok && storageOK ? 'Couldn’t save: this browser’s storage for the page is full. Delete a few presets and try again.'
+    : existing ? `Updated “${name}” in My presets.` : `Saved “${name}” to My presets. Add saved look can place it on any track.`);
+}
+function seqCopy(bl) { seq.clip = JSON.parse(JSON.stringify(bl)); seqNote(`Copied “${seqName(bl)}”. Paste puts a copy at the playhead, or right-click a spot to paste there.`); }
 function seqPaste(track, t) {
   if (!seq.clip) return;
   const len = seq.clip.b - seq.clip.a, dur = seqDur(), a = r1(clamp(t, 0, Math.max(0, dur - Math.min(len, dur))));
   const nb = TL.cleanBlock({ ...JSON.parse(JSON.stringify(seq.clip)), id: TL.id(), track, a, b: Math.min(dur, a + len) });
   seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
-  seqNote(`Pasted “${nb.label}” on track ${track + 1} at ${fmtSeq(a, true)}.`);
+  seqNote(`Pasted “${seqName(nb)}” on track ${track + 1} at ${fmtSeq(a, true)}.`);
 }
 function seqDelete(bl) {
   seqChange(() => { seq.rec.blocks = seq.rec.blocks.filter((b) => b.id !== bl.id); });
-  seq.selId = null; seqNote(`Deleted “${bl.label}”. Undo brings it back.`);
+  seq.selId = null; seqNote(`Deleted “${seqName(bl)}”. Undo brings it back.`);
 }
 function seqPickSlider(bl, x, y) {
   seqCtx.innerHTML = '';
@@ -8955,7 +9076,7 @@ function seqPickSlider(bl, x, y) {
             bl.autos.push({ key, pts: [[0, v], [1, v]] });
           }
         });
-        seqNote(has ? `${name} no longer changes in “${bl.label}”.` : `${name} now changes over “${bl.label}”. Drag the dots to shape it, double-click the block to add a point.`);
+        seqNote(has ? `${name} no longer changes in “${seqName(bl)}”.` : `${name} now changes over “${seqName(bl)}”. Drag the dots to shape it, double-click the block to add a point.`);
       });
       seqCtx.appendChild(b);
     }
@@ -8979,13 +9100,18 @@ seqView.addEventListener('contextmenu', (e) => {
       { label: 'Copy', key: 'Ctrl+C', run: () => seqCopy(bl) },
       { label: 'Paste here', key: 'Ctrl+V', disabled: !seq.clip, run: () => seqPaste(bl.track, t) },
       '-',
+      { label: 'Rename…', run: () => seqAsk(e.clientX, e.clientY, 'Name this block', bl.label || '', seqName(bl), (name) => {
+        seqChange(() => { bl.label = name; }); seqNote(name ? `Renamed to “${name}”.` : 'Name cleared; the block shows what its loop shows.');
+      }) },
+      { label: 'Save to My presets…', run: () => seqAsk(e.clientX, e.clientY, 'Save this look as', bl.label || '', nextPresetName(), (name) => seqSaveLook(bl, name || nextPresetName())) },
+      '-',
       { label: `Change over time…${bl.autos.length ? ` (${bl.autos.length})` : ''}`, run: () => seqPickSlider(bl, e.clientX, e.clientY) },
       '-',
       { label: 'Delete', key: 'Del', run: () => seqDelete(bl) },
     ]);
   } else if (laneEl) {
     const track = +laneEl.dataset.track; seqSelectTrack(track);
-    seqOpenCtx(e.clientX, e.clientY, [{ label: seq.clip ? `Paste “${seq.clip.label}” here` : 'Paste here (copy a block first)', key: 'Ctrl+V', disabled: !seq.clip, run: () => seqPaste(track, t) }]);
+    seqOpenCtx(e.clientX, e.clientY, [{ label: seq.clip ? `Paste “${seqName(seq.clip)}” here` : 'Paste here (copy a block first)', key: 'Ctrl+V', disabled: !seq.clip, run: () => seqPaste(track, t) }]);
   }
 });
 document.addEventListener('pointerdown', (e) => {
@@ -9013,12 +9139,11 @@ function seqPlace(label, look) {
   if (b - a < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
   const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)) });
   seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
-  seqNote(`Added “${label}” to track ${seq.selTrack + 1} at ${fmtSeq(a, true)}. Drag its ends to change how long it plays.`);
+  seqNote(`Added “${seqName(nb)}” to track ${seq.selTrack + 1} at ${fmtSeq(a, true)}. Drag its ends to change how long it plays.`);
 }
 $('#seqAddCurrent').addEventListener('click', () => {
   const K = KEYS[seq.selTrack];
-  const n = seq.rec.blocks.filter((b) => b.label.startsWith('Current look')).length + 1;
-  seqPlace(`Current look ${n}`, loopOn(K) ? loops[K].tgt : loops[edit].tgt);
+  seqPlace('', loopOn(K) ? loops[K].tgt : loops[edit].tgt);
 });
 function seqAddMarker() {
   const m = { id: TL.id(), t: r1(clamp(seq.t, 0, seqDur())), name: `Marker ${seq.rec.markers.length + 1}` };

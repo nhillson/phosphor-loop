@@ -24,7 +24,7 @@
     const autos = (Array.isArray(b.autos) ? b.autos : []).filter((x) => x && typeof x.key === 'string')
       .slice(0, 32).map((x) => ({ key: x.key.slice(0, 40), pts: cleanPts(x.pts) }));
     return { id: typeof b.id === 'string' ? b.id.slice(0, 24) : id(), track: clamp(Math.round(num(b.track)), 0, TRACKS - 1),
-      a: r2(a), b: r2(end), label: String(b.label || 'Look').slice(0, 80), look: b.look, fin: r2(fin), fout: r2(fout), autos };
+      a: r2(a), b: r2(end), label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', look: b.look, fin: r2(fin), fout: r2(fout), autos };
   }
   function cleanData(d) {
     return {
