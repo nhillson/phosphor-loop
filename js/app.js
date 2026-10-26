@@ -159,7 +159,7 @@ const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that ca
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
+  return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
@@ -1031,6 +1031,7 @@ $$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver
 $$('#mirrorFx button').forEach((b) => b.addEventListener('click', () => { loops[edit].tgt.mirrorFx = b.dataset.mfx; syncUI(); }));
 $('#mirrorSpin').addEventListener('click', () => { const t = loops[edit].tgt; t.mirrorSpin = !t.mirrorSpin; syncUI(); });
 $('#motion').addEventListener('click', () => { takeOver('in1'); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
+$('#soft').addEventListener('click', () => { const t = loops[edit].tgt; t.soft = t.soft === false; syncUI(); });
 // Subject silhouette: the person in a video, camera, screen or phone picture, found by MediaPipe (js/subject.js)
 const SUBJECT_SRC = ['video', 'camera', 'screen', 'phone'];
 const subjectOn = (t) => PhosphorSubject.MODES.includes(t.subject);
@@ -1295,6 +1296,7 @@ function syncUI() {
   $('#dyeHint').textContent = `Loop ${otherK}’s picture soaks color into this one: wherever loop ${otherK} is bright, this loop’s colors keep turning, so loop ${otherK}’s shapes show up as rainbow bands.`;
   $('#motionCtl').hidden = !LIVE.some(usesHere);
   $('#motion').setAttribute('aria-pressed', String(!!t.motion));
+  $('#soft').setAttribute('aria-pressed', String(t.soft !== false));
   $('#subjectCtl').hidden = !SUBJECT_SRC.some(usesHere);
   $$('#subject button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.subject === (t.subject || 'off'))));
   syncSubjectStatus();
@@ -1327,6 +1329,8 @@ function patchLoop(k, p, force) {
   // Posterize, and where it works, stay through every new look (Autopilot, Surprise); a preset, recipe or Neutral sets them
   if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
   if (!force && !('posterIn' in p)) n.posterIn = !!L.tgt.posterIn;
+  // Soft trails stays through every new look too; a preset, recipe or Neutral sets it (on, unless saved off)
+  if (!force && !('soft' in p)) n.soft = L.tgt.soft !== false;
   // The mirror's Transition and Spin are yours: they stay through every new look (loadPreset brings back a preset's)
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
@@ -8386,6 +8390,7 @@ function runLoop(k, xf, brush, f) {
     if (lc) gl.uniform3fv(lc, inkCol);
   }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
+  set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
   set1f(fbProg, 'uAspPic', picAspect);
   set1f(fbProg, 'uAspVid', vid.aspect);
   set1f(fbProg, 'uAspCam', cam.aspect);

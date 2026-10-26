@@ -47,6 +47,7 @@ uniform vec2 uSim;
 uniform float uPxK;   // how many pixels make one Standard-size step (more at a sharper picture), so effects keep their size
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
+uniform float uSoft;   // Soft trails: the brighter of the input and the trails wins, instead of adding up (see main)
 // A change of mirror glides in (see "mirror transitions" in js/app.js): the mirror it's leaving, how far along it
 // is (1 done), the Transition style (1 Melt, 2 Iris, 3 Ripple) and how far Spin has turned the pattern
 uniform float uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;
@@ -825,7 +826,10 @@ void main() {
   s += uBrushCol * (exp(-bd * bd / (0.011 * 0.011)) + 0.25 * exp(-bd / 0.02)) * uBrushOn;
 
   s = clamp(s, 0.0, 1.0);
-  vec3 outc = 1.0 - (1.0 - fb) * (1.0 - s);
+  // A video fills the screen with light every frame, and added onto long trails it piles up into white. With Soft
+  // trails each spot shows the brighter of the new frame and the fading echoes, so nothing gets brighter than the
+  // video itself, and whatever moves still leaves its echoes behind
+  vec3 outc = uSoft > 0.5 ? max(fb, s) : 1.0 - (1.0 - fb) * (1.0 - s);
   // Where the spectrograph is loud it shows as itself over the trails; where it's quiet the trails show through
   if (specA > 0.0) outc = mix(outc, s, specA);
   // Color filters inside the loop land on what the loop keeps, so it feeds itself the filtered picture next frame.

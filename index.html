@@ -428,6 +428,8 @@
           <div class="ctl" id="motionCtl" hidden>
             <button class="btn" id="motion" aria-pressed="false"><span class="led"></span>Only movement</button>
             <span class="hint">For camera, phone, screen, video and the other loop: only what moves gets in.</span>
+            <button class="btn" id="soft" aria-pressed="true"><span class="led"></span>Soft trails</button>
+            <span class="hint">Keeps a video from piling up into white: each spot shows the brighter of the new frame and its echoes, rather than adding them together. Moving things still leave trails. Turn it off for the old glow, which can turn white at high Trails.</span>
           </div>
           <div class="ctl" id="subjectCtl" hidden>
             <span class="lbl" id="subjectLbl">Subject silhouette</span>
@@ -1079,6 +1081,7 @@
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
             <dt>Input size</dt><dd>How big the input sits on screen, up to filling it.</dd>
             <dt>Only movement</dt><dd>For live inputs and video: only what moves gets in.</dd>
+            <dt>Soft trails</dt><dd>For live inputs and video, on unless you turn it off: each spot shows the brighter of the new frame and its fading echoes instead of adding them up, so a video can’t pile up into white at high Trails. Moving things still leave echoes. It stays through every new look.</dd>
             <dt>Adjust the picture</dt><dd>Under each picture, video or live input: Tracking (worn-tape wobble), Brightness, Contrast, Color, Cut out dark parts, and Hold this frame.</dd>
           </dl></div>
           <div class="g-card"><h3>Effects</h3><dl>
@@ -1177,7 +1180,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Autopilot keeps it from turning white by itself. When you’re steering, lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
+          <dt>The screen went white</dt><dd>Autopilot keeps it from turning white by itself. On video, check Soft trails is on. When you’re steering, lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>
