@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const { FR, makeDrone } = window.PhosphorFractals;
-const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
+const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_POSTER, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
 const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.PhosphorHelpers;
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
@@ -327,11 +327,12 @@ function program(fs) {
   return { p, u };
 }
 
-let fbProg, compProg, dispProg;
+let fbProg, compProg, dispProg, posterProg;
 try {
   fbProg = program(FS_FEEDBACK);
   compProg = program(FS_COMPOSITE);
   dispProg = program(FS_DISPLAY);
+  posterProg = program(FS_POSTER);
 } catch (err) {
   fail('The screen couldn’t start on this graphics card. Try another browser, or update your graphics drivers.');
   return;
@@ -465,6 +466,8 @@ gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
 gl.useProgram(compProg.p);
 set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1); set1i(compProg, 'uC', 2); set1i(compProg, 'uD', 3);
+gl.useProgram(posterProg.p);
+set1i(posterProg, 'uNow', 0); set1i(posterProg, 'uLast', 1);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
 for (const [i, key] of KEYS.entries()) set1i(dispProg, 'uDancer' + key, i + 1);
@@ -1061,7 +1064,7 @@ $$('#posterWhere button').forEach((b) => b.addEventListener('click', () => {
   // Picking where with Posterize off turns it on, so the button always shows something
   if (!(t.poster > 0)) t.poster = 50;
   syncUI();
-  showOSD(`POSTERIZE ${edit}`, t.posterIn ? 'INSIDE THE LOOP' : 'ON SCREEN');
+  showOSD(`POSTERIZE ${edit}`, t.posterIn ? 'WITHIN LOOPS' : 'FINAL PASS');
 }));
 // A fractal's camera always glides: it wanders and rolls through (Runner, Crawler and Mix it up were removed;
 // looks saved with them glide too)
@@ -5749,7 +5752,7 @@ phoOff.addEventListener('click', () => {
 const shapes = new PhosphorShapes.World();
 let shapeProg = null, shapeRT = null, shapeRTSize = '', shapeSel = 0, shapeSelAt = -1e9, shapeSw = { n: 0 }, shapeSig = '';
 const shapeTpl = { ...PhosphorShapes.DEFAULTS };
-const SHAPE_SLIDERS = { size: '#shapeSize', gravity: '#shapeGravity', swallow: '#shapeSwallow', disk: '#shapeDisk', tilt: '#shapeTilt' };
+const SHAPE_SLIDERS = { speed: '#shapeSpeed', size: '#shapeSize', gravity: '#shapeGravity', swallow: '#shapeSwallow', disk: '#shapeDisk', tilt: '#shapeTilt' };
 const shapeLabel = (s) => (s.wire ? 'Wireframe ' : '') + PhosphorShapes.KINDS.find((k) => k.id === s.kind).label.toLowerCase();
 const shapeCur = () => { const s = shapes.byId(shapeSel); return s && !s.dying ? s : null; };
 function shapeText(k, v) {
@@ -5758,6 +5761,7 @@ function shapeText(k, v) {
   if (k === 'swallow') return v === 0 ? 'LENS' : v === 100 ? 'SWALLOW' : String(v);
   if (k === 'disk') return v === 0 ? 'NONE' : String(v);
   if (k === 'tilt') return `${v}°`;
+  if (k === 'speed') return v === 50 ? 'USUAL' : `${Math.pow(4, (v - 50) / 50).toFixed(v < 50 ? 2 : 1)}×`;
   return String(v);
 }
 function shapeSyncUI() {
@@ -5832,10 +5836,10 @@ $('#shapeClear').addEventListener('click', () => { shapes.clear(); shapeSel = 0;
   // From the keyboard
   btn.addEventListener('click', (e) => { if (e.detail === 0) addShape(); });
 }
-// Autopilot may now and then add a shape of its own, fling one, or take away one it added
+// Autopilot may now and then add a shape of its own, fling one, or take away one it added (off until switched on)
 const SHAPE_AP_KEY = 'phosphor-shapes-ap';
-let shapeAp = true, shapeApNext = 0;
-try { shapeAp = localStorage.getItem(SHAPE_AP_KEY) !== '0'; } catch (_) {}
+let shapeAp = false, shapeApNext = 0;
+try { shapeAp = localStorage.getItem(SHAPE_AP_KEY) === '1'; } catch (_) {}
 $('#shapeAp').setAttribute('aria-pressed', String(shapeAp));
 $('#shapeAp').addEventListener('click', () => {
   shapeAp = !shapeAp;
@@ -7360,7 +7364,7 @@ for (const [k, { el, out }] of Object.entries(gradeEls)) {
 $('#gradeReset').addEventListener('click', () => setGrade(GRADE_DEF));
 $$('#gradeWhere button').forEach((b) => b.addEventListener('click', () => {
   setGrade({ ...grade, gInside: b.dataset.gin === '1' });
-  showOSD('COLOR GRADING', grade.gInside ? 'INSIDE THE LOOPS' : 'ON SCREEN');
+  showOSD('COLOR GRADING', grade.gInside ? 'WITHIN LOOPS' : 'FINAL PASS');
 }));
 { let saved = null; try { saved = JSON.parse(localStorage.getItem(GRADE_KEY) || 'null'); } catch (_) {} setGrade(saved); }
 const gradeOn = () => Object.keys(GRADE_DEF).some((k) => grade[k] !== GRADE_DEF[k]);
@@ -7873,6 +7877,31 @@ function twStep(k, dt) {
 }
 // What a loop shows (and what the other loop sees of it): its time-warped picture while Time warp is on
 function shownTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[L.tw.wf].tex : L.rt[L.front].tex; }
+// What loop k gives the mix: its picture, or its Posterize in the final pass (see posterPass)
+function mixTex(k) { const pz = loops[k].pz; return pz && pz.live ? pz.rt[pz.f].tex : shownTex(k); }
+// Posterize in the final pass (FS_POSTER): loop k's picture snapped to steps into a pair of pictures of its own,
+// taking turns, so each frame can see the steps the last one drew. Made when first needed, at the current
+// sharpness, and let go when Posterize is off or set to work within the loop.
+function posterPass(k) {
+  const L = loops[k];
+  const on = L.rt && loopOn(k) && !L.tgt.posterIn && L.cur.poster > 0.5;
+  if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
+  if (!on) return;
+  const fresh = !L.pz;
+  if (fresh) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH };
+  const pz = L.pz, last = pz.rt[pz.f];
+  pz.f = 1 - pz.f;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, pz.rt[pz.f].fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(posterProg.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shownTex(k));
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, last.tex);
+  set2f(posterProg, 'uSim', simW, simH);
+  set1f(posterProg, 'uN', posterSteps(L.cur.poster));
+  set1f(posterProg, 'uFresh', fresh ? 1 : 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  pz.live = true;
+}
 function shownPrev(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[1 - L.tw.wf].tex : L.rt[1 - L.front].tex; }
 
 /* ================= ink drops ================= */
@@ -9424,20 +9453,19 @@ function frame() {
     for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
   }
 
+  for (const key of KEYS) posterPass(key);
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);
   for (const key of KEYS) {
     gl.activeTexture(gl.TEXTURE0 + LOOP_NUM[key]);
-    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? shownTex(key) : shownTex('A'));
+    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? mixTex(key) : shownTex('A'));
   }
   set2f(compProg, 'uSim', simW, simH);
   set1f(compProg, 'uWA', wA);
   set1f(compProg, 'uWB', wB);
   set1f(compProg, 'uWC', W.C);
   set1f(compProg, 'uWD', W.D);
-  { const P = (k) => { const L = loops[k]; return loopOn(k) && !L.tgt.posterIn && L.cur.poster > 0.5 ? posterSteps(L.cur.poster) : 0; };
-    set4f(compProg, 'uPoster', P('A'), P('B'), P('C'), P('D')); }
   for (const k of KEYS) {
     const g = loopGrade[k] ? { ...GRADE_DEF, ...loopGrade[k] } : null;
     set3f(compProg, 'uGC' + k, g ? g.gHue * Math.PI / 180 : 0, g ? g.gSepia / 100 : 0, g ? 1 : 0);

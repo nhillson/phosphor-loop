@@ -16,11 +16,15 @@ vec3 hsv(float h, float s, float v) {
   return v * mix(vec3(1.0), k, s);
 }
 // Posterize: red, green and blue each snapped to n even steps from black to white (n is 2 or more, and may be
-// between whole numbers while the slider glides). On screen each color goes to its nearest step; inside a loop
-// (down = 1) it goes to the step below, so trails still fade away, a step at a time, instead of sticking.
+// between whole numbers while the slider glides). Each color goes to its nearest step, or (down = 1, within a
+// loop) to the step below, so trails still fade away, a step at a time, instead of sticking. Each step's edge is
+// a short ramp rather than a cliff: a color sitting right on an edge (a video's grain, a trail fading through it)
+// would otherwise flip between two steps every frame and flicker. (The final pass has FS_POSTER instead.)
 vec3 posterize(vec3 c, float n, float down) {
   float m = max(n - 1.0, 1.0);
-  return floor(clamp(c, 0.0, 1.0) * m + 0.5 - 0.5 * down) / m;
+  vec3 x = clamp(c, 0.0, 1.0) * m, i = floor(x);
+  float t = mix(0.5, 1.0, down);
+  return (i + smoothstep(t - 0.15 - 0.15 * down, t + 0.15 - 0.15 * down, x - i)) / m;
 }
 // Color grading (see "color grading" in app.js): tone t (exposure in stops, contrast, gamma, saturation), color c
 // (hue in radians, sepia) and red, green and blue gains g
@@ -807,19 +811,16 @@ uniform vec2 uSim;
 // tone (exposure in stops, contrast, gamma, saturation), then hue (radians), sepia and on (0 or 1), then RGB gains
 uniform vec4 uGTA, uGTB, uGTC, uGTD;
 uniform vec3 uGCA, uGCB, uGCC, uGCD, uGRA, uGRB, uGRC, uGRD;
-// Each loop's Posterize while it's set to work on screen: how many steps (A, B, C, D; 0 for none)
-uniform vec4 uPoster;
 out vec4 o;
 ${COMMON}
-vec3 post(vec3 c, float n) { return n > 0.0 ? posterize(c, n, 0.0) : c; }
 vec3 lgrade(vec3 col, vec4 t, vec3 c, vec3 g) { return c.z < 0.5 ? col : gradeCol(col, t, c.xy, g); }
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   vec4 A = texture(uA, uv), B = texture(uB, uv), C = texture(uC, uv), D = texture(uD, uv);
-  vec3 a = post(lgrade(A.rgb, uGTA, uGCA, uGRA), uPoster.x) * uWA;
-  vec3 b = post(lgrade(B.rgb, uGTB, uGCB, uGRB), uPoster.y) * uWB;
-  vec3 c = uWC > 0.0 ? post(lgrade(C.rgb, uGTC, uGCC, uGRC), uPoster.z) * uWC : vec3(0.0);
-  vec3 d = uWD > 0.0 ? post(lgrade(D.rgb, uGTD, uGCD, uGRD), uPoster.w) * uWD : vec3(0.0);
+  vec3 a = lgrade(A.rgb, uGTA, uGCA, uGRA) * uWA;
+  vec3 b = lgrade(B.rgb, uGTB, uGCB, uGRB) * uWB;
+  vec3 c = uWC > 0.0 ? lgrade(C.rgb, uGTC, uGCC, uGRC) * uWC : vec3(0.0);
+  vec3 d = uWD > 0.0 ? lgrade(D.rgb, uGTD, uGCD, uGRD) * uWD : vec3(0.0);
   vec3 col = 1.0 - (1.0 - a) * (1.0 - b) * (1.0 - c) * (1.0 - d);
   // A loop's Subject silhouette (where its alpha is below 1) lies over the other loops instead of adding light
   col = mix(col, a, clamp((1.0 - A.a) * uWA, 0.0, 1.0));
@@ -827,6 +828,31 @@ void main() {
   if (uWC > 0.0) col = mix(col, c, clamp((1.0 - C.a) * uWC, 0.0, 1.0));
   if (uWD > 0.0) col = mix(col, d, clamp((1.0 - D.a) * uWD, 0.0, 1.0));
   o = vec4(col, 1.0);
+}`;
+
+// Posterize in the final pass: a loop's picture snapped to uN even steps (see posterize), drawn into a picture of
+// its own before the loops are mixed. It remembers the steps it drew last frame (uLast) and keeps each color on
+// its old step until it's clearly past the edge into the next one, so a video's grain, or anything hovering right
+// on an edge, can't flip it back and forth every frame. The picture is smoothed a touch first for the same reason.
+const FS_POSTER = `#version 300 es
+precision highp float;
+uniform sampler2D uNow, uLast;
+uniform vec2 uSim;
+uniform float uN, uFresh;
+out vec4 o;
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim, px = 1.0 / uSim;
+  vec4 now = texture(uNow, uv);
+  vec3 c = 0.5 * now.rgb + 0.125 * (texture(uNow, uv + vec2(px.x, 0.0)).rgb + texture(uNow, uv - vec2(px.x, 0.0)).rgb +
+                                    texture(uNow, uv + vec2(0.0, px.y)).rgb + texture(uNow, uv - vec2(0.0, px.y)).rgb);
+  float m = max(uN - 1.0, 1.0);
+  vec3 x = clamp(c, 0.0, 1.0) * m, lv = floor(x + 0.5);
+  if (uFresh < 0.5) {
+    vec3 was = floor(texture(uLast, uv).rgb * m + 0.5);
+    // Stays on its old step while within 0.75 of a step of it (0.5 would be no memory at all)
+    lv = mix(lv, was, vec3(lessThan(abs(x - was), vec3(0.75))));
+  }
+  o = vec4(lv / m, now.a);
 }`;
 
 // Time warp: each part of a loop's picture comes from a different moment. The loop's recent frames are kept
@@ -2436,5 +2462,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_POSTER, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();

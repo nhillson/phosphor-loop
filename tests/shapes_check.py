@@ -125,8 +125,22 @@ def main():
             st = pg.evaluate(STATE_JS)
             print(f'  merge: {len(st)} shape(s) after {c.frames() - start} frames' + (f', size {st[0]["size"]:.0f} (from 40)' if len(st) == 1 else ''))
             ok(len(st) == 1 and st[0]['size'] > 40, 'two shapes pulling on each other did not merge into a bigger one')
-            # 6. Autopilot adds one of its own
+            # 6. Wander speed: a fast wanderer covers more ground than a slow one
             pg.click('#shapeClear')
+            c.wait_frames(15, 'cleared for wander speed')
+            pg.evaluate("""() => { const S = __plShapes;
+              for (const [x, v] of [[-0.4, 0], [0.4, 100]]) { const s = S.addShape(x, 0, { wander: true, gravity: 0, size: 20, speed: v }); s.life = 1; } }""")
+            path_js = """() => __plShapes.shapes.list.filter((s) => !s.dying).map((s) => [s.speed, s.x, s.y])"""
+            before = {p[0]: p[1:] for p in pg.evaluate(path_js)}
+            c.wait_frames(40, 'wandering')
+            after = {p[0]: p[1:] for p in pg.evaluate(path_js)}
+            moved = {v: ((after[v][0] - before[v][0]) ** 2 + (after[v][1] - before[v][1]) ** 2) ** 0.5 for v in before if v in after}
+            print(f'  wander speed: slow moved {moved.get(0, 0):.3f}, fast moved {moved.get(100, 0):.3f}')
+            ok(moved.get(100, 0) > 4 * moved.get(0, 0), f'Wander speed made no difference: {moved}')
+            # 7. Autopilot adds one of its own, once its switch is on (off to begin with)
+            pg.click('#shapeClear')
+            ok(pg.get_attribute('#shapeAp', 'aria-pressed') == 'false', 'Autopilot may add shapes is on to begin with')
+            pg.click('#shapeAp')
             pg.click('#autopilot')
             pg.evaluate('__plShapes.apSoon()')
             c.wait_frames(5, 'autopilot')

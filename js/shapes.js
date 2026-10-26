@@ -16,7 +16,7 @@ const KINDS = [
 const KIND_NUM = Object.fromEntries(KINDS.map((k, i) => [k.id, i]));
 
 // What a new shape starts with (the sliders' values, 0 to 100, except tilt in degrees)
-const DEFAULTS = { kind: 'sphere', wire: false, color: '#202024', size: 45, gravity: 50, swallow: 40, disk: 50, tilt: 75, wander: true };
+const DEFAULTS = { kind: 'sphere', wire: false, color: '#202024', size: 45, gravity: 50, swallow: 40, disk: 50, tilt: 75, wander: true, speed: 50 };
 const radiusOf = (size) => 0.03 + 0.12 * size / 100;               // in screen heights
 const diskOf = (disk) => (disk < 1 ? 0 : 1.9 + 4.1 * disk / 100);  // the disk's outer edge, in shape radii
 
@@ -416,7 +416,7 @@ class World {
     const a = this.aspect;
     const s = {
       id: nextId++, kind: KIND_NUM[o.kind] != null ? o.kind : 'sphere', wire: !!o.wire, color: o.color,
-      size: o.size, gravity: o.gravity, swallow: o.swallow, disk: o.disk, tilt: o.tilt, wander: !!o.wander,
+      size: o.size, gravity: o.gravity, swallow: o.swallow, disk: o.disk, tilt: o.tilt, wander: !!o.wander, speed: Number.isFinite(o.speed) ? o.speed : 50,
       x: x ?? (Math.random() - 0.5) * a * 0.7, y: y ?? (Math.random() - 0.5) * 0.7, vx: 0, vy: 0,
       head: Math.random() * Math.PI * 2, turn: 0, ax: Math.random() * 6, ay: Math.random() * 6, az: Math.random() * 6,
       wx: 0.15 + Math.random() * 0.25, wy: 0.2 + Math.random() * 0.3, wz: (Math.random() - 0.5) * 0.4,
@@ -500,7 +500,8 @@ class World {
         s.vx += ax * dt; s.vy += ay * dt;
         // Wandering: a gentle drift whose heading turns now and then; a fling slows back to it over a few seconds
         s.turn += (Math.random() - 0.5) * dt * 4; s.turn *= Math.exp(-dt * 0.7); s.head += s.turn * dt;
-        const W = 0.05, e = 1 - Math.exp(-dt * 0.5);
+        // Wander speed: 50 is the usual drift, each 50 either way four times faster or slower
+        const W = 0.05 * Math.pow(4, (s.speed - 50) / 50), e = 1 - Math.exp(-dt * 0.5);
         s.vx += (Math.cos(s.head) * W - s.vx) * e; s.vy += (Math.sin(s.head) * W - s.vy) * e;
       } else {
         const e = Math.exp(-dt * 0.9);
@@ -525,6 +526,7 @@ class World {
       big.gravity = Math.min(100, big.gravity + small.gravity);
       big.disk = Math.max(big.disk, small.disk);
       big.wander = big.wander && small.wander;
+      big.speed = Math.max(big.speed, small.speed);
       big.byAp = big.byAp && small.byAp;
       if (this.held && this.held.s === small) this.held.s = big;
       small.dying = true; small.life = 0;

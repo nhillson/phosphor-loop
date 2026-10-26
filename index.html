@@ -469,10 +469,10 @@
             <input type="range" id="poster" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Two steps</span></div>
             <div class="seg seg-2" id="posterWhere" role="group" aria-label="Where Posterize works">
-              <button data-pin="0" aria-pressed="true">On screen</button>
-              <button data-pin="1" aria-pressed="false">Inside the loop</button>
+              <button data-pin="0" aria-pressed="true">Final Pass</button>
+              <button data-pin="1" aria-pressed="false">Within Loops</button>
             </div>
-            <span class="hint">Flattens this loop’s colors into a few solid bands, like a screen print or a poster. Further right, fewer bands. On screen lays it over the loop like a lens, and the trails underneath stay smooth. Inside the loop, the loop feeds on the banded picture, so trails fade in steps and the bands harden into flat blobs. Autopilot leaves it where you put it, through every new look.</span>
+            <span class="hint">Flattens this loop’s colors into a few solid bands, like a screen print or a poster. Further right, fewer bands. Final Pass lays it over the loop like a lens, and the trails underneath stay smooth. Within Loops, the loop feeds on the banded picture, so trails fade in steps and the bands harden into flat blobs. Autopilot leaves it where you put it, through every new look.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
@@ -618,6 +618,12 @@
           <button data-wander="0" aria-pressed="false" title="It stays where you put it">Stay put</button>
         </div>
         <div class="ctl">
+          <div class="ctl-head"><label for="shapeSpeed">Wander speed</label><output id="shapeSpeedOut" for="shapeSpeed"></output></div>
+          <input type="range" id="shapeSpeed" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Creeping</span><span>Darting</span></div>
+          <span class="hint">How fast it drifts about while it wanders. A fling still sends it flying, then it slows back to this.</span>
+        </div>
+        <div class="ctl">
           <div class="ctl-head"><label for="shapeSize">Size</label><output id="shapeSizeOut" for="shapeSize"></output></div>
           <input type="range" id="shapeSize" min="0" max="100" step="1" value="45">
         </div>
@@ -650,7 +656,7 @@
           <button class="btn" id="shapeClear" disabled>Clear all shapes</button>
         </div>
         <p class="hint" id="shapeStatus" role="status">No shapes yet. Click Add shape, or drag it onto the picture.</p>
-        <div class="chips"><button class="chip" id="shapeAp" aria-pressed="true" title="While Autopilot runs it may now and then add a shape, fling one, or take away one it added"><span class="led"></span>Autopilot may add and fling shapes</button></div>
+        <div class="chips"><button class="chip" id="shapeAp" aria-pressed="false" title="While Autopilot runs it may now and then add a shape, fling one, or take away one it added"><span class="led"></span>Autopilot may add and fling shapes</button></div>
         <span class="hint">Drag a shape on the picture to move it, or drag and let go to fling it. Click one to change it here.</span>
       </section>
 
@@ -824,10 +830,10 @@
         <h2 id="h-grade">Color grading</h2>
         <p class="hint">Changes the finished picture, after every loop is mixed together, like a filter over the whole screen. Autopilot leaves it where you put it, presets keep it, and Neutral puts it back to normal. Double-click a slider to put just that one back.</p>
         <div class="seg seg-2" id="gradeWhere" role="group" aria-label="Where Color grading works">
-          <button data-gin="0" aria-pressed="true">On screen</button>
-          <button data-gin="1" aria-pressed="false">Inside the loops</button>
+          <button data-gin="0" aria-pressed="true">Final Pass</button>
+          <button data-gin="1" aria-pressed="false">Within Loops</button>
         </div>
-        <p class="hint">On screen lays the grading over the finished picture like a lens. Inside the loops, every loop feeds on the graded picture, so the grading builds up frame after frame: small amounts go a long way (a little Hue keeps the colors turning, a little Contrast pushes everything to bold darks and lights). Shapes aren’t graded then.</p>
+        <p class="hint">Final Pass lays the grading over the finished picture like a lens. Within Loops, every loop feeds on the graded picture, so the grading builds up frame after frame: small amounts go a long way (a little Hue keeps the colors turning, a little Contrast pushes everything to bold darks and lights). Shapes aren’t graded then.</p>
         <h3 class="subhead">Tone</h3>
         <div class="ctl">
           <div class="ctl-head"><label for="gExposure">Exposure</label><output id="gExposureOut" for="gExposure"></output></div>
@@ -1071,7 +1077,7 @@
             <dt>Spin</dt><dd>Twists every echo. Small amounts make spirals.</dd>
             <dt>Trails</dt><dd>How long echoes last. High is dreamy, low is snappy, and None turns the feedback off.</dd>
             <dt>Color shift</dt><dd>Moves each echo a little further round the rainbow.</dd>
-            <dt>Posterize</dt><dd>Flattens the loop's colors into a few solid bands, like a poster. On screen lays it over the loop; Inside the loop makes the loop feed on the bands, so its trails fade in steps.</dd>
+            <dt>Posterize</dt><dd>Flattens the loop's colors into a few solid bands, like a poster. Final Pass lays it over the loop; Within Loops makes the loop feed on the bands, so its trails fade in steps.</dd>
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Flow</dt><dd>Slow currents curl the echoes into threads and swirls, like ink in water. Works best with Trails high.</dd>
             <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>
@@ -1095,6 +1101,7 @@
             <dt>Add shape</dt><dd>Click it and a shape appears somewhere on the picture, or drag it onto the picture and let go where you want it. Up to eight shapes, flat (circle, triangle, square, star, hexagon), solid (sphere, cube, pyramid, diamond) or rings (donut, ringed planet), solid or as glowing wireframes. They lie over everything, whichever loops are showing.</dd>
             <dt>On the picture</dt><dd>Drag a shape to move it; drag fast and let go to fling it. Click one to change it with the controls. They bounce off the edges of the screen.</dd>
             <dt>Wander or Stay put</dt><dd>A wandering shape drifts about by itself and is pulled by the others' gravity, so it can fall into orbit; when two touch they merge into one bigger shape with both their pulls. A shape left to stay put stays where you put it (until flung), but still pulls the others.</dd>
+            <dt>Wander speed</dt><dd>How fast a wandering shape drifts about, from creeping to darting.</dd>
             <dt>Gravity</dt><dd>How hard it pulls, from none to a black hole.</dd>
             <dt>Lens or swallow</dt><dd>To the left the pull bends the view round the shape like a lens, leaving the picture as it was. To the right it drags the picture's own pixels in, so the trails swirl into it and vanish.</dd>
             <dt>Disk and Disk tilt</dt><dd>The accretion disk: the picture's own colours whirling round the shape, brighter on the side coming towards you. Tilted nearly edge on, its far side shows bent up over the top of the shape, like the black hole in Interstellar.</dd>
