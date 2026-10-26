@@ -478,6 +478,11 @@
             <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
             <input type="range" id="warp" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wobbly</span></div>
+            <div class="seg seg-2 where" data-where="warpFinal" role="group" aria-label="Where Warp works">
+              <button data-final="1" aria-pressed="false">Final Pass</button>
+              <button data-final="0" aria-pressed="true">Within Loops</button>
+            </div>
+            <span class="hint">Within Loops the wobble builds up echo after echo into melting swirls. Final Pass ripples the finished picture, like looking at it through water.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="flow">Flow</label><output id="flowOut" for="flow"></output></div>
@@ -522,12 +527,21 @@
               <button data-mirror="6" aria-pressed="false">6</button>
               <button data-mirror="8" aria-pressed="false">8</button>
             </div>
+            <div class="seg seg-2 where" data-where="mirrorFinal" role="group" aria-label="Where Mirror works">
+              <button data-final="1" aria-pressed="false">Final Pass</button>
+              <button data-final="0" aria-pressed="true">Within Loops</button>
+            </div>
+            <span class="hint">Within Loops the mirrored picture feeds back into itself, so Zoom and Spin fold it into a kaleidoscope. Final Pass simply mirrors the finished picture.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="split">Split lines</label><output id="splitOut" for="split"></output></div>
             <input type="range" id="split" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Far apart</span></div>
-            <span class="hint">Every other line of the picture slides left and the lines between slide right.</span>
+            <div class="seg seg-2 where" data-where="splitFinal" role="group" aria-label="Where Split lines works">
+              <button data-final="1" aria-pressed="false">Final Pass</button>
+              <button data-final="0" aria-pressed="true">Within Loops</button>
+            </div>
+            <span class="hint">Every other line of the picture slides left and the lines between slide right. Within Loops they keep sliding, echo after echo, into smeared streaks. Final Pass is a crisp glitch over the finished picture.</span>
           </div>
           <div class="ctl" id="timeCtl">
             <div class="ctl-head"><label for="time">Time warp</label><output id="timeOut" for="time"></output></div>
@@ -564,7 +578,11 @@
             <div class="ctl-head"><label for="chroma">Color chase</label><output id="chromaOut" for="chroma"></output></div>
             <input type="range" id="chroma" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wild</span></div>
-            <span class="hint">Red is pushed around by the green parts, green by the blue and blue by the red, so the three colors keep chasing each other into rainbow fringes and braids.</span>
+            <div class="seg seg-2 where" data-where="chromaFinal" role="group" aria-label="Where Color chase works">
+              <button data-final="1" aria-pressed="false">Final Pass</button>
+              <button data-final="0" aria-pressed="true">Within Loops</button>
+            </div>
+            <span class="hint">Red is pushed around by the green parts, green by the blue and blue by the red, so the three colors keep chasing each other into rainbow fringes and braids. Final Pass pulls the colors apart once, over the finished picture, for rainbow edges like a misaligned old TV.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="restless">Restless</label><output id="restlessOut" for="restless"></output></div>
@@ -1077,6 +1095,7 @@
             <dt>Spin</dt><dd>Twists every echo. Small amounts make spirals.</dd>
             <dt>Trails</dt><dd>How long echoes last. High is dreamy, low is snappy, and None turns the feedback off.</dd>
             <dt>Color shift</dt><dd>Moves each echo a little further round the rainbow.</dd>
+            <dt>Final Pass or Within Loops</dt><dd>Mirror, Warp, Split lines, Color chase and Posterize each have this switch. Within Loops, the effect feeds back into the loop every frame, so it builds up echo after echo. Final Pass lays it over the loop's finished picture once, like a lens, and the loop underneath carries on untouched. Autopilot never changes the switch.</dd>
             <dt>Posterize</dt><dd>Flattens the loop's colors into a few solid bands, like a poster. Final Pass lays it over the loop; Within Loops makes the loop feed on the bands, so its trails fade in steps.</dd>
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Flow</dt><dd>Slow currents curl the echoes into threads and swirls, like ink in water. Works best with Trails high.</dd>

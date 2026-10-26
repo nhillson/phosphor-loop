@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const { FR, makeDrone } = window.PhosphorFractals;
-const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_POSTER, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
+const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
 const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.PhosphorHelpers;
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
@@ -160,7 +160,7 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
@@ -327,12 +327,12 @@ function program(fs) {
   return { p, u };
 }
 
-let fbProg, compProg, dispProg, posterProg;
+let fbProg, compProg, dispProg, finalProg;
 try {
   fbProg = program(FS_FEEDBACK);
   compProg = program(FS_COMPOSITE);
   dispProg = program(FS_DISPLAY);
-  posterProg = program(FS_POSTER);
+  finalProg = program(FS_FINAL);
 } catch (err) {
   fail('The screen couldn’t start on this graphics card. Try another browser, or update your graphics drivers.');
   return;
@@ -466,8 +466,8 @@ gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
 gl.useProgram(compProg.p);
 set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1); set1i(compProg, 'uC', 2); set1i(compProg, 'uD', 3);
-gl.useProgram(posterProg.p);
-set1i(posterProg, 'uNow', 0); set1i(posterProg, 'uLast', 1);
+gl.useProgram(finalProg.p);
+set1i(finalProg, 'uNow', 0); set1i(finalProg, 'uLast', 1);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
 for (const [i, key] of KEYS.entries()) set1i(dispProg, 'uDancer' + key, i + 1);
@@ -1057,7 +1057,15 @@ $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`GROW ${edit}`, GROW_SIZE_NAME[t.growSize]);
 }));
-// Posterize works on screen (the loop keeps its smooth picture) or inside the loop (it feeds on the stepped one)
+// Mirror, Warp, Split lines and Color chase work within the loop (feeding back every frame) or in the final pass
+// (laid over the finished picture once; see finalPass)
+$$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+  const key = g.dataset.where;
+  loops[edit].tgt[key] = b.dataset.final === '1';
+  syncUI();
+  showOSD(`${g.getAttribute('aria-label').replace(/^Where | works$/g, '').toUpperCase()} ${edit}`, b.dataset.final === '1' ? 'FINAL PASS' : 'WITHIN LOOPS');
+})));
+// Posterize works in the final pass (the loop keeps its smooth picture) or within the loop (it feeds on the stepped one)
 $$('#posterWhere button').forEach((b) => b.addEventListener('click', () => {
   const t = loops[edit].tgt;
   t.posterIn = b.dataset.pin === '1';
@@ -1235,6 +1243,8 @@ function syncUI() {
   syncTextUI(); syncSilhouetteUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
+  $$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b) =>
+    b.setAttribute('aria-pressed', String((b.dataset.final === '1') === !!t[g.dataset.where]))));
   $$('#timeShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.tshape === (t.timeShape ?? 0))));
   $$('#specShape button').forEach((b) => b.setAttribute('aria-pressed', String((+b.dataset.round === 1) === !!t.specRound)));
   const fly = [t.in1, t.in2].find((s) => sceneGroup(s) === 'world');
@@ -1287,9 +1297,10 @@ function patchLoop(k, p, force) {
   n.subject = p.subject ?? (force ? 'off' : L.tgt.subject);
   // Looks saved before Color grading took Recolor's place still carry it; it's left behind
   delete n.recolor;
-  // Posterize, and where it works, stay through every new look (Autopilot, Surprise); a preset, recipe or Neutral sets them
+  // Posterize stays through every new look (Autopilot, Surprise), and so does where each effect works (Final Pass
+  // or Within Loops); a preset, recipe or Neutral sets them
   if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
-  if (!force && !('posterIn' in p)) n.posterIn = !!L.tgt.posterIn;
+  if (!force) for (const w of Object.values(FINAL_FX)) if (!(w in p)) n[w] = !!L.tgt[w];
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
@@ -7890,28 +7901,46 @@ function twStep(k, dt) {
 }
 // What a loop shows (and what the other loop sees of it): its time-warped picture while Time warp is on
 function shownTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[L.tw.wf].tex : L.rt[L.front].tex; }
-// What loop k gives the mix: its picture, or its Posterize in the final pass (see posterPass)
+// What loop k gives the mix: its picture, or that picture after its final pass (see finalPass)
 function mixTex(k) { const pz = loops[k].pz; return pz && pz.live ? pz.rt[pz.f].tex : shownTex(k); }
-// Posterize in the final pass (FS_POSTER): loop k's picture snapped to steps into a pair of pictures of its own,
-// taking turns, so each frame can see the steps the last one drew. Made when first needed, at the current
-// sharpness, and let go when Posterize is off or set to work within the loop.
-function posterPass(k) {
-  const L = loops[k];
-  const on = L.rt && loopOn(k) && !L.tgt.posterIn && L.cur.poster > 0.5;
+// The effects that can work in the final pass instead of within the loop, each with the switch that says so.
+// Posterize starts in the final pass; the others start within the loop, where they've always been.
+const FINAL_FX = { poster: 'posterIn', mirror: 'mirrorFinal', warp: 'warpFinal', split: 'splitFinal', chroma: 'chromaFinal' };
+const isFinal = (t, fx) => (fx === 'poster' ? !t.posterIn : !!t[FINAL_FX[fx]]);
+// Loop k's final pass (FS_FINAL): its picture with the effects set to Final Pass laid over it once, drawn into a
+// pair of pictures of its own, taking turns, so Posterize can see the steps it drew last frame. Made when first
+// needed, at the current sharpness, and let go when no effect is in the final pass.
+function finalPass(k) {
+  const L = loops[k], t = L.tgt, c = L.cur;
+  const amt = (fx, v) => (isFinal(t, fx) ? v : 0);
+  const steps = amt('poster', c.poster > 0.5 ? posterSteps(c.poster) : 0);
+  const mirror = amt('mirror', t.mirror);
+  const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
+  const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
+  const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
+  const on = L.rt && loopOn(k) && (steps > 0 || mirror > 0 || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
-  const fresh = !L.pz;
-  if (fresh) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH };
+  if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
   const pz = L.pz, last = pz.rt[pz.f];
   pz.f = 1 - pz.f;
   gl.bindFramebuffer(gl.FRAMEBUFFER, pz.rt[pz.f].fbo);
   gl.viewport(0, 0, simW, simH);
-  gl.useProgram(posterProg.p);
+  gl.useProgram(finalProg.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shownTex(k));
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, last.tex);
-  set2f(posterProg, 'uSim', simW, simH);
-  set1f(posterProg, 'uN', posterSteps(L.cur.poster));
-  set1f(posterProg, 'uFresh', fresh ? 1 : 0);
+  set2f(finalProg, 'uSim', simW, simH);
+  set1f(finalProg, 'uPxK', simH / SIM_H);
+  set1f(finalProg, 'uTime', simT + (11.0 * LOOP_OFF[k]));
+  set1f(finalProg, 'uMirror', mirror);
+  set1f(finalProg, 'uSplit', split);
+  set1f(finalProg, 'uWarp', warp);
+  set1f(finalProg, 'uChroma', chroma);
+  set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
+  set1f(finalProg, 'uN', steps);
+  // Posterize has no steps of its own to remember on its first frame
+  set1f(finalProg, 'uFresh', pz.stepped ? 0 : 1);
+  pz.stepped = steps > 0;
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   pz.live = true;
 }
@@ -8230,6 +8259,9 @@ function runLoop(k, xf, brush, f) {
   if (br > 0.005) { const B = breathe(k, br, f / 60); z += B.z; s *= B.s; }
   else { L.breath.z *= 0.95; L.breath.s += (1 - L.breath.s) * 0.05; }
   z = clamp(z, -100, 100); s = clamp(s, -100, 100); col = clamp(col, 0, 100); w = clamp(w, 0, 100);
+  L.warpNow = w;   // with the music's push, for Warp in the final pass
+  // Effects set to Final Pass are left out of the loop (see finalPass)
+  if (t.warpFinal) w = 0;
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
   const ramp = tr >= 0.1 ? 1 : (tr / 0.1) * (tr / 0.1) * (3 - 2 * tr / 0.1);
@@ -8272,7 +8304,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uWarp', (w / 100) * 0.006 * f);
   const fl = (clamp(c.flow, 0, 100) / 100) * FLOW_K;
   set1f(fbProg, 'uFlow', fl * f);
-  const sp = clamp(c.split, 0, 100) / 100;
+  const sp = t.splitFinal ? 0 : clamp(c.split, 0, 100) / 100;
   set1f(fbProg, 'uSplit', Math.pow(sp, 1.5) * 0.007 * f);
   set1f(fbProg, 'uSplitOff', sp * 0.06);
   // Gentle low on the slider, wild at the top
@@ -8290,7 +8322,7 @@ function runLoop(k, xf, brush, f) {
   L.chaseAt[0] += (goal[0] - L.chaseAt[0]) * ce;
   L.chaseAt[1] += (goal[1] - L.chaseAt[1]) * ce;
   set2f(fbProg, 'uCenter', L.chaseAt[0], L.chaseAt[1]);
-  set1f(fbProg, 'uChroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
+  set1f(fbProg, 'uChroma', t.chromaFinal ? 0 : Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
   set1f(fbProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.3 * clamp(c.restless, 0, 100) / 100, f));
   set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
@@ -8307,7 +8339,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uPoster', t.posterIn && c.poster > 0.5 ? posterSteps(c.poster) : 0);
   setLoopGradeUniforms(f);
   set1f(fbProg, 'uAspText', textAspect);
-  set1f(fbProg, 'uMirror', t.mirror);
+  set1f(fbProg, 'uMirror', t.mirrorFinal ? 0 : t.mirror);
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
@@ -9466,7 +9498,7 @@ function frame() {
     for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
   }
 
-  for (const key of KEYS) posterPass(key);
+  for (const key of KEYS) finalPass(key);
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);

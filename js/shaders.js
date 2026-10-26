@@ -19,7 +19,7 @@ vec3 hsv(float h, float s, float v) {
 // between whole numbers while the slider glides). Each color goes to its nearest step, or (down = 1, within a
 // loop) to the step below, so trails still fade away, a step at a time, instead of sticking. Each step's edge is
 // a short ramp rather than a cliff: a color sitting right on an edge (a video's grain, a trail fading through it)
-// would otherwise flip between two steps every frame and flicker. (The final pass has FS_POSTER instead.)
+// would otherwise flip between two steps every frame and flicker. (The final pass has FS_FINAL instead.)
 vec3 posterize(vec3 c, float n, float down) {
   float m = max(n - 1.0, 1.0);
   vec3 x = clamp(c, 0.0, 1.0) * m, i = floor(x);
@@ -830,29 +830,72 @@ void main() {
   o = vec4(col, 1.0);
 }`;
 
-// Posterize in the final pass: a loop's picture snapped to uN even steps (see posterize), drawn into a picture of
-// its own before the loops are mixed. It remembers the steps it drew last frame (uLast) and keeps each color on
-// its old step until it's clearly past the edge into the next one, so a video's grain, or anything hovering right
-// on an edge, can't flip it back and forth every frame. The picture is smoothed a touch first for the same reason.
-const FS_POSTER = `#version 300 es
+// A loop's final pass: effects set to Final Pass are laid over the loop's finished picture once, on its way to the
+// screen, instead of feeding back into it every frame. Mirror folds it, Split lines slides every other line, Warp
+// ripples it like water and Color chase pulls its red, green and blue apart into rainbow fringes; then Posterize
+// snaps it to uN even steps (0: no Posterize here). Posterize remembers the steps it drew last frame (uLast) and
+// keeps each color on its old step until it's clearly past the edge into the next one, so a video's grain, or
+// anything hovering right on an edge, can't flip it back and forth every frame; it smooths the picture a touch
+// first for the same reason.
+const FS_FINAL = `#version 300 es
 precision highp float;
 uniform sampler2D uNow, uLast;
 uniform vec2 uSim;
+uniform float uPxK, uTime;
+uniform float uMirror, uSplit, uWarp, uChroma, uChromaTurn;
 uniform float uN, uFresh;
 out vec4 o;
+${COMMON}
+vec2 mirrorFold(vec2 p, float n) {
+  if (n < 1.0) return p;
+  if (n < 3.0) { p.x = abs(p.x); return p; }
+  if (n < 5.0) return abs(p);
+  float seg = TAU / n;
+  float a = mod(atan(p.y, p.x), seg);
+  a = abs(a - seg * 0.5);
+  return length(p) * vec2(cos(a), sin(a));
+}
+// The same pushes as Color chase within the loop (see chromaAt), taken once at full strength from the picture here
+vec3 chromaOnce(vec2 st, float asp) {
+  vec2 r = vec2(0.012 / asp, 0.012);
+  vec3 E = texture(uNow, st + vec2(r.x, 0.0)).rgb, W = texture(uNow, st - vec2(r.x, 0.0)).rgb;
+  vec3 N = texture(uNow, st + vec2(0.0, r.y)).rgb, S = texture(uNow, st - vec2(0.0, r.y)).rgb;
+  vec3 C = 0.25 * (E + W + N + S);
+  vec3 gx = ((E - W) / 0.024).gbr, gy = ((N - S) / 0.024).gbr, by = C.gbr;
+  vec3 n = sqrt(gx * gx + gy * gy) + 3.0;
+  vec3 a = by * 7.0 + uChromaTurn + vec3(0.0, 2.1, 4.2);
+  vec3 slide = smoothstep(0.03, 0.3, by);
+  vec3 dx = (gy / n * 0.9 + cos(a) * slide * 0.5) * uChroma;
+  vec3 dy = (-gx / n * 0.9 + sin(a) * slide * 0.5) * uChroma;
+  return vec3(texture(uNow, st + vec2(dx.r / asp, dy.r)).r,
+              texture(uNow, st + vec2(dx.g / asp, dy.g)).g,
+              texture(uNow, st + vec2(dx.b / asp, dy.b)).b);
+}
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim, px = 1.0 / uSim;
-  vec4 now = texture(uNow, uv);
-  vec3 c = 0.5 * now.rgb + 0.125 * (texture(uNow, uv + vec2(px.x, 0.0)).rgb + texture(uNow, uv - vec2(px.x, 0.0)).rgb +
-                                    texture(uNow, uv + vec2(0.0, px.y)).rgb + texture(uNow, uv - vec2(0.0, px.y)).rgb);
-  float m = max(uN - 1.0, 1.0);
-  vec3 x = clamp(c, 0.0, 1.0) * m, lv = floor(x + 0.5);
-  if (uFresh < 0.5) {
-    vec3 was = floor(texture(uLast, uv).rgb * m + 0.5);
-    // Stays on its old step while within 0.75 of a step of it (0.5 would be no memory at all)
-    lv = mix(lv, was, vec3(lessThan(abs(x - was), vec3(0.75))));
+  float asp = uSim.x / uSim.y;
+  vec2 p = (uv - 0.5) * vec2(asp, 1.0);
+  p = mirrorFold(p, uMirror);
+  float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
+  p.x += uSplit * side;
+  if (uWarp > 0.0) p += uWarp * vec2(sin(p.y * 7.0 + uTime * 1.1 + sin(p.x * 3.0 + uTime * 0.5)),
+                                     cos(p.x * 7.0 - uTime * 0.9 + sin(p.y * 2.0 - uTime * 0.3)));
+  vec2 st = p / vec2(asp, 1.0) + 0.5;
+  vec4 now = texture(uNow, st);
+  vec3 c = uChroma > 0.0 ? chromaOnce(st, asp) : now.rgb;
+  if (uN > 0.0) {
+    c = 0.5 * c + 0.125 * (texture(uNow, st + vec2(px.x, 0.0)).rgb + texture(uNow, st - vec2(px.x, 0.0)).rgb +
+                           texture(uNow, st + vec2(0.0, px.y)).rgb + texture(uNow, st - vec2(0.0, px.y)).rgb);
+    float m = max(uN - 1.0, 1.0);
+    vec3 x = clamp(c, 0.0, 1.0) * m, lv = floor(x + 0.5);
+    if (uFresh < 0.5) {
+      vec3 was = floor(texture(uLast, uv).rgb * m + 0.5);
+      // Stays on its old step while within 0.75 of a step of it (0.5 would be no memory at all)
+      lv = mix(lv, was, vec3(lessThan(abs(x - was), vec3(0.75))));
+    }
+    c = lv / m;
   }
-  o = vec4(lv / m, now.a);
+  o = vec4(c, now.a);
 }`;
 
 // Time warp: each part of a loop's picture comes from a different moment. The loop's recent frames are kept
@@ -2462,5 +2505,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_POSTER, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();
