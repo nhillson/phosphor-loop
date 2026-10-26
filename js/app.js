@@ -7222,18 +7222,26 @@ function fit() {
   const bz = getComputedStyle(bezel);
   const padX = parseFloat(bz.paddingLeft) + parseFloat(bz.paddingRight);
   const padY = parseFloat(bz.paddingTop) + parseFloat(bz.paddingBottom);
-  // A size set by hand with the handles on the frame is the space the picture fits into
+  // A size set by hand with the handles on the frame: while a handle is dragged it's the exact size; after that
+  // it's the picture's shape, and the picture is as big as that shape can be in the space it has
   const own = !narrow && !fs && layout.cw && layout.ch;
-  const availW = Math.max(160, Math.floor(own ? Math.min(sr.width - padX, layout.cw) : sr.width - padX));
+  const sizing = own && rzDragging;
+  // Spread out controls: the picture is as wide as its column and as tall as its shape makes it
+  const spread = !narrow && !fs && !sizing && document.body.classList.contains('wide-ctl');
+  const availW = Math.max(160, Math.floor(sizing ? Math.min(sr.width - padX, layout.cw) : sr.width - padX));
   const out = outputOpen();
-  const want = out ? outWin.innerWidth / Math.max(1, outWin.innerHeight) : SHAPES[shape];
+  const want = out ? outWin.innerWidth / Math.max(1, outWin.innerHeight) : own && !sizing ? layout.cw / layout.ch
+    : SHAPES[shape] || (spread ? 16 / 9 : 0);
   let availH = narrow
     ? Math.round(want ? Math.min(window.innerHeight * 0.62, availW / want) : window.innerHeight * 0.58)
-    : own ? layout.ch : Math.max(120, Math.floor(sr.height - padY));
+    : sizing ? layout.ch
+    : spread ? Math.floor(Math.min(availW / want, window.innerHeight * 0.8))
+    : Math.max(120, Math.floor(sr.height - padY));
   let w = availW, h = availH;
   if (want) { w = Math.floor(Math.min(availW, availH * want)); h = Math.floor(w / want); }
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
+  if (spread) stage.style.height = (h + padY) + 'px'; else stage.style.removeProperty('height');
   let cw, ch, aspect;
   if (capCfg()) {
     cw = capCfg().width;
@@ -7266,6 +7274,8 @@ fit();
 $$('#shape button').forEach((b) => b.addEventListener('click', () => {
   shape = b.dataset.shape;
   try { localStorage.setItem('phosphor-shape', shape); } catch (_) {}
+  // A shape picked here takes over from one dragged with the handles on the frame
+  if (layout.cw || layout.ch) { delete layout.cw; delete layout.ch; applyLayout(); saveLayout(); }
   syncShapeUI();
   fit();
 }));
@@ -7273,15 +7283,17 @@ function syncShapeUI() { $$('#shape button').forEach((b) => b.setAttribute('aria
 syncShapeUI();
 
 /* ================= sizing the picture and the controls by hand ================= */
-// Drag the right edge, bottom edge or corner of the picture's frame to size it; drag the bar between the picture
-// and the controls to make the controls wider or narrower. Everything else moves to fit, and it's remembered in
-// this browser. Double-click a handle to go back to the automatic size.
+// Drag the right edge, bottom edge or corner of the picture's frame to give it a shape (once let go, the picture
+// fills all the room it has in that shape; see fit); drag the bar between the picture and the controls to make
+// the controls wider or narrower. It's remembered in this browser. Double-click a handle to go back to the
+// automatic size.
 const deck = $('.deck'), deckSplit = $('#deckSplit');
+var rzDragging = false;   // a handle on the picture's frame is being dragged (see fit)
 function applyLayout() {
   for (const [key, v] of [['--side-w', layout.side], ['--mon-w', layout.mon]]) {
     if (v) deck.style.setProperty(key, v + 'px'); else deck.style.removeProperty(key);
   }
-  stage.classList.toggle('sized', !!(layout.cw && layout.ch) && !narrowMQ.matches);
+  stage.classList.toggle('sized', rzDragging && !narrowMQ.matches);
 }
 function saveLayout() { lsSet(LAYOUT_KEY, JSON.stringify(layout)); }
 const wideOn = () => document.body.classList.contains('wide-ctl') && !narrowMQ.matches;
@@ -7335,9 +7347,10 @@ for (const h of $$('.rz')) {
     // A fixed shape (4:3 or 16:9) can't be stretched one way only, so sizing by hand fills the box you draw
     if (shape !== 'fill' && !outputOpen()) {
       shape = 'fill'; lsSet('phosphor-shape', shape); syncShapeUI();
-      toast('Screen shape is now Fill the space, so the picture can take any size you drag it to.');
+      toast('The picture takes the shape you drag it to, then fills all the room it has in that shape.');
     }
-    layout.cw = Math.round(c0.width); layout.ch = Math.round(c0.height); applyLayout();
+    layout.cw = Math.round(c0.width); layout.ch = Math.round(c0.height);
+    rzDragging = true; applyLayout();
     dragWith(e, h, `rz-${kind}-on`, (ev) => {
       if (kind.includes('r')) {
         const w = Math.max(160, Math.round(c0.width + ev.clientX - e.clientX));
@@ -7350,7 +7363,7 @@ for (const h of $$('.rz')) {
       }
       if (kind.includes('b')) layout.ch = Math.max(90, Math.round(c0.height + ev.clientY - e.clientY));
       applyLayout();
-    });
+    }, () => { rzDragging = false; applyLayout(); relayout(); });
   });
   h.addEventListener('dblclick', () => {
     delete layout.cw; delete layout.ch; applyLayout(); saveLayout(); relayout();
