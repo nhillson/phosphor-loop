@@ -38,6 +38,78 @@ vec3 gradeCol(vec3 col, vec4 t, vec2 c, vec3 g) {
   col = (col * exp2(t.x) - 0.5) * t.y + 0.5;
   return pow(clamp(col, 0.0, 1.0), vec3(1.0 / t.z));
 }
+// 3D lighting (see "3D lighting" in app.js): brightness read as height, then lit like glossy plastic. The height
+// is read on two rings of 8 spots around this one, r and r/2 apart (in screen heights), the inner ring turned half
+// a step so together they look 16 ways: a wider ring gives smoother, rounder bumps, while how steep they are
+// depends on depth alone. reliefAdd adds one spot's height h on ring i to a running total t (x, y: the slope, z:
+// the mean height). Flat ground keeps its color exactly; slopes facing the light L brighten, the others darken,
+// hollows get a soft shadow, and shine adds a highlight on the slopes that face it.
+const vec2 RELIEF_RING[16] = vec2[16](vec2(1.0, 0.0), vec2(0.7071, 0.7071), vec2(0.0, 1.0), vec2(-0.7071, 0.7071),
+  vec2(-1.0, 0.0), vec2(-0.7071, -0.7071), vec2(0.0, -1.0), vec2(0.7071, -0.7071),
+  vec2(0.4619, 0.1913), vec2(0.1913, 0.4619), vec2(-0.1913, 0.4619), vec2(-0.4619, 0.1913),
+  vec2(-0.4619, -0.1913), vec2(-0.1913, -0.4619), vec2(0.1913, -0.4619), vec2(0.4619, -0.1913));
+float reliefH(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+// Ring spot i's offset times its weight in the slope: each ring's slope is 2 / (8 * its radius²) * Σ h * offset,
+// the two averaged, here per r (so 0.125 on the outer ring, 0.25 * 2 on the inner, then halved)
+vec3 reliefAdd(vec3 t, float h, int i) {
+  return t + vec3(h * RELIEF_RING[i] * (i < 8 ? 0.125 : 0.5), h / 16.0);
+}
+vec3 reliefShade(vec3 col, vec3 t, float h, float depth, float shine, vec3 L) {
+  vec3 n = normalize(vec3(-t.xy * depth * 5.0, 1.0));
+  float lit = clamp(dot(n, L) / L.z, 0.0, 2.5);
+  lit *= 1.0 - clamp((t.z - h) * depth * 4.0, 0.0, 0.7);
+  vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
+  float p = 6.0 + 60.0 * shine;
+  float spec = max(pow(max(dot(n, H), 0.0), p) - pow(H.z, p), 0.0) * shine * 1.6;
+  return col * lit + spec * mix(vec3(1.0), col, 0.25);
+}
+`;
+
+// Mirror: fold (the stops Off, 2, 4, 6, 8) and mirrorFold, which glides from one mirror to the next (see "mirror
+// transitions" in js/app.js). Shared by the loop (FS_FEEDBACK) and its final pass (FS_FINAL); needs COMMON and the
+// uniforms uSim, uMirror, uMirrorFrom, uMirrorT, uMirrorStyle and uMirrorTurn.
+const MIRROR = `
+vec2 fold(vec2 p, float n) {
+  if (n < 1.0) return p;
+  if (n < 3.0) { p.x = abs(p.x); return p; }
+  if (n < 5.0) return abs(p);
+  float seg = TAU / n;
+  float a = mod(atan(p.y, p.x), seg);
+  a = abs(a - seg * 0.5);
+  return length(p) * vec2(cos(a), sin(a));
+}
+// Iris: each mirror as a zigzag of the angle, so the number of sides can slide between the stops. x is half a
+// side's width, y where the first side starts and z where it ends up; at the stops it comes out exactly as fold
+vec3 foldShape(float n) {
+  if (n < 3.0) return vec3(3.14159265, -1.57079633, -1.57079633);
+  if (n < 5.0) return vec3(1.57079633, 0.0, 0.0);
+  return vec3(3.14159265 / n, 3.14159265 / n, 0.0);
+}
+vec2 mirrorFold(vec2 p) {
+  if (uMirrorT >= 1.0) return fold(p, uMirror);
+  float e = uMirrorT;
+  p = rot(uMirrorTurn) * p;
+  vec2 q;
+  if (uMirrorStyle > 1.5 && uMirrorStyle < 2.5) {
+    vec3 a = foldShape(uMirrorFrom), b = foldShape(uMirror);
+    // The number of sides slides, not their width
+    float h = 3.14159265 / mix(3.14159265 / a.x, 3.14159265 / b.x, e);
+    // Between stops the sides don't fit round exactly: the odd one out (the seam) sweeps once round as it goes
+    float seam = 3.14159265 + e * TAU;
+    float th = seam + mod(atan(p.y, p.x) - seam, TAU) - mix(a.y, b.y, e);
+    float z = h - abs(mod(th, 2.0 * h) - h) + mix(a.z, b.z, e);
+    q = length(p) * vec2(cos(z), sin(z));
+  } else {
+    float w = e;
+    // Ripple: the new mirror is a circle that spreads out from the middle until it fills the screen
+    if (uMirrorStyle > 2.5) {
+      float edge = e * (0.5 * length(vec2(uSim.x / uSim.y, 1.0)) + 0.12);
+      w = 1.0 - smoothstep(edge - 0.08, edge, length(p));
+    }
+    q = mix(fold(p, uMirrorFrom), fold(p, uMirror), w);
+  }
+  return rot(-uMirrorTurn) * q;
+}
 `;
 
 const FS_FEEDBACK = `#version 300 es
@@ -47,6 +119,10 @@ uniform vec2 uSim;
 uniform float uPxK;   // how many pixels make one Standard-size step (more at a sharper picture), so effects keep their size
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
+uniform float uSoft;   // Soft trails: the brighter of the input and the trails wins, instead of adding up (see main)
+// A change of mirror glides in (see "mirror transitions" in js/app.js): the mirror it's leaving, how far along it
+// is (1 done), the Transition style (1 Melt, 2 Iris, 3 Ripple) and how far Spin has turned the pattern
+uniform float uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;
 uniform float uCutout;   // Subject silhouette: the live inputs carry a see-through surround (alpha) to lay over the rest
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
@@ -69,7 +145,8 @@ uniform int uIn1, uIn2;
 uniform vec2 uWave[81];     // the Wave curve's 81 points, worked out once per frame
 uniform vec4 uWaveBox[8];   // 8 stretches of 10 segments: centre and radius of each
 uniform vec4 uAdjA[11];  // per input: tracking, brightness, contrast, color
-uniform vec4 uAdjB[11];  // per input: cut-out level
+uniform vec4 uAdjB[11];  // per input: cut-out level; 3D lighting's depth, smoothness and shine
+uniform vec3 uReliefL;   // 3D lighting: which way the light comes from (shared with the finished picture's)
 uniform vec2 uShift;
 uniform vec4 uBrush;
 uniform vec3 uBrushCol;
@@ -87,15 +164,7 @@ float sdSeg(vec2 p, vec2 a, vec2 b) {
   float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
   return length(pa - ba * h);
 }
-vec2 fold(vec2 p, float n) {
-  if (n < 1.0) return p;
-  if (n < 3.0) { p.x = abs(p.x); return p; }
-  if (n < 5.0) return abs(p);
-  float seg = TAU / n;
-  float a = mod(atan(p.y, p.x), seg);
-  a = abs(a - seg * 0.5);
-  return length(p) * vec2(cos(a), sin(a));
-}
+${MIRROR}
 vec3 hueRot(vec3 c, float a) {
   const vec3 k = vec3(0.57735027);
   float ca = cos(a);
@@ -428,11 +497,28 @@ vec3 grade(vec3 c, int id) {
   if (key > 0.0) c *= smoothstep(key - 0.06, key + 0.06, dot(c, vec3(0.299, 0.587, 0.114)));
   return c;
 }
+// 3D lighting on one input: its own graded picture (edges included, so a picture smaller than the screen gets a
+// rounded rim) read as height around q. k turns a step on screen into a step in the picture; fx is -1 when mirrored.
+vec3 inputRelief(vec3 c, sampler2D tex, vec2 q, vec2 k, float fx, int id) {
+  vec4 b = uAdjB[id];
+  float r = mix(0.004, 0.05, b.z);
+  vec3 t = vec3(0.0);
+  for (int i = 0; i < 16; i++) {
+    vec2 o = RELIEF_RING[i] * r;
+    vec2 qi = q + vec2(o.x * fx, o.y) * k;
+    vec2 e = edgeMask(qi);
+    t = reliefAdd(t, reliefH(grade(texture(tex, clamp(qi, 0.0, 1.0)).rgb, id)) * e.x * e.y, i);
+  }
+  vec2 e = edgeMask(q);
+  return reliefShade(c, t, reliefH(c) * e.x * e.y, b.y, b.w, uReliefL);
+}
 vec3 still(sampler2D tex, float asp, vec2 p, int id) {
   vec2 hs = vec2(0.3 * uScale * asp, 0.3 * uScale);
   vec2 q = p / (2.0 * hs) + 0.5;
   vec2 e = edgeMask(q);
-  return grade(sampleSrc(tex, q, id), id) * e.x * e.y;
+  vec3 c = grade(sampleSrc(tex, q, id), id);
+  if (uAdjB[id].y > 0.0) c = inputRelief(c, tex, q, 0.5 / hs, 1.0, id);
+  return c * e.x * e.y;
 }
 vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, float base) {
   vec2 hs = vec2(base * uScale * asp, base * uScale);
@@ -447,6 +533,7 @@ vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, f
     m = smoothstep(0.07, 0.24, d);
     c = (c * 1.6 + 0.3 * hsv(fract(uTime * 0.05 + d), 0.8, 1.0)) * m;
   }
+  if (uAdjB[id].y > 0.0) c = inputRelief(c, cur, q, 0.5 / hs, flip > 0.5 ? -1.0 : 1.0, id);
   // Subject silhouette: only the person, with how solid they are here in gCutA (see main)
   if (uCutout > 0.5 && id >= 5 && id <= 8) {
     float a = texture(cur, clamp(q, 0.0, 1.0)).a * m * e.x * e.y;
@@ -716,7 +803,7 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   float asp = uSim.x / uSim.y;
   vec2 p = (uv - 0.5) * vec2(asp, 1.0);
-  vec2 pf = fold(p, uMirror);
+  vec2 pf = mirrorFold(p);
 
   // Where this pixel was one frame ago
   vec2 q = rot(uSpin) * (pf - uCenter) * exp(-uZoom) + uCenter;
@@ -790,7 +877,10 @@ void main() {
   s += uBrushCol * (exp(-bd * bd / (0.011 * 0.011)) + 0.25 * exp(-bd / 0.02)) * uBrushOn;
 
   s = clamp(s, 0.0, 1.0);
-  vec3 outc = 1.0 - (1.0 - fb) * (1.0 - s);
+  // A video fills the screen with light every frame, and added onto long trails it piles up into white. With Soft
+  // trails each spot shows the brighter of the new frame and the fading echoes, so nothing gets brighter than the
+  // video itself, and whatever moves still leaves its echoes behind
+  vec3 outc = uSoft > 0.5 ? max(fb, s) : 1.0 - (1.0 - fb) * (1.0 - s);
   // Where the spectrograph is loud it shows as itself over the trails; where it's quiet the trails show through
   if (specA > 0.0) outc = mix(outc, s, specA);
   // Color filters inside the loop land on what the loop keeps, so it feeds itself the filtered picture next frame.
@@ -842,19 +932,12 @@ precision highp float;
 uniform sampler2D uNow, uLast;
 uniform vec2 uSim;
 uniform float uPxK, uTime;
-uniform float uMirror, uSplit, uWarp, uChroma, uChromaTurn;
+uniform float uMirror, uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;   // Mirror (uMirror 0 and uMirrorT 1: none)
+uniform float uSplit, uWarp, uChroma, uChromaTurn;
 uniform float uN, uFresh;
 out vec4 o;
 ${COMMON}
-vec2 mirrorFold(vec2 p, float n) {
-  if (n < 1.0) return p;
-  if (n < 3.0) { p.x = abs(p.x); return p; }
-  if (n < 5.0) return abs(p);
-  float seg = TAU / n;
-  float a = mod(atan(p.y, p.x), seg);
-  a = abs(a - seg * 0.5);
-  return length(p) * vec2(cos(a), sin(a));
-}
+${MIRROR}
 // The same pushes as Color chase within the loop (see chromaAt), taken once at full strength from the picture here
 vec3 chromaOnce(vec2 st, float asp) {
   vec2 r = vec2(0.012 / asp, 0.012);
@@ -875,7 +958,7 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uSim, px = 1.0 / uSim;
   float asp = uSim.x / uSim.y;
   vec2 p = (uv - 0.5) * vec2(asp, 1.0);
-  p = mirrorFold(p, uMirror);
+  p = mirrorFold(p);
   float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
   p.x += uSplit * side;
   if (uWarp > 0.0) p += uWarp * vec2(sin(p.y * 7.0 + uTime * 1.1 + sin(p.x * 3.0 + uTime * 0.5)),
@@ -947,6 +1030,10 @@ uniform vec4 uGradeTone;
 uniform vec2 uGradeColor;
 uniform vec3 uGradeRGB;
 uniform float uGradeOn;
+// 3D lighting on the finished picture (see "3D lighting" in app.js): depth (0: off), ring size in screen heights
+// and shine, and which way the light comes from
+uniform vec3 uRelief;
+uniform vec3 uReliefL;
 out vec4 o;
 ${COMMON}
 vec3 hueTurn(vec3 c, float a) {
@@ -974,6 +1061,12 @@ void main() {
   col.r = texture(uTex, cuv + ca).r;
   col.g = texture(uTex, cuv).g;
   col.b = texture(uTex, cuv - ca).b;
+  if (uRelief.x > 0.0) {
+    vec2 k = vec2(uRes.y / uRes.x, 1.0) * uRelief.y;
+    vec3 t = vec3(0.0);
+    for (int i = 0; i < 16; i++) t = reliefAdd(t, reliefH(texture(uTex, cuv + RELIEF_RING[i] * k).rgb), i);
+    col = reliefShade(col, t, reliefH(texture(uTex, cuv).rgb), uRelief.x, uRelief.z, uReliefL);
+  }
   if (uHueKick != 0.0) col = max(hueTurn(col, uHueKick), 0.0);
 
   col *= 1.0 + uFlash;

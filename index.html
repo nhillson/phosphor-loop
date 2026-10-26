@@ -428,6 +428,8 @@
           <div class="ctl" id="motionCtl" hidden>
             <button class="btn" id="motion" aria-pressed="false"><span class="led"></span>Only movement</button>
             <span class="hint">For camera, phone, screen, video and the other loop: only what moves gets in.</span>
+            <button class="btn" id="soft" aria-pressed="true"><span class="led"></span>Soft trails</button>
+            <span class="hint">Keeps a video from piling up into white: each spot shows the brighter of the new frame and its echoes, rather than adding them together. Moving things still leave trails. Turn it off for the old glow, which can turn white at high Trails.</span>
           </div>
           <div class="ctl" id="subjectCtl" hidden>
             <span class="lbl" id="subjectLbl">Subject silhouette</span>
@@ -527,6 +529,15 @@
               <button data-mirror="6" aria-pressed="false">6</button>
               <button data-mirror="8" aria-pressed="false">8</button>
             </div>
+            <div class="ctl-head"><span class="lbl" id="mirrorFxLbl">Transition</span></div>
+            <div class="seg seg-4" id="mirrorFx" role="group" aria-labelledby="mirrorFxLbl">
+              <button data-mfx="cut" aria-pressed="false">Cut</button>
+              <button data-mfx="melt" aria-pressed="true">Melt</button>
+              <button data-mfx="iris" aria-pressed="false">Iris</button>
+              <button data-mfx="ripple" aria-pressed="false">Ripple</button>
+            </div>
+            <button class="btn" id="mirrorSpin" aria-pressed="false"><span class="led"></span>Spin</button>
+            <span class="hint">How a new mirror comes in, over 3 seconds: Melt blends into it, Iris grows or shrinks the sides, Ripple spreads it out from the middle. Spin turns the pattern once round as it changes. Cut switches at once.</span>
             <div class="seg seg-2 where" data-where="mirrorFinal" role="group" aria-label="Where Mirror works">
               <button data-final="1" aria-pressed="false">Final Pass</button>
               <button data-final="0" aria-pressed="true">Within Loops</button>
@@ -911,6 +922,41 @@
         <div class="dev-actions"><button class="btn small" id="gradeReset">Back to normal</button></div>
       </section>
 
+      <section class="group" id="reliefGroup" aria-labelledby="h-relief">
+        <h2 id="h-relief">3D lighting</h2>
+        <p class="hint">Makes the finished picture look like glossy molten plastic: bright parts rise up as bumps, dark parts sink, and a light shines across them. Trails and echoes stack up into ridges. Each input can also get its own 3D look under its <b>Adjust the picture</b>, lit by the same light. Autopilot leaves it where you put it, presets keep it, and Neutral turns it off.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rDepth">Depth</label><output id="rDepthOut" for="rDepth"></output></div>
+          <input type="range" id="rDepth" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Deep bumps</span></div>
+          <span class="hint">How tall the bumps stand. Off leaves the picture flat.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rSmooth">Smoothness</label><output id="rSmoothOut" for="rSmooth"></output></div>
+          <input type="range" id="rSmooth" min="0" max="100" step="1" value="30">
+          <div class="ends"><span>Crisp carving</span><span>Soft jelly</span></div>
+          <span class="hint">Left, fine detail and grain stand out like carving. Right, everything melts into big round blobs.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rShine">Shine</label><output id="rShineOut" for="rShine"></output></div>
+          <input type="range" id="rShine" min="0" max="100" step="1" value="60">
+          <div class="ends"><span>Matte clay</span><span>Wet plastic</span></div>
+          <span class="hint">How glossy the surface is: white highlights on the slopes facing the light.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rLight">Light comes from</label><output id="rLightOut" for="rLight"></output></div>
+          <input type="range" id="rLight" min="0" max="359" step="1" value="135">
+          <span class="hint">Which side the light shines from. Also lights each input’s own 3D look.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rSpin">Light circles</label><output id="rSpinOut" for="rSpin"></output></div>
+          <input type="range" id="rSpin" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Still</span><span>Fast</span></div>
+          <span class="hint">Sends the light slowly round the picture, so the highlights roll across the bumps.</span>
+        </div>
+        <div class="dev-actions"><button class="btn small" id="reliefReset">Back to normal</button></div>
+      </section>
+
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
         <h2 id="h-shared">Shared presets</h2>
         <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
@@ -1088,6 +1134,7 @@
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
             <dt>Input size</dt><dd>How big the input sits on screen, up to filling it.</dd>
             <dt>Only movement</dt><dd>For live inputs and video: only what moves gets in.</dd>
+            <dt>Soft trails</dt><dd>For live inputs and video, on unless you turn it off: each spot shows the brighter of the new frame and its fading echoes instead of adding them up, so a video can’t pile up into white at high Trails. Moving things still leave echoes. It stays through every new look.</dd>
             <dt>Adjust the picture</dt><dd>Under each picture, video or live input: Tracking (worn-tape wobble), Brightness, Contrast, Color, Cut out dark parts, and Hold this frame.</dd>
           </dl></div>
           <div class="g-card"><h3>Effects</h3><dl>
@@ -1103,7 +1150,7 @@
             <dt>Pushed by the other loop</dt><dd>Like Melt, but the other loop does the pushing. Its bright parts decide which way this loop slides and its outlines drag this loop’s trails along them, so the other loop’s shapes show up as currents and swirls. It works even while the other loop is hidden. Works best with Trails high.</dd>
             <dt>Dyed by the other loop</dt><dd>The other loop soaks color into this one. Wherever it’s bright, this loop’s colors keep turning round the rainbow, so its shapes show up here as shifting rainbow bands. Grey and white parts pick up color too.</dd>
             <dt>Grow</dt><dd>The picture grows patterns out of itself, the way stripes and spots form on animals: coral, zebra stripes, fingerprints, mazes. They start at outlines and spread through anything lit, and keep re-forming as the loop zooms and spins. Fine, Medium and Big set how far apart the stripes sit. Low is a fine texture, high takes over the whole picture. Keep Trails high.</dd>
-            <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
+            <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides. Transition sets how a new mirror comes in, over 3 seconds, whether you press it or Autopilot, Surprise or a recipe picks it: Melt blends the old mirror into the new one, Iris grows or shrinks the number of sides (from or to Off it melts), Ripple spreads the new mirror out from the middle, and Cut switches at once. Spin also turns the pattern once round as it changes. Autopilot always uses your Transition; loading a preset switches straight to its mirror.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
             <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
           </dl></div>
@@ -1187,7 +1234,7 @@
         <h2><small>Troubleshooting</small>If something looks wrong</h2>
         <dl class="g-fix">
           <dt>You’ve lost track of what you changed</dt><dd>Press Neutral to get back to just the input, then build up again.</dd>
-          <dt>The screen went white</dt><dd>Autopilot keeps it from turning white by itself. When you’re steering, lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
+          <dt>The screen went white</dt><dd>Autopilot keeps it from turning white by itself. On video, check Soft trails is on. When you’re steering, lower Trails, Input size or Color shift a little, or turn down Feed A into B and Feed B into A. Press Clear to wipe it and start fresh.</dd>
           <dt>The screen is black</dt><dd>Raise Trails, make Input size bigger, or drag on the screen. Check the input isn’t set to Nothing.</dd>
           <dt>Nothing is moving</dt><dd>Check that Freeze is off, then move Zoom or Spin.</dd>
           <dt>Camera, Screen or Phone won’t start</dt><dd>Allow access when the browser asks. The phone link only works from the https:// web address, with both devices online.</dd>

@@ -159,8 +159,8 @@ const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that ca
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+  return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
+           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
@@ -245,6 +245,43 @@ function mkLoop() {
            probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], cells: crystalStart(), breath: { z: 0, s: 1 } };
 }
 const loops = { A: mkLoop(), B: mkLoop(), C: mkLoop(), D: mkLoop() };
+// Mirror transitions: a new mirror (from its buttons, Autopilot, Surprise or a recipe) glides in over MIRROR_SECS
+// in the loop's Transition style (Cut switches at once), and with Spin on the pattern turns once round as it goes.
+// L.mx is the change under way: the mirror it's leaving, the one it's going to, and how far along it is (1 done).
+// A preset and Neutral cut straight to their mirror (mirrorCut).
+const MIRROR_SECS = 3;
+const MIRROR_FX = { cut: 0, melt: 1, iris: 2, ripple: 3 };
+function mirrorCut(k) { const m = loops[k].tgt.mirror; loops[k].mx = { from: m, to: m, e: 1 }; }
+function mirrorStep(k, dt) {
+  const t = loops[k].tgt, m = loops[k].mx || (loops[k].mx = { from: t.mirror, to: t.mirror, e: 1 });
+  if (t.mirror !== m.to) {
+    // Partway through a change: going back reverses it from where it is, anything else carries on from the
+    // mirror that's showing most
+    if (m.e < 1 && t.mirror === m.from) { m.from = m.to; m.e = 1 - m.e; }
+    else { m.from = m.e < 0.5 ? m.from : m.to; m.e = 0; }
+    m.to = t.mirror;
+  }
+  if (m.from === m.to || t.mirrorFx === 'cut') m.e = 1;
+  if (m.e < 1) m.e = Math.min(1, m.e + dt / MIRROR_SECS);
+}
+// The shader's view of loop k's mirror change (see mirrorFold in js/shaders.js)
+// Loop k's mirror for a program: the loop's own (fbProg) or its final pass (finalProg); on is false where the
+// mirror isn't (Mirror set to the other one of Final Pass and Within Loops)
+function mirrorUniforms(prog, k, on) {
+  const t = loops[k].tgt, m = loops[k].mx || { from: t.mirror, e: 1 };
+  if (!on) { set1f(prog, 'uMirror', 0); set1f(prog, 'uMirrorT', 1); return; }
+  const e = m.e * m.e * (3 - 2 * m.e);
+  // Iris can't grow sides out of no mirror at all, so to and from Off it melts
+  let style = MIRROR_FX[t.mirrorFx] ?? 1;
+  if (style === 2 && (m.from === 0 || t.mirror === 0)) style = 1;
+  set1f(prog, 'uMirror', t.mirror);
+  set1f(prog, 'uMirrorFrom', m.from);
+  set1f(prog, 'uMirrorT', m.e >= 1 ? 1 : e);
+  set1f(prog, 'uMirrorStyle', style);
+  set1f(prog, 'uMirrorTurn', t.mirrorSpin && m.e < 1 ? 6.2831853 * e : 0);
+}
+// Whether loop k is mirrored at all just now, counting a change of mirror still gliding in from or out to Off
+const mirrorAny = (k) => { const t = loops[k].tgt, m = loops[k].mx; return t.mirror > 0 || !!(m && m.e < 1 && m.from > 0); };
 const mixDefaults = { showA: 100, showB: 0, showC: 100, showD: 100, xab: 0, xba: 0, xc: 0, xd: 0 };
 // "view" is the old single fader between loops A and B (0 A only, 50 both, 100 B only). Autopilot, taste profiles
 // and old presets still think in it, so it reads and writes the A and B Show faders: setting view 25 shows A fully
@@ -996,7 +1033,10 @@ $$('#inputs button').forEach((b) => b.addEventListener('click', () => {
 }));
 in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
 $$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver('mirror'); loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
+$$('#mirrorFx button').forEach((b) => b.addEventListener('click', () => { loops[edit].tgt.mirrorFx = b.dataset.mfx; syncUI(); }));
+$('#mirrorSpin').addEventListener('click', () => { const t = loops[edit].tgt; t.mirrorSpin = !t.mirrorSpin; syncUI(); });
 $('#motion').addEventListener('click', () => { takeOver('in1'); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
+$('#soft').addEventListener('click', () => { const t = loops[edit].tgt; t.soft = t.soft === false; syncUI(); });
 // Subject silhouette: the person in a video, camera, screen or phone picture, found by MediaPipe (js/subject.js)
 const SUBJECT_SRC = ['video', 'camera', 'screen', 'phone'];
 const subjectOn = (t) => PhosphorSubject.MODES.includes(t.subject);
@@ -1150,6 +1190,7 @@ function setLoopCount(n, how) {
       loops[k].started = true;
       patchLoop(k, k === 'C' ? C_START : D_START);
       Object.assign(loops[k].cur, loops[k].tgt);
+      mirrorCut(k);
       clearLoopTargets(k);
       mix.tgt[SHOW[k]] = mix.cur[SHOW[k]] = 100;
       mix.tgt[FEED_INTO[k]] = mix.cur[FEED_INTO[k]] = 0;
@@ -1238,6 +1279,8 @@ function syncUI() {
   $('#blendCtl').hidden = t.in2 === 'none';
   $$('#mirror button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mirror === t.mirror)));
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
+  $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
+  $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'silhouette']) $('#row-' + s).hidden = !usesHere(s);
   syncTextUI(); syncSilhouetteUI();
@@ -1268,6 +1311,7 @@ function syncUI() {
   $('#dyeHint').textContent = `Loop ${otherK}’s picture soaks color into this one: wherever loop ${otherK} is bright, this loop’s colors keep turning, so loop ${otherK}’s shapes show up as rainbow bands.`;
   $('#motionCtl').hidden = !LIVE.some(usesHere);
   $('#motion').setAttribute('aria-pressed', String(!!t.motion));
+  $('#soft').setAttribute('aria-pressed', String(t.soft !== false));
   $('#subjectCtl').hidden = !SUBJECT_SRC.some(usesHere);
   $$('#subject button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.subject === (t.subject || 'off'))));
   syncSubjectStatus();
@@ -1301,6 +1345,11 @@ function patchLoop(k, p, force) {
   // or Within Loops); a preset, recipe or Neutral sets them
   if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
   if (!force) for (const w of Object.values(FINAL_FX)) if (!(w in p)) n[w] = !!L.tgt[w];
+  // Soft trails stays through every new look too; a preset, recipe or Neutral sets it (on, unless saved off)
+  if (!force && !('soft' in p)) n.soft = L.tgt.soft !== false;
+  // The mirror's Transition and Spin are yours: they stay through every new look (loadPreset brings back a preset's)
+  n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
+  n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
@@ -2037,7 +2086,7 @@ function neutral() {
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
   for (const k of activeKeys()) patchLoop(k, { ...flat }, true);
-  for (const k of activeKeys()) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; }
+  for (const k of activeKeys()) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; mirrorCut(k); }
   // Just loop A on screen, and nothing fed anywhere
   for (const q of MIX_SLIDERS) { mix.tgt[q] = 0; mix.cur[q] = 0; }
   mix.tgt.showA = mix.cur.showA = 100;
@@ -2045,6 +2094,7 @@ function neutral() {
   ADJ_SRC.forEach((x) => { adj[x] = adjDefaults(); });
   syncAdjUI();
   setGrade(GRADE_DEF);
+  setRelief(RELIEF_DEF);
   Object.values(LIVE_SRC).forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
@@ -3390,7 +3440,7 @@ const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TAST
 const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], ...SELF_RANGE };
 const TASTE_DEF = loopDefaults();
-const TASTE_LOOK = Object.keys(TASTE_DEF);
+const TASTE_LOOK = Object.keys(TASTE_DEF).filter((f) => f !== 'mirrorFx' && f !== 'mirrorSpin');
 const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
 const TASTE_FILE_KIND = 'phosphor-loop-taste';
 // profiles: your own ({ id, name, votes, thumb, saved }); sharedList: the admin's, from presets.json; active: the lit
@@ -5394,8 +5444,12 @@ const ADJ_DEF = [
   ['contrast', 'Contrast', -100, 100, 'Flatter', 'Punchier', true],
   ['sat', 'Color', -100, 100, 'Gray', 'Vivid', true],
   ['key', 'Cut out dark parts', 0, 100, 'Off', 'Only the brightest', false],
+  // 3D lighting on this input alone, lit from where the 3D lighting section says (see "3D lighting")
+  ['rDepth', '3D depth', 0, 100, 'Flat', 'Deep bumps', false],
+  ['rSmooth', '3D smoothness', 0, 100, 'Crisp carving', 'Soft jelly', false, '0'],
+  ['rShine', '3D shine', 0, 100, 'Matte clay', 'Wet plastic', false, 'MATTE'],
 ];
-function adjDefaults() { return { tracking: 0, bright: 0, contrast: 0, sat: 0, key: 0 }; }
+function adjDefaults() { return { tracking: 0, bright: 0, contrast: 0, sat: 0, key: 0, rDepth: 0, rSmooth: 30, rShine: 60 }; }
 const adj = {};
 ADJ_SRC.forEach((src) => { adj[src] = adjDefaults(); });
 const adjEls = [];
@@ -5408,6 +5462,9 @@ function packAdj() {
     adjA[i + 2] = a.contrast / 100;
     adjA[i + 3] = a.sat / 100;
     adjB[i] = a.key / 100 * 0.9;
+    adjB[i + 1] = a.rDepth / 100;
+    adjB[i + 2] = a.rSmooth / 100;
+    adjB[i + 3] = a.rShine / 100;
   }
 }
 function buildAdjust(src) {
@@ -5416,22 +5473,23 @@ function buildAdjust(src) {
   d.innerHTML = '<summary>Adjust the picture</summary>';
   const body = document.createElement('div');
   body.className = 'adj-body';
-  for (const [k, label, min, max, lo, hi, bip] of ADJ_DEF) {
+  for (const [k, label, min, max, lo, hi, bip, zero = 'OFF'] of ADJ_DEF) {
+    const def = adjDefaults()[k];
     const id = `adj-${src}-${k}`;
     const c = document.createElement('div');
     c.className = 'ctl';
     c.innerHTML = `<div class="ctl-head"><label for="${id}">${label}</label><output id="${id}-out" for="${id}"></output></div>` +
-      `<input type="range" id="${id}"${bip ? ' class="bipolar"' : ''} min="${min}" max="${max}" step="1" value="0">` +
+      `<input type="range" id="${id}"${bip ? ' class="bipolar"' : ''} min="${min}" max="${max}" step="1" value="${def}">` +
       `<div class="ends"><span>${lo}</span><span>${hi}</span></div>`;
     body.appendChild(c);
     const el = c.querySelector('input'), out = c.querySelector('output');
     const refresh = () => {
       fillTrack(el);
       const v = +el.value;
-      out.textContent = v === 0 ? (bip ? '0' : 'OFF') : (bip && v > 0 ? '+' + v : String(v));
+      out.textContent = v === 0 ? (bip ? '0' : zero) : (bip && v > 0 ? '+' + v : String(v));
     };
     el.addEventListener('input', () => { adj[src][k] = +el.value; refresh(); });
-    el.addEventListener('dblclick', () => { el.value = 0; adj[src][k] = 0; refresh(); });
+    el.addEventListener('dblclick', () => { el.value = def; adj[src][k] = def; refresh(); });
     adjEls.push({ src, k, el, refresh });
     refresh();
   }
@@ -6241,6 +6299,7 @@ function snapshot() {
     snd: { amount: snd.amount, map: clone(snd.map), react: clone(snd.react) },
     text: { str: txt.str, style: txt.style },
     grade: { ...grade },
+    relief: { ...relief },
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
@@ -6334,6 +6393,13 @@ function loadPreset(pr, quiet) {
   patchLoop('B', d.B || B_PARTNER, true);
   if (n > 2) { patchLoop('C', d.C || C_START, true); loops.C.started = true; }
   if (n > 3) { patchLoop('D', d.D || D_START, true); loops.D.started = true; }
+  // A preset saved with a mirror Transition brings it back (older ones keep yours), and its mirror is there at once
+  for (const k of KEYS) {
+    const s = d[k];
+    if (s && s.mirrorFx in MIRROR_FX) loops[k].tgt.mirrorFx = s.mirrorFx;
+    if (s && typeof s.mirrorSpin === 'boolean') loops[k].tgt.mirrorSpin = s.mirrorSpin;
+    mirrorCut(k);
+  }
   const m = d.mix || {};
   mix.tgt.view = m.view ?? 0; mix.tgt.xab = m.xab ?? 0; mix.tgt.xba = m.xba ?? 0;
   if (Number.isFinite(m.showA) && Number.isFinite(m.showB)) { mix.tgt.showA = m.showA; mix.tgt.showB = m.showB; }
@@ -6349,6 +6415,7 @@ function loadPreset(pr, quiet) {
   syncSoundUI();
   // Presets saved before Color grading existed load with it at normal
   setGrade(d.grade);
+  setRelief(d.relief);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
@@ -7398,6 +7465,60 @@ function setGradeUniforms() {
   set2f(dispProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(dispProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
 }
+/* ================= 3D lighting ================= */
+// The finished picture's brightness read as height and lit like glossy plastic (reliefShade in shaders.js), drawn
+// in the display pass only. Each input can have its own under Adjust the picture (rDepth and the rest in adj),
+// lit by the same light, whose direction is set here and can circle. Autopilot leaves it alone; presets keep it
+// and Neutral turns it off.
+const RELIEF_KEY = 'phosphor-relief-v1';
+const RELIEF_DEF = { rDepth: 0, rSmooth: 30, rShine: 60, rLight: 135, rSpin: 0 };
+const relief = { ...RELIEF_DEF };
+const reliefEls = {};
+for (const k of Object.keys(RELIEF_DEF)) reliefEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
+const LIGHT_SIDES = ['the right', 'top right', 'the top', 'top left', 'the left', 'bottom left', 'the bottom', 'bottom right'];
+function reliefText(k, v) {
+  switch (k) {
+    case 'rDepth': return v === 0 ? 'OFF' : String(v);
+    case 'rShine': return v === 0 ? 'MATTE' : String(v);
+    case 'rLight': return LIGHT_SIDES[Math.round(v / 45) % 8].toUpperCase();
+    case 'rSpin': return v === 0 ? 'STILL' : String(v);
+    default: return String(v);
+  }
+}
+function cleanRelief(r) {
+  const out = { ...RELIEF_DEF };
+  if (!r || typeof r !== 'object') return out;
+  for (const k of Object.keys(RELIEF_DEF)) {
+    const { el } = reliefEls[k];
+    if (Number.isFinite(r[k])) out[k] = clamp(Math.round(r[k]), +el.min, +el.max);
+  }
+  return out;
+}
+function syncReliefUI() {
+  for (const [k, { el, out }] of Object.entries(reliefEls)) { el.value = relief[k]; fillTrack(el); out.textContent = reliefText(k, relief[k]); }
+}
+function saveRelief() { try { localStorage.setItem(RELIEF_KEY, JSON.stringify(relief)); } catch (_) {} }
+function setRelief(r) { Object.assign(relief, cleanRelief(r)); syncReliefUI(); saveRelief(); }
+for (const [k, { el, out }] of Object.entries(reliefEls)) {
+  el.addEventListener('input', () => { relief[k] = +el.value; fillTrack(el); out.textContent = reliefText(k, relief[k]); saveRelief(); });
+  el.addEventListener('dblclick', () => setRelief({ ...relief, [k]: RELIEF_DEF[k] }));
+}
+$('#reliefReset').addEventListener('click', () => setRelief(RELIEF_DEF));
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(RELIEF_KEY) || 'null'); } catch (_) {} setRelief(saved); }
+// Which way the light comes from, 40° above the picture: worked out once per frame for the display pass and used
+// by the next frame's loops too. Circling adds up a turn of its own, so changing its speed never makes it jump.
+const reliefL = [0, 0, 1];
+let reliefTurn = 0, reliefLast = 0;
+function setReliefUniforms(now) {
+  const dt = reliefLast ? Math.min((now - reliefLast) / 1000, 0.25) : 0;
+  reliefLast = now;
+  reliefTurn = (reliefTurn + dt * (relief.rSpin / 100) ** 2 * Math.PI / 2) % (2 * Math.PI);
+  const a = relief.rLight * Math.PI / 180 + reliefTurn, e = 40 * Math.PI / 180;
+  reliefL[0] = Math.cos(a) * Math.cos(e); reliefL[1] = Math.sin(a) * Math.cos(e); reliefL[2] = Math.sin(e);
+  set3f(dispProg, 'uRelief', relief.rDepth / 100, 0.004 + 0.046 * relief.rSmooth / 100, relief.rShine / 100);
+  set3f(dispProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
+}
+window.__plRelief = { relief, setRelief, adj };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
@@ -7411,6 +7532,8 @@ function setLoopGradeUniforms(f) {
   set2f(fbProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(fbProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
 }
+// For tests/: the mirror change under way on a loop (see "mirror transitions")
+window.__plMirror = { state: (k) => loops[k].mx };
 window.__plGrade = { grade, setGrade, snapshot: () => snapshot(), loadPreset: (data) => loadPreset({ id: '', name: '', data }, true) };
 
 const wideBtn = $('#wideBtn'), WIDE_KEY = 'phosphor-wide-controls';
@@ -7914,11 +8037,11 @@ function finalPass(k) {
   const L = loops[k], t = L.tgt, c = L.cur;
   const amt = (fx, v) => (isFinal(t, fx) ? v : 0);
   const steps = amt('poster', c.poster > 0.5 ? posterSteps(c.poster) : 0);
-  const mirror = amt('mirror', t.mirror);
+  const mirror = t.mirrorFinal && mirrorAny(k);
   const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
   const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
   const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
-  const on = L.rt && loopOn(k) && (steps > 0 || mirror > 0 || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
+  const on = L.rt && loopOn(k) && (steps > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
   if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
@@ -7932,7 +8055,7 @@ function finalPass(k) {
   set2f(finalProg, 'uSim', simW, simH);
   set1f(finalProg, 'uPxK', simH / SIM_H);
   set1f(finalProg, 'uTime', simT + (11.0 * LOOP_OFF[k]));
-  set1f(finalProg, 'uMirror', mirror);
+  mirrorUniforms(finalProg, k, mirror);
   set1f(finalProg, 'uSplit', split);
   set1f(finalProg, 'uWarp', warp);
   set1f(finalProg, 'uChroma', chroma);
@@ -8339,7 +8462,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uPoster', t.posterIn && c.poster > 0.5 ? posterSteps(c.poster) : 0);
   setLoopGradeUniforms(f);
   set1f(fbProg, 'uAspText', textAspect);
-  set1f(fbProg, 'uMirror', t.mirrorFinal ? 0 : t.mirror);
+  mirrorUniforms(fbProg, k, !t.mirrorFinal);
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
@@ -8369,6 +8492,7 @@ function runLoop(k, xf, brush, f) {
     if (lc) gl.uniform3fv(lc, inkCol);
   }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
+  set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
   set1f(fbProg, 'uAspPic', picAspect);
   set1f(fbProg, 'uAspVid', vid.aspect);
   set1f(fbProg, 'uAspCam', cam.aspect);
@@ -8379,6 +8503,7 @@ function runLoop(k, xf, brush, f) {
   const la = U(fbProg, 'uAdjA[0]'), lb = U(fbProg, 'uAdjB[0]');
   if (la) gl.uniform4fv(la, adjA);
   if (lb) gl.uniform4fv(lb, adjB);
+  set3f(fbProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
   let b = [0, 0, 0, 0], on = 0;
   if (brush) {
     let a = foldJS(brush[0][0], brush[0][1], t.mirror);
@@ -9495,6 +9620,7 @@ function frame() {
       const o = otherLoop(key);
       if (loopOn(o) && (clamp(mix.cur[FEED_INTO[key]], 0, 100) > 0.1 || readsOther(key))) need[o] = true;
     }
+    for (const key of act) mirrorStep(key, dt);
     for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
   }
 
@@ -9549,6 +9675,7 @@ function frame() {
   set2f(dispProg, 'uShake', snd.shakeDir[0] * shake, snd.shakeDir[1] * shake);
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
   setGradeUniforms();
+  setReliefUniforms(now);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   if (window.__phosphorCapture?.onFrame) window.__phosphorCapture.onFrame(now);
