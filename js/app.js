@@ -160,7 +160,7 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
@@ -245,6 +245,38 @@ function mkLoop() {
            probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], cells: crystalStart(), breath: { z: 0, s: 1 } };
 }
 const loops = { A: mkLoop(), B: mkLoop(), C: mkLoop(), D: mkLoop() };
+// Mirror transitions: a new mirror (from its buttons, Autopilot, Surprise or a recipe) glides in over MIRROR_SECS
+// in the loop's Transition style (Cut switches at once), and with Spin on the pattern turns once round as it goes.
+// L.mx is the change under way: the mirror it's leaving, the one it's going to, and how far along it is (1 done).
+// A preset and Neutral cut straight to their mirror (mirrorCut).
+const MIRROR_SECS = 3;
+const MIRROR_FX = { cut: 0, melt: 1, iris: 2, ripple: 3 };
+function mirrorCut(k) { const m = loops[k].tgt.mirror; loops[k].mx = { from: m, to: m, e: 1 }; }
+function mirrorStep(k, dt) {
+  const t = loops[k].tgt, m = loops[k].mx || (loops[k].mx = { from: t.mirror, to: t.mirror, e: 1 });
+  if (t.mirror !== m.to) {
+    // Partway through a change: going back reverses it from where it is, anything else carries on from the
+    // mirror that's showing most
+    if (m.e < 1 && t.mirror === m.from) { m.from = m.to; m.e = 1 - m.e; }
+    else { m.from = m.e < 0.5 ? m.from : m.to; m.e = 0; }
+    m.to = t.mirror;
+  }
+  if (m.from === m.to || t.mirrorFx === 'cut') m.e = 1;
+  if (m.e < 1) m.e = Math.min(1, m.e + dt / MIRROR_SECS);
+}
+// The shader's view of loop k's mirror change (see mirrorFold in js/shaders.js)
+function mirrorUniforms(k) {
+  const t = loops[k].tgt, m = loops[k].mx || { from: t.mirror, e: 1 };
+  const e = m.e * m.e * (3 - 2 * m.e);
+  // Iris can't grow sides out of no mirror at all, so to and from Off it melts
+  let style = MIRROR_FX[t.mirrorFx] ?? 1;
+  if (style === 2 && (m.from === 0 || t.mirror === 0)) style = 1;
+  set1f(fbProg, 'uMirror', t.mirror);
+  set1f(fbProg, 'uMirrorFrom', m.from);
+  set1f(fbProg, 'uMirrorT', m.e >= 1 ? 1 : e);
+  set1f(fbProg, 'uMirrorStyle', style);
+  set1f(fbProg, 'uMirrorTurn', t.mirrorSpin && m.e < 1 ? 6.2831853 * e : 0);
+}
 const mixDefaults = { showA: 100, showB: 0, showC: 100, showD: 100, xab: 0, xba: 0, xc: 0, xd: 0 };
 // "view" is the old single fader between loops A and B (0 A only, 50 both, 100 B only). Autopilot, taste profiles
 // and old presets still think in it, so it reads and writes the A and B Show faders: setting view 25 shows A fully
@@ -996,6 +1028,8 @@ $$('#inputs button').forEach((b) => b.addEventListener('click', () => {
 }));
 in2Sel.addEventListener('change', () => chooseSource('in2', in2Sel.value));
 $$('#mirror button').forEach((b) => b.addEventListener('click', () => { takeOver('mirror'); loops[edit].tgt.mirror = +b.dataset.mirror; syncUI(); }));
+$$('#mirrorFx button').forEach((b) => b.addEventListener('click', () => { loops[edit].tgt.mirrorFx = b.dataset.mfx; syncUI(); }));
+$('#mirrorSpin').addEventListener('click', () => { const t = loops[edit].tgt; t.mirrorSpin = !t.mirrorSpin; syncUI(); });
 $('#motion').addEventListener('click', () => { takeOver('in1'); const t = loops[edit].tgt; t.motion = !t.motion; syncUI(); });
 // Subject silhouette: the person in a video, camera, screen or phone picture, found by MediaPipe (js/subject.js)
 const SUBJECT_SRC = ['video', 'camera', 'screen', 'phone'];
@@ -1142,6 +1176,7 @@ function setLoopCount(n, how) {
       loops[k].started = true;
       patchLoop(k, k === 'C' ? C_START : D_START);
       Object.assign(loops[k].cur, loops[k].tgt);
+      mirrorCut(k);
       clearLoopTargets(k);
       mix.tgt[SHOW[k]] = mix.cur[SHOW[k]] = 100;
       mix.tgt[FEED_INTO[k]] = mix.cur[FEED_INTO[k]] = 0;
@@ -1230,6 +1265,8 @@ function syncUI() {
   $('#blendCtl').hidden = t.in2 === 'none';
   $$('#mirror button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mirror === t.mirror)));
   $('#mirrorOut').textContent = t.mirror === 0 ? 'OFF' : `${t.mirror} WAY`;
+  $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
+  $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'silhouette']) $('#row-' + s).hidden = !usesHere(s);
   syncTextUI(); syncSilhouetteUI();
@@ -1290,6 +1327,9 @@ function patchLoop(k, p, force) {
   // Posterize, and where it works, stay through every new look (Autopilot, Surprise); a preset, recipe or Neutral sets them
   if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
   if (!force && !('posterIn' in p)) n.posterIn = !!L.tgt.posterIn;
+  // The mirror's Transition and Spin are yours: they stay through every new look (loadPreset brings back a preset's)
+  n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
+  n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
@@ -2026,7 +2066,7 @@ function neutral() {
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
   for (const k of activeKeys()) patchLoop(k, { ...flat }, true);
-  for (const k of activeKeys()) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; }
+  for (const k of activeKeys()) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; mirrorCut(k); }
   // Just loop A on screen, and nothing fed anywhere
   for (const q of MIX_SLIDERS) { mix.tgt[q] = 0; mix.cur[q] = 0; }
   mix.tgt.showA = mix.cur.showA = 100;
@@ -3379,7 +3419,7 @@ const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TAST
 const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], ...SELF_RANGE };
 const TASTE_DEF = loopDefaults();
-const TASTE_LOOK = Object.keys(TASTE_DEF);
+const TASTE_LOOK = Object.keys(TASTE_DEF).filter((f) => f !== 'mirrorFx' && f !== 'mirrorSpin');
 const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
 const TASTE_FILE_KIND = 'phosphor-loop-taste';
 // profiles: your own ({ id, name, votes, thumb, saved }); sharedList: the admin's, from presets.json; active: the lit
@@ -6323,6 +6363,13 @@ function loadPreset(pr, quiet) {
   patchLoop('B', d.B || B_PARTNER, true);
   if (n > 2) { patchLoop('C', d.C || C_START, true); loops.C.started = true; }
   if (n > 3) { patchLoop('D', d.D || D_START, true); loops.D.started = true; }
+  // A preset saved with a mirror Transition brings it back (older ones keep yours), and its mirror is there at once
+  for (const k of KEYS) {
+    const s = d[k];
+    if (s && s.mirrorFx in MIRROR_FX) loops[k].tgt.mirrorFx = s.mirrorFx;
+    if (s && typeof s.mirrorSpin === 'boolean') loops[k].tgt.mirrorSpin = s.mirrorSpin;
+    mirrorCut(k);
+  }
   const m = d.mix || {};
   mix.tgt.view = m.view ?? 0; mix.tgt.xab = m.xab ?? 0; mix.tgt.xba = m.xba ?? 0;
   if (Number.isFinite(m.showA) && Number.isFinite(m.showB)) { mix.tgt.showA = m.showA; mix.tgt.showB = m.showB; }
@@ -7387,6 +7434,8 @@ function setLoopGradeUniforms(f) {
   set2f(fbProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(fbProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
 }
+// For tests/: the mirror change under way on a loop (see "mirror transitions")
+window.__plMirror = { state: (k) => loops[k].mx };
 window.__plGrade = { grade, setGrade, snapshot: () => snapshot(), loadPreset: (data) => loadPreset({ id: '', name: '', data }, true) };
 
 const wideBtn = $('#wideBtn'), WIDE_KEY = 'phosphor-wide-controls';
@@ -8294,7 +8343,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uPoster', t.posterIn && c.poster > 0.5 ? posterSteps(c.poster) : 0);
   setLoopGradeUniforms(f);
   set1f(fbProg, 'uAspText', textAspect);
-  set1f(fbProg, 'uMirror', t.mirror);
+  mirrorUniforms(k);
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
@@ -9450,6 +9499,7 @@ function frame() {
       const o = otherLoop(key);
       if (loopOn(o) && (clamp(mix.cur[FEED_INTO[key]], 0, 100) > 0.1 || readsOther(key))) need[o] = true;
     }
+    for (const key of act) mirrorStep(key, dt);
     for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
   }
 

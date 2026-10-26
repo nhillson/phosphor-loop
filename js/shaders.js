@@ -47,6 +47,9 @@ uniform vec2 uSim;
 uniform float uPxK;   // how many pixels make one Standard-size step (more at a sharper picture), so effects keep their size
 uniform float uTime, uZoom, uSpin, uDecay, uHue, uWarp, uMirror, uBlur, uEdge, uGain, uForm, uFloor, uBrushOn;
 uniform float uBlend, uScale, uMotion, uXfeed;
+// A change of mirror glides in (see "mirror transitions" in js/app.js): the mirror it's leaving, how far along it
+// is (1 done), the Transition style (1 Melt, 2 Iris, 3 Ripple) and how far Spin has turned the pattern
+uniform float uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;
 uniform float uCutout;   // Subject silhouette: the live inputs carry a see-through surround (alpha) to lay over the rest
 uniform float uFlow, uSplit, uSplitOff, uInkDt;
 uniform float uMelt, uMeltTurn;   // Melt: how far the picture pushes itself this frame, and which way each brightness slides
@@ -95,6 +98,38 @@ vec2 fold(vec2 p, float n) {
   float a = mod(atan(p.y, p.x), seg);
   a = abs(a - seg * 0.5);
   return length(p) * vec2(cos(a), sin(a));
+}
+// Iris: each mirror as a zigzag of the angle, so the number of sides can slide between the stops. x is half a
+// side's width, y where the first side starts and z where it ends up; at the stops it comes out exactly as fold
+vec3 foldShape(float n) {
+  if (n < 3.0) return vec3(3.14159265, -1.57079633, -1.57079633);
+  if (n < 5.0) return vec3(1.57079633, 0.0, 0.0);
+  return vec3(3.14159265 / n, 3.14159265 / n, 0.0);
+}
+vec2 mirrorFold(vec2 p) {
+  if (uMirrorT >= 1.0) return fold(p, uMirror);
+  float e = uMirrorT;
+  p = rot(uMirrorTurn) * p;
+  vec2 q;
+  if (uMirrorStyle > 1.5 && uMirrorStyle < 2.5) {
+    vec3 a = foldShape(uMirrorFrom), b = foldShape(uMirror);
+    // The number of sides slides, not their width
+    float h = 3.14159265 / mix(3.14159265 / a.x, 3.14159265 / b.x, e);
+    // Between stops the sides don't fit round exactly: the odd one out (the seam) sweeps once round as it goes
+    float seam = 3.14159265 + e * TAU;
+    float th = seam + mod(atan(p.y, p.x) - seam, TAU) - mix(a.y, b.y, e);
+    float z = h - abs(mod(th, 2.0 * h) - h) + mix(a.z, b.z, e);
+    q = length(p) * vec2(cos(z), sin(z));
+  } else {
+    float w = e;
+    // Ripple: the new mirror is a circle that spreads out from the middle until it fills the screen
+    if (uMirrorStyle > 2.5) {
+      float edge = e * (0.5 * length(vec2(uSim.x / uSim.y, 1.0)) + 0.12);
+      w = 1.0 - smoothstep(edge - 0.08, edge, length(p));
+    }
+    q = mix(fold(p, uMirrorFrom), fold(p, uMirror), w);
+  }
+  return rot(-uMirrorTurn) * q;
 }
 vec3 hueRot(vec3 c, float a) {
   const vec3 k = vec3(0.57735027);
@@ -716,7 +751,7 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   float asp = uSim.x / uSim.y;
   vec2 p = (uv - 0.5) * vec2(asp, 1.0);
-  vec2 pf = fold(p, uMirror);
+  vec2 pf = mirrorFold(p);
 
   // Where this pixel was one frame ago
   vec2 q = rot(uSpin) * (pf - uCenter) * exp(-uZoom) + uCenter;

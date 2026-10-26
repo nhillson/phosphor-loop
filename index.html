@@ -522,6 +522,15 @@
               <button data-mirror="6" aria-pressed="false">6</button>
               <button data-mirror="8" aria-pressed="false">8</button>
             </div>
+            <div class="ctl-head"><span class="lbl" id="mirrorFxLbl">Transition</span></div>
+            <div class="seg seg-4" id="mirrorFx" role="group" aria-labelledby="mirrorFxLbl">
+              <button data-mfx="cut" aria-pressed="false">Cut</button>
+              <button data-mfx="melt" aria-pressed="true">Melt</button>
+              <button data-mfx="iris" aria-pressed="false">Iris</button>
+              <button data-mfx="ripple" aria-pressed="false">Ripple</button>
+            </div>
+            <button class="btn" id="mirrorSpin" aria-pressed="false"><span class="led"></span>Spin</button>
+            <span class="hint">How a new mirror comes in, over 3 seconds: Melt blends into it, Iris grows or shrinks the sides, Ripple spreads it out from the middle. Spin turns the pattern once round as it changes. Cut switches at once.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="split">Split lines</label><output id="splitOut" for="split"></output></div>
@@ -1084,7 +1093,7 @@
             <dt>Pushed by the other loop</dt><dd>Like Melt, but the other loop does the pushing. Its bright parts decide which way this loop slides and its outlines drag this loop’s trails along them, so the other loop’s shapes show up as currents and swirls. It works even while the other loop is hidden. Works best with Trails high.</dd>
             <dt>Dyed by the other loop</dt><dd>The other loop soaks color into this one. Wherever it’s bright, this loop’s colors keep turning round the rainbow, so its shapes show up here as shifting rainbow bands. Grey and white parts pick up color too.</dd>
             <dt>Grow</dt><dd>The picture grows patterns out of itself, the way stripes and spots form on animals: coral, zebra stripes, fingerprints, mazes. They start at outlines and spread through anything lit, and keep re-forming as the loop zooms and spins. Fine, Medium and Big set how far apart the stripes sit. Low is a fine texture, high takes over the whole picture. Keep Trails high.</dd>
-            <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides.</dd>
+            <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides. Transition sets how a new mirror comes in, over 3 seconds, whether you press it or Autopilot, Surprise or a recipe picks it: Melt blends the old mirror into the new one, Iris grows or shrinks the number of sides (from or to Off it melts), Ripple spreads the new mirror out from the middle, and Cut switches at once. Spin also turns the pattern once round as it changes. Autopilot always uses your Transition; loading a preset switches straight to its mirror.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
             <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
           </dl></div>
