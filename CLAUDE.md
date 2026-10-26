@@ -38,6 +38,9 @@ file don't rebuild the app.
 4f. **Shapes** (the Shapes section: 2D/3D shapes over everything, with gravity, lens/swallow and an accretion disk;
    code in `js/shapes.js`, glue under "shapes" in js/app.js): `python3 tests/shapes_check.py` (about 3 minutes). It
    takes a picture of every kind, flings, drops, merges and clears, and reaches into the app through `window.__plShapes`.
+4g. **3D lighting** (the 3D lighting section over the finished picture, and 3D depth / smoothness / shine under each input's
+   Adjust the picture; `reliefShade` in js/shaders.js): `python3 tests/relief_check.py` (about 1.5 minutes). It feeds
+   `tests/media/person.webm` in and reaches into the app through `window.__plRelief`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

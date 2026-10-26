@@ -904,6 +904,41 @@
         <div class="dev-actions"><button class="btn small" id="gradeReset">Back to normal</button></div>
       </section>
 
+      <section class="group" id="reliefGroup" aria-labelledby="h-relief">
+        <h2 id="h-relief">3D lighting</h2>
+        <p class="hint">Makes the finished picture look like glossy molten plastic: bright parts rise up as bumps, dark parts sink, and a light shines across them. Trails and echoes stack up into ridges. Each input can also get its own 3D look under its <b>Adjust the picture</b>, lit by the same light. Autopilot leaves it where you put it, presets keep it, and Neutral turns it off.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rDepth">Depth</label><output id="rDepthOut" for="rDepth"></output></div>
+          <input type="range" id="rDepth" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Deep bumps</span></div>
+          <span class="hint">How tall the bumps stand. Off leaves the picture flat.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rSmooth">Smoothness</label><output id="rSmoothOut" for="rSmooth"></output></div>
+          <input type="range" id="rSmooth" min="0" max="100" step="1" value="30">
+          <div class="ends"><span>Crisp carving</span><span>Soft jelly</span></div>
+          <span class="hint">Left, fine detail and grain stand out like carving. Right, everything melts into big round blobs.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rShine">Shine</label><output id="rShineOut" for="rShine"></output></div>
+          <input type="range" id="rShine" min="0" max="100" step="1" value="60">
+          <div class="ends"><span>Matte clay</span><span>Wet plastic</span></div>
+          <span class="hint">How glossy the surface is: white highlights on the slopes facing the light.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rLight">Light comes from</label><output id="rLightOut" for="rLight"></output></div>
+          <input type="range" id="rLight" min="0" max="359" step="1" value="135">
+          <span class="hint">Which side the light shines from. Also lights each input’s own 3D look.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="rSpin">Light circles</label><output id="rSpinOut" for="rSpin"></output></div>
+          <input type="range" id="rSpin" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Still</span><span>Fast</span></div>
+          <span class="hint">Sends the light slowly round the picture, so the highlights roll across the bumps.</span>
+        </div>
+        <div class="dev-actions"><button class="btn small" id="reliefReset">Back to normal</button></div>
+      </section>
+
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
         <h2 id="h-shared">Shared presets</h2>
         <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>

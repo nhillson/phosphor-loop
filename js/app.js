@@ -2078,6 +2078,7 @@ function neutral() {
   ADJ_SRC.forEach((x) => { adj[x] = adjDefaults(); });
   syncAdjUI();
   setGrade(GRADE_DEF);
+  setRelief(RELIEF_DEF);
   Object.values(LIVE_SRC).forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
@@ -5427,8 +5428,12 @@ const ADJ_DEF = [
   ['contrast', 'Contrast', -100, 100, 'Flatter', 'Punchier', true],
   ['sat', 'Color', -100, 100, 'Gray', 'Vivid', true],
   ['key', 'Cut out dark parts', 0, 100, 'Off', 'Only the brightest', false],
+  // 3D lighting on this input alone, lit from where the 3D lighting section says (see "3D lighting")
+  ['rDepth', '3D depth', 0, 100, 'Flat', 'Deep bumps', false],
+  ['rSmooth', '3D smoothness', 0, 100, 'Crisp carving', 'Soft jelly', false, '0'],
+  ['rShine', '3D shine', 0, 100, 'Matte clay', 'Wet plastic', false, 'MATTE'],
 ];
-function adjDefaults() { return { tracking: 0, bright: 0, contrast: 0, sat: 0, key: 0 }; }
+function adjDefaults() { return { tracking: 0, bright: 0, contrast: 0, sat: 0, key: 0, rDepth: 0, rSmooth: 30, rShine: 60 }; }
 const adj = {};
 ADJ_SRC.forEach((src) => { adj[src] = adjDefaults(); });
 const adjEls = [];
@@ -5441,6 +5446,9 @@ function packAdj() {
     adjA[i + 2] = a.contrast / 100;
     adjA[i + 3] = a.sat / 100;
     adjB[i] = a.key / 100 * 0.9;
+    adjB[i + 1] = a.rDepth / 100;
+    adjB[i + 2] = a.rSmooth / 100;
+    adjB[i + 3] = a.rShine / 100;
   }
 }
 function buildAdjust(src) {
@@ -5449,22 +5457,23 @@ function buildAdjust(src) {
   d.innerHTML = '<summary>Adjust the picture</summary>';
   const body = document.createElement('div');
   body.className = 'adj-body';
-  for (const [k, label, min, max, lo, hi, bip] of ADJ_DEF) {
+  for (const [k, label, min, max, lo, hi, bip, zero = 'OFF'] of ADJ_DEF) {
+    const def = adjDefaults()[k];
     const id = `adj-${src}-${k}`;
     const c = document.createElement('div');
     c.className = 'ctl';
     c.innerHTML = `<div class="ctl-head"><label for="${id}">${label}</label><output id="${id}-out" for="${id}"></output></div>` +
-      `<input type="range" id="${id}"${bip ? ' class="bipolar"' : ''} min="${min}" max="${max}" step="1" value="0">` +
+      `<input type="range" id="${id}"${bip ? ' class="bipolar"' : ''} min="${min}" max="${max}" step="1" value="${def}">` +
       `<div class="ends"><span>${lo}</span><span>${hi}</span></div>`;
     body.appendChild(c);
     const el = c.querySelector('input'), out = c.querySelector('output');
     const refresh = () => {
       fillTrack(el);
       const v = +el.value;
-      out.textContent = v === 0 ? (bip ? '0' : 'OFF') : (bip && v > 0 ? '+' + v : String(v));
+      out.textContent = v === 0 ? (bip ? '0' : zero) : (bip && v > 0 ? '+' + v : String(v));
     };
     el.addEventListener('input', () => { adj[src][k] = +el.value; refresh(); });
-    el.addEventListener('dblclick', () => { el.value = 0; adj[src][k] = 0; refresh(); });
+    el.addEventListener('dblclick', () => { el.value = def; adj[src][k] = def; refresh(); });
     adjEls.push({ src, k, el, refresh });
     refresh();
   }
@@ -6274,6 +6283,7 @@ function snapshot() {
     snd: { amount: snd.amount, map: clone(snd.map), react: clone(snd.react) },
     text: { str: txt.str, style: txt.style },
     grade: { ...grade },
+    relief: { ...relief },
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
@@ -6389,6 +6399,7 @@ function loadPreset(pr, quiet) {
   syncSoundUI();
   // Presets saved before Color grading existed load with it at normal
   setGrade(d.grade);
+  setRelief(d.relief);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
@@ -7438,6 +7449,60 @@ function setGradeUniforms() {
   set2f(dispProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(dispProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
 }
+/* ================= 3D lighting ================= */
+// The finished picture's brightness read as height and lit like glossy plastic (reliefShade in shaders.js), drawn
+// in the display pass only. Each input can have its own under Adjust the picture (rDepth and the rest in adj),
+// lit by the same light, whose direction is set here and can circle. Autopilot leaves it alone; presets keep it
+// and Neutral turns it off.
+const RELIEF_KEY = 'phosphor-relief-v1';
+const RELIEF_DEF = { rDepth: 0, rSmooth: 30, rShine: 60, rLight: 135, rSpin: 0 };
+const relief = { ...RELIEF_DEF };
+const reliefEls = {};
+for (const k of Object.keys(RELIEF_DEF)) reliefEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
+const LIGHT_SIDES = ['the right', 'top right', 'the top', 'top left', 'the left', 'bottom left', 'the bottom', 'bottom right'];
+function reliefText(k, v) {
+  switch (k) {
+    case 'rDepth': return v === 0 ? 'OFF' : String(v);
+    case 'rShine': return v === 0 ? 'MATTE' : String(v);
+    case 'rLight': return LIGHT_SIDES[Math.round(v / 45) % 8].toUpperCase();
+    case 'rSpin': return v === 0 ? 'STILL' : String(v);
+    default: return String(v);
+  }
+}
+function cleanRelief(r) {
+  const out = { ...RELIEF_DEF };
+  if (!r || typeof r !== 'object') return out;
+  for (const k of Object.keys(RELIEF_DEF)) {
+    const { el } = reliefEls[k];
+    if (Number.isFinite(r[k])) out[k] = clamp(Math.round(r[k]), +el.min, +el.max);
+  }
+  return out;
+}
+function syncReliefUI() {
+  for (const [k, { el, out }] of Object.entries(reliefEls)) { el.value = relief[k]; fillTrack(el); out.textContent = reliefText(k, relief[k]); }
+}
+function saveRelief() { try { localStorage.setItem(RELIEF_KEY, JSON.stringify(relief)); } catch (_) {} }
+function setRelief(r) { Object.assign(relief, cleanRelief(r)); syncReliefUI(); saveRelief(); }
+for (const [k, { el, out }] of Object.entries(reliefEls)) {
+  el.addEventListener('input', () => { relief[k] = +el.value; fillTrack(el); out.textContent = reliefText(k, relief[k]); saveRelief(); });
+  el.addEventListener('dblclick', () => setRelief({ ...relief, [k]: RELIEF_DEF[k] }));
+}
+$('#reliefReset').addEventListener('click', () => setRelief(RELIEF_DEF));
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(RELIEF_KEY) || 'null'); } catch (_) {} setRelief(saved); }
+// Which way the light comes from, 40° above the picture: worked out once per frame for the display pass and used
+// by the next frame's loops too. Circling adds up a turn of its own, so changing its speed never makes it jump.
+const reliefL = [0, 0, 1];
+let reliefTurn = 0, reliefLast = 0;
+function setReliefUniforms(now) {
+  const dt = reliefLast ? Math.min((now - reliefLast) / 1000, 0.25) : 0;
+  reliefLast = now;
+  reliefTurn = (reliefTurn + dt * (relief.rSpin / 100) ** 2 * Math.PI / 2) % (2 * Math.PI);
+  const a = relief.rLight * Math.PI / 180 + reliefTurn, e = 40 * Math.PI / 180;
+  reliefL[0] = Math.cos(a) * Math.cos(e); reliefL[1] = Math.sin(a) * Math.cos(e); reliefL[2] = Math.sin(e);
+  set3f(dispProg, 'uRelief', relief.rDepth / 100, 0.004 + 0.046 * relief.rSmooth / 100, relief.rShine / 100);
+  set3f(dispProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
+}
+window.__plRelief = { relief, setRelief, adj };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
@@ -8401,6 +8466,7 @@ function runLoop(k, xf, brush, f) {
   const la = U(fbProg, 'uAdjA[0]'), lb = U(fbProg, 'uAdjB[0]');
   if (la) gl.uniform4fv(la, adjA);
   if (lb) gl.uniform4fv(lb, adjB);
+  set3f(fbProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
   let b = [0, 0, 0, 0], on = 0;
   if (brush) {
     let a = foldJS(brush[0][0], brush[0][1], t.mirror);
@@ -9572,6 +9638,7 @@ function frame() {
   set2f(dispProg, 'uShake', snd.shakeDir[0] * shake, snd.shakeDir[1] * shake);
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
   setGradeUniforms();
+  setReliefUniforms(now);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   if (window.__phosphorCapture?.onFrame) window.__phosphorCapture.onFrame(now);
