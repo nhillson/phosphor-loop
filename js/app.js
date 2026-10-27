@@ -314,6 +314,13 @@ const rib = { held: new Set(), jump: false, auto: lsGet('phosphor-ribbit-walk') 
 let activePresetId = null;
 let frozen = false;
 let staticAmt = 0;
+// Stream-friendly (the stream app's switch, through __phosphorCapture.streamFriendly): calmer pictures that come
+// through the live stream's small bitrate sharp. Fast zoom, spin, warp, melt, split and colour cycling are held
+// to a gentle top speed, flashes and shakes on the beat are softer, Autopilot changes looks less often and more
+// slowly and brings in Sparks (fine speckle) rarely. Only what's drawn changes: every slider keeps its own value,
+// so switching it off brings the picture back exactly as set. calmK glides between 0 and 1 over a few seconds.
+let streamCalm = false, calmK = 0;
+const calmCap = (v, cap) => v + (clamp(v, -cap, cap) - v) * calmK;
 
 /* ================= DOM ================= */
 const canvas = $('#screen');
@@ -790,7 +797,7 @@ function showOSD(a, b) {
   clearTimeout(osdTimer);
   osdTimer = setTimeout(() => osd.classList.remove('on'), 2200);
 }
-function burst() { if (!reduceMotion) staticAmt = 1; }
+function burst() { if (!reduceMotion && !streamCalm) staticAmt = 1; }
 let tipGone = false;
 function hideTip() {
   if (tipGone) return;
@@ -2198,7 +2205,7 @@ function cleanWeights(v) {
   }
   return out;
 }
-const apW = (k) => apSet.weights[k] ?? 1;
+const apW = (k) => (apSet.weights[k] ?? 1) * (streamCalm && k === 'sparks' ? 0.25 : 1);
 // One world's or fractal's own weight
 const mW = (name) => apW('sc:' + name);
 // The How often menu (see openWeights) and what it calls each input and level
@@ -2231,8 +2238,8 @@ const apAllowed = (src) => !apSet.off.includes(sceneGroup(src) || src) && !(is3D
 function saveAp() {
   try { localStorage.setItem(AP_KEY, JSON.stringify({ ...apSet, pins: [...ap.pins] })); } catch (_) {}
 }
-const apEverySec = () => 10 * Math.pow(12, apSet.every / 100);   // 10 seconds to 2 minutes; 30 by default
-const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100);    // 1.5 to 30 seconds; 10 by default
+const apEverySec = () => 10 * Math.pow(12, apSet.every / 100) * (streamCalm ? 1.5 : 1);   // 10 seconds to 2 minutes; 30 by default
+const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100) * (streamCalm ? 1.5 : 1);    // 1.5 to 30 seconds; 10 by default
 // Each pin has a name: a setting under Mix the two loops is just its own ("view"); a loop's setting also says
 // which loop it holds: "zoom@A", "zoom@B", or "zoom@both" for one pinned on both loops with a right-click.
 function pinParse(id) {
@@ -8355,6 +8362,7 @@ function runLoop(k, xf, brush, f) {
   if (br > 0.005) { const B = breathe(k, br, f / 60); z += B.z; s *= B.s; }
   else { L.breath.z *= 0.95; L.breath.s += (1 - L.breath.s) * 0.05; }
   z = clamp(z, -100, 100); s = clamp(s, -100, 100); col = clamp(col, 0, 100); w = clamp(w, 0, 100);
+  if (calmK > 0.001) { z = calmCap(z, 35); s = calmCap(s, 30); col = calmCap(col, 30); w = calmCap(w, 40); }
   L.warpNow = w;   // with the music's push, for Warp in the final pass
   // Effects set to Final Pass are left out of the loop (see finalPass)
   if (t.warpFinal) w = 0;
@@ -8400,11 +8408,11 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uWarp', (w / 100) * 0.006 * f);
   const fl = (clamp(c.flow, 0, 100) / 100) * FLOW_K;
   set1f(fbProg, 'uFlow', fl * f);
-  const sp = t.splitFinal ? 0 : clamp(c.split, 0, 100) / 100;
+  const sp = t.splitFinal ? 0 : calmCap(clamp(c.split, 0, 100), 30) / 100;
   set1f(fbProg, 'uSplit', Math.pow(sp, 1.5) * 0.007 * f);
   set1f(fbProg, 'uSplitOff', sp * 0.06);
   // Gentle low on the slider, wild at the top
-  set1f(fbProg, 'uMelt', Math.pow(clamp(c.melt, 0, 100) / 100, 1.3) * MELT_K * f);
+  set1f(fbProg, 'uMelt', Math.pow(calmCap(clamp(c.melt, 0, 100), 50) / 100, 1.3) * MELT_K * f);
   set1f(fbProg, 'uMeltTurn', simT * 0.07 + (2.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uPush', Math.pow(clamp(c.push, 0, 100) / 100, 1.3) * PUSH_K * f);
   set1f(fbProg, 'uPushTurn', simT * 0.05 + (3.0 * LOOP_OFF[k]));
@@ -9684,6 +9692,7 @@ function frame() {
   if (lookOnScreen !== ratedLook) syncRated();
   if (!frozen) simT += dt;
   staticAmt = Math.max(0, staticAmt - dt * 3);
+  calmK += ((streamCalm ? 1 : 0) - calmK) * (1 - Math.exp(-dt * 0.8));
 
   for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update(subjectModes(name));
   syncSubjectStatus();
@@ -9788,6 +9797,7 @@ function frame() {
     if (m.warp) shake = a * E.beat * calm;
   }
   set1f(dispProg, 'uPunch', punch);
+  if (calmK > 0.001) { const q = 1 - 0.7 * calmK; flash *= q; hueKick *= q; shake *= q; punch *= 1 - 0.4 * calmK; }
   set1f(dispProg, 'uFlash', flash);
   set1f(dispProg, 'uHueKick', hueKick);
   set2f(dispProg, 'uShake', snd.shakeDir[0] * shake, snd.shakeDir[1] * shake);
@@ -9848,5 +9858,8 @@ if (window.__phosphorCaptureConfig) window.__phosphorCapture = {
   },
   stopSound,
   autopilot() { setAutopilot(true); },
+  // The stream app's Stream-friendly switch (see streamCalm)
+  streamFriendly(on) { streamCalm = !!on; return streamCalm; },
+  get calm() { return { on: streamCalm, amount: calmK }; },
 };
 })();
