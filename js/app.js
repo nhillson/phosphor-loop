@@ -8167,42 +8167,108 @@ function shaderFx(k) {
 }
 
 /* ---------- the Shaders section (folded away until opened) ---------- */
-const shUI = { role: 'input', q: '', built: '' };
+const shUI = { built: '' };
+/* The shader library: a gallery like the nature pictures, with a preview of each shader (shaders/thumbs, made by
+   tools/shaders/build.mjs; your own get one when they're added), Inputs and Effects, kinds, and a search. */
+const shLib = { role: 'input', cat: 'all', q: '' }, shLibDlg = $('#shLib');
+let shLibReturn = null;
 const shSearchText = (e) => `${e.name} ${(e.cats || []).join(' ')} ${e.credit || ''}`.toLowerCase();
-function renderShaderList() {
-  const box = $('#shList'), t = loops[edit].tgt, cur = shUI.role === 'input' ? t.shader : t.fx;
-  const q = shUI.q.trim().toLowerCase();
-  const fits = (e) => e.role === shUI.role && (!q || shSearchText(e).includes(q));
-  const mine = shaderLib.mine.filter(fits), built = (shaderLib.index || []).filter(fits);
-  box.textContent = '';
-  if (!shaderLib.index && !mine.length) { box.innerHTML = '<p class="hint">Loading the shaders…</p>'; return; }
-  if (!mine.length && !built.length) { box.innerHTML = '<p class="hint">No shaders match.</p>'; return; }
-  const head = (text) => { const h = document.createElement('h3'); h.textContent = text; box.appendChild(h); };
-  const row = (e, own) => {
-    const r = document.createElement('div'); r.className = 'sh-row'; r.setAttribute('role', 'listitem');
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'sh-item'; b.dataset.id = e.id;
-    b.setAttribute('aria-pressed', String(e.id === cur));
-    b.innerHTML = `${escapeHTML(e.name)}<small>${escapeHTML([own ? 'Yours' : (e.cats || [])[0], e.audio ? 'listens to sound' : '', own ? '' : e.credit].filter(Boolean).join(' · '))}</small>`;
-    b.addEventListener('click', () => useShader(e.id, shUI.role));
-    r.appendChild(b);
-    if (own) {
+function shLibItems() {
+  return [...shaderLib.mine.map((e) => ({ ...e, own: true, cats: ['Yours'] })), ...(shaderLib.index || [])].filter((e) => e.role === shLib.role);
+}
+function shLibRender() {
+  const items = shLibItems(), t = loops[edit].tgt, cur = shLib.role === 'input' ? (usesShader(t) ? t.shader : '') : t.fx;
+  const cats = [...new Set(items.map((e) => (e.cats || [])[0] || 'Other'))].sort((a, b) => (a === 'Yours' ? -1 : b === 'Yours' ? 1 : a.localeCompare(b)));
+  if (shLib.cat !== 'all' && !cats.includes(shLib.cat)) shLib.cat = 'all';
+  const tabs = $('#shLibTabs'); tabs.textContent = '';
+  for (const c of ['all', ...cats]) {
+    const n = c === 'all' ? items.length : items.filter((e) => ((e.cats || [])[0] || 'Other') === c).length;
+    const b = document.createElement('button'); b.className = 'chip'; b.type = 'button';
+    b.setAttribute('aria-pressed', String(shLib.cat === c));
+    b.innerHTML = `${escapeHTML(c === 'all' ? 'All' : c)} <b>${n}</b>`;
+    // Picking a kind redraws the tabs, so the newly picked one takes the focus (and Escape still closes)
+    b.addEventListener('click', () => { shLib.cat = c; shLibRender(); shLibDlg.scrollTop = 0; $('#shLibTabs [aria-pressed="true"]')?.focus(); });
+    tabs.appendChild(b);
+  }
+  $$('#shLibRoles button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.role === shLib.role)));
+  const q = shLib.q.trim().toLowerCase();
+  const shown = items.filter((e) => (shLib.cat === 'all' || ((e.cats || [])[0] || 'Other') === shLib.cat) && (!q || shSearchText(e).includes(q)));
+  const grid = $('#shLibGrid'), frag = document.createDocumentFragment();
+  grid.textContent = '';
+  for (const e of shown) {
+    const w = document.createElement('div'); w.className = 'sh-tile-wrap';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'nat-tile'; b.dataset.id = e.id;
+    b.title = [e.name, e.credit, e.audio ? 'listens to sound' : ''].filter(Boolean).join(' · ');
+    b.setAttribute('aria-current', String(e.id === cur));
+    const src = e.own ? e.thumb : e.thumb && 'shaders/' + e.thumb;
+    b.innerHTML = (src ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(src)}">` : '<span class="sh-noimg">No preview</span>') +
+      (e.audio ? '<i class="sh-badge">♪ sound</i>' : '') + `<span>${escapeHTML(e.name)}</span>`;
+    b.addEventListener('click', () => { useShader(e.id, shLib.role); closeShaderLib(); });
+    w.appendChild(b);
+    if (e.own) {
       const d = document.createElement('button'); d.type = 'button'; d.className = 'sh-del'; d.textContent = '×';
       d.setAttribute('aria-label', `Delete ${e.name}`);
       d.addEventListener('click', () => {
         if (!d.classList.contains('sure')) { d.classList.add('sure'); d.textContent = 'Delete?'; return; }
         shaderLib.mine = shaderLib.mine.filter((x) => x.id !== e.id); saveMyShaders();
         shaderLib.desc.delete(e.id);
-        renderShaderList();
+        shLibRender();
       });
-      r.appendChild(d);
+      w.appendChild(d);
     }
-    box.appendChild(r);
-  };
-  if (mine.length) { head('Yours'); mine.forEach((e) => row(e, true)); }
-  // The built-in ones under their first category, in alphabetical order of category
-  const groups = new Map();
-  for (const e of built) { const c = (e.cats || [])[0] || 'Other'; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(e); }
-  for (const c of [...groups.keys()].sort()) { head(c); groups.get(c).forEach((e) => row(e, false)); }
+    frag.appendChild(w);
+  }
+  grid.appendChild(frag);
+  if (!shown.length) grid.innerHTML = '<p class="hint">No shaders match.</p>';
+  $('#shLibCount').textContent = `${shown.length} ${shLib.role === 'input' ? 'inputs' : 'effects'}`;
+  $('#shLibHint').textContent = shLib.role === 'input'
+    ? `Tap a shader to make it loop ${edit}’s input.` : `Tap a shader to lay it over loop ${edit}’s picture.`;
+}
+function openShaderLib(role) {
+  if (role) shLib.role = role;
+  shaderIndex().catch(() => null).then(() => {
+    if (!shaderLib.index && !shaderLib.mine.length) { toast('The shader library couldn’t be loaded. It needs internet the first time.'); return; }
+    shLibRender();
+    shLibReturn = document.activeElement;
+    shLibDlg.hidden = false;
+    document.documentElement.style.overflow = 'hidden';
+    const cur = $('#shLibGrid [aria-current="true"]');
+    if (cur) cur.scrollIntoView({ block: 'center' }); else shLibDlg.scrollTop = 0;
+    (cur || $('#shLibSearch')).focus({ preventScroll: true });
+  });
+}
+function closeShaderLib() {
+  if (shLibDlg.hidden) return;
+  shLibDlg.hidden = true;
+  document.documentElement.style.overflow = '';
+  if (shLibReturn && shLibReturn.focus) shLibReturn.focus();
+}
+$('#shOpenIn').addEventListener('click', () => openShaderLib('input'));
+$('#shOpenFx').addEventListener('click', () => openShaderLib('effect'));
+$('#shLibClose').addEventListener('click', closeShaderLib);
+$$('#shLibRoles button').forEach((b) => b.addEventListener('click', () => { shLib.role = b.dataset.role; shLib.cat = 'all'; shLibRender(); shLibDlg.scrollTop = 0; }));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !shLibDlg.hidden) closeShaderLib(); });
+$('#shLibSearch').addEventListener('input', (e) => { shLib.q = e.target.value; shLibRender(); });
+shLibDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeShaderLib(); }
+  else e.stopPropagation();   // keep the app's keys from firing while browsing
+});
+const usesShader = (t) => (t.in1 === 'shader' || t.in2 === 'shader') && !!t.shader;
+// A preview of a pasted shader, made once when it's added (240 by 180, like the built-in ones)
+function shaderThumb(d, role) {
+  const W = 240, H = 180, host = new PS.ShaderHost(gl, d, useFloat);
+  if (host.error) return '';
+  let tex = null;
+  for (let f = 0; f < 30; f++) tex = host.render({ w: W, h: H, time: 1.2 + f / 30, dt: 1 / 30, values: {}, audio: shaderAudio(), noise: shaderNoise(), pic: picTex, image: role === 'effect' ? picTex : null, mouse: [0.5, 0.5, 0, 0] });
+  const px = new Uint8Array(W * H * 4), fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.deleteFramebuffer(fb); host.dispose();
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d'), img = cx.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W * 4; x++) img.data[y * W * 4 + x] = x % 4 === 3 ? 255 : px[(H - 1 - y) * W * 4 + x];
+  cx.putImageData(img, 0, 0);
+  return cv.toDataURL('image/jpeg', 0.75);
 }
 // Sliders and switches for a shader's own settings; changing one changes the loop's value for it
 function buildShaderVals(box, d, getVals, setVal) {
@@ -8273,7 +8339,6 @@ function syncShaderUI() {
       (n, v) => { const T = loops[k].tgt; T.fxVals = { ...T.fxVals, [n]: v }; });
   }
   $('#shMsg').textContent = [inOn && shaderStatus(k, 'in', t.shader), fxOn && shaderStatus(k, 'fx', t.fx)].filter(Boolean).join(' ');
-  for (const b of $$('#shList .sh-item')) b.setAttribute('aria-pressed', String(b.dataset.id === (shUI.role === 'input' ? t.shader : t.fx) && (shUI.role === 'input' ? inOn : fxOn)));
 }
 function useShader(id, role) {
   const t = loops[edit].tgt;
@@ -8284,6 +8349,8 @@ function useShader(id, role) {
   } else { t.fx = id; t.fxVals = {}; }
   shaderDesc(id);
   lookOnScreen++;
+  const e = shaderEntry(id);
+  if (e?.credit && !id.startsWith('u:')) toast(`${e.name}: ${e.credit}`);
   showOSD(role === 'input' ? `INPUT ${edit}` : `EFFECT ${edit}`, shaderName(id).toUpperCase().slice(0, 18));
   syncUI();
 }
@@ -8295,12 +8362,6 @@ $('#shInOff').addEventListener('click', () => {
   settleDevices(); syncUI();
 });
 $('#shFxOff').addEventListener('click', () => { loops[edit].tgt.fx = ''; syncUI(); });
-$$('#shRole button').forEach((b) => b.addEventListener('click', () => {
-  shUI.role = b.dataset.role;
-  $$('#shRole button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  renderShaderList(); syncShaderUI();
-}));
-$('#shSearch').addEventListener('input', (e) => { shUI.q = e.target.value; renderShaderList(); syncShaderUI(); });
 let shPasteRole = 'input';
 $$('#shPasteRole button').forEach((b) => b.addEventListener('click', () => {
   shPasteRole = b.dataset.role;
@@ -8326,18 +8387,15 @@ $('#shPasteAdd').addEventListener('click', () => {
   host.dispose();
   if (err) { msg.textContent = `It doesn’t run here yet: ${err}`; return; }
   const id = 'u:' + randId(10);
-  shaderLib.mine.unshift({ id, name, role: shPasteRole, kind: d.kind, audio: d.audio, code });
+  shaderLib.mine.unshift({ id, name, role: shPasteRole, kind: d.kind, audio: d.audio, code, thumb: shaderThumb(d, shPasteRole) });
   if (!saveMyShaders()) { shaderLib.mine.shift(); msg.textContent = 'This browser’s storage for the page is full, so it couldn’t be kept.'; return; }
   shaderLib.desc.set(id, d);
   $('#shPasteCode').value = ''; $('#shPasteName').value = ''; $('#shPasteName').placeholder = 'My shader';
   msg.textContent = `Added “${name}” to your shaders, and put it on loop ${edit}.`;
-  if (shUI.role !== shPasteRole) $(`#shRole button[data-role="${shPasteRole}"]`).click();
   useShader(id, shPasteRole);
-  renderShaderList();
 });
-// The built-in list is fetched the first time the section is opened (or a look uses a shader)
-function shaderListSoon() { shaderIndex().then(() => { renderShaderList(); syncShaderUI(); }, () => { $('#shList').innerHTML = '<p class="hint">The built-in shaders couldn’t be loaded. They need internet the first time.</p>'; }); }
-$('#shaderGroup').addEventListener('click', (e) => { if (e.target.closest('.group-toggle') && !shaderLib.index) shaderListSoon(); });
+// The built-in list is fetched when the library is opened, Autopilot starts, or a look uses a shader
+function shaderListSoon() { shaderIndex().then(() => syncShaderUI(), () => {}); }
 // Autopilot can bring shaders in once it knows them
 apBtns.forEach((b) => b.addEventListener('click', () => { if (ap.on && !shaderLib.index) shaderListSoon(); }));
 shaderLib.uiReady = true;
