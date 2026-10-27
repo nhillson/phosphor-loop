@@ -10,8 +10,8 @@ const QHINT = {
   good: '720p at 30 frames a second. Works on most home internet.',
   better: '1080p at 30 frames a second. Recommended for Kick and Twitch: keeps the most fine detail.',
   best: '1080p at 60 frames a second. Smoothest motion, but on Kick and Twitch fine detail suffers (each frame gets half the data).',
-  ultra: '1440p at 30 frames a second. YouTube gets the full 1440p; Kick and Twitch get a sharp 1080p copy. Needs a strong graphics card.',
-  max: '4K at 30 frames a second. YouTube gets full 4K; Kick and Twitch get a sharp 1080p copy. Needs a very strong graphics card and fast internet.',
+  ultra: '1440p at 30 frames a second. YouTube gets the full 1440p; Kick gets a sharp 1080p copy; Twitch gets 2K with Enhanced Broadcasting if your account has 2K, otherwise 1080p. Needs a strong graphics card.',
+  max: '4K at 30 frames a second. YouTube gets full 4K; Kick gets a sharp 1080p copy; Twitch gets 2K with Enhanced Broadcasting if your account has 2K, otherwise 1080p. Needs a very strong graphics card and fast internet.',
 };
 // What each switched-on platform gets at this quality, and the upload that needs (with 20% to spare)
 function uploadLine() {
@@ -21,6 +21,12 @@ function uploadLine() {
   if (!on.length) return '';
   let total = 0;
   const parts = on.map((p) => {
+    // Enhanced Broadcasting: Twitch picks the qualities when the stream starts, up to about 10.5 Mbps (more for 2K)
+    if (p === 'twitch' && S.twitch.enhanced) {
+      const two = q.height >= 1440;
+      total += two ? 15 : 10.5;
+      return `Twitch ${two ? 'up to 2K' : Math.min(q.height, 1080) + 'p'} with Enhanced Broadcasting (Twitch picks, up to about ${two ? 15 : 10.5} Mbps)`;
+    }
     const h = Math.min(q.height, MAX_H[p]);
     const table = h === q.height ? q : (q.fps > 30 ? quality.best : quality.better);
     const mbps = (table.bitrate[p] || table.bitrate.twitch) / 1e6;
@@ -49,6 +55,8 @@ function renderSettings() {
   $('#opt-calm').checked = !!S.streamFriendly;
   renderRec();
   $('#opt-yt-hevc').checked = !!S.youtube.hevc;
+  $('#opt-tw-eb').checked = !!S.twitch.enhanced;
+  renderTwitchNote();
   $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
   $('#qualityHint').innerHTML = '';
   $('#qualityHint').append(QHINT[S.quality] + (status.live ? ' Stop the stream to change this.' : ''));
@@ -100,6 +108,20 @@ function renderRec() {
   $('#recFolder').textContent = R.last ? 'Show the last video in its folder' : 'Open the recordings folder';
 }
 
+// Under the Twitch card: what Enhanced Broadcasting is doing (while live), or what it does (before going live)
+function renderTwitchNote() {
+  const el = $('#note-twitch');
+  const d = (status.destinations || {}).twitch;
+  const q = quality[S.quality] || {};
+  $('#opt-tw-eb').disabled = !!status.live || !!status.starting;
+  el.classList.toggle('on', !!(d && d.note));
+  if (d && d.note) { el.textContent = d.note; return; }
+  if (!S.twitch.enhanced) { el.textContent = 'Off: Twitch gets one normal stream (1080p at most, 6 Mbps).'; return; }
+  el.textContent = q.height >= 1440
+    ? 'Twitch picks the qualities each time you go live. 2K (1440p) needs a Twitch Affiliate or Partner account; otherwise Twitch gets 1080p. Changes apply the next time you switch Stream on.'
+    : 'Twitch picks the qualities each time you go live. For 2K, pick 1440p or 4K under Picture quality (needs a Twitch Affiliate or Partner account). Changes apply the next time you switch Stream on.';
+}
+
 const STATE_WORDS = { connecting: 'Connecting…', live: 'Live', retrying: 'Reconnecting…' };
 function renderStatus() {
   const dests = status.destinations || {};
@@ -136,6 +158,7 @@ function renderStatus() {
     $(`#state-${p}`).textContent = d ? (d.state === 'retrying' ? d.message : STATE_WORDS[d.state] || '') : '';
     $(`#on-${p}`).disabled = !!status.live;
   }
+  if (S) renderTwitchNote();
   if (status.encoder) $('#encoder').textContent = 'Using: ' + status.encoder + (status.setting ? ` · ${status.setting}` : '');
   $('#tuneRun').disabled = !!tune.running || !!status.live || !!status.starting;
   $$('[data-q]').forEach((b) => { b.disabled = !!status.live || !!tune.running; });
@@ -237,6 +260,7 @@ for (const p of PLATFORMS) {
   $(`#on-${p}`).addEventListener('change', (e) => save({ [p]: { enabled: e.target.checked } }));
 }
 $('#opt-yt-hevc').addEventListener('change', (e) => save({ youtube: { hevc: e.target.checked } }));
+$('#opt-tw-eb').addEventListener('change', (e) => save({ twitch: { enhanced: e.target.checked } }));
 $('#opt-calm').addEventListener('change', (e) => save({ streamFriendly: e.target.checked }));
 $$('[data-save]').forEach((b) => b.addEventListener('click', async () => {
   const p = b.dataset.save;

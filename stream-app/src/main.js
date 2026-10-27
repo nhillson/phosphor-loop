@@ -5,7 +5,8 @@ const { app, BrowserWindow, WebContentsView, ipcMain, session, desktopCapturer, 
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFile } = require('node:child_process');
-const { Streamer, buildUrl, VARIANTS } = require('./stream.js');
+const { Streamer, buildUrl, VARIANTS, LIGHT, codecOfVariant } = require('./stream.js');
+const EB = require('./twitch-eb.js');
 const { Tuner, candidates, pick } = require('./tune.js');
 const capturePageSource = require('./capture-page.js');
 const { REC_SIZES, REC_QUALITY, REC_DEFAULTS, recPlan, finish, outputName } = require('./record.js');
@@ -50,7 +51,7 @@ if (!TEST && !app.requestSingleInstanceLock()) app.quit();
 const dataDir = () => app.getPath('userData');
 const settingsFile = () => path.join(dataDir(), 'settings.json');
 const DEFAULTS = {
-  twitch: { enabled: true, key: '' },
+  twitch: { enabled: true, key: '', enhanced: true }, // enhanced: Twitch's Enhanced Broadcasting (Twitch picks the settings; 2K)
   kick: { enabled: false, server: '', key: '' },
   youtube: { enabled: false, key: '', hevc: true }, // hevc: send YouTube the sharper HEVC format when the card can make it
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
@@ -85,7 +86,7 @@ function saveSettings() {
 }
 function publicSettings() {
   return {
-    twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key },
+    twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key, enhanced: settings.twitch.enhanced },
     kick: { enabled: settings.kick.enabled, server: settings.kick.server, hasKey: !!settings.kick.key },
     youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
     quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
@@ -190,12 +191,13 @@ ipcMain.on('capture-problem', (_e, text) => { log('Recorder: ' + text); if (stre
 function destinations() {
   const list = [];
   if (TEST && process.env.PHOSPHOR_TEST_RTMP) {
-    list.push({ id: 'twitch', name: 'Test server', url: process.env.PHOSPHOR_TEST_RTMP, secret: 'test-key-secret' });
+    // Enhanced Broadcasting only with a stand-in Twitch settings service (PHOSPHOR_TWITCH_CONFIG_URL)
+    list.push({ id: 'twitch', name: 'Test server', url: process.env.PHOSPHOR_TEST_RTMP, secret: 'test-key-secret', enhanced: !!process.env.PHOSPHOR_TWITCH_CONFIG_URL && !ebOff });
     if (process.env.PHOSPHOR_TEST_RTMP2) list.push({ id: 'youtube', name: 'Test YouTube', url: process.env.PHOSPHOR_TEST_RTMP2, secret: 'test-key-secret2' });
     return list;
   }
   const t = settings.twitch, k = settings.kick;
-  if (t.enabled && t.key) { const key = unlock(t.key); list.push({ id: 'twitch', name: 'Twitch', url: buildUrl('twitch', { key }), secret: key }); }
+  if (t.enabled && t.key) { const key = unlock(t.key); list.push({ id: 'twitch', name: 'Twitch', url: buildUrl('twitch', { key }), secret: key, enhanced: !!t.enhanced && !ebOff }); }
   if (k.enabled && k.key && k.server) { const key = unlock(k.key); list.push({ id: 'kick', name: 'Kick', url: buildUrl('kick', { server: k.server, key }), secret: key }); }
   const y = settings.youtube;
   if (y.enabled && y.key) { const key = unlock(y.key); list.push({ id: 'youtube', name: 'YouTube', url: buildUrl('youtube', { key }), secret: key }); }
@@ -205,8 +207,23 @@ function destinations() {
 // Who gets what: each platform gets the picture at the biggest size it takes (Kick and Twitch: 1080p at most), at its
 // own rate, in H.264, except YouTube, which gets HEVC when this graphics card can make it at that size. Platforms
 // that would get exactly the same stream share one squeeze.
+// Twitch with Enhanced Broadcasting is different: Twitch itself says which encodes it wants (see enhancedPlan).
+const probed = new Map(); // codec@size -> variant or null, for this run of the app (the card doesn't change)
+async function probeCodec(codec, size) {
+  const k = `${streamer.encoder.id}|${codec}@${size.width}x${size.height}`;
+  if (!probed.has(k)) probed.set(k, codec === 'hevc' ? await streamer.probeHevc(size) : codec === 'av1' ? await streamer.probeAv1(size) : streamer.encoder.variant);
+  return probed.get(k);
+}
+const encodeKey = (e) => `${e.width}x${e.height}|${e.variant}|${e.bitrate}|${e.fps || ''}|${e.gop || ''}`;
+function addEncode(encodes, e) {
+  const key = encodeKey(e);
+  let i = encodes.findIndex((x) => x.key === key);
+  if (i < 0) { encodes.push({ ...e, key }); i = encodes.length - 1; }
+  return i;
+}
 async function makePlan(dests) {
   const q = QUALITY[settings.quality];
+  const input = drawnSize();
   const encodes = [], routed = [];
   const checked = new Map();
   const works = async (variant, size) => {
@@ -214,14 +231,13 @@ async function makePlan(dests) {
     if (!checked.has(k)) checked.set(k, size.height <= 1080 || VARIANTS[variant].cpu ? '' : await streamer.tryVariant(variant, { ...size, bitrate: 20000000 }));
     return checked.get(k);
   };
-  for (const d of dests) {
+  const plain = async (d) => {
     let height = Math.min(q.height, MAX_HEIGHT[d.id] || 1080);
     let width = Math.round(height * 16 / 9 / 2) * 2;
     let variant = streamer.encoder.variant;
     if (d.id === 'youtube' && settings.youtube.hevc) {
-      const k = `hevc@${width}x${height}`;
-      if (!checked.has(k)) checked.set(k, await streamer.probeHevc({ width, height }));
-      if (checked.get(k)) variant = checked.get(k);
+      const v = await probeCodec('hevc', { width, height });
+      if (v) variant = v;
       else log(`YouTube: this computer can't make HEVC at ${height}p, so YouTube gets H.264`);
     }
     const problem = await works(variant, { width, height });
@@ -231,13 +247,87 @@ async function makePlan(dests) {
       height = 1080; width = 1920; variant = streamer.encoder.variant;
     }
     const bitrate = (height === q.height ? q.bitrate : (QUALITY.better.fps === q.fps ? QUALITY.better : QUALITY.best).bitrate)[d.id] || q.bitrate.twitch;
-    const key = `${width}x${height}|${variant}|${bitrate}`;
-    let i = encodes.findIndex((e) => e.key === key);
-    if (i < 0) { encodes.push({ key, width, height, bitrate, variant }); i = encodes.length - 1; }
-    routed.push({ ...d, stream: i });
+    routed.push({ ...d, stream: addEncode(encodes, { width, height, bitrate, variant }) });
+  };
+  const twitch = dests.find((d) => d.id === 'twitch' && d.enhanced);
+  for (const d of dests) if (d !== twitch) await plain(d);
+  if (twitch) {
+    let eb = null;
+    // First Twitch's own choice; if this computer can't make all of it at once, ask Twitch for fewer qualities
+    for (const maxTracks of [null, 2]) {
+      try { eb = await enhancedPlan(twitch, { q, input, maxTracks }); } catch (e) {
+        log(`Twitch Enhanced Broadcasting not used: ${e.message}`);
+        tell(`Twitch’s Enhanced Broadcasting isn’t available right now, so Twitch gets a normal stream. Twitch said: “${e.message}”`, e.kind === 'warning' ? 'info' : 'warn');
+        eb = null; break;
+      }
+      const all = [...encodes];
+      eb.encodes.forEach((e) => addEncode(all, e));
+      const problem = await streamer.tryPlan({ fps: q.fps, input, encodes: all });
+      if (!problem) break;
+      log(`Twitch Enhanced Broadcasting: this computer can't make all ${all.length} encodes at once (${problem.slice(0, 200)})${maxTracks ? '' : '; asking Twitch for fewer'}`);
+      if (maxTracks) tell('This graphics card can’t make all the qualities Twitch’s Enhanced Broadcasting wants on top of the other platforms, so Twitch gets a normal stream.', 'warn');
+      eb = null;
+    }
+    if (!eb) await plain(twitch);
+    else {
+      const streams = eb.encodes.map((e) => addEncode(encodes, e));
+      const fb = eb.fallbackTrack >= 0 ? streams[eb.fallbackTrack] : -1;
+      routed.push({ ...twitch, url: eb.url, secrets: eb.secrets, multitrack: true, streams, stream: streams[0], note: eb.note,
+        fallback: fb >= 0 ? { url: twitch.url, stream: fb, label: eb.fallbackLabel, note: 'Normal stream (Enhanced Broadcasting didn’t work this time)' } : null });
+      if (eb.warning) tell(`Twitch says: ${eb.warning}`, 'info');
+    }
   }
-  return { plan: { fps: q.fps, input: { width: q.width, height: q.height }, encodes, calm: settings.streamFriendly }, dests: routed };
+  // Same order as the destinations were given
+  routed.sort((a, b) => dests.findIndex((d) => d.id === a.id) - dests.findIndex((d) => d.id === b.id));
+  return { plan: { fps: q.fps, input, encodes, calm: settings.streamFriendly }, dests: routed };
 }
+
+// Twitch's Enhanced Broadcasting: ask Twitch for its settings, and turn its answer into encodes this computer makes.
+// The top quality (and anything 1080p or bigger) gets the sharpest settings; the small extra qualities lighter ones.
+async function enhancedPlan(d, { q, input, maxTracks }) {
+  const canvas = EB.canvasFor(input, q.fps);
+  const size = { width: canvas.width, height: canvas.height };
+  const can = { h264: streamer.encoder.variant, hevc: await probeCodec('hevc', size), av1: await probeCodec('av1', size) };
+  const codecs = ['h264', ...(can.hevc ? ['h265'] : []), ...(can.av1 ? ['av1'] : [])];
+  const machine = await EB.systemInfo(gpuDevices);
+  const gpu = (machine.gpu || [])[0];
+  log(`Twitch Enhanced Broadcasting: asking Twitch for settings (picture ${canvas.width}x${canvas.height} at ${q.fps} fps; can make ${codecs.join(', ')}; ` +
+    `${gpu ? `${gpu.model} [${gpu.vendor_id.toString(16)}:${gpu.device_id.toString(16)}] driver ${gpu.driver_version}` : 'no graphics card found'}${maxTracks ? `; at most ${maxTracks} qualities` : ''})`);
+  const post = EB.buildPost({ key: d.secret, version: app.getVersion(), codecs, canvas, machine, maxTracks });
+  const { config, warning } = await EB.requestConfig(post, { url: process.env.PHOSPHOR_TWITCH_CONFIG_URL || EB.CONFIG_URL });
+  const tracks = EB.tracksFrom(config, { input: size, fps: q.fps });
+  if (!tracks.length) throw new EB.TwitchError('Twitch sent no qualities for this picture');
+  const family = streamer.encoder.id;
+  const encodes = tracks.map((t, i) => {
+    const top = i === 0 || t.height >= 1080;
+    const variant = top ? can[t.codec] : (LIGHT[t.codec] || {})[family] || can[t.codec];
+    if (!variant) throw new EB.TwitchError(`Twitch asked for ${EB.CODEC_NAME[t.codec]} at ${t.height}p, which this computer can’t make`);
+    return { width: t.width, height: t.height, bitrate: t.bitrate, fps: t.fps < q.fps ? t.fps : undefined, gop: t.gop !== 2 ? t.gop : undefined, variant };
+  });
+  const { url, secrets, configId } = EB.ingestUrl(config, d.secret);
+  // If Twitch later turns the multitrack stream down, the best H.264 track (1080p or less) goes out as a normal stream
+  let fallbackTrack = -1;
+  tracks.forEach((t, i) => { if (t.codec === 'h264' && t.height <= 1080 && t.bitrate <= 6500000 && (fallbackTrack < 0 || t.height > tracks[fallbackTrack].height)) fallbackTrack = i; });
+  const note = `Enhanced Broadcasting: ${EB.summary(tracks)}`;
+  log(`Twitch Enhanced Broadcasting: config ${configId || '(no id)'}: ${EB.summary(tracks)} (` +
+    tracks.map((t, i) => `${t.type}→${encodes[i].variant}`).join(', ') + `)${warning ? '; Twitch warns: ' + warning : ''}`);
+  return { encodes, tracks, url, secrets, note, warning, fallbackTrack, fallbackLabel: fallbackTrack >= 0 ? `${tracks[fallbackTrack].height}p H.264` : '' };
+}
+
+// Enhanced Broadcasting stopped working mid-stream (stream.js already switched Twitch to a normal stream if it
+// could). Without a track that can go out normally, the stream starts again with Enhanced Broadcasting off until the
+// next time Stream is switched on.
+let ebOff = false;
+streamer.on('multitrack-failed', (def, why) => {
+  if (def.fallback) {
+    tell('Twitch didn’t take the Enhanced Broadcasting stream, so Twitch now gets a normal stream. The other platforms weren’t touched.', 'warn');
+    return;
+  }
+  log('Twitch: restarting the stream without Enhanced Broadcasting (' + why + ')');
+  tell('Twitch didn’t take the Enhanced Broadcasting stream, so the stream is starting again with a normal Twitch stream.', 'warn');
+  ebOff = true;
+  stopLive().then(() => goLive());
+});
 
 let startingLive = false;
 async function goLive() {
@@ -258,16 +348,17 @@ async function goLive() {
     await waitFrames(30);
     if (probing) await probing;
     if (!(await waitForSite())) { tell('Phosphor Loop didn’t finish loading. Check the internet connection, then try again.', 'warn'); return { ok: false }; }
-    const { plan, dests: routed } = await makePlan(dests);
     // The picture may be bigger than the stream (a 4K recording running): each platform gets its sharp smaller copy
-    plan.input = drawnSize();
+    const { plan, dests: routed } = await makePlan(dests);
     streamer.start(routed, plan);
     if (settings.autopilotOnLive) siteCall('autopilot').catch(() => {});
     applyCalm();
     if (sleepBlock === null) sleepBlock = powerSaveBlocker.start('prevent-display-sleep');
+    const NAME = { h264: 'H.264', hevc: 'HEVC', av1: 'AV1' };
     log(`Going live at ${settings.quality} (${plan.input.height}p${plan.fps}): ` + routed.map((d) => {
+      if (d.multitrack) return `${d.name} Enhanced Broadcasting (${d.streams.length} qualities)`;
       const e = plan.encodes[d.stream];
-      return `${d.name} ${e.height}p ${VARIANTS[e.variant] && VARIANTS[e.variant].hevc ? 'HEVC' : 'H.264'} ${(e.bitrate / 1e6).toFixed(1)} Mbps (${e.variant})`;
+      return `${d.name} ${e.height}p ${NAME[codecOfVariant(e.variant)]} ${(e.bitrate / 1e6).toFixed(1)} Mbps (${e.variant})`;
     }).join(', '));
     return { ok: true };
   } finally { startingLive = false; sendStatus(); }
@@ -371,10 +462,11 @@ function permissions() {
 }
 
 /* ---------- the computer (for the log) ---------- */
-let gpuName = '';
+let gpuName = '', gpuDevices = [];
 function logMachine() {
   // 'basic' (the full report makes Windows gather DirectX diagnostics, which can slow the page while it runs)
   app.getGPUInfo('basic').then((info) => {
+    gpuDevices = info.gpuDevice || [];
     const list = (info.gpuDevice || []).map((d) => `${d.deviceString || ''} [${(d.vendorId || 0).toString(16)}:${(d.deviceId || 0).toString(16)}]${d.active ? ' active' : ''} driver ${d.driverVersion || '?'}`);
     log('Graphics: ' + (list.join('; ') || 'unknown'));
   }).catch(() => {});
@@ -644,6 +736,7 @@ ipcMain.handle('save', async (_e, patch) => {
     const cur = settings[p];
     if ('enabled' in patch[p]) cur.enabled = !!patch[p].enabled;
     if ('hevc' in patch[p] && p === 'youtube') cur.hevc = !!patch[p].hevc;
+    if ('enhanced' in patch[p] && p === 'twitch') cur.enhanced = !!patch[p].enhanced;
     if ('server' in patch[p]) cur.server = String(patch[p].server || '').trim();
     if ('key' in patch[p]) cur.key = lock(String(patch[p].key || '').trim());
   }
@@ -702,7 +795,8 @@ async function resizeSite() {
   log(`Quality now ${settings.quality}: ${ok ? 'resized in place' : 'reloading the page'}`);
   if (!ok) site.webContents.reload();
 }
-ipcMain.handle('go-live', () => goLive());
+// Switching Stream on by hand tries Enhanced Broadcasting again (if it failed last time)
+ipcMain.handle('go-live', () => { ebOff = false; return goLive(); });
 ipcMain.handle('stop', () => stopLive());
 ipcMain.handle('help', (_e, which) => { if (HELP[which]) shell.openExternal(HELP[which]); });
 ipcMain.handle('collapse', (_e, on) => { settings.collapsed = !!on; saveSettings(); layout(); });

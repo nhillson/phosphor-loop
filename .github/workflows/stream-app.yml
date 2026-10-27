@@ -61,6 +61,11 @@ jobs:
         env:
           FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
 
+      - name: Test Twitch Enhanced Broadcasting (several qualities in one connection, and falling back)
+        run: node test/twitch-eb-test.js
+        env:
+          FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
+
       - name: Test the sharpness test's engine
         run: node test/tune-test.js
         env:

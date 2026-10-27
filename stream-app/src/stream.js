@@ -22,11 +22,12 @@ const ENCODERS = [
 // every extra keyframe starves the frames around it).
 // The sharpness test (tune.js) tries these on the real graphics card and keeps whichever comes out sharpest.
 //   auto: may be picked by the sharpness test; false = measured for comparison only (never streamed with)
-const rules = ({ fps, bitrate }) => ['-b:v', String(bitrate), '-maxrate', String(bitrate), '-bufsize', String(bitrate), '-g', String(fps * 2)];
+// gop: seconds between keyframes (2 unless Twitch's Enhanced Broadcasting asks for something else)
+const rules = ({ fps, bitrate, gop = 2 }) => ['-b:v', String(bitrate), '-maxrate', String(bitrate), '-bufsize', String(bitrate), '-g', String(Math.round(fps * gop))];
 const nv = (preset, extra, { idr = true } = {}) => (q) => ['-c:v', 'h264_nvenc', '-preset', preset, '-tune', 'hq', '-rc', 'cbr',
   ...extra, ...rules(q), '-no-scenecut', '1', ...(idr ? ['-forced-idr', '1'] : []), '-profile:v', 'high'];
 const AQ0 = ['-spatial-aq', '0', '-temporal-aq', '0'];
-const x264 = (preset, params) => (q) => ['-c:v', 'libx264', '-preset', preset, ...rules(q), '-keyint_min', String(q.fps * 2),
+const x264 = (preset, params) => (q) => ['-c:v', 'libx264', '-preset', preset, ...rules(q), '-keyint_min', String(Math.round(q.fps * (q.gop || 2))),
   '-sc_threshold', '0', '-bf', '2', '-profile:v', 'high', '-x264-params', 'nal-hrd=cbr:' + params];
 const VARIANTS = {
   // NVIDIA
@@ -52,6 +53,10 @@ const VARIANTS = {
     args: nv('p6', ['-multipass', 'qres', ...AQ0, '-rc-lookahead', '8', '-bf', '2']) },
   'nv-obs': { codec: 'h264_nvenc', auto: false, label: 'What OBS uses (for comparison)',
     args: nv('p5', ['-multipass', 'qres', '-spatial-aq', '1', '-aq-strength', '8', '-temporal-aq', '1', '-rc-lookahead', '8', '-bf', '2'], { idr: true }) },
+  // Lighter, for the smaller extra qualities Twitch's Enhanced Broadcasting asks for (720p and below), so the card
+  // has time left for the top quality and the other platforms
+  'nv-p5-light': { codec: 'h264_nvenc', auto: false, label: 'Lighter (extra Twitch qualities)',
+    args: nv('p5', ['-multipass', 'disabled', ...AQ0, '-rc-lookahead', '8', '-bf', '2']) },
   'nv-p4': { codec: 'h264_nvenc', auto: true, label: 'Basic (older cards)',
     args: (q) => ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'cbr', '-bf', '0', ...rules(q), '-forced-idr', '1', '-profile:v', 'high'] },
   // AMD and Intel
@@ -82,10 +87,29 @@ const VARIANTS = {
     args: (q) => ['-c:v', 'hevc_qsv', '-preset', 'slower', ...rules(q), '-profile:v', 'main'] },
   'x265-fast': { codec: 'libx265', family: 'libx264', hevc: true, cpu: true, auto: false, label: 'HEVC, processor',
     args: (q) => ['-c:v', 'libx265', '-preset', 'veryfast', ...rules(q), '-x265-params',
-      `scenecut=0:aq-mode=0:psy-rd=0:keyint=${q.fps * 2}:min-keyint=${q.fps * 2}:log-level=error`] },
+      `scenecut=0:aq-mode=0:psy-rd=0:keyint=${Math.round(q.fps * (q.gop || 2))}:min-keyint=${Math.round(q.fps * (q.gop || 2))}:log-level=error`] },
+  // AV1, only if Twitch ever asks for it (Enhanced Broadcasting) and the card can make it (NVIDIA RTX 40 and newer,
+  // AMD RX 7000 and newer, Intel Arc). Never made on the processor: far too slow.
+  'nva-p7': { codec: 'av1_nvenc', family: 'h264_nvenc', av1: true, auto: false, label: 'AV1, max quality',
+    args: (q) => ['-c:v', 'av1_nvenc', '-preset', 'p7', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'fullres', ...AQ0, '-rc-lookahead', '16',
+      '-bf', '3', ...rules(q), '-no-scenecut', '1', '-forced-idr', '1'] },
+  'nva-p5': { codec: 'av1_nvenc', family: 'h264_nvenc', av1: true, auto: false, label: 'AV1, lighter',
+    args: (q) => ['-c:v', 'av1_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'cbr', '-multipass', 'disabled', ...AQ0, '-bf', '0', ...rules(q), '-no-scenecut', '1', '-forced-idr', '1'] },
+  'amfa': { codec: 'av1_amf', family: 'h264_amf', av1: true, auto: false, label: 'AV1, AMD',
+    args: (q) => ['-c:v', 'av1_amf', '-usage', 'transcoding', '-quality', 'quality', '-rc', 'cbr', ...rules(q)] },
+  'qsva': { codec: 'av1_qsv', family: 'h264_qsv', av1: true, auto: false, label: 'AV1, Intel',
+    args: (q) => ['-c:v', 'av1_qsv', '-preset', 'slower', ...rules(q)] },
 };
 // HEVC settings per graphics card, best first
 const HEVC_TIERS = { h264_nvenc: ['nvh-p7', 'nvh-p5'], h264_amf: ['amfh'], h264_qsv: ['qsvh'], libx264: ['x265-fast'] };
+const AV1_TIERS = { h264_nvenc: ['nva-p7', 'nva-p5'], h264_amf: ['amfa'], h264_qsv: ['qsva'], libx264: [] };
+// The lighter settings per codec and graphics card, for Twitch's smaller extra qualities
+const LIGHT = {
+  h264: { h264_nvenc: 'nv-p5-light', h264_amf: 'amf-basic', h264_qsv: 'qsv-basic', libx264: 'x264-veryfast' },
+  hevc: { h264_nvenc: 'nvh-p5', h264_amf: 'amfh', h264_qsv: 'qsvh', libx264: 'x265-fast' },
+  av1: { h264_nvenc: 'nva-p5', h264_amf: 'amfa', h264_qsv: 'qsva', libx264: null },
+};
+const codecOfVariant = (id) => (VARIANTS[id] && VARIANTS[id].av1 ? 'av1' : VARIANTS[id] && VARIANTS[id].hevc ? 'hevc' : 'h264');
 // Each encoder has settings tiers, best first. The first tier the computer's graphics card accepts is used, so an
 // older card still gets the best settings it can do instead of falling all the way back to the processor.
 const TIERS = { h264_nvenc: ['nv-p7-full', 'nv-p6-qres', 'nv-p4'], h264_amf: ['amf-best', 'amf-basic'],
@@ -193,6 +217,32 @@ class Streamer extends EventEmitter {
     return null;
   }
 
+  // The best AV1 settings this computer can make at this size (null if none)
+  async probeAv1(size) {
+    const family = this.encoder ? this.encoder.id : 'libx264';
+    for (const v of AV1_TIERS[family] || []) {
+      const problem = await this.tryVariant(v, size);
+      if (!problem) return v;
+      this.log(`AV1 ${v} at ${size.width}x${size.height} not usable: ${problem.slice(0, 200)}`);
+    }
+    return null;
+  }
+
+  // Can this computer make all of a plan's encodes at the same time? (A graphics card has a limit on how many it
+  // makes at once, and Twitch's Enhanced Broadcasting can ask for five.) '' = yes, otherwise FFmpeg's reason.
+  tryPlan(plan, frames = 20) {
+    const input = plan.input || { width: 1280, height: 720 };
+    const n = plan.encodes.length;
+    const branches = plan.encodes.map((e, i) => `[s${i}]${e.fps && e.fps < plan.fps ? `fps=${e.fps},` : ''}scale=${e.width || input.width}:${e.height || input.height},format=${/_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p'}[v${i}]`);
+    const args = ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', `testsrc2=s=${input.width}x${input.height}:r=${plan.fps}`,
+      '-frames:v', String(frames), '-filter_complex', `[0:v]split=${n}${plan.encodes.map((_, i) => `[s${i}]`).join('')};` + branches.join(';')];
+    plan.encodes.forEach((e, i) => args.push('-map', `[v${i}]`, ...forStream(encoderArgs(e.variant, { fps: e.fps || plan.fps, bitrate: e.bitrate, gop: e.gop }), i)));
+    args.push('-f', 'null', '-');
+    return new Promise((res) => {
+      execFile(this.ffmpeg, args, { timeout: 45000, windowsHide: true }, (err, _o, stderr) => res(err ? String(stderr || err.message).trim().split('\n').slice(-2).join(' ') || 'failed' : ''));
+    });
+  }
+
   // dests: [{id, name, url, secret, stream}], plan: {fps, input: {width, height}, encodes: [{width, height, bitrate,
   // variant}]}. Each destination gets the encode numbered by its "stream" (encodes are shared when identical).
   // Older form: plan = {fps, bitrate}: one encode for every destination.
@@ -204,7 +254,7 @@ class Streamer extends EventEmitter {
     this.live = true;
     this.quality = plan;
     this.plan = plan;
-    this.redact = redactor(dests.map((d) => d.secret));
+    this.redact = redactor(dests.flatMap((d) => [d.secret, ...(d.secrets || [])]));
     this.startedAt = Date.now();
     for (const d of dests) this.senders.set(d.id, { def: d, proc: null, state: 'connecting', message: 'Connecting…', retry: 0, timer: null });
     this.startEncoder();
@@ -229,19 +279,22 @@ class Streamer extends EventEmitter {
     const branches = plan.encodes.map((e, i) => {
       const resize = e.width && e.height && (e.width !== input.width || e.height !== input.height);
       const fmt = /_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p';
-      return `[s${i}]${calm}scale=${resize ? `w=${e.width}:h=${e.height}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}[v${i}]`;
+      // A slower extra quality (Twitch's Enhanced Broadcasting can ask for 30 fps copies of a 60 fps picture)
+      const slower = e.fps && e.fps < plan.fps ? `fps=${e.fps},` : '';
+      return `[s${i}]${slower}${calm}scale=${resize ? `w=${e.width}:h=${e.height}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}[v${i}]`;
     });
     const graph = `[0:v:0]split=${n}${plan.encodes.map((_, i) => `[s${i}]`).join('')};` + branches.join(';');
     const encArgs = [];
     plan.encodes.forEach((e, i) => {
-      encArgs.push('-map', `[v${i}]`, ...forStream(encoderArgs(e.variant || this.encoder.variant, { fps: q.fps, bitrate: e.bitrate }), i));
+      const fps = e.fps && e.fps < q.fps ? e.fps : q.fps;
+      encArgs.push('-map', `[v${i}]`, ...forStream(encoderArgs(e.variant || this.encoder.variant, { fps, bitrate: e.bitrate, gop: e.gop }), i), `-r:v:${i}`, String(fps));
     });
     const args = ['-hide_banner', '-loglevel', 'warning', '-stats_period', '5', '-progress', 'pipe:2',
       // A picture bigger than 1080p is unpacked on the graphics card when it can (much less work for the processor)
       ...((input.height || 0) > 1080 ? ['-hwaccel', 'auto'] : []),
       '-fflags', '+genpts', '-thread_queue_size', '1024', '-i', 'pipe:0',
       '-filter_complex', graph, ...encArgs, '-map', '0:a:0?',
-      '-r', String(q.fps), '-fps_mode', 'cfr',
+      '-fps_mode', 'cfr',
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
       '-bsf:v', 'dump_extra=freq=keyframe',
       '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
@@ -288,12 +341,15 @@ class Streamer extends EventEmitter {
     // It looks for up to 3 s for a full picture (one comes every 2 s), which it needs when joining mid-stream.
     // It takes only its own encode out of the shared stream (which may hold several).
     const total = this.plan.encodes.reduce((a, e) => a + e.bitrate, 0) + 160000;
-    const enc = this.plan.encodes[s.def.stream] || this.plan.encodes[0];
-    const hevc = VARIANTS[enc.variant] && VARIANTS[enc.variant].hevc;
+    // Twitch's Enhanced Broadcasting: several encodes ("tracks") in one connection, the top quality first. FFmpeg
+    // sends the first as ordinary FLV video and the others as enhanced-RTMP multitrack packets, as OBS does.
+    const streams = s.def.multitrack && Array.isArray(s.def.streams) && s.def.streams.length ? s.def.streams : [s.def.stream];
+    const enc = this.plan.encodes[streams[0]] || this.plan.encodes[0];
+    const hevc = !s.def.multitrack && VARIANTS[enc.variant] && VARIANTS[enc.variant].hevc;
     const args = ['-hide_banner', '-loglevel', 'info', '-nostats', '-probesize', String(Math.max(10000000, Math.round(total / 8 * 4))),
       '-analyzeduration', '3000000',
       '-readrate', '1', '-readrate_initial_burst', '0.5', '-f', 'mpegts', '-i', 'pipe:0',
-      '-map', `0:v:${s.def.stream}`, '-map', '0:a:0?', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-flvflags', 'no_duration_filesize', '-rw_timeout', '15000000',
+      ...streams.flatMap((n) => ['-map', `0:v:${n}`]), '-map', '0:a:0?', '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-flvflags', 'no_duration_filesize', '-rw_timeout', '15000000',
       // HEVC goes out as "enhanced RTMP", which YouTube understands
       ...(hevc ? ['-rtmp_enhanced_codecs', 'hvc1'] : []),
       '-f', 'flv', s.def.url];
@@ -313,6 +369,26 @@ class Streamer extends EventEmitter {
     p.on('exit', (code) => {
       if (s.proc === p) s.proc = null;
       if (!this.live || !this.senders.has(id)) return;
+      // Enhanced Broadcasting that keeps failing within half a minute (Twitch turning it down, or the stream key it
+      // gave no longer working): switch this platform to its normal single stream, made from one of the tracks
+      // already being squeezed, so nothing else is disturbed
+      if (s.def.multitrack) {
+        s.mtFails = Date.now() - s.startedAt < 30000 ? (s.mtFails || 0) + 1 : 0;
+        if (s.mtFails >= 3) {
+          const why = tail.split('\n').slice(-3).join(' | ');
+          this.log(`${s.def.name}: Enhanced Broadcasting failed ${s.mtFails} times in a row (${why})`);
+          this.emit('multitrack-failed', s.def, why);
+          if (s.def.fallback) {
+            this.log(`${s.def.name}: switching to a normal stream (${s.def.fallback.label || 'one track'})`);
+            s.def = { ...s.def, ...s.def.fallback, multitrack: false, streams: null, fallback: null, note: s.def.fallback.note || '' };
+            s.retry = 0; s.mtFails = 0; s.wasLive = false;
+            s.state = 'retrying'; s.message = 'Switching to a normal stream…';
+            s.timer = setTimeout(() => this.startSender(id), 1000);
+            this.emitStatus();
+            return;
+          }
+        }
+      }
       s.retry++;
       const wait = Math.min(30, [2, 5, 10, 20][s.retry - 1] || 30);
       s.state = 'retrying';
@@ -363,7 +439,8 @@ class Streamer extends EventEmitter {
     const other = [];
     for (const line of lines) {
       const m = line.match(/^(frame|dup_frames|drop_frames|speed|progress)=\s*(\S+)/);
-      if (!m) { if (line.trim()) other.push(line.trim()); continue; }
+      // FFmpeg's other progress figures (fps=, bitrate=, out_time=, stream_0_1_q=…) aren't needed in the log
+      if (!m) { if (line.trim() && !/^[a-z0-9_]+=/.test(line.trim())) other.push(line.trim()); continue; }
       if (m[1] === 'frame') pr.frame = +m[2];
       else if (m[1] === 'dup_frames') pr.dup = +m[2];
       else if (m[1] === 'drop_frames') pr.drop = +m[2];
@@ -413,7 +490,7 @@ class Streamer extends EventEmitter {
 
   status() {
     const destinations = {};
-    for (const [id, s] of this.senders) destinations[id] = { state: s.state, message: s.message };
+    for (const [id, s] of this.senders) destinations[id] = { state: s.state, message: s.message, note: s.def.note || '' };
     return { live: this.live, since: this.live ? this.startedAt : 0, kbps: this.kbps, encoder: this.encoder && this.encoder.label,
       pictureFps: this.live ? this.pictureFps : 0, wantFps: this.live && this.quality ? this.quality.fps : 0, destinations };
   }
@@ -429,4 +506,4 @@ function explain(tail, def, wasLive) {
   return `${def.name} stopped.`;
 }
 
-module.exports = { Streamer, buildUrl, encoderArgs, forStream, redactor, ENCODERS, TIERS, VARIANTS, HEVC_TIERS };
+module.exports = { Streamer, buildUrl, encoderArgs, forStream, redactor, ENCODERS, TIERS, VARIANTS, HEVC_TIERS, AV1_TIERS, LIGHT, codecOfVariant };

@@ -1,7 +1,7 @@
 {
   "name": "phosphor-stream",
   "productName": "Phosphor Stream",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Stream Phosphor Loop to Twitch, Kick and YouTube",
   "author": "Nick Hillson",
   "license": "UNLICENSED",

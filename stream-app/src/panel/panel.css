@@ -94,6 +94,9 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent-hi);
 .seg2 { grid-template-columns: repeat(2, 1fr); margin-top: -4px; }
 .mini-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); padding-top: 2px; }
 .hint .need { display: block; margin-top: 4px; color: var(--text); }
+.dest-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.dest-note:empty { display: none; }
+.dest-note.on { color: var(--text); }
 .hint { margin: 0; color: var(--muted); font-size: 12.5px; }
 
 .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: 12px; padding-top: 4px; }
