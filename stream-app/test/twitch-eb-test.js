@@ -23,6 +23,7 @@ const FP = FF.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1');
 const FRAMES = +(process.env.FRAMES || 900);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pseb-'));
 const logs = [];
+const appLogs = []; // what the app itself would write to its log (the stand-in servers' own messages are kept apart)
 const ann = (kind, title, text) => { if (process.env.GITHUB_ACTIONS) console.log(`::${kind} title=twitch-eb ${title}::` + String(text).slice(-3500).replace(/%/g, '%25').replace(/\r?\n/g, '%0A')); };
 const fail = (m) => { console.error('FAIL: ' + m); console.log(logs.slice(-60).join('\n')); ann('error', 'failed', m + '\n' + logs.slice(-40).join('\n')); process.exit(1); };
 const ok = (m) => console.log('ok  ' + m);
@@ -176,7 +177,7 @@ async function endToEnd() {
     if (process.env.GITHUB_ACTIONS) fail('the build computer\'s FFmpeg is too old for multitrack: ' + v.line);
     return;
   }
-  const s = new Streamer({ ffmpeg: FF, log: (m) => logs.push(m) });
+  const s = new Streamer({ ffmpeg: FF, log: (m) => { logs.push(m); appLogs.push(m); } });
   await s.probe();
   const hevc = await s.probeHevc({ width: 480, height: 270 });
   if (!hevc) fail('no HEVC encoder for the test');
@@ -213,14 +214,15 @@ async function endToEnd() {
   if (rate && Math.abs(rate - 15) > 1) fail('the 15 fps track arrived at ' + slow.avg_frame_rate);
   if (!got.some((x) => x.codec_type === 'audio' && x.codec_name === 'aac')) fail('no AAC sound on the multitrack stream');
   if (!st.destinations.twitch || st.destinations.twitch.note !== 'Enhanced: test') fail('status has no Enhanced Broadcasting note: ' + JSON.stringify(st));
-  if (logs.some((l) => /live_minted_SECRET|live_1_userKEY/.test(l))) fail('a stream key reached the log');
+  const leak = appLogs.find((l) => /live_minted_SECRET|live_1_userKEY/.test(l));
+  if (leak) fail('a stream key reached the log: ' + leak.slice(0, 200));
   ok(`multitrack: ${video.map((x) => `${x.codec_name} ${x.width}x${x.height} ${x.avg_frame_rate}`).join(', ')} + aac`);
 
   // 4. turned down three times in a row → a normal stream from the H.264 track, by itself
   const B = path.join(dir, 'fallback.mkv');
   const lb = listener(19372, B, 'normal server');
   await new Promise((r) => setTimeout(r, 400));
-  const s2 = new Streamer({ ffmpeg: FF, log: (m) => logs.push(m) });
+  const s2 = new Streamer({ ffmpeg: FF, log: (m) => { logs.push(m); appLogs.push(m); } });
   s2.encoder = s.encoder;
   let failed = 0, gen2 = 0;
   s2.on('multitrack-failed', () => { failed++; });
