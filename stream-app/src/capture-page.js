@@ -19,10 +19,14 @@ module.exports = function capturePageSource() {
     }
     if (wanted && !S.loop) {
       try {
-        const shared = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        // Music, not a phone call: no echo cancelling, noise removal or volume levelling (they make music sound
+        // muffled and underwater), and both speakers at full quality
+        const MUSIC = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2, sampleRate: 48000, sampleSize: 16 };
+        const shared = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: MUSIC });
         shared.getVideoTracks().forEach((t) => t.stop());
         const track = shared.getAudioTracks()[0];
         if (track) {
+          try { await track.applyConstraints({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }); } catch (_) {}
           S.loop = track;
           S.ctx.createMediaStreamSource(new MediaStream([track])).connect(S.dest);
           try { window.__phosphorCapture.listen(new MediaStream([track.clone()])); } catch (_) {}
@@ -135,7 +139,7 @@ module.exports = function capturePageSource() {
     S.video = hook.canvas.captureStream(opts.fps).getVideoTracks()[0];
     const types = ['video/x-matroska;codecs=avc1,opus', 'video/webm;codecs=h264,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t));
-    const rec = new MediaRecorder(new MediaStream([S.video, audio]), { mimeType, videoBitsPerSecond: opts.recordBitrate, audioBitsPerSecond: 192000 });
+    const rec = new MediaRecorder(new MediaStream([S.video, audio]), { mimeType, videoBitsPerSecond: opts.recordBitrate, audioBitsPerSecond: 320000 });
     const gen = opts.gen;
     rec.ondataavailable = (e) => {
       if (!e.data || !e.data.size) return;
@@ -145,7 +149,12 @@ module.exports = function capturePageSource() {
     rec.onerror = (e) => window.phosphorStream.problem(String((e && e.error && e.error.message) || 'recorder error'));
     rec.start(200);
     S.rec = rec;
-    return { mimeType, sound: !!S.loop, soundErr: S.loop ? '' : (S.soundErr || '') };
+    let soundInfo = '';
+    try {
+      const t = S.loop && S.loop.getSettings();
+      if (t) soundInfo = (t.channelCount || '?') + ' ch, ' + (t.sampleRate || '?') + ' Hz, echo ' + t.echoCancellation + ', noise ' + t.noiseSuppression + ', level ' + t.autoGainControl;
+    } catch (_) {}
+    return { mimeType, sound: !!S.loop, soundErr: S.loop ? '' : (S.soundErr || ''), soundInfo };
   };
 })();`;
 };

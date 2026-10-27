@@ -177,7 +177,7 @@ streamer.on('capture', async (gen) => {
   const q = QUALITY[settings.quality];
   try {
     captureInfo = await siteCall('start', { gen, fps: q.fps, recordBitrate: recordBitrate(q), sound: true });
-    log(`Capture ${gen}: ${captureInfo.mimeType}, sound ${captureInfo.sound ? 'on' : 'off ' + captureInfo.soundErr}`);
+    log(`Capture ${gen}: ${captureInfo.mimeType}, sound ${captureInfo.sound ? 'on (' + (captureInfo.soundInfo || 'no details') + ')' : 'off ' + captureInfo.soundErr}`);
     if (!captureInfo.sound) tell('Couldn’t hear this computer’s sound, so the stream is silent for now. Check that a speaker or headphones are set up in Windows.', 'warn');
   } catch (e) {
     log('Capture could not start: ' + e.message);

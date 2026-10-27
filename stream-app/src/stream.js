@@ -244,7 +244,7 @@ class Streamer extends EventEmitter {
       '-r', String(q.fps), '-fps_mode', 'cfr',
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
       '-bsf:v', 'dump_extra=freq=keyframe',
-      '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+      '-af', 'aresample=async=1000', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
       '-f', 'mpegts', '-mpegts_flags', '+resend_headers', '-muxdelay', '0', 'pipe:1'];
     this.prog = { frame: 0, dup: 0, drop: 0, at: Date.now(), lastLog: Date.now(), lastFrame: 0, lastDup: 0, lastDrop: 0, partial: '' };
     this.pictureFps = 0;
