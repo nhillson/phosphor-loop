@@ -27,6 +27,7 @@ FILES = {
     'js/ribbit.js': 'application/javascript',
     'js/spotify.js': 'application/javascript',
     'js/timeline.js': 'application/javascript',
+    'js/shaderhost.js': 'application/javascript',
     'js/subject.js': 'application/javascript',
     'js/shapes.js': 'application/javascript',
     'js/app.js': 'application/javascript',

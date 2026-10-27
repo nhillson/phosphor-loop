@@ -1014,3 +1014,31 @@ button.seq-card { cursor: pointer; }
   .seq-card .seq-txt, .seq-song-card svg, .seq-mini { display: none; }
   .seq-song-card::after { content: "\266A"; }
 }
+
+/* ---------- Shaders (Shadertoy, ISF) ---------- */
+#shaderGroup .group-body { display: flex; flex-direction: column; gap: 12px; }
+#shaderGroup .group-body[hidden] { display: none; }
+.sh-now { gap: 6px; }
+.sh-cur { font-size: 14px; color: var(--loop-a-ink); text-align: right; overflow-wrap: anywhere; }
+.sh-vals { display: flex; flex-direction: column; gap: 8px; }
+.sh-vals:empty { display: none; }
+.sh-vals .ctl-head label { font-size: 13px; }
+.sh-vals select, .sh-vals input[type="color"] { background: var(--well); border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font: 13px var(--f-body); padding: 4px 6px; }
+.sh-msg:empty { display: none; }
+.sh-search { width: 100%; box-sizing: border-box; margin-top: 8px; min-height: 34px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--well); color: var(--ink); font: 14px var(--f-body); }
+.sh-list { margin-top: 8px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 4px; }
+.sh-list h3 { margin: 10px 0 2px; font: 11px/1.2 var(--f-display); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+.sh-row { display: flex; align-items: stretch; gap: 4px; }
+.sh-item { flex: 1; min-width: 0; text-align: left; padding: 6px 8px; border-radius: 5px; border: 1px solid transparent; background: none; color: var(--ink); font: 14px/1.25 var(--f-body); cursor: pointer; }
+.sh-item small { display: block; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-item:hover, .sh-item:focus-visible { background: var(--raise); }
+.sh-item[aria-pressed="true"] { border-color: var(--loop-a-ink); background: var(--press-1); color: var(--press-ink); }
+.sh-del { flex: none; width: 30px; border-radius: 5px; border: 1px solid var(--line); background: var(--raise); color: var(--dim); cursor: pointer; font: 14px var(--f-body); }
+.sh-del.sure { width: auto; padding: 0 8px; color: #ffd9d5; border-color: var(--tally); }
+.sh-paste { display: flex; flex-direction: column; gap: 8px; }
+.sh-paste summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.sh-paste[open] summary { margin-bottom: 8px; }
+.sh-paste > * + * { margin-top: 8px; }
+.sh-field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); }
+.sh-field input { flex: 1; min-width: 0; min-height: 32px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--well); color: var(--ink); font: 14px var(--f-body); }
+#shPasteCode { width: 100%; box-sizing: border-box; min-height: 140px; padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--well); color: var(--ink); font: 12px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; resize: vertical; }

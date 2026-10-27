@@ -781,9 +781,9 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 12) return seedPatch(p, uTime);
   if (id == 22) return seedSpec(p);
   if (id == 24) return seedText(p, uTime);
-  // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this
+  // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31), the fractal flights (25 to 30) and a shader (32), each drawn just before this
   // pass (see draw3D) filling the screen
-  if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 31)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
+  if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);
   if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
   if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);
