@@ -17,6 +17,19 @@
     out[0][0] = 0; out[out.length - 1][0] = 1;
     return out;
   }
+  // Which picture or video a block's look uses (see seqCaptureMedia in app.js)
+  function cleanMedia(m) {
+    if (!m || typeof m !== 'object') return null;
+    const one = (x, kinds) => {
+      if (!x || typeof x !== 'object' || !kinds.includes(x.kind)) return null;
+      const o = { kind: x.kind, name: String(x.name || '').slice(0, 120) };
+      for (const k of ['f', 'key', 'id']) if (typeof x[k] === 'string' && x[k]) o[k] = x[k].slice(0, 160);
+      if (Number.isFinite(+x.at) && +x.at > 0) o.at = Math.round(+x.at * 10) / 10;
+      return o;
+    };
+    const pic = one(m.pic, ['nature', 'own', 'card']), vid = one(m.vid, ['own', 'clip']);
+    return pic || vid ? { ...(pic ? { pic } : {}), ...(vid ? { vid } : {}) } : null;
+  }
   function cleanBlock(b) {
     if (!b || typeof b !== 'object' || !b.look || typeof b.look !== 'object') return null;
     const a = Math.max(0, num(b.a)), end = Math.max(a + MIN_LEN, num(b.b, a + 16));
@@ -24,7 +37,8 @@
     const autos = (Array.isArray(b.autos) ? b.autos : []).filter((x) => x && typeof x.key === 'string')
       .slice(0, 32).map((x) => ({ key: x.key.slice(0, 40), pts: cleanPts(x.pts) }));
     return { id: typeof b.id === 'string' ? b.id.slice(0, 24) : id(), track: clamp(Math.round(num(b.track)), 0, TRACKS - 1),
-      a: r2(a), b: r2(end), label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', look: b.look, fin: r2(fin), fout: r2(fout), autos };
+      a: r2(a), b: r2(end), label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', look: b.look, fin: r2(fin), fout: r2(fout), autos,
+      ...(cleanMedia(b.media) ? { media: cleanMedia(b.media) } : {}) };
   }
   function cleanData(d) {
     return {

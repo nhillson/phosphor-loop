@@ -80,6 +80,11 @@ SPOTIFY SONG SEQUENCER
   the playhead on the chosen track. A block shows what its loop shows until
   you name it (right-click › Rename…); right-click › Save to My presets…
   keeps its look as a preset.
+  A block that uses Picture or Video remembers which one: a nature picture or
+  library clip by name, your own picture or video as a copy kept in this
+  browser. A video starts where it was when the block was added and follows
+  the song. Picture and Video are shared by all loops, so when two blocks on
+  screen want different ones, the newer block's wins.
 
 SIZING THE PICTURE AND THE CONTROLS
   Drag the right edge, bottom edge or corner of the picture's frame to size

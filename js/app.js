@@ -4758,6 +4758,10 @@ fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
 }));
 
 /* ================= picture & video files ================= */
+// What's in the Picture and the Video input right now (shared by every loop), so a sequencer block can remember it:
+// a nature picture by its file, a picture or video of your own by a key it's kept under (see blockMediaDB), the
+// test card, or a library clip by its id. picCanvas and vidBlob hold your own file until a block keeps a copy.
+const inMedia = { pic: { kind: 'card', name: 'the test card' }, vid: null, picCanvas: null, vidBlob: null };
 const picFile = $('#picFile'), vidFile = $('#vidFile');
 $('#pickPic').addEventListener('click', () => picFile.click());
 $('#pickVid').addEventListener('click', () => vidFile.click());
@@ -4767,6 +4771,7 @@ $('#useCard').addEventListener('click', () => {
   uploadTo(picTex, testCard);
   picAspect = 4 / 3;
   $('#picName').textContent = 'the test card';
+  inMedia.pic = { kind: 'card', name: 'the test card' }; inMedia.picCanvas = null;
   $('#useCard').hidden = true;
   natNoCredit();
   nat.own = false;
@@ -4806,10 +4811,12 @@ function loadFile(file) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      uploadTo(picTex, downscale(img));
+      const small = downscale(img);
+      uploadTo(picTex, small);
       picAspect = img.naturalWidth / img.naturalHeight;
       URL.revokeObjectURL(url);
       $('#picName').textContent = file.name;
+      inMedia.pic = { kind: 'own', key: 'p' + randId(12), name: file.name }; inMedia.picCanvas = small;
       $('#useCard').hidden = false;
       natNoCredit();
       nat.own = true;
@@ -4823,6 +4830,7 @@ function loadFile(file) {
     clips.ask++;   // a library clip still on its way doesn't replace this one
     openVideo(URL.createObjectURL(file), file.name).then((ok) => {
       if (!ok) return;
+      inMedia.vid = { kind: 'own', key: 'v' + randId(12), name: file.name }; inMedia.vidBlob = file;
       // A video of your own: Autopilot leaves it in place instead of bringing in library clips
       clips.own = true;
       clipNoCredit();
@@ -4912,6 +4920,7 @@ function natPick(i, quiet) {
     uploadTo(picTex, downscale(img));
     picAspect = img.naturalWidth / img.naturalHeight;
     $('#picName').textContent = p.n;
+    inMedia.pic = { kind: 'nature', f: p.f, name: p.n }; inMedia.picCanvas = null;
     $('#useCard').hidden = false;
     nat.cur = i;
     nat.own = false;
@@ -5095,6 +5104,7 @@ function clipPick(c, quiet) {
       if (ask !== clips.ask) return false;   // a later pick (or a video of your own) overtook this one
       return openVideo(URL.createObjectURL(blob), c.n, { quiet }).then((ok) => {
         if (!ok || ask !== clips.ask) return ok;
+        inMedia.vid = { kind: 'clip', id: c.id, name: c.n }; inMedia.vidBlob = null;
         clips.cur = c.id;
         clips.own = false;
         const from = c.src && /^https?:/.test(c.src)
@@ -8597,7 +8607,14 @@ const fmtSeq = (t, tenths) => {
 const r1 = (v) => Math.round(v * 10) / 10;
 const inputName = (k) => SRC_LABEL[k] || 'Nothing';
 // A block's name: the one you gave it, or else what its loop shows
-const seqName = (bl) => (bl.rec ? 'Recording…' : bl.label || inputName(bl.look?.in1));
+const seqName = (bl) => {
+  if (bl.rec) return 'Recording…';
+  if (bl.label) return bl.label;
+  const in1 = bl.look?.in1, m = bl.media;
+  if (in1 === 'picture' && m?.pic) return m.pic.name;
+  if (in1 === 'video' && m?.vid) return m.vid.name;
+  return inputName(in1);
+};
 
 const seq = {
   records: new Map(), key: 'standalone', rec: TL.newRecord(), song: null, accountId: null, lastPlayback: null,
@@ -8651,10 +8668,11 @@ $('#seqRedo').addEventListener('click', seqRedo);
 
 /* ---------- the song's spectrograph, built from what the app hears ---------- */
 const SPEC_SEQ_RATE = 20, SPEC_SEQ_BANDS = 28;
-const seqSpecDB = (() => {
+// A key/value store in IndexedDB (each in a database of its own)
+function idbStore(dbName) {
   let db = null;
   const open = () => db ||= new Promise((res, rej) => {
-    const r = indexedDB.open('phosphor-song-spectrographs', 1);
+    const r = indexedDB.open(dbName, 1);
     r.onupgradeneeded = () => r.result.createObjectStore('s');
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
@@ -8663,7 +8681,10 @@ const seqSpecDB = (() => {
     return new Promise((res, rej) => { const tx = d.transaction('s', mode), q = fn(tx.objectStore('s')); tx.oncomplete = () => res(q?.result); tx.onerror = () => rej(tx.error); });
   };
   return { get: (k) => run('readonly', (s) => s.get(k)), put: (k, v) => run('readwrite', (s) => s.put(v, k)) };
-})();
+}
+const seqSpecDB = idbStore('phosphor-song-spectrographs');
+// Copies of your own pictures and videos that sequencer blocks use, so they come back after the page is reopened
+const blockMediaDB = idbStore('phosphor-block-media');
 function seqSpecFor(key, dur) {
   const n = Math.ceil(dur * SPEC_SEQ_RATE);
   const sp = { key, n, data: new Uint8Array(n * SPEC_SEQ_BANDS), heard: new Uint8Array(n), changed: false, savedAt: 0 };
@@ -8745,6 +8766,7 @@ function seqRun(on, message) {
   } else {
     if (seq.apMode) { seq.apMode = null; }
     seqStopRec();
+    seq.ownsVideo = false;
   }
   if (message) seqNote(message);
 }
@@ -8783,6 +8805,110 @@ $('#seqEnd').addEventListener('change', (e) => { seq.rec.end = e.target.value; s
 
 /* ---------- playing the blocks onto the loops ---------- */
 const SEQ_SKIP = new Set(['in1', 'in2', 'blend']);
+/* ---------- a block's picture or video ---------- */
+// A block that uses Picture or Video remembers which one: a nature picture by its file, the test card, a library clip
+// by its id, or a picture or video of your own as a copy kept in this browser (blockMediaDB). The Picture and Video
+// inputs are shared by every loop, so when two blocks on screen want different ones, the newer block's wins.
+const usesIn = (look, src) => look?.in1 === src || look?.in2 === src;
+const sameMedia = (a, b) => !!a && !!b && a.kind === b.kind && (a.f || a.key || a.id || '') === (b.f || b.key || b.id || '');
+const seqKept = new Set();
+async function seqKeep(key, getBlob) {
+  if (seqKept.has(key)) return;
+  seqKept.add(key);
+  try { await blockMediaDB.put(key, await getBlob()); }
+  catch (_) { seqKept.delete(key); seqNote('This browser has no room left to keep a copy of that file, so the block will use whatever is loaded when it plays.'); }
+}
+function canvasBlob(src) {
+  let c = src;
+  if (!(c instanceof HTMLCanvasElement)) {
+    c = document.createElement('canvas'); c.width = src.naturalWidth || src.width; c.height = src.naturalHeight || src.height;
+    c.getContext('2d').drawImage(src, 0, 0);
+  }
+  return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('no picture'))), 'image/jpeg', 0.92));
+}
+// What the Picture and Video inputs hold now, for a block with this look (and keeps copies of your own files)
+function seqCaptureMedia(look) {
+  const m = {};
+  if (usesIn(look, 'picture') && inMedia.pic) {
+    m.pic = { ...inMedia.pic };
+    if (m.pic.kind === 'own' && inMedia.picCanvas) { const c = inMedia.picCanvas; seqKeep(m.pic.key, () => canvasBlob(c)); }
+  }
+  if (usesIn(look, 'video') && inMedia.vid) {
+    m.vid = { ...inMedia.vid, at: r1(vid.video?.currentTime || 0) };
+    if (m.vid.kind === 'own' && inMedia.vidBlob) { const f = inMedia.vidBlob; seqKeep(m.vid.key, () => f); }
+  }
+  return m.pic || m.vid ? m : null;
+}
+const seqMediaSig = (look) => JSON.stringify([usesIn(look, 'picture') ? inMedia.pic : null, usesIn(look, 'video') ? inMedia.vid : null]);
+const seqMediaAsk = { pic: 0, vid: 0 };
+function seqBlobImage(blob) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad picture')); };
+    img.src = url;
+  });
+}
+async function seqLoadPic(pm) {
+  const ask = ++seqMediaAsk.pic;
+  try {
+    if (pm.kind === 'nature') {
+      await natList();
+      const i = nat.pics.findIndex((p) => p.f === pm.f);
+      if (i < 0) throw new Error();
+      if (ask === seqMediaAsk.pic) natPick(i, true);
+    } else if (pm.kind === 'card') {
+      if (ask === seqMediaAsk.pic) $('#useCard').click();
+    } else {
+      const blob = await blockMediaDB.get(pm.key);
+      if (!blob) throw new Error();
+      const img = await seqBlobImage(blob);
+      if (ask !== seqMediaAsk.pic) return;
+      uploadTo(picTex, downscale(img));
+      picAspect = img.naturalWidth / img.naturalHeight;
+      $('#picName').textContent = pm.name; $('#useCard').hidden = false;
+      natNoCredit(); nat.own = true; nat.ask++;
+      inMedia.pic = { ...pm }; inMedia.picCanvas = null;
+    }
+  } catch (_) {
+    if (ask === seqMediaAsk.pic) seqNote(`The picture “${pm.name}” isn’t available any more. Pick it again under Inputs, then add the block again.`);
+  }
+}
+// Puts the video where the block wants it: its start point plus how far into the block the song is
+function seqVidTime(bl) {
+  const v = vid.video, at = (bl.media?.vid?.at || 0) + Math.max(0, seq.t - bl.a);
+  if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
+  const want = at % v.duration;
+  if (Math.abs(v.currentTime - want) > 0.4) v.currentTime = want;
+}
+async function seqLoadVid(bl) {
+  const vm = bl.media.vid, ask = ++seqMediaAsk.vid;
+  try {
+    if (vm.kind === 'clip') {
+      await clipList();
+      const c = (clips.list || []).find((x) => x.id === vm.id);
+      if (!c || !(await clipPick(c, true))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
+    } else {
+      const blob = await blockMediaDB.get(vm.key);
+      if (!blob) throw new Error(`The video “${vm.name}” isn’t kept in this browser any more. Load it again under Inputs, then add the block again.`);
+      if (ask !== seqMediaAsk.vid) return;
+      clips.ask++;
+      if (!(await openVideo(URL.createObjectURL(blob), vm.name, { quiet: true }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
+      clips.own = true; clipNoCredit();
+      inMedia.vid = { ...vm }; delete inMedia.vid.at; inMedia.vidBlob = null;
+    }
+    if (ask === seqMediaAsk.vid) seqVidTime(bl);
+  } catch (e) { if (ask === seqMediaAsk.vid) seqNote(e.message); }
+}
+function seqShowMedia(bl) {
+  const m = bl?.media;
+  if (!m) return;
+  if (m.pic && !sameMedia(m.pic, inMedia.pic)) seqLoadPic(m.pic);
+  if (m.vid) {
+    seq.ownsVideo = true;
+    if (sameMedia(m.vid, inMedia.vid)) seqVidTime(bl); else seqLoadVid(bl);
+  }
+}
 function seqApplyTrack(k, x, now) {
   const K = KEYS[k], L = loops[K], T = L.tgt;
   if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); return; }
@@ -8795,6 +8921,8 @@ function seqApplyTrack(k, x, now) {
     if (x.other && x.main.look.in1 !== T.in1 && T.in2 === 'none') { T.in2 = x.main.look.in1; seq.xin[k] = true; }
     if (wasCross && !x.other) L.cur.blend = T.blend;
     seq.applied[k] = sig;
+    // The outgoing block's picture or video first, then the incoming one's, which wins where they share an input
+    seqShowMedia(x.other); seqShowMedia(x.main);
     const used = [T.in1, T.in2];
     if (used.includes('camera') && !cam.on) startCamera();
     if (used.includes('screen') && !scr.on) startScreen(true);
@@ -8861,6 +8989,11 @@ function seqTick(now) {
       }
     }
   }
+  // A block's video plays and pauses with the song
+  if (seq.running && seq.ownsVideo && vid.video && uses('video')) {
+    if (!seq.playing || frozen) { if (!vid.video.paused) vid.video.pause(); }
+    else if (vid.video.paused && !vidUserPaused) vid.video.play().catch(() => {});
+  }
   if (!$('#seq').hidden) seqDraw(now);
 }
 
@@ -8869,11 +9002,12 @@ function seqRecTick(p) {
   const K = KEYS[seq.selTrack], L = loops[K];
   if (!seq.running || !p.playing) { seqStopRec(true); return; }
   const t = p.t;
-  if (seq.recBlock && (L.gen !== seq.recGen || t < seq.recBlock.a)) seqStopRec(true);
+  // A new look, or a different picture or video, starts the next block
+  if (seq.recBlock && (L.gen !== seq.recGen || t < seq.recBlock.a || seqMediaSig(L.tgt) !== seq.recMedia)) seqStopRec(true);
   if (!seq.recBlock) {
     seq.recBefore ||= seqSnap();
-    seq.recGen = L.gen;
-    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0 });
+    seq.recGen = L.gen; seq.recMedia = seqMediaSig(L.tgt);
+    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0, media: seqCaptureMedia(L.tgt) });
     seq.recBlock.rec = true;
     seq.rec.blocks.push(seq.recBlock);
   }
@@ -9054,6 +9188,7 @@ function seqInspector() {
   const bl = seq.rec.blocks.find((b) => b.id === seq.selId), el = $('#seqInsp');
   if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
+    (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
     (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
 }
 function seqMeasure() {
@@ -9307,16 +9442,16 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------- adding looks, markers ---------- */
-function seqPlace(label, look) {
+function seqPlace(label, look, withMedia) {
   const dur = seqDur(), a = r1(clamp(seq.t, 0, dur)), b = r1(Math.min(dur, a + 16));
   if (b - a < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
-  const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)) });
+  const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)), media: withMedia ? seqCaptureMedia(look) : null });
   seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
   seqNote(`Added “${seqName(nb)}” to track ${seq.selTrack + 1} at ${fmtSeq(a, true)}. Drag its ends to change how long it plays.`);
 }
 $('#seqAddCurrent').addEventListener('click', () => {
   const K = KEYS[seq.selTrack];
-  seqPlace('', loopOn(K) ? loops[K].tgt : loops[edit].tgt);
+  seqPlace('', loopOn(K) ? loops[K].tgt : loops[edit].tgt, true);
 });
 function seqAddMarker() {
   const m = { id: TL.id(), t: r1(clamp(seq.t, 0, seqDur())), name: `Marker ${seq.rec.markers.length + 1}` };

@@ -22,7 +22,7 @@ try {
   window.__phosphorCaptureConfig={width:320,height:180,renderHeight:144};
   sessionStorage.setItem('phosphor-spotify-session-v1',JSON.stringify({access:'fixture',refresh:'fixture',scope:'user-modify-playback-state',expiresAt:Date.now()+3600000}));
  });
- const app=(await readFile(root+'/js/app.js','utf8')).replace('let captureNextAt = 0;','window.__seqTest={seq,seqTick,spotify,snd,ap,loops,mix,loopGrade,TL,KEYS}; let captureNextAt = 0;');
+ const app=(await readFile(root+'/js/app.js','utf8')).replace('let captureNextAt = 0;','window.__seqTest={seq,seqTick,spotify,snd,ap,loops,mix,loopGrade,TL,KEYS,inMedia,natPick,natList,nat,vid}; let captureNextAt = 0;');
  await page.route('**/js/app.js',r=>r.fulfill({contentType:'text/javascript',body:app}));
  const frames=count=>page.evaluate(count=>new Promise(resolve=>{const next=()=>{if(--count<=0)resolve();else requestAnimationFrame(next);};requestAnimationFrame(next);}),count);
  let track='A',progress=0,playing=true;const seeks=[],calls=[];
@@ -37,7 +37,7 @@ try {
  });
  const T=(fn,arg)=>page.evaluate(fn,arg);
  const poll=()=>T(()=>window.__seqTest.spotify.poll());
- await page.goto(`http://127.0.0.1:${server.address().port}`);
+ await page.goto(`http://127.0.0.1:${server.address().port}`,{timeout:30000});
  await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');
  await T(()=>window.__seqTest.spotify.stop());
  assert.equal(await page.locator('#drift').count(),0,'Auto-drift is gone');
@@ -151,7 +151,7 @@ try {
  step('each song keeps its own sequence, which starts by itself');
 
  // Reload: the sequence and its versions are still there
- await page.reload();await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');
+ await page.reload({timeout:30000});await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');
  const kept=await T(()=>({n:window.__seqTest.seq.rec.blocks.length,v:window.__seqTest.seq.rec.versions.map(x=>x.name)}));
  assert.equal(kept.n,3);assert.deepEqual(kept.v,['Main']);
  assert.ok(await page.locator('#seq').isVisible(),'the sequencer stays open');
@@ -171,27 +171,76 @@ try {
  assert.ok(recd.length>=2,'one block per look');assert.ok(recd.every(([t,ok,label])=>t===1&&ok&&label===''),'recorded blocks go on track 2, unnamed');
  step('record look changes writes blocks onto the chosen track');
 
+ // A block remembers its picture or video, and brings it back when it plays (even after a reload)
+ const pic=async(name,color)=>page.evaluate(([name,color])=>new Promise(res=>{const c=document.createElement('canvas');c.width=64;c.height=48;const x=c.getContext('2d');x.fillStyle=color;x.fillRect(0,0,64,48);
+   c.toBlob(b=>{const dt=new DataTransfer();dt.items.add(new File([b],name,{type:'image/png'}));const inp=document.getElementById('picFile');inp.files=dt.files;inp.dispatchEvent(new Event('change'));res();});}),[name,color]);
+ await T(()=>{const {seq}=window.__seqTest;seq.rec.blocks=[];seq.dirty=true;});
+ progress=0;playing=false;await poll();await frames(2);
+ await page.locator('button.seq-card').nth(0).click();
+ await pic('red.png','#f00');await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='red.png');
+ await page.click('#seqAddCurrent');await frames(2);
+ const redBlock=await T(()=>{const {seq}=window.__seqTest;return seq.rec.blocks.find(b=>b.id===seq.selId);});
+ assert.equal(redBlock.media?.pic?.kind,'own');assert.equal(redBlock.media.pic.name,'red.png');
+ assert.ok((await page.locator(`.seq-blk[data-id="${redBlock.id}"]`).getAttribute('title')).startsWith('red.png'),'an unnamed picture block shows the picture name');
+ // a video of your own on track 2, starting 20 s along
+ await page.locator('button.seq-card').nth(1).click();
+ await page.setInputFiles('#vidFile',root+'tests/media/person.webm');await page.waitForFunction(()=>window.__seqTest.inMedia.vid?.name==='person.webm');
+ await T(()=>{const v=window.__seqTest.vid.video;v.currentTime=Math.min(1.5,v.duration/2);});await frames(2);
+ await page.click('#seqAddCurrent');await frames(2);
+ const vidBlock=await T(()=>{const {seq}=window.__seqTest;return seq.rec.blocks.find(b=>b.id===seq.selId);});
+ assert.equal(vidBlock.media?.vid?.kind,'own');assert.ok(vidBlock.media.vid.at>0.5,'remembers where the video was');
+ // Now load something else into both inputs
+ await pic('blue.png','#00f');await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='blue.png');
+ await T(()=>window.__seqTest.natList().then(()=>window.__seqTest.natPick(0,true)));await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.kind==='nature');
+ const natName=await T(()=>window.__seqTest.inMedia.pic.name);
+ // Playing the blocks puts their picture and video back, the video at its start point plus time into the block
+ if(!(await T(()=>window.__seqTest.seq.running)))await page.click('#seqPlay');
+ progress=4000;await poll();await frames(4);
+ await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='red.png',null,{timeout:8000});
+ assert.equal(await page.textContent('#picName'),'red.png');
+ const vt=await T(()=>window.__seqTest.vid.video.currentTime);
+ assert.ok(Math.abs(vt-(vidBlock.media.vid.at+4)%await T(()=>window.__seqTest.vid.video.duration))<0.8,'video at its start point plus 4 s: '+vt);
+ // A nature-picture block (with the sequence stopped, so it doesn't put its own pictures back meanwhile)
+ await page.click('#seqStop');await frames(2);
+ await T(()=>window.__seqTest.natPick(0,true));await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.kind==='nature');
+ await T(()=>{const {seq}=window.__seqTest;seq.t=20;});
+ await page.locator('button.seq-card').nth(0).click();
+ progress=20000;await poll();await frames(2);
+ await page.click('#seqAddCurrent');await frames(2);
+ const natBlock=await T(()=>{const {seq}=window.__seqTest;return seq.rec.blocks.find(b=>b.id===seq.selId);});
+ assert.equal(natBlock.media?.pic?.kind,'nature');assert.equal(natBlock.media.pic.name,natName);
+ // After a reload, the copies kept in the browser come back
+ await page.waitForFunction(()=>new Promise(r=>{const q=indexedDB.open('phosphor-block-media');q.onsuccess=()=>{const tx=q.result.transaction('s','readonly');const c=tx.objectStore('s').count();c.onsuccess=()=>r(c.result>=2);};}));
+ await page.reload({timeout:30000});await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');await T(()=>window.__seqTest.spotify.stop());
+ assert.equal(await T(()=>window.__seqTest.seq.rec.blocks.length),3);
+ progress=5000;playing=true;await poll();await frames(3);
+ if(!(await T(()=>window.__seqTest.seq.running)))await page.click('#seqPlay');
+ await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='red.png'&&window.__seqTest.inMedia.vid?.name==='person.webm',null,{timeout:10000});
+ progress=22000;await poll();await frames(4);
+ await page.waitForFunction(n=>window.__seqTest.inMedia.pic?.name===n,natName,{timeout:8000});
+ step('blocks remember their picture or video (own files, nature pictures) and bring it back, also after a reload');
+
  // Sizing by hand: the bar between picture and controls, then the picture's corner; both are remembered
  await page.click('#seqHide');await frames(2);
  const split=await page.locator('#deckSplit').boundingBox();
  await page.mouse.move(split.x+3,split.y+300);await page.mouse.down();await page.mouse.move(split.x-117,split.y+300,{steps:4});await page.mouse.up();await frames(3);
  const side=await page.evaluate(()=>document.querySelector('.panel').getBoundingClientRect().width);
  assert.ok(Math.abs(side-500)<12,'controls about 120 px wider: '+side);
- const corner=await page.locator('.rz-c').boundingBox(),c0=await page.locator('#screen').boundingBox();
+ // A dragged size is a shape: once let go, the picture keeps that shape and fills the room it has
+ const corner=await page.locator('.rz-c').boundingBox();
  await page.mouse.move(corner.x+10,corner.y+10);await page.mouse.down();await page.mouse.move(corner.x-190,corner.y-90,{steps:5});await page.mouse.up();await frames(3);
- const c1=await page.locator('#screen').boundingBox(),btns=await page.locator('#tasteStrip').boundingBox();
- assert.ok(Math.abs(c0.width-200-c1.width)<6&&Math.abs(c0.height-100-c1.height)<6,`picture resized by its corner: ${c0.width}x${c0.height} -> ${c1.width}x${c1.height}`);
- assert.ok(btns.y<c1.y+c1.height+60,'the buttons move up under the smaller picture');
+ const L1=await page.evaluate(()=>JSON.parse(localStorage.getItem('phosphor-layout-v1')));
+ const c1=await page.locator('#screen').boundingBox();
+ assert.ok(L1.cw&&L1.ch&&Math.abs(c1.width/c1.height-L1.cw/L1.ch)<0.03,`the picture keeps the dragged shape: ${c1.width}x${c1.height} vs ${L1.cw}x${L1.ch}`);
  const right=await page.locator('.rz-r').boundingBox();
- await page.mouse.move(right.x+6,right.y+right.height/2);await page.mouse.down();await page.mouse.move(right.x+46,right.y+right.height/2,{steps:3});await page.mouse.up();await frames(3);
+ await page.mouse.move(right.x+6,right.y+right.height/2);await page.mouse.down();await page.mouse.move(right.x-114,right.y+right.height/2,{steps:3});await page.mouse.up();await frames(3);
  const c2=await page.locator('#screen').boundingBox();
- assert.ok(Math.abs(c2.width-c1.width-40)<6&&Math.abs(c2.height-c1.height)<2,'the right edge changes width only');
- await page.reload();await page.waitForFunction(()=>window.__seqTest?.seq);await frames(4);
+ assert.ok(c2.width/c2.height<c1.width/c1.height-0.05,'dragging the right edge in makes the shape narrower');
+ await page.reload({timeout:30000});await page.waitForFunction(()=>window.__seqTest?.seq);await frames(4);
  const c3=await page.locator('#screen').boundingBox();
  assert.ok(Math.abs(c3.width-c2.width)<3&&Math.abs(c3.height-c2.height)<3,'sizes are remembered');
  await page.dblclick('.rz-c');await page.dblclick('#deckSplit');await frames(3);
- const c4=await page.locator('#screen').boundingBox();
- assert.ok(c4.width>c3.width,'double-click goes back to filling the space');
+ assert.ok(!(await page.evaluate(()=>JSON.parse(localStorage.getItem('phosphor-layout-v1')).cw)),'double-click goes back to the automatic size');
  step('drag to size the controls and the picture; remembered; double-click resets');
 
  assert.deepEqual(errors,[]);
