@@ -607,43 +607,6 @@
         </div>
       </section>
 
-      <section class="group" id="shaderGroup" aria-labelledby="h-shaders">
-        <h2 id="h-shaders">Shaders</h2>
-        <p class="hint">Shadertoy and ISF shaders for loop <b id="shLoop">A</b>, the loop chosen above. A shader that makes a picture becomes the loop’s input; an effect shader works on the loop’s finished picture. Shaders that listen to sound get the music from React to sound.</p>
-        <div class="ctl sh-now">
-          <div class="ctl-head"><span class="lbl">Input</span><span class="sh-cur" id="shInName">None</span></div>
-          <div class="sh-vals" id="shInVals"></div>
-          <button class="btn small" id="shInOff" hidden>Stop using it</button>
-        </div>
-        <div class="ctl sh-now">
-          <div class="ctl-head"><span class="lbl">Effect</span><span class="sh-cur" id="shFxName">None</span></div>
-          <div class="sh-vals" id="shFxVals"></div>
-          <button class="btn small" id="shFxOff" hidden>Take it off</button>
-        </div>
-        <p class="hint sh-msg" id="shMsg" role="status" aria-live="polite"></p>
-        <div class="ctl">
-          <div class="seg seg-2" id="shRole" role="group" aria-label="Which shaders to show">
-            <button data-role="input" aria-pressed="true">Inputs</button>
-            <button data-role="effect" aria-pressed="false">Effects</button>
-          </div>
-          <input type="search" class="sh-search" id="shSearch" placeholder="Search shaders" aria-label="Search shaders" autocomplete="off" spellcheck="false">
-          <div class="sh-list" id="shList" role="list" aria-label="Shaders"><p class="hint">Loading the shaders…</p></div>
-        </div>
-        <details class="sh-paste">
-          <summary>Paste a shader</summary>
-          <label class="sh-field">Name <input id="shPasteName" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="My shader"></label>
-          <textarea id="shPasteCode" rows="8" spellcheck="false" placeholder="Paste Shadertoy code (with mainImage) or a whole ISF shader, header and all"></textarea>
-          <div class="seg seg-2" id="shPasteRole" role="group" aria-label="Use it as">
-            <button data-role="input" aria-pressed="true">Input</button>
-            <button data-role="effect" aria-pressed="false">Effect</button>
-          </div>
-          <div class="dev-actions"><button class="btn small" id="shPasteAdd">Add to my shaders</button></div>
-          <p class="hint" id="shPasteMsg" role="status" aria-live="polite"></p>
-          <p class="hint">Shadertoy shaders get the music on iChannel0, the loop’s picture on iChannel1, a noise picture on iChannel2 and the Picture input on iChannel3. Only the Image tab is used. Your shaders stay in this browser.</p>
-        </details>
-        <p class="hint">Built in: shaders from the ISF Files collection (MIT licence, credits in each shader) and a few made for Phosphor Loop.</p>
-      </section>
-
       <section class="group" id="shapesGroup" aria-labelledby="h-shapes">
         <h2 id="h-shapes">Shapes</h2>
         <div class="ctl">
@@ -1217,7 +1180,6 @@
             <dt>Picture sharpness</dt><dd>How many lines the picture is drawn with; the number shows at the top right. Standard is the 576 lines Phosphor Loop has always used and is the lightest on the computer. High goes up to 1080, like HD video. Full draws as many lines as the screen (or the Output window) shows. Auto, the usual setting, starts where it last settled on this computer, sharpens while the picture stays smooth and steps back if it slows down. Effects keep their size at every setting; only the detail gets finer. Each computer or phone keeps its own choice.</dd>
             <dt>Color grading</dt><dd>A filter over the finished picture, after every loop is mixed. Exposure, Contrast and Midtones set how bright and punchy it is; Saturation, Hue, Red, Green, Blue and Sepia change its colors. It never feeds back into the loops, Autopilot leaves it alone, presets keep it, and Neutral or Back to normal resets it.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture, or wipe it to black.</dd>
-            <dt>Shaders</dt><dd>Under Shaders (folded away until you open it): pick a shader as the chosen loop’s input, or an effect shader to lay over its finished picture. Built in are about 170 from the ISF Files collection plus a few made for Phosphor Loop; Paste a shader takes Shadertoy code (with mainImage) or a whole ISF shader, and keeps it in this browser. A shader’s own settings show as sliders, the sequencer can change them over a block, shaders that listen to sound get the music, Autopilot can bring them in, and presets remember them.</dd>
             <dt>Sizing the picture and the controls</dt><dd>Drag the right edge, the bottom edge or the corner of the picture’s frame to give it a new shape; making it wider than there’s room for narrows the controls. When you let go, the picture keeps that shape and grows to fill all the room it has, and it keeps filling as the controls get wider or narrower. Picking a Screen shape replaces it. Drag the bar between the picture and the controls to make the controls wider or narrower. With Spread out controls on, the picture is as wide as its column. Your sizes are remembered in this browser; double-click a handle or the bar to go back to the automatic size.</dd>
             <dt>Sequencer</dt><dd>Opens the sequencer under the picture: four tracks, one for each loop (A to D), where you place looks by time along the song. A loop with no block at that moment goes blank. Blocks fade in and out, blocks that overlap on a track crossfade (right-click one to rename it or save its look to My presets), a block remembers which picture or video its loop was showing (your own files by where they are on disk, never a copy), and any loop, effect or color grading slider can change over a block. Scroll moves along the song and Shift + scroll zooms. Above the tracks, a spectrograph of the song builds up as it plays and is saved with it.</dd>
             <dt>Full screen</dt><dd>Show only the picture. To leave full screen, move the mouse (or tap the picture) and press Exit full screen at the top right, or press Esc.</dd>
@@ -1373,7 +1335,6 @@
 <script src="js/spotify.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/subject.js"></script>
-<script src="js/shaderhost.js"></script>
 <script src="js/app.js"></script>
 
 </body>

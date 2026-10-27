@@ -77,7 +77,7 @@ export function createCaptureServer({root, input, liveDir, maxChunkBytes = 8 * 1
         return;
       }
       // Serve workstation assets only; never expose local state, credentials, or captures.
-      if (!/^\/(?:index\.html|phone\.html|qrcode\.js|presets\.json|icon-[\w.-]+|vendor\/essentia\/(?:essentia-wasm\.es\.js|essentia\.js-core\.es\.js|LICENSE|README\.md)|(?:js|styles|nature|shaders)\/[^\0]+)?$/.test(pathname)) return reply(404);
+      if (!/^\/(?:index\.html|phone\.html|qrcode\.js|presets\.json|icon-[\w.-]+|vendor\/essentia\/(?:essentia-wasm\.es\.js|essentia\.js-core\.es\.js|LICENSE|README\.md)|(?:js|styles|nature)\/[^\0]+)?$/.test(pathname)) return reply(404);
       const file = await realpath(resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname)));
       if (!file.startsWith(resolve(root) + sep)) return reply(403);
       const info = await stat(file);

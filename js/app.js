@@ -151,31 +151,18 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, shader: 32 };
-const SRC_LABEL = { shader: 'Shader', wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
-// The shaders from outside (see "shaders from outside"): the built-in list once it has arrived, your own pasted ones,
-// and each one read and ready to run. Here at the top because looks are put together before the rest is set up.
-const MY_SHADERS_KEY = 'phosphor-my-shaders-v1';
-const SHADER_RES = 0.6;   // shader inputs draw at this fraction of the loop's size, to stay smooth
-const shaderLib = { index: null, req: null, mine: [], desc: new Map(), loading: new Set(), told: new Set(), uiReady: false };
-try {
-  const v = JSON.parse(localStorage.getItem(MY_SHADERS_KEY) || '[]');
-  if (Array.isArray(v)) shaderLib.mine = v.filter((x) => x && typeof x.id === 'string' && typeof x.code === 'string').slice(0, 200);
-} catch (_) { /* none yet */ }
-// The shaders that make a picture, built in (once the list has arrived) and your own
-function shaderInputs() { return [...(shaderLib.index || []), ...shaderLib.mine].filter((x) => x.role === 'input'); }
 function loopDefaults() {
   return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
-           lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
-           // A Shadertoy or ISF shader as the input (shader) and as an effect over the loop's picture (fx), each with its settings
-           shader: '', shaderVals: {}, fx: '', fxVals: {} };
+           lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
 const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
@@ -1267,7 +1254,6 @@ function syncUI() {
   $$('#subject button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.subject === (t.subject || 'off'))));
   syncSubjectStatus();
   syncVisibility();
-  syncShaderUI();
   if (!mirroring) mirrorRefreshSoon();
 }
 
@@ -1284,12 +1270,6 @@ function patchLoop(k, p, force) {
   // 3D world; recipes and presets set everything
   const keep = !force && liveActive(L.tgt.in1) && !is3D(p.in1) ? L.tgt.in1 : null;
   const n = { ...loopDefaults(), ...p };
-  // A look (Autopilot's, say) that uses Shader without naming one gets one of the shaders that make a picture
-  if ((n.in1 === 'shader' || n.in2 === 'shader') && !n.shader) {
-    const list = shaderInputs();
-    if (list.length) { n.shader = pick(list).id; n.shaderVals = {}; }
-    else { if (n.in1 === 'shader') n.in1 = 'wave'; if (n.in2 === 'shader') n.in2 = 'none'; }
-  }
   if (p.shift) { n.shiftX = p.shift[0]; n.shiftY = p.shift[1]; }
   delete n.shift;
   // A fractal Autopilot brought in as an ordinary input gets no showcase (see rampStart)
@@ -2176,7 +2156,7 @@ const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
 const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['text', 'Text'], ['spectro', 'Spectrograph'],
-  ['world', '3D worlds'], ['fractal', 'Fractals'], ['shader', 'Shaders'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
+  ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
 const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [],
@@ -2860,8 +2840,6 @@ function apPool() {
   if (vid.on || clipsReady()) pool.push('video');   // a clip from the clip library comes in when a look picks Video
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src);
   if (snd.analyser) pool.push('spectro');
-  // The built-in shaders that make a picture (and your own), once their list has arrived
-  if (shaderInputs().length) pool.push('shader');
   // Leave out the inputs switched off under Autopilot settings. If that leaves nothing it can use right now
   // (say only Camera is on, and no camera is running), it uses them all rather than stall.
   const ok = pool.filter(apAllowed);
@@ -6681,7 +6659,7 @@ renderTaste();
 // Presets and taste profiles sit folded at the bottom until opened (v2: the controls were rearranged, so everyone
 // starts again from these defaults).
 const FOLD_KEY = 'phosphor-folded-v2';
-const FOLD_DEFAULT = ['h-shared', 'h-pre', 'h-taste', 'h-shaders'];
+const FOLD_DEFAULT = ['h-shared', 'h-pre', 'h-taste'];
 let folded = {};
 try { folded = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (_) { folded = {}; }
 const foldControls = [];
@@ -8050,302 +8028,6 @@ function finalPass(k) {
 }
 function shownPrev(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[1 - L.tw.wf].tex : L.rt[1 - L.front].tex; }
 
-/* ================= shaders from outside (Shadertoy, ISF) ================= */
-// The built-in collection (shaders/index.json, files under shaders/) and the ones you paste in (kept in this browser)
-// run through js/shaderhost.js. A loop can have one as its input (tgt.shader, settings in tgt.shaderVals) and one as
-// an effect over its finished picture (tgt.fx, tgt.fxVals). Each loop has its own running copies (shaderHosts), so
-// shaders that remember earlier frames remember their own loop's.
-const PS = window.PhosphorShaderHost;
-const saveMyShaders = () => lsSet(MY_SHADERS_KEY, JSON.stringify(shaderLib.mine));
-function shaderIndex() {
-  if (shaderLib.index) return Promise.resolve(shaderLib.index);
-  if (!shaderLib.req) {
-    shaderLib.req = fetch('shaders/index.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((d) => (shaderLib.index = Array.isArray(d.shaders) ? d.shaders : []))
-      .catch((e) => { shaderLib.req = null; throw e; });
-  }
-  return shaderLib.req;
-}
-const shaderEntry = (id) => (id && id.startsWith('u:') ? shaderLib.mine.find((x) => x.id === id) : (shaderLib.index || []).find((x) => x.id === id)) || null;
-const shaderName = (id) => shaderEntry(id)?.name || (id ? id.replace(/^.*\//, '') : 'None');
-// A shader, read and ready to run, or null while it's still on its way (asking for it starts it coming)
-function shaderDesc(id) {
-  if (!id) return null;
-  if (shaderLib.desc.has(id)) return shaderLib.desc.get(id);
-  if (shaderLib.loading.has(id)) return null;
-  shaderLib.loading.add(id);
-  (async () => {
-    let code = null, name = id;
-    if (id.startsWith('u:')) { const m = shaderEntry(id); code = m?.code; name = m?.name || id; }
-    else {
-      await shaderIndex();
-      const e = shaderEntry(id);
-      if (e) { const r = await fetch('shaders/' + e.file); if (r.ok) code = await r.text(); name = e.name; }
-    }
-    shaderLib.desc.set(id, code ? PS.parse(code, name) : { error: 'That shader isn’t available.' });
-  })().catch(() => shaderLib.desc.set(id, { error: 'That shader couldn’t be loaded. The built-in ones need internet the first time.' }))
-    .finally(() => { shaderLib.loading.delete(id); syncShaderUI(); });
-  return null;
-}
-const shaderHosts = { A: {}, B: {}, C: {}, D: {} };
-// Loop k's running copy of a shader for its input ('in') or its effect ('fx'); null while loading or if it can't run
-function hostFor(k, slot, id) {
-  const cur = shaderHosts[k][slot];
-  if (cur && cur.id === id) return cur.host.error ? null : cur.host;
-  const d = shaderDesc(id);
-  if (!d) return null;
-  if (cur) cur.host.dispose();
-  delete shaderHosts[k][slot];
-  if (d.error) return null;
-  const host = new PS.ShaderHost(gl, d, useFloat);
-  shaderHosts[k][slot] = { id, host };
-  if (host.error) {
-    if (!shaderLib.told.has(id)) { shaderLib.told.add(id); toast(`The shader “${d.name}” couldn’t run here: ${host.error.slice(0, 160)}`, 8000); }
-    syncShaderUI();
-    return null;
-  }
-  return host;
-}
-// The music for shaders, in Shadertoy's layout: 512 across, the spectrum on the first row and the waveform on the
-// second; ISF's audio and audioFFT inputs read the same picture. Filled once a frame, only while a shader is in use.
-const shAudio = { tex: null, at: -1, data: new Uint8Array(512 * 2 * 4), wave: null, noise: null };
-function shaderAudio() {
-  if (!shAudio.tex) {
-    shAudio.tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, shAudio.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, shAudio.data);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  }
-  if (shAudio.at === last) return shAudio.tex;
-  shAudio.at = last;
-  const D = shAudio.data, bins = snd.analyser && snd.bins;
-  let wave = null;
-  if (bins && snd.analyser.getByteTimeDomainData) {
-    if (!shAudio.wave || shAudio.wave.length !== snd.analyser.fftSize) shAudio.wave = new Uint8Array(snd.analyser.fftSize);
-    try { snd.analyser.getByteTimeDomainData(shAudio.wave); wave = shAudio.wave; } catch (_) { wave = null; }
-  }
-  for (let i = 0; i < 512; i++) {
-    const f = bins ? bins[Math.min(bins.length - 1, i)] : 0, w = wave ? wave[Math.floor(i * wave.length / 512)] : 128;
-    D.fill(f, i * 4, i * 4 + 3); D[i * 4 + 3] = 255;
-    D.fill(w, (512 + i) * 4, (512 + i) * 4 + 3); D[(512 + i) * 4 + 3] = 255;
-  }
-  gl.bindTexture(gl.TEXTURE_2D, shAudio.tex);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 512, 2, gl.RGBA, gl.UNSIGNED_BYTE, D);
-  return shAudio.tex;
-}
-// Shadertoy's usual noise picture, for shaders that look one up
-function shaderNoise() {
-  if (shAudio.noise) return shAudio.noise;
-  const d = new Uint8Array(256 * 256 * 4);
-  for (let i = 0; i < d.length; i++) d[i] = Math.floor(Math.random() * 256);
-  shAudio.noise = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, shAudio.noise);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 256, 0, gl.RGBA, gl.UNSIGNED_BYTE, d);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-  return shAudio.noise;
-}
-// What every shader is given: the time (each loop a little apart), the music, a noise picture and the Picture input.
-// A Shadertoy input sees its loop's last frame on iChannel1; an effect sees the loop's finished picture there.
-function shaderFrame(k, w, h, values, image) {
-  return { w, h, time: simT + 11 * LOOP_OFF[k], dt: 1 / 60, values: values || {}, audio: shaderAudio(), noise: shaderNoise(), pic: picTex, image, mouse: [0.5, 0.5, 0, 0] };
-}
-function drawShaderIn(k) {
-  const t = loops[k].tgt, host = hostFor(k, 'in', t.shader);
-  if (!host) return null;
-  const w = Math.max(2, Math.round(simW * SHADER_RES)), h = Math.max(2, Math.round(simH * SHADER_RES));
-  return host.render(shaderFrame(k, w, h, t.shaderVals, shownTex(k)));
-}
-// Loop k's effect shader, over its finished picture; what the mix shows (fxOut) stays empty without one
-function shaderFx(k) {
-  const L = loops[k];
-  L.fxOut = null;
-  if (!loopOn(k) || !L.rt || !L.tgt.fx) return;
-  const host = hostFor(k, 'fx', L.tgt.fx);
-  if (host) L.fxOut = host.render(shaderFrame(k, simW, simH, L.tgt.fxVals, mixTex(k)));
-}
-
-/* ---------- the Shaders section (folded away until opened) ---------- */
-const shUI = { role: 'input', q: '', built: '' };
-const shSearchText = (e) => `${e.name} ${(e.cats || []).join(' ')} ${e.credit || ''}`.toLowerCase();
-function renderShaderList() {
-  const box = $('#shList'), t = loops[edit].tgt, cur = shUI.role === 'input' ? t.shader : t.fx;
-  const q = shUI.q.trim().toLowerCase();
-  const fits = (e) => e.role === shUI.role && (!q || shSearchText(e).includes(q));
-  const mine = shaderLib.mine.filter(fits), built = (shaderLib.index || []).filter(fits);
-  box.textContent = '';
-  if (!shaderLib.index && !mine.length) { box.innerHTML = '<p class="hint">Loading the shaders…</p>'; return; }
-  if (!mine.length && !built.length) { box.innerHTML = '<p class="hint">No shaders match.</p>'; return; }
-  const head = (text) => { const h = document.createElement('h3'); h.textContent = text; box.appendChild(h); };
-  const row = (e, own) => {
-    const r = document.createElement('div'); r.className = 'sh-row'; r.setAttribute('role', 'listitem');
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'sh-item'; b.dataset.id = e.id;
-    b.setAttribute('aria-pressed', String(e.id === cur));
-    b.innerHTML = `${escapeHTML(e.name)}<small>${escapeHTML([own ? 'Yours' : (e.cats || [])[0], e.audio ? 'listens to sound' : '', own ? '' : e.credit].filter(Boolean).join(' · '))}</small>`;
-    b.addEventListener('click', () => useShader(e.id, shUI.role));
-    r.appendChild(b);
-    if (own) {
-      const d = document.createElement('button'); d.type = 'button'; d.className = 'sh-del'; d.textContent = '×';
-      d.setAttribute('aria-label', `Delete ${e.name}`);
-      d.addEventListener('click', () => {
-        if (!d.classList.contains('sure')) { d.classList.add('sure'); d.textContent = 'Delete?'; return; }
-        shaderLib.mine = shaderLib.mine.filter((x) => x.id !== e.id); saveMyShaders();
-        shaderLib.desc.delete(e.id);
-        renderShaderList();
-      });
-      r.appendChild(d);
-    }
-    box.appendChild(r);
-  };
-  if (mine.length) { head('Yours'); mine.forEach((e) => row(e, true)); }
-  // The built-in ones under their first category, in alphabetical order of category
-  const groups = new Map();
-  for (const e of built) { const c = (e.cats || [])[0] || 'Other'; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(e); }
-  for (const c of [...groups.keys()].sort()) { head(c); groups.get(c).forEach((e) => row(e, false)); }
-}
-// Sliders and switches for a shader's own settings; changing one changes the loop's value for it
-function buildShaderVals(box, d, getVals, setVal) {
-  box.textContent = '';
-  if (!d || d.error) return;
-  const vals = getVals();
-  for (const i of d.inputs) {
-    const v = vals[i.name] ?? i.def;
-    const id = `shv-${box.id}-${i.name}`;
-    const c = document.createElement('div'); c.className = 'ctl';
-    if (i.type === 'float' || (i.type === 'long' && !i.values)) {
-      const step = i.type === 'long' ? 1 : (i.max - i.min) / 200;
-      c.innerHTML = `<div class="ctl-head"><label for="${id}">${escapeHTML(i.label)}</label><output for="${id}"></output></div><input type="range" id="${id}" min="${i.min}" max="${i.max}" step="${step}">`;
-      const r = c.querySelector('input'), o = c.querySelector('output');
-      r.value = v; o.textContent = (+v).toFixed(i.type === 'long' ? 0 : 2); fillTrack(r);
-      r.addEventListener('input', () => { setVal(i.name, +r.value); o.textContent = (+r.value).toFixed(i.type === 'long' ? 0 : 2); fillTrack(r); });
-    } else if (i.type === 'long') {
-      c.innerHTML = `<div class="ctl-head"><label for="${id}">${escapeHTML(i.label)}</label></div><select id="${id}"></select>`;
-      const sel = c.querySelector('select');
-      i.values.forEach((val, n) => { const op = document.createElement('option'); op.value = val; op.textContent = i.labels?.[n] ?? val; sel.appendChild(op); });
-      sel.value = v; sel.addEventListener('change', () => setVal(i.name, +sel.value));
-    } else if (i.type === 'bool') {
-      c.innerHTML = `<button type="button" class="btn small" id="${id}" aria-pressed="${!!v}"><span class="led"></span>${escapeHTML(i.label)}</button>`;
-      const b = c.querySelector('button');
-      b.addEventListener('click', () => { const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on)); setVal(i.name, on ? 1 : 0); });
-    } else if (i.type === 'color') {
-      const hex = '#' + [0, 1, 2].map((n) => Math.round(clamp(+v[n], 0, 1) * 255).toString(16).padStart(2, '0')).join('');
-      c.innerHTML = `<div class="ctl-head"><label for="${id}">${escapeHTML(i.label)}</label><input type="color" id="${id}" value="${hex}"></div>`;
-      const inp = c.querySelector('input');
-      inp.addEventListener('input', () => { const h = inp.value; setVal(i.name, [1, 3, 5].map((n) => parseInt(h.slice(n, n + 2), 16) / 255).concat(+(v[3] ?? 1))); });
-    } else if (i.type === 'point2D') {
-      for (const [n, axis] of [[0, 'across'], [1, 'up']]) {
-        const sub = document.createElement('div'); sub.className = 'ctl';
-        const lo = i.norm ? 0 : i.min[n], hi = i.norm ? 1 : i.max[n];
-        sub.innerHTML = `<div class="ctl-head"><label for="${id}-${n}">${escapeHTML(i.label)} (${axis})</label></div><input type="range" id="${id}-${n}" min="${lo}" max="${hi}" step="${(hi - lo) / 200}">`;
-        const r = sub.querySelector('input'); r.value = v[n]; fillTrack(r);
-        r.addEventListener('input', () => { const cur = [...(getVals()[i.name] ?? i.def)]; cur[n] = +r.value; setVal(i.name, cur); fillTrack(r); });
-        box.appendChild(sub);
-      }
-      continue;
-    } else continue;
-    box.appendChild(c);
-  }
-}
-function shaderStatus(k, slot, id) {
-  if (!id) return '';
-  const d = shaderDesc(id);
-  if (!d) return 'Loading…';
-  if (d.error) return d.error;
-  const h = shaderHosts[k][slot];
-  return h && h.id === id && h.host.error ? `It couldn’t run here: ${h.host.error}` : '';
-}
-function syncShaderUI() {
-  if (!shaderLib.uiReady) return;   // the section is set up further down the page's code
-  const k = edit, t = loops[k].tgt;
-  $('#shLoop').textContent = k;
-  const inOn = (t.in1 === 'shader' || t.in2 === 'shader') && !!t.shader, fxOn = !!t.fx;
-  $('#shInName').textContent = inOn ? shaderName(t.shader) : 'None';
-  $('#shFxName').textContent = fxOn ? shaderName(t.fx) : 'None';
-  $('#shInOff').hidden = !inOn; $('#shFxOff').hidden = !fxOn;
-  // The sliders are made again only when the loop or its shader changes, so dragging one isn't interrupted
-  const sig = `${k}|${inOn ? t.shader : ''}|${fxOn ? t.fx : ''}|${shaderDesc(inOn ? t.shader : '') ? 1 : 0}${shaderDesc(fxOn ? t.fx : '') ? 1 : 0}`;
-  if (sig !== shUI.built) {
-    shUI.built = sig;
-    buildShaderVals($('#shInVals'), inOn ? shaderDesc(t.shader) : null, () => loops[k].tgt.shaderVals || {},
-      (n, v) => { const T = loops[k].tgt; T.shaderVals = { ...T.shaderVals, [n]: v }; });
-    buildShaderVals($('#shFxVals'), fxOn ? shaderDesc(t.fx) : null, () => loops[k].tgt.fxVals || {},
-      (n, v) => { const T = loops[k].tgt; T.fxVals = { ...T.fxVals, [n]: v }; });
-  }
-  $('#shMsg').textContent = [inOn && shaderStatus(k, 'in', t.shader), fxOn && shaderStatus(k, 'fx', t.fx)].filter(Boolean).join(' ');
-  for (const b of $$('#shList .sh-item')) b.setAttribute('aria-pressed', String(b.dataset.id === (shUI.role === 'input' ? t.shader : t.fx) && (shUI.role === 'input' ? inOn : fxOn)));
-}
-function useShader(id, role) {
-  const t = loops[edit].tgt;
-  if (role === 'input') {
-    takeOver('in1');
-    t.shader = id; t.shaderVals = {}; t.in1 = 'shader';
-    settleDevices();
-  } else { t.fx = id; t.fxVals = {}; }
-  shaderDesc(id);
-  lookOnScreen++;
-  showOSD(role === 'input' ? `INPUT ${edit}` : `EFFECT ${edit}`, shaderName(id).toUpperCase().slice(0, 18));
-  syncUI();
-}
-$('#shInOff').addEventListener('click', () => {
-  const t = loops[edit].tgt;
-  takeOver('in1');
-  if (t.in1 === 'shader') t.in1 = 'wave';
-  if (t.in2 === 'shader') t.in2 = 'none';
-  settleDevices(); syncUI();
-});
-$('#shFxOff').addEventListener('click', () => { loops[edit].tgt.fx = ''; syncUI(); });
-$$('#shRole button').forEach((b) => b.addEventListener('click', () => {
-  shUI.role = b.dataset.role;
-  $$('#shRole button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  renderShaderList(); syncShaderUI();
-}));
-$('#shSearch').addEventListener('input', (e) => { shUI.q = e.target.value; renderShaderList(); syncShaderUI(); });
-let shPasteRole = 'input';
-$$('#shPasteRole button').forEach((b) => b.addEventListener('click', () => {
-  shPasteRole = b.dataset.role;
-  $$('#shPasteRole button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-}));
-// Pasted code: an ISF filter (one with inputImage) starts out as an effect, anything else as an input
-$('#shPasteCode').addEventListener('input', () => {
-  const d = PS.parse($('#shPasteCode').value);
-  if (d.error) return;
-  const role = d.filter && d.kind === 'isf' ? 'effect' : 'input';
-  if (role !== shPasteRole) $(`#shPasteRole button[data-role="${role}"]`).click();
-  const n = $('#shPasteName');
-  if (!n.value && d.kind === 'isf' && d.description) n.placeholder = d.description.slice(0, 40);
-});
-$('#shPasteAdd').addEventListener('click', () => {
-  const code = $('#shPasteCode').value, msg = $('#shPasteMsg');
-  const name = ($('#shPasteName').value.trim() || $('#shPasteName').placeholder || 'My shader').slice(0, 40);
-  const d = PS.parse(code, name);
-  if (d.error) { msg.textContent = d.error; return; }
-  // Tried once here first, so a shader that can't run never joins the list
-  const host = new PS.ShaderHost(gl, d, useFloat);
-  const err = host.error;
-  host.dispose();
-  if (err) { msg.textContent = `It doesn’t run here yet: ${err}`; return; }
-  const id = 'u:' + randId(10);
-  shaderLib.mine.unshift({ id, name, role: shPasteRole, kind: d.kind, audio: d.audio, code });
-  if (!saveMyShaders()) { shaderLib.mine.shift(); msg.textContent = 'This browser’s storage for the page is full, so it couldn’t be kept.'; return; }
-  shaderLib.desc.set(id, d);
-  $('#shPasteCode').value = ''; $('#shPasteName').value = ''; $('#shPasteName').placeholder = 'My shader';
-  msg.textContent = `Added “${name}” to your shaders, and put it on loop ${edit}.`;
-  if (shUI.role !== shPasteRole) $(`#shRole button[data-role="${shPasteRole}"]`).click();
-  useShader(id, shPasteRole);
-  renderShaderList();
-});
-// The built-in list is fetched the first time the section is opened (or a look uses a shader)
-function shaderListSoon() { shaderIndex().then(() => { renderShaderList(); syncShaderUI(); }, () => { $('#shList').innerHTML = '<p class="hint">The built-in shaders couldn’t be loaded. They need internet the first time.</p>'; }); }
-$('#shaderGroup').addEventListener('click', (e) => { if (e.target.closest('.group-toggle') && !shaderLib.index) shaderListSoon(); });
-// Autopilot can bring shaders in once it knows them
-apBtns.forEach((b) => b.addEventListener('click', () => { if (ap.on && !shaderLib.index) shaderListSoon(); }));
-shaderLib.uiReady = true;
-// For the shaders check (tests/shaders-integration.mjs)
-window.__plShaders = { lib: shaderLib, hosts: shaderHosts, loops, patchLoop, useShader, shaderDesc, setEdit: (k) => setEdit(k) };
-if (ap.on || KEYS.some((k) => loops[k].tgt.in1 === 'shader' || loops[k].tgt.fx)) shaderListSoon();
-syncShaderUI();
-
 /* ================= ink drops ================= */
 // Six droppers, each on its own uneven rhythm, land a drop of ink somewhere on screen about twice a second.
 // While it bleeds, a drop drifts with the same currents Flow uses (flowAtJS mirrors flowAt in the shader).
@@ -8671,10 +8353,8 @@ function runLoop(k, xf, brush, f) {
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
   const fly1 = is3D(t.in1) ? t.in1 : null;
   const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
-  // A shader input draws its picture just before this pass too (the loop has one shader, used by either input)
-  const shTex = t.in1 === 'shader' || t.in2 === 'shader' ? drawShaderIn(k) : null;
-  const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : t.in1 === 'shader' ? shTex : null;
-  const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : t.in2 === 'shader' ? shTex : flyTex1;
+  const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
+  const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -8756,8 +8436,8 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
   set1f(fbProg, 'uXfeed', xf);
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
-  set1i(fbProg, 'uIn1', (is3D(t.in1) || t.in1 === 'shader') && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
-  set1i(fbProg, 'uIn2', t.in2 === 'none' || ((is3D(t.in2) || t.in2 === 'shader') && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
+  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
   set1f(fbProg, 'uScale', scale);
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
@@ -8928,18 +8608,7 @@ const SEQ_SLIDERS = [
 const SEQ_NAME = Object.fromEntries(SEQ_SLIDERS.flatMap(([, list]) => list));
 const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1'];
 // A slider's range, from the control itself
-// A shader's own setting in a block: sh:<name> for its input shader, fx:<name> for its effect shader
-function seqShaderInput(key, look) {
-  if (!/^(sh|fx):/.test(key)) return null;
-  const d = shaderDesc(key.startsWith('sh:') ? look?.shader : look?.fx);
-  return d?.inputs?.find((i) => i.name === key.slice(3)) || null;
-}
-const seqKeyName = (key, look) => {
-  if (!/^(sh|fx):/.test(key)) return SEQ_NAME[key] || key;
-  return `${key.startsWith('sh:') ? 'Shader' : 'Effect shader'}: ${seqShaderInput(key, look)?.label || key.slice(3)}`;
-};
-function seqRange(key, look) {
-  if (/^(sh|fx):/.test(key)) { const i = seqShaderInput(key, look); return i && typeof i.min === 'number' ? [i.min, i.max] : [0, 1]; }
+function seqRange(key) {
   const el = key === 'show' ? $('#showA') : key === 'feed' ? $('#xab') : $('#' + key);
   return el ? [Number(el.min), Number(el.max)] : [0, 100];
 }
@@ -9310,7 +8979,7 @@ function seqApplyTrack(k, x, now) {
   const vals = {};
   const take = (blk, u, wt) => {
     for (const au of blk.autos) {
-      const [lo, hi] = seqRange(au.key, blk.look), v = lo + (hi - lo) * TL.autoValue(au.pts, u);
+      const [lo, hi] = seqRange(au.key), v = lo + (hi - lo) * TL.autoValue(au.pts, u);
       if (!(au.key in vals)) vals[au.key] = { sum: 0, wt: 0 };
       vals[au.key].sum += v * wt; vals[au.key].wt += wt;
     }
@@ -9324,8 +8993,6 @@ function seqApplyTrack(k, x, now) {
     if (key === 'show') show = v;
     else if (key === 'feed') feed = v;
     else if (key in GRADE_DEF) grade[key] = v;
-    else if (key.startsWith('sh:')) T.shaderVals = { ...T.shaderVals, [key.slice(3)]: v };
-    else if (key.startsWith('fx:')) T.fxVals = { ...T.fxVals, [key.slice(3)]: v };
     else if (key in T) T[key] = v;
   }
   mix.tgt[SHOW[K]] = clamp(show, 0, 100) * x.show;
@@ -9487,9 +9154,9 @@ function seqDrawStatic() {
       html += '<svg class="auto" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + bl.autos.map((au, ai) =>
         `<polyline points="${au.pts.map(([u, val]) => `${u * 100},${100 - val * 100}`).join(' ')}" fill="none" stroke="${SEQ_LINES[ai % 4]}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`).join('') + '</svg>';
       if (bl.id === seq.selId || w > 120) bl.autos.forEach((au, ai) => {
-        html += au.pts.map(([u, val], pi) => `<span class="dot" data-h="pt" data-a="${ai}" data-p="${pi}" title="${seqKeyName(au.key, bl.look)}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
+        html += au.pts.map(([u, val], pi) => `<span class="dot" data-h="pt" data-a="${ai}" data-p="${pi}" title="${SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
       });
-      if (w > 90) html += `<span class="atag">${bl.autos.map((au) => seqKeyName(au.key, bl.look)).join(' · ')}</span>`;
+      if (w > 90) html += `<span class="atag">${bl.autos.map((au) => SEQ_NAME[au.key] || au.key).join(' · ')}</span>`;
     }
     if (w > 34) html += `<span class="t">${escapeHTML(seqName(bl))}<small>${fmtSeq(bl.a)}–${fmtSeq(bl.b)}</small></span>`;
     html += '<div class="eg l" data-h="l"></div><div class="eg r" data-h="r"></div>';
@@ -9557,7 +9224,7 @@ function seqInspector() {
   if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
-    (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${seqKeyName(au.key, bl.look)}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
+    (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
 }
 function seqMeasure() {
   const v = seq.view, zoom = v.pps / (v.minPps || 1);
@@ -9663,7 +9330,7 @@ seqView.addEventListener('dblclick', (e) => {
   const r = el.getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
   const au = bl.autos[bl.autos.length - 1];
   seqChange(() => { au.pts.push([u, val]); au.pts.sort((p, q) => p[0] - q[0]); });
-  seqNote(`Added a point to ${seqKeyName(au.key, bl.look)}. Drag it to set the value.`);
+  seqNote(`Added a point to ${SEQ_NAME[au.key] || au.key}. Drag it to set the value.`);
 });
 function seqRenameMarker(el) {
   const m = seq.rec.markers.find((x) => x.id === el.dataset.id); if (!m) return;
@@ -9736,14 +9403,7 @@ function seqDelete(bl) {
 }
 function seqPickSlider(bl, x, y) {
   seqCtx.innerHTML = '';
-  // The block's shaders' own settings join the list
-  const shList = (slot, title) => {
-    const id = slot === 'sh' ? (usesIn(bl.look, 'shader') ? bl.look.shader : '') : bl.look.fx;
-    const d = id && shaderDesc(id);
-    const list = (d?.inputs || []).filter((i) => i.type === 'float' || i.type === 'long').map((i) => [`${slot}:${i.name}`, i.label]);
-    return list.length ? [[`${title}: ${shaderName(id)}`, list]] : [];
-  };
-  for (const [group, list] of [...SEQ_SLIDERS, ...shList('sh', 'Shader'), ...shList('fx', 'Effect shader')]) {
+  for (const [group, list] of SEQ_SLIDERS) {
     const h = document.createElement('div'); h.className = 'mh'; h.textContent = group; seqCtx.appendChild(h);
     for (const [key, name] of list) {
       const has = bl.autos.find((au) => au.key === key);
@@ -9754,9 +9414,7 @@ function seqPickSlider(bl, x, y) {
           if (has) bl.autos = bl.autos.filter((au) => au !== has);
           else {
             // The line starts at the block's own value for that slider
-            const [lo, hi] = seqRange(key, bl.look), sh = seqShaderInput(key, bl.look);
-            const cur = sh ? (key.startsWith('sh:') ? bl.look.shaderVals : bl.look.fxVals)?.[sh.name] ?? sh.def
-              : key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
+            const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
             const v = clamp((cur - lo) / ((hi - lo) || 1), 0, 1);
             bl.autos.push({ key, pts: [[0, v], [1, v]] });
           }
@@ -10070,13 +9728,13 @@ function frame() {
     for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
   }
 
-  for (const key of KEYS) { finalPass(key); shaderFx(key); }
+  for (const key of KEYS) finalPass(key);
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);
   for (const key of KEYS) {
     gl.activeTexture(gl.TEXTURE0 + LOOP_NUM[key]);
-    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? loops[key].fxOut || mixTex(key) : shownTex('A'));
+    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? mixTex(key) : shownTex('A'));
   }
   set2f(compProg, 'uSim', simW, simH);
   set1f(compProg, 'uWA', wA);

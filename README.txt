@@ -89,20 +89,6 @@ SPOTIFY SONG SEQUENCER
   the song. Picture and Video are shared by all loops, so when two blocks on
   screen want different ones, the newer block's wins.
 
-SHADERS (SHADERTOY AND ISF)
-  The Shaders section (folded until opened) puts a shader on the loop chosen
-  under Loops: as its input (Inputs) or as an effect over its finished
-  picture (Effects). About 170 come built in (shaders/: ISF Files collection,
-  MIT licence, plus Phosphor Loop originals in shaders/st/), fetched only when
-  used. Paste a shader takes Shadertoy code (Image tab only; music on
-  iChannel0, the loop's picture on iChannel1, noise on iChannel2, the Picture
-  input on iChannel3) or a whole ISF shader; it's tried first and kept in this
-  browser. ISF settings show as sliders; the sequencer can change them over a
-  block. Autopilot brings shaders in (toggle Shaders under its inputs), and
-  presets and sequencer blocks remember them. To rebuild the collection:
-  node tools/shaders/build.mjs <ISF-Files/ISF folder>; it keeps only shaders
-  that compile and draw here. Tests: node tests/shaders-integration.mjs.
-
 SIZING THE PICTURE AND THE CONTROLS
   Drag the right edge, bottom edge or corner of the picture's frame to size
   it; drag the bar between the picture and the controls to size the controls.
