@@ -4759,19 +4759,30 @@ fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
 
 /* ================= picture & video files ================= */
 // What's in the Picture and the Video input right now (shared by every loop), so a sequencer block can remember it:
-// a nature picture by its file, a picture or video of your own by a key it's kept under (see blockMediaDB), the
-// test card, or a library clip by its id. picCanvas and vidBlob hold your own file until a block keeps a copy.
-const inMedia = { pic: { kind: 'card', name: 'the test card' }, vid: null, picCanvas: null, vidBlob: null };
+// a nature picture by its file, the test card, a library clip by its id, or a picture or video of your own by its
+// file name. No copy of your own file is ever kept: where the browser offers it (Chrome, Edge), a pointer to the file
+// on disk is kept instead (picHandle, vidHandle; see filePointerDB), and the file is opened from there each time.
+const inMedia = { pic: { kind: 'card', name: 'the test card' }, vid: null, picHandle: null, vidHandle: null };
+// Files of your own picked this visit, by name, so a block can find its file again where there's no pointer to it
+const ownFiles = new Map();
 const picFile = $('#picFile'), vidFile = $('#vidFile');
-$('#pickPic').addEventListener('click', () => picFile.click());
-$('#pickVid').addEventListener('click', () => vidFile.click());
+// Chrome and Edge's own file picker hands back a pointer to the file as well; other browsers use the plain one
+async function pickOwn(kind, input) {
+  if (!window.showOpenFilePicker) { input.click(); return; }
+  try {
+    const [h] = await window.showOpenFilePicker({ types: [{ description: kind === 'image' ? 'Pictures' : 'Videos', accept: { [kind + '/*']: [] } }] });
+    loadFile(await h.getFile(), h);
+  } catch (e) { if (e?.name !== 'AbortError') input.click(); }
+}
+$('#pickPic').addEventListener('click', () => pickOwn('image', picFile));
+$('#pickVid').addEventListener('click', () => pickOwn('video', vidFile));
 picFile.addEventListener('change', () => { if (picFile.files[0]) loadFile(picFile.files[0]); picFile.value = ''; });
 vidFile.addEventListener('change', () => { if (vidFile.files[0]) loadFile(vidFile.files[0]); vidFile.value = ''; });
 $('#useCard').addEventListener('click', () => {
   uploadTo(picTex, testCard);
   picAspect = 4 / 3;
   $('#picName').textContent = 'the test card';
-  inMedia.pic = { kind: 'card', name: 'the test card' }; inMedia.picCanvas = null;
+  inMedia.pic = { kind: 'card', name: 'the test card' }; inMedia.picHandle = null;
   $('#useCard').hidden = true;
   natNoCredit();
   nat.own = false;
@@ -4802,7 +4813,7 @@ function feedInto(src) {
   syncUI();
   showOSD(`INPUT ${edit}`, SRC_LABEL[src].toUpperCase());
 }
-function loadFile(file) {
+function loadFile(file, handle = null) {
   if (!file) return;
   const type = file.type || '';
   // A taste profile someone sent (see Taste profiles)
@@ -4816,7 +4827,7 @@ function loadFile(file) {
       picAspect = img.naturalWidth / img.naturalHeight;
       URL.revokeObjectURL(url);
       $('#picName').textContent = file.name;
-      inMedia.pic = { kind: 'own', key: 'p' + randId(12), name: file.name }; inMedia.picCanvas = small;
+      inMedia.pic = { kind: 'own', name: file.name }; inMedia.picHandle = handle; ownFiles.set(file.name, file);
       $('#useCard').hidden = false;
       natNoCredit();
       nat.own = true;
@@ -4830,7 +4841,7 @@ function loadFile(file) {
     clips.ask++;   // a library clip still on its way doesn't replace this one
     openVideo(URL.createObjectURL(file), file.name).then((ok) => {
       if (!ok) return;
-      inMedia.vid = { kind: 'own', key: 'v' + randId(12), name: file.name }; inMedia.vidBlob = file;
+      inMedia.vid = { kind: 'own', name: file.name }; inMedia.vidHandle = handle; ownFiles.set(file.name, file);
       // A video of your own: Autopilot leaves it in place instead of bringing in library clips
       clips.own = true;
       clipNoCredit();
@@ -4920,7 +4931,7 @@ function natPick(i, quiet) {
     uploadTo(picTex, downscale(img));
     picAspect = img.naturalWidth / img.naturalHeight;
     $('#picName').textContent = p.n;
-    inMedia.pic = { kind: 'nature', f: p.f, name: p.n }; inMedia.picCanvas = null;
+    inMedia.pic = { kind: 'nature', f: p.f, name: p.n }; inMedia.picHandle = null;
     $('#useCard').hidden = false;
     nat.cur = i;
     nat.own = false;
@@ -5104,7 +5115,7 @@ function clipPick(c, quiet) {
       if (ask !== clips.ask) return false;   // a later pick (or a video of your own) overtook this one
       return openVideo(URL.createObjectURL(blob), c.n, { quiet }).then((ok) => {
         if (!ok || ask !== clips.ask) return ok;
-        inMedia.vid = { kind: 'clip', id: c.id, name: c.n }; inMedia.vidBlob = null;
+        inMedia.vid = { kind: 'clip', id: c.id, name: c.n }; inMedia.vidHandle = null;
         clips.cur = c.id;
         clips.own = false;
         const from = c.src && /^https?:/.test(c.src)
@@ -5318,7 +5329,9 @@ stage.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 
 stage.addEventListener('drop', (e) => {
   e.preventDefault(); dragDepth = 0; dropEl.hidden = true;
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (f) loadFile(f);
+  // A dropped file's pointer has to be asked for during the drop itself
+  const hp = e.dataTransfer?.items?.[0]?.getAsFileSystemHandle?.();
+  if (f) Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null), () => loadFile(f));
 });
 
 /* ================= video deck ================= */
@@ -8680,11 +8693,17 @@ function idbStore(dbName) {
     const d = await open();
     return new Promise((res, rej) => { const tx = d.transaction('s', mode), q = fn(tx.objectStore('s')); tx.oncomplete = () => res(q?.result); tx.onerror = () => rej(tx.error); });
   };
-  return { get: (k) => run('readonly', (s) => s.get(k)), put: (k, v) => run('readwrite', (s) => s.put(v, k)) };
+  return { get: (k) => run('readonly', (s) => s.get(k)), put: (k, v) => run('readwrite', (s) => s.put(v, k)),
+    entries: async () => { const [k, v] = await Promise.all([run('readonly', (s) => s.getAllKeys()), run('readonly', (s) => s.getAll())]); return k.map((key, i) => [key, v[i]]); } };
 }
 const seqSpecDB = idbStore('phosphor-song-spectrographs');
-// Copies of your own pictures and videos that sequencer blocks use, so they come back after the page is reopened
-const blockMediaDB = idbStore('phosphor-block-media');
+// Pointers to your own pictures and videos on disk that sequencer blocks use, by file name (never the files
+// themselves). Chrome and Edge only; elsewhere a block finds its file by name once you've picked it this visit.
+const filePointerDB = idbStore('phosphor-file-pointers');
+const filePointers = new Map();
+if (window.showOpenFilePicker) filePointerDB.entries().then((list) => { for (const [k, h] of list) if (!filePointers.has(k)) filePointers.set(k, h); }).catch(() => {});
+// An earlier build kept copies of the files themselves; they're cleared away
+try { indexedDB.deleteDatabase('phosphor-block-media'); } catch (_) { /* nothing to clear */ }
 function seqSpecFor(key, dur) {
   const n = Math.ceil(dur * SPEC_SEQ_RATE);
   const sp = { key, n, data: new Uint8Array(n * SPEC_SEQ_BANDS), heard: new Uint8Array(n), changed: false, savedAt: 0 };
@@ -8771,6 +8790,7 @@ function seqRun(on, message) {
   if (message) seqNote(message);
 }
 async function seqPlay() {
+  seqAskFiles();
   if (seq.song && spotify.snapshot?.track?.uri === seq.song.uri) {
     seqRun(true, spotify.snapshot.playing ? 'Following the song in Spotify.' : 'Following the song. Press play in Spotify to start it.');
     if (!spotify.snapshot.playing && spotify.canSeek) {
@@ -8807,40 +8827,57 @@ $('#seqEnd').addEventListener('change', (e) => { seq.rec.end = e.target.value; s
 const SEQ_SKIP = new Set(['in1', 'in2', 'blend']);
 /* ---------- a block's picture or video ---------- */
 // A block that uses Picture or Video remembers which one: a nature picture by its file, the test card, a library clip
-// by its id, or a picture or video of your own as a copy kept in this browser (blockMediaDB). The Picture and Video
+// by its id, or a picture or video of your own by its file name and a pointer to it (filePointerDB). The Picture and Video
 // inputs are shared by every loop, so when two blocks on screen want different ones, the newer block's wins.
 const usesIn = (look, src) => look?.in1 === src || look?.in2 === src;
-const sameMedia = (a, b) => !!a && !!b && a.kind === b.kind && (a.f || a.key || a.id || '') === (b.f || b.key || b.id || '');
-const seqKept = new Set();
-async function seqKeep(key, getBlob) {
-  if (seqKept.has(key)) return;
-  seqKept.add(key);
-  try { await blockMediaDB.put(key, await getBlob()); }
-  catch (_) { seqKept.delete(key); seqNote('This browser has no room left to keep a copy of that file, so the block will use whatever is loaded when it plays.'); }
-}
-function canvasBlob(src) {
-  let c = src;
-  if (!(c instanceof HTMLCanvasElement)) {
-    c = document.createElement('canvas'); c.width = src.naturalWidth || src.width; c.height = src.naturalHeight || src.height;
-    c.getContext('2d').drawImage(src, 0, 0);
-  }
-  return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('no picture'))), 'image/jpeg', 0.92));
+const sameMedia = (a, b) => !!a && !!b && a.kind === b.kind && (a.f || a.id || a.name || '') === (b.f || b.id || b.name || '');
+// Keeps the pointer to a file of your own (Chrome, Edge), so blocks using it can open it on a later visit
+function seqKeepPointer(name, h) {
+  if (!h || filePointers.get(name) === h) return;
+  filePointers.set(name, h);
+  filePointerDB.put(name, h).catch(() => {});
 }
 // What the Picture and Video inputs hold now, for a block with this look (and keeps copies of your own files)
 function seqCaptureMedia(look) {
   const m = {};
   if (usesIn(look, 'picture') && inMedia.pic) {
     m.pic = { ...inMedia.pic };
-    if (m.pic.kind === 'own' && inMedia.picCanvas) { const c = inMedia.picCanvas; seqKeep(m.pic.key, () => canvasBlob(c)); }
+    if (m.pic.kind === 'own') seqKeepPointer(m.pic.name, inMedia.picHandle);
   }
   if (usesIn(look, 'video') && inMedia.vid) {
     m.vid = { ...inMedia.vid, at: r1(vid.video?.currentTime || 0) };
-    if (m.vid.kind === 'own' && inMedia.vidBlob) { const f = inMedia.vidBlob; seqKeep(m.vid.key, () => f); }
+    if (m.vid.kind === 'own') seqKeepPointer(m.vid.name, inMedia.vidHandle);
   }
   return m.pic || m.vid ? m : null;
 }
 const seqMediaSig = (look) => JSON.stringify([usesIn(look, 'picture') ? inMedia.pic : null, usesIn(look, 'video') ? inMedia.vid : null]);
 const seqMediaAsk = { pic: 0, vid: 0 };
+// Opens a file of your own for a block: through its pointer where there is one (and you've let the page open it this
+// visit), or else the file of that name you picked this visit. Throws with what to do when neither works.
+async function seqOwnFile(name, what) {
+  const h = filePointers.get(name);
+  if (h) {
+    let ok = false;
+    try { ok = (await h.queryPermission({ mode: 'read' })) === 'granted'; } catch (_) { /* treat as not allowed */ }
+    if (ok) {
+      try { const f = await h.getFile(); ownFiles.set(name, f); return { file: f, h }; }
+      catch (_) { if (!ownFiles.has(name)) throw new Error(`The ${what} “${name}” isn’t where it was (moved, renamed or deleted). Pick it again under Inputs and the sequencer will use it from there.`); }
+    } else if (!ownFiles.has(name)) throw new Error(`The browser needs your OK to open “${name}”. Press Stop, then Play, and allow it.`);
+  }
+  if (ownFiles.has(name)) return { file: ownFiles.get(name), h: null };
+  throw new Error(`Pick the ${what} “${name}” under Inputs once and the sequencer will use it (this browser can’t keep a pointer to your files).`);
+}
+// Play is a click, so it can ask the browser for leave to open the files this song's blocks use (one OK per file;
+// Chrome offers to remember it)
+function seqAskFiles() {
+  if (!window.showOpenFilePicker) return;
+  const names = new Set(seq.rec.blocks.flatMap((b) => [b.media?.pic, b.media?.vid].filter((m) => m?.kind === 'own').map((m) => m.name)));
+  for (const name of names) {
+    const h = filePointers.get(name);
+    if (!h) continue;
+    h.queryPermission({ mode: 'read' }).then((p) => (p === 'granted' ? p : h.requestPermission({ mode: 'read' }))).catch(() => {});
+  }
+}
 function seqBlobImage(blob) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(blob), img = new Image();
@@ -8860,18 +8897,17 @@ async function seqLoadPic(pm) {
     } else if (pm.kind === 'card') {
       if (ask === seqMediaAsk.pic) $('#useCard').click();
     } else {
-      const blob = await blockMediaDB.get(pm.key);
-      if (!blob) throw new Error();
-      const img = await seqBlobImage(blob);
+      const { file, h } = await seqOwnFile(pm.name, 'picture');
+      const img = await seqBlobImage(file);
       if (ask !== seqMediaAsk.pic) return;
       uploadTo(picTex, downscale(img));
       picAspect = img.naturalWidth / img.naturalHeight;
       $('#picName').textContent = pm.name; $('#useCard').hidden = false;
       natNoCredit(); nat.own = true; nat.ask++;
-      inMedia.pic = { ...pm }; inMedia.picCanvas = null;
+      inMedia.pic = { ...pm }; inMedia.picHandle = h;
     }
-  } catch (_) {
-    if (ask === seqMediaAsk.pic) seqNote(`The picture “${pm.name}” isn’t available any more. Pick it again under Inputs, then add the block again.`);
+  } catch (e) {
+    if (ask === seqMediaAsk.pic) seqNote(e?.message || `The picture “${pm.name}” isn’t available any more. Pick it again under Inputs.`);
   }
 }
 // Puts the video where the block wants it: its start point plus how far into the block the song is
@@ -8889,13 +8925,12 @@ async function seqLoadVid(bl) {
       const c = (clips.list || []).find((x) => x.id === vm.id);
       if (!c || !(await clipPick(c, true))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
     } else {
-      const blob = await blockMediaDB.get(vm.key);
-      if (!blob) throw new Error(`The video “${vm.name}” isn’t kept in this browser any more. Load it again under Inputs, then add the block again.`);
+      const { file, h } = await seqOwnFile(vm.name, 'video');
       if (ask !== seqMediaAsk.vid) return;
       clips.ask++;
-      if (!(await openVideo(URL.createObjectURL(blob), vm.name, { quiet: true }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
+      if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
       clips.own = true; clipNoCredit();
-      inMedia.vid = { ...vm }; delete inMedia.vid.at; inMedia.vidBlob = null;
+      inMedia.vid = { ...vm }; delete inMedia.vid.at; inMedia.vidHandle = h;
     }
     if (ask === seqMediaAsk.vid) seqVidTime(bl);
   } catch (e) { if (ask === seqMediaAsk.vid) seqNote(e.message); }

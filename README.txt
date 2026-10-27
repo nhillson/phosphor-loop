@@ -81,8 +81,11 @@ SPOTIFY SONG SEQUENCER
   you name it (right-click › Rename…); right-click › Save to My presets…
   keeps its look as a preset.
   A block that uses Picture or Video remembers which one: a nature picture or
-  library clip by name, your own picture or video as a copy kept in this
-  browser. A video starts where it was when the block was added and follows
+  library clip by name, your own picture or video by its file name. No copy
+  of your file is kept. In Chrome and Edge a pointer to the file on disk is
+  kept, so the block opens it from where it is (press Play and allow it once;
+  Chrome can remember that). Elsewhere, pick the file once per visit and
+  blocks with that file name use it. A video starts where it was when the block was added and follows
   the song. Picture and Video are shared by all loops, so when two blocks on
   screen want different ones, the newer block's wins.
 

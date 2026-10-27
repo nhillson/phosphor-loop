@@ -22,7 +22,7 @@ try {
   window.__phosphorCaptureConfig={width:320,height:180,renderHeight:144};
   sessionStorage.setItem('phosphor-spotify-session-v1',JSON.stringify({access:'fixture',refresh:'fixture',scope:'user-modify-playback-state',expiresAt:Date.now()+3600000}));
  });
- const app=(await readFile(root+'/js/app.js','utf8')).replace('let captureNextAt = 0;','window.__seqTest={seq,seqTick,spotify,snd,ap,loops,mix,loopGrade,TL,KEYS,inMedia,natPick,natList,nat,vid}; let captureNextAt = 0;');
+ const app=(await readFile(root+'/js/app.js','utf8')).replace('let captureNextAt = 0;','window.__seqTest={seq,seqTick,spotify,snd,ap,loops,mix,loopGrade,TL,KEYS,inMedia,natPick,natList,nat,vid,loadFile,filePointers,ownFiles}; let captureNextAt = 0;');
  await page.route('**/js/app.js',r=>r.fulfill({contentType:'text/javascript',body:app}));
  const frames=count=>page.evaluate(count=>new Promise(resolve=>{const next=()=>{if(--count<=0)resolve();else requestAnimationFrame(next);};requestAnimationFrame(next);}),count);
  let track='A',progress=0,playing=true;const seeks=[],calls=[];
@@ -209,16 +209,41 @@ try {
  await page.click('#seqAddCurrent');await frames(2);
  const natBlock=await T(()=>{const {seq}=window.__seqTest;return seq.rec.blocks.find(b=>b.id===seq.selId);});
  assert.equal(natBlock.media?.pic?.kind,'nature');assert.equal(natBlock.media.pic.name,natName);
- // After a reload, the copies kept in the browser come back
- await page.waitForFunction(()=>new Promise(r=>{const q=indexedDB.open('phosphor-block-media');q.onsuccess=()=>{const tx=q.result.transaction('s','readonly');const c=tx.objectStore('s').count();c.onsuccess=()=>r(c.result>=2);};}));
- await page.reload({timeout:30000});await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');await T(()=>window.__seqTest.spotify.stop());
- assert.equal(await T(()=>window.__seqTest.seq.rec.blocks.length),3);
- progress=5000;playing=true;await poll();await frames(3);
+ // A picture with a pointer to its file (Chrome's picker gives one; here a file in the browser's private storage
+ // stands in for a file on disk): only the pointer is kept, never the picture itself
+ await page.click('#seqStop');await frames(2);
+ await T(async()=>{const root=await navigator.storage.getDirectory();const h=await root.getFileHandle('green.png',{create:true});
+   const c=document.createElement('canvas');c.width=64;c.height=48;c.getContext('2d').fillStyle='#0f0';c.getContext('2d').fillRect(0,0,64,48);
+   const b=await new Promise(r=>c.toBlob(r,'image/png'));const w=await h.createWritable();await w.write(b);await w.close();
+   window.__seqTest.loadFile(await h.getFile(),h);});
+ await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='green.png');
+ progress=40000;await poll();await frames(2);
+ await page.locator('button.seq-card').nth(0).click();await page.click('#seqAddCurrent');await frames(2);
+ assert.equal(await T(()=>window.__seqTest.filePointers.get('green.png')?.kind),'file','a pointer to the file is kept');
+ await page.waitForFunction(()=>new Promise(r=>{const q=indexedDB.open('phosphor-file-pointers');q.onsuccess=()=>{const k=q.result.transaction('s','readonly').objectStore('s').getAllKeys();k.onsuccess=()=>{r(k.result.includes('green.png'));q.result.close();};};}));
+ // As on a later visit: nothing picked this time, so the block opens the picture through its pointer
+ await T(()=>{const t=window.__seqTest;t.ownFiles.clear();t.inMedia.pic={kind:'card',name:'the test card'};t.seq.applied=[null,null,null,null];});
+ progress=42000;playing=true;await poll();await frames(2);
  if(!(await T(()=>window.__seqTest.seq.running)))await page.click('#seqPlay');
+ await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='green.png',null,{timeout:8000});
+ // This test browser crashes reading a pointer to its private storage back after a reload (real Chrome reads pointers
+ // to files on disk fine), so the pointer is cleared before reloading
+ await T(()=>new Promise(r=>{window.__seqTest.filePointers.clear();const q=indexedDB.open('phosphor-file-pointers');q.onsuccess=()=>{const tx=q.result.transaction('s','readwrite');tx.objectStore('s').clear();tx.oncomplete=()=>{q.result.close();r();};};}));
+ assert.ok(!(await T(()=>Object.keys(window.__seqTest).includes('blockMediaDB'))),'no copies of files are kept');
+ // After a reload, blocks whose file has no pointer wait until it's picked again, then use it
+ await page.reload({timeout:30000});await page.waitForFunction(()=>window.__seqTest?.seq.song?.uri==='spotify:track:A');await T(()=>window.__seqTest.spotify.stop());
+ assert.equal(await T(()=>window.__seqTest.seq.rec.blocks.length),4);
+ progress=5000;playing=true;await poll();await frames(2);
+ if(!(await T(()=>window.__seqTest.seq.running)))await page.click('#seqPlay');
+ await frames(4);
+ await page.waitForFunction(()=>/Pick the (picture “red\.png”|video “person\.webm”)/.test(document.getElementById("seqNote").textContent),null,{timeout:8000});
+ assert.notEqual(await T(()=>window.__seqTest.inMedia.pic?.name),"red.png","without its file, the block waits");
+ await pic('red.png','#f00');await page.setInputFiles('#vidFile',root+'tests/media/person.webm');
+ await T(()=>{window.__seqTest.seq.applied=[null,null,null,null];});await frames(4);
  await page.waitForFunction(()=>window.__seqTest.inMedia.pic?.name==='red.png'&&window.__seqTest.inMedia.vid?.name==='person.webm',null,{timeout:10000});
  progress=22000;await poll();await frames(4);
  await page.waitForFunction(n=>window.__seqTest.inMedia.pic?.name===n,natName,{timeout:8000});
- step('blocks remember their picture or video (own files, nature pictures) and bring it back, also after a reload');
+ step('blocks remember their picture or video (own files, nature pictures) and bring it back; own files by pointer, or by name once picked again');
 
  // Sizing by hand: the bar between picture and controls, then the picture's corner; both are remembered
  await page.click('#seqHide');await frames(2);
