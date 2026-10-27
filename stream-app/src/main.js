@@ -54,6 +54,7 @@ const DEFAULTS = {
   kick: { enabled: false, server: '', key: '' },
   youtube: { enabled: false, key: '', hevc: true }, // hevc: send YouTube the sharper HEVC format when the card can make it
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
+  streamFriendly: false, // Stream-friendly: calmer picture and gentler Autopilot while streaming (never while only recording)
   record: { ...REC_DEFAULTS }, // Record a video: size (2160, 1440 or 1080 lines), quality (youtube, clean, perfect), fps (30 or 60)
   tuned: null, // what the sharpness test picked: { variant, label, at, quality, detail, usual, usualDetail, gpu }
 };
@@ -89,6 +90,7 @@ function publicSettings() {
     youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
     quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
     autopilotOnLive: settings.autopilotOnLive, collapsed: settings.collapsed, record: settings.record,
+    streamFriendly: settings.streamFriendly,
   };
 }
 function publicTune() {
@@ -134,6 +136,20 @@ function tell(text, kind = 'info') {
   if (win && !win.isDestroyed()) win.webContents.send('notice', notice);
 }
 
+// The Stream-friendly switch
+function setStreamFriendly(v) {
+  if (!!v === settings.streamFriendly) return;
+  settings.streamFriendly = !!v;
+  log('Stream-friendly ' + (settings.streamFriendly ? 'on' : 'off'));
+  applyCalm();
+  // Live: the squeezer picks up (or drops) its smoothing with a one-second restart; the platforms stay connected
+  if (streamer.live && streamer.plan) { streamer.plan.calm = settings.streamFriendly; streamer.restartEncoder(); }
+}
+// Stream-friendly is on only while streaming: recording by itself, or nothing at all, keeps the full picture
+function applyCalm() {
+  const on = !!settings.streamFriendly && streamer.live;
+  siteCall('calm', { on }).then((ok) => { if (!ok && on) log('Stream-friendly: this Phosphor Loop has no calm mode yet'); }).catch(() => {});
+}
 function siteCall(cmd, opts) {
   return site.webContents.executeJavaScript(`window.phosphorStreamCapture(${JSON.stringify(cmd)}, ${JSON.stringify(opts || {})})`, true);
 }
@@ -220,7 +236,7 @@ async function makePlan(dests) {
     if (i < 0) { encodes.push({ key, width, height, bitrate, variant }); i = encodes.length - 1; }
     routed.push({ ...d, stream: i });
   }
-  return { plan: { fps: q.fps, input: { width: q.width, height: q.height }, encodes }, dests: routed };
+  return { plan: { fps: q.fps, input: { width: q.width, height: q.height }, encodes, calm: settings.streamFriendly }, dests: routed };
 }
 
 let startingLive = false;
@@ -247,6 +263,7 @@ async function goLive() {
     plan.input = drawnSize();
     streamer.start(routed, plan);
     if (settings.autopilotOnLive) siteCall('autopilot').catch(() => {});
+    applyCalm();
     if (sleepBlock === null) sleepBlock = powerSaveBlocker.start('prevent-display-sleep');
     log(`Going live at ${settings.quality} (${plan.input.height}p${plan.fps}): ` + routed.map((d) => {
       const e = plan.encodes[d.stream];
@@ -260,6 +277,7 @@ async function stopLive() {
   log('Stopping');
   try { await siteCall('stop'); } catch (_) {}
   streamer.stop();
+  applyCalm();
   // The picture goes back to a recording's size, or the screen's own
   resizeSite();
   if (sleepBlock !== null) { powerSaveBlocker.stop(sleepBlock); sleepBlock = null; }
@@ -300,7 +318,7 @@ function createWindow() {
     if (!streamer.live) return;
     // The page reloaded while live: pick the picture up again
     log('Page reloaded while live; reconnecting the picture');
-    if (await waitForSite()) streamer.restartEncoder();
+    if (await waitForSite()) { applyCalm(); streamer.restartEncoder(); }
   });
   wc.on('render-process-gone', (_e, d) => {
     log('Page stopped: ' + d.reason);
@@ -630,6 +648,7 @@ ipcMain.handle('save', async (_e, patch) => {
     if ('key' in patch[p]) cur.key = lock(String(patch[p].key || '').trim());
   }
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) if (k in patch) settings[k] = !!patch[k];
+  if ('streamFriendly' in patch) setStreamFriendly(patch.streamFriendly);
   if (patch.quality && QUALITY[patch.quality] && !streamer.live && !tune.running) settings.quality = patch.quality;
   if ('startWithWindows' in patch && app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.startWithWindows });
   saveSettings();
@@ -757,6 +776,14 @@ async function runTest() {
     const r = await goLive();
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
     await expect('streaming', (n) => n[1] === 720, 'live');
+    // Stream-friendly on while live: the page calms down, the stream carries on, and nothing reloads
+    setStreamFriendly(true);
+    await waitFrames(30);
+    const calm = await site.webContents.executeJavaScript('window.__phosphorCapture.calm || null', true);
+    result.calm = calm;
+    if (!calm || !calm.on || !(calm.amount > 0)) throw new Error('Stream-friendly did not reach the page: ' + JSON.stringify(calm));
+    if (!streamer.live || !streamer.plan.calm) throw new Error('the stream stopped, or lost its smoothing, when Stream-friendly came on');
+    await expect('Stream-friendly on', (n) => n[1] === 720, 'calm');
     await waitFrames(Math.round(frames / 2));
     // Record on while streaming, bigger than the stream: drawn at the recording's size, the stream gets a copy
     settings.record = { size: 1080, quality: 'youtube', fps: 30 };
@@ -790,6 +817,10 @@ async function runTest() {
     if (dir) fs.writeFileSync(path.join(dir, 'panel-off.png'), (await win.webContents.capturePage()).toPNG());
     await waitFrames(10);
     await expect('stream off', (n) => same(n, free), 'idleAgain');
+    // Stream-friendly is for streaming only: off air, the page has its full picture back
+    const calmOff = await site.webContents.executeJavaScript('window.__phosphorCapture.calm || null', true);
+    if (!calmOff || calmOff.on) throw new Error('Stream-friendly stayed on after the stream stopped: ' + JSON.stringify(calmOff));
+    setStreamFriendly(false);
     // Record on its own, then Discard: nothing is saved, and the picture goes back to the window's size
     const before = fs.readdirSync(recDir()).length;
     if (!(await recordStart()).ok) throw new Error('recording on its own did not start');

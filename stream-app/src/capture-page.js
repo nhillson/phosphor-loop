@@ -120,6 +120,8 @@ module.exports = function capturePageSource() {
     if (cmd === 'rec-stop') return recStop();
     if (cmd === 'frames') return S.frames;
     if (cmd === 'ready') return !!(window.__phosphorCapture && window.__phosphorCapture.canvas);
+    // Stream-friendly: calmer motion and gentler Autopilot while live (an older Phosphor Loop without it just says no)
+    if (cmd === 'calm') { try { return !!window.__phosphorCapture.streamFriendly(!!opts.on) === !!opts.on; } catch (_) { return false; } }
     if (cmd === 'autopilot') { try { window.__phosphorCapture.autopilot(); return true; } catch (_) { return false; } }
     if (cmd === 'stop') { stop(); return true; }
     if (cmd === 'size') { const c = window.__phosphorCapture && window.__phosphorCapture.canvas; return c ? { width: c.width, height: c.height } : null; }

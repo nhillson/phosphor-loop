@@ -59,7 +59,7 @@ function worstWindowMbps(windowMs) {
   const plan = { fps: 30, input: { width: 640, height: 360 }, encodes: [
     { width: 640, height: 360, bitrate: 3000000, variant: hevc },
     { width: 320, height: 180, bitrate: 1000000, variant: 'x264-veryfast' },
-  ] };
+  ], calm: true };   // with Stream-friendly's smoothing on, so its filter is exercised too
   const statuses = [];
   s.on('status', (st) => statuses.push(JSON.stringify(st)));
   s.start([

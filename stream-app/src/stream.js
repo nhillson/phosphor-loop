@@ -222,11 +222,14 @@ class Streamer extends EventEmitter {
     // sharp (FFmpeg's defaults blur them). An encode smaller than the picture (Kick's 1080p copy of a 4K picture)
     // is scaled down in the same step, with a sharp filter.
     const conv = 'in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv';
+    // Stream-friendly: a light smoothing of fine speckle and frame-to-frame shimmer before squeezing, so the
+    // platform's small bitrate goes on the shapes instead of noise. Recordings never pass through here.
+    const calm = plan.calm ? 'hqdn3d=1.5:1:4:3,' : '';
     const n = plan.encodes.length;
     const branches = plan.encodes.map((e, i) => {
       const resize = e.width && e.height && (e.width !== input.width || e.height !== input.height);
       const fmt = /_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p';
-      return `[s${i}]scale=${resize ? `w=${e.width}:h=${e.height}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}[v${i}]`;
+      return `[s${i}]${calm}scale=${resize ? `w=${e.width}:h=${e.height}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}[v${i}]`;
     });
     const graph = `[0:v:0]split=${n}${plan.encodes.map((_, i) => `[s${i}]`).join('')};` + branches.join(';');
     const encArgs = [];

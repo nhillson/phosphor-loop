@@ -142,3 +142,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent-hi);
 .link.discard.armed { color: var(--live); font-weight: 600; }
 #recBlock .seg { margin-bottom: 6px; }
 #recFolder { align-self: flex-start; }
+
+/* Stream-friendly, tucked under the Stream switch (lined up with its words) */
+.calm-row { padding: 0 0 0 26px; margin-top: -6px; }
+.calm-row b { color: var(--text); font-weight: 600; }
+.calm-row + .air-switch { padding-top: 14px; border-top: 1px solid var(--line); }

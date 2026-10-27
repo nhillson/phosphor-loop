@@ -46,6 +46,7 @@ function renderSettings() {
   }
   if (S.kick.server && !$('#server-kick').value) $('#server-kick').value = S.kick.server;
   for (const k of ['startWithWindows', 'goLiveOnOpen', 'autopilotOnLive']) $(`#opt-${k}`).checked = S[k];
+  $('#opt-calm').checked = !!S.streamFriendly;
   renderRec();
   $('#opt-yt-hevc').checked = !!S.youtube.hevc;
   $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
@@ -236,6 +237,7 @@ for (const p of PLATFORMS) {
   $(`#on-${p}`).addEventListener('change', (e) => save({ [p]: { enabled: e.target.checked } }));
 }
 $('#opt-yt-hevc').addEventListener('change', (e) => save({ youtube: { hevc: e.target.checked } }));
+$('#opt-calm').addEventListener('change', (e) => save({ streamFriendly: e.target.checked }));
 $$('[data-save]').forEach((b) => b.addEventListener('click', async () => {
   const p = b.dataset.save;
   const key = $(`#key-${p}`).value.trim();
