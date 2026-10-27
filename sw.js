@@ -76,7 +76,9 @@ async function cacheFirst(req) {
 function networkFirst(event, req, url) {
   const key = new URL(url.pathname, url.origin).href;   // ?show=1 and the like share one copy
   const cacheP = caches.open(CACHE);
-  const network = fetch(req);
+  // Always asks the server whether a file changed (cheap when it hasn't). Without this the browser can hand back a
+  // file it fetched in the last 10 minutes, so right after an update the new page could run with old code
+  const network = fetch(req, { cache: 'no-cache' });
   // Refresh the saved copy whenever the network answers, even if the saved one was served first
   event.waitUntil(network.then((res) => {
     if (!res.ok || res.type !== 'basic') return null;
