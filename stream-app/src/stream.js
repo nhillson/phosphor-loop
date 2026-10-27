@@ -361,10 +361,11 @@ class Streamer extends EventEmitter {
     p.stderr.on('data', (d) => {
       const text = this.redact(d);
       tail = (tail + text).slice(-600);
-      if (s.state !== 'live' && /Output #0, flv/.test(tail)) {
+      if (s.state !== 'live' && /Output #0, flv/.test(text + tail)) {
         s.state = 'live'; s.message = 'Live'; s.retry = 0; s.wasLive = true; this.emitStatus();
       }
-      for (const line of text.split(/\r?\n/)) if (/error|fail|refused|denied|invalid|timed? ?out/i.test(line)) this.log(`${s.def.name}: ${line.trim()}`);
+      // (Joining a stream mid-way, the first moments can't be read until the next full picture: not worth logging)
+      for (const line of text.split(/\r?\n/)) if (/error|fail|refused|denied|invalid|timed? ?out/i.test(line) && !/decode_slice_header|non-existing PPS|no frame!/i.test(line)) this.log(`${s.def.name}: ${line.trim()}`);
     });
     p.on('exit', (code) => {
       if (s.proc === p) s.proc = null;

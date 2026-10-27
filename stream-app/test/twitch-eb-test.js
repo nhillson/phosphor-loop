@@ -25,7 +25,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pseb-'));
 const logs = [];
 const appLogs = []; // what the app itself would write to its log (the stand-in servers' own messages are kept apart)
 const ann = (kind, title, text) => { if (process.env.GITHUB_ACTIONS) console.log(`::${kind} title=twitch-eb ${title}::` + String(text).slice(-3500).replace(/%/g, '%25').replace(/\r?\n/g, '%0A')); };
-const fail = (m) => { console.error('FAIL: ' + m); console.log(logs.slice(-60).join('\n')); ann('error', 'failed', m + '\n' + logs.slice(-40).join('\n')); process.exit(1); };
+const fail = (m) => { console.error('FAIL: ' + m); console.log(logs.slice(-60).join('\n')); ann('error', 'failed', logs.slice(-25).join('\n').slice(-2500) + '\n=> ' + m.slice(0, 900)); process.exit(1); };
 const ok = (m) => console.log('ok  ' + m);
 
 // A sample answer, shaped like Twitch's (OBS's GoLiveApi::Config)
@@ -230,8 +230,9 @@ async function endToEnd() {
   s2.start([{ id: 'twitch', name: 'Twitch', url: 'rtmp://127.0.0.1:19379/app/nobody-listens', secret: 'k', multitrack: true, streams: [0, 1, 2], stream: 0,
     fallback: { url: 'rtmp://127.0.0.1:19372/app/live_1_userKEY', stream: 0, label: '360p H.264', note: 'Normal stream' } }], plan);
   gen2 = s2.gen;
-  // long enough for three refusals (2 s and 5 s apart) and then a stretch of normal streaming
-  await fakeRecording(s2, () => gen2, FRAMES);
+  // long enough for three refusals (each about 4 s of looking at the stream, then 2 s and 5 s apart; slower on
+  // Windows, where a refused connection takes a couple of seconds) and then a good stretch of normal streaming
+  await fakeRecording(s2, () => gen2, FRAMES * 2);
   const st2 = s2.status();
   s2.stop();
   await stopAll([lb]);
