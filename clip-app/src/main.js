@@ -86,6 +86,73 @@ async function keepYtdlpFresh() {
 }
 
 /* ---------- the clip library ---------- */
+// Where a new library folder really goes. A folder that already has a library is used as it is. An empty folder
+// becomes the library. Anything else (a whole drive like D:\, or a folder with other things in it) gets a
+// "Phosphor Clips" folder made inside it, so the clips never mix with other files.
+async function libraryDestination(chosen) {
+  let dir = path.resolve(chosen);
+  const has = async (d, f) => fsp.access(path.join(d, f)).then(() => true, () => false);
+  if (await has(dir, 'library.json')) return { dir, existing: true };
+  let entries = [];
+  try { entries = await fsp.readdir(dir); } catch (_) {}
+  if (entries.length && path.basename(dir).toLowerCase() !== 'phosphor clips') {
+    dir = path.join(dir, 'Phosphor Clips');
+    if (await has(dir, 'library.json')) return { dir, existing: true };
+  }
+  const from = path.resolve(library.dir);
+  const inside = (a, b) => { const rel = path.relative(a, b); return !rel || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+  if (inside(from, dir) || inside(dir, from)) return { problem: 'That’s the library folder itself (or inside it). Pick a different folder or drive.' };
+  return { dir };
+}
+// Moves every clip, thumbnail and the library list to a new folder (another drive is fine): copy everything, check
+// each clip arrived whole, switch to the new folder, and only then remove the old copy. If anything goes wrong
+// before the switch, the old library is untouched and stays in use.
+async function moveLibrary(dest) {
+  const old = library, from = library.dir, clips = library.data.clips.slice();
+  log(`library: moving ${clips.length} clips from ${from} to ${dest}`);
+  send('lib-moving', { to: dest, count: clips.length });
+  try {
+    await fsp.mkdir(dest, { recursive: true });
+    // Only the library's own files: each clip and its thumbnail, in their category folders, and the list
+    const copy = async (abs) => {
+      const to = path.join(dest, path.relative(from, abs));
+      await fsp.mkdir(path.dirname(to), { recursive: true });
+      await fsp.copyFile(abs, to);
+    };
+    for (const c of clips) {
+      await copy(old.abs(c));
+      if (c.t) await copy(old.thumbAbs(c)).catch(() => {});   // a missing thumbnail is made again
+    }
+    await copy(old.indexFile());
+    for (const c of clips) {
+      const a = await fsp.stat(library.abs(c));
+      const b = await fsp.stat(path.join(dest, ...c.f.split('/'))).catch(() => null);
+      if (!b || b.size !== a.size) throw new Error('a clip did not copy over whole: ' + c.f);
+    }
+  } catch (e) {
+    log('library move failed: ' + e.message);
+    send('lib-moving', null);
+    throw new Error('Couldn’t move the clips (is the drive full?). Nothing was changed; your clips are still in the old folder.');
+  }
+  settings.libraryDir = dest;
+  saveSettings();
+  await openLibrary();
+  // The old copy goes only once the new library is open and has every clip
+  if (library.data.clips.length >= clips.length) {
+    // Only the library's own files go (each clip, its thumbnail, the list), then any folders left empty, so
+    // nothing else that happened to share the old folder is ever touched
+    for (const c of clips) {
+      await fsp.rm(old.abs(c), { force: true }).catch(() => {});
+      if (c.t) await fsp.rm(old.thumbAbs(c), { force: true }).catch(() => {});
+    }
+    await fsp.rm(old.indexFile(), { force: true }).catch(() => {});
+    for (const d of await fsp.readdir(from).catch(() => [])) await fsp.rmdir(path.join(from, d)).catch(() => {});
+    await fsp.rmdir(from).catch(() => log('library move: the old folder still has other files in it, so it was left'));
+  } else log(`library move: the new library lists ${library.data.clips.length} of ${clips.length} clips; keeping the old folder`);
+  log('library: moved to ' + dest);
+  send('lib-moving', null);
+  return clips.length;
+}
 let library = null;
 async function openLibrary() {
   library = new Library(settings.libraryDir, {
@@ -820,12 +887,29 @@ function setupIpc() {
   handle('lib:open', () => shell.openPath(library.dir));
   handle('lib:rescan', async () => { await library.scan(); sendLibrary(); return { ok: true }; });
   handle('lib:choose', async () => {
-    const r = await dialog.showOpenDialog(win, { title: 'Where should the clip library be?', defaultPath: library.dir, properties: ['openDirectory', 'createDirectory'] });
+    const r = await dialog.showOpenDialog(win, { title: 'Where should the clip library be? (A whole drive is fine)', defaultPath: library.dir, properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
-    settings.libraryDir = r.filePaths[0];
-    saveSettings();
-    await openLibrary();
-    return { ok: true };
+    const plan = await libraryDestination(r.filePaths[0]);
+    if (plan.problem) return { ok: false, message: plan.problem };
+    const count = library.data.clips.length;
+    // A folder that already holds a library: just use that one, as before
+    if (plan.existing || !count) {
+      settings.libraryDir = plan.dir; saveSettings(); await openLibrary();
+      return { ok: true, message: plan.existing ? 'Now using the clip library in ' + plan.dir : '' };
+    }
+    const q = await dialog.showMessageBox(win, {
+      type: 'question', title: 'Move your clips?', noLink: true, defaultId: 0, cancelId: 2,
+      message: `Move your ${count} clip${count === 1 ? '' : 's'} to ${plan.dir}?`,
+      detail: 'They’re copied over, checked, and only then removed from the old folder. Phosphor Loop will find them in the new place by itself.',
+      buttons: ['Move my clips there', 'Start an empty library there', 'Cancel'],
+    });
+    if (q.response === 2) return { ok: false };
+    if (q.response === 1) { settings.libraryDir = plan.dir; saveSettings(); await openLibrary(); return { ok: true }; }
+    if ([...jobs.values()].some((j) => j.status === 'working' || j.status === 'saving')) {
+      return { ok: false, message: 'A clip is still being grabbed or saved. Try again once it’s finished.' };
+    }
+    const moved = await moveLibrary(plan.dir);
+    return { ok: true, message: `Moved ${moved} clip${moved === 1 ? '' : 's'} to ${plan.dir}.` };
   });
   handle('cat:add', async (name) => { const cat = await library.addCategory(name); sendLibrary(); return { ok: true, cat }; });
   handle('cat:rename', async ({ id, n }) => { await library.renameCategory(id, n); sendLibrary(); return { ok: true }; });

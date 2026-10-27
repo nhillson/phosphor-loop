@@ -676,7 +676,17 @@ function clipCard(c) {
 function stopHoverVideos() { $$('#grid video').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); }); }
 $('#libSearch').addEventListener('input', () => { S.libQuery = $('#libSearch').value; renderLibrary(); });
 $('#libOpen').addEventListener('click', () => api.call('lib:open'));
-$('#libChange').addEventListener('click', () => call('lib:choose'));
+$('#libChange').addEventListener('click', async () => {
+  const r = await call('lib:choose');
+  if (r && r.ok && r.message) toast(r.message, 'ok', 6000);
+});
+// Moving the library to another folder or drive: the button says so until it's done
+api.on('lib-moving', (m) => {
+  const b = $('#libChange');
+  b.disabled = !!m;
+  b.textContent = m ? 'Moving your clips…' : 'Change…';
+  if (m) toast(`Moving ${m.count} clip${m.count === 1 ? '' : 's'} to ${m.to}. This can take a few minutes.`, '', 8000);
+});
 $('#libRescan').addEventListener('click', async () => { const r = await call('lib:rescan'); if (r && r.ok) toast('Library is up to date.', 'ok', 2500); });
 
 /* modals: the web page is hidden while one is open, so it can't cover it */
