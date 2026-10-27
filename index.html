@@ -621,9 +621,13 @@
           <button class="btn small" id="shFxOff" hidden>Take it off</button>
         </div>
         <p class="hint sh-msg" id="shMsg" role="status" aria-live="polite"></p>
-        <div class="dev-actions sh-open">
-          <button class="btn" id="shOpenIn" aria-haspopup="dialog" aria-controls="shLib">Shader library: inputs…</button>
-          <button class="btn" id="shOpenFx" aria-haspopup="dialog" aria-controls="shLib">Shader library: effects…</button>
+        <div class="ctl">
+          <div class="seg seg-2" id="shRole" role="group" aria-label="Which shaders to show">
+            <button data-role="input" aria-pressed="true">Inputs</button>
+            <button data-role="effect" aria-pressed="false">Effects</button>
+          </div>
+          <input type="search" class="sh-search" id="shSearch" placeholder="Search shaders" aria-label="Search shaders" autocomplete="off" spellcheck="false">
+          <div class="sh-list" id="shList" role="list" aria-label="Shaders"><p class="hint">Loading the shaders…</p></div>
         </div>
         <details class="sh-paste">
           <summary>Paste a shader</summary>
@@ -1288,26 +1292,6 @@
       <p class="hint" id="natHint">Tap a picture to feed it into loop A.</p>
       <div class="nat-grid" id="natGrid"></div>
       <p class="hint nat-foot">Photos from Wikimedia Commons’ Featured Pictures, free to use. Each one names its photographer when you pick it; the full list is in <a href="nature/CREDITS.txt" target="_blank" rel="noopener">nature/CREDITS.txt</a>.</p>
-    </div>
-  </div>
-
-  <div class="guide nat shlib" id="shLib" role="dialog" aria-modal="true" aria-labelledby="shLibTitle" hidden>
-    <div class="guide-bar nat-bar">
-      <span class="wordmark" id="shLibTitle">Shader library</span>
-      <span class="nat-count" id="shLibCount"></span>
-      <span class="spacer"></span>
-      <input type="search" class="sh-search" id="shLibSearch" placeholder="Search" aria-label="Search shaders" autocomplete="off" spellcheck="false">
-      <button class="btn small" id="shLibClose">Close</button>
-      <div class="chips nat-tabs sh-roles" id="shLibRoles" role="group" aria-label="Inputs or effects">
-        <button class="chip" data-role="input" aria-pressed="true">Inputs</button>
-        <button class="chip" data-role="effect" aria-pressed="false">Effects</button>
-      </div>
-      <div class="chips nat-tabs" id="shLibTabs" role="group" aria-label="Kinds of shaders"></div>
-    </div>
-    <div class="nat-inner">
-      <p class="hint" id="shLibHint">Tap a shader to put it on loop A.</p>
-      <div class="nat-grid sh-grid" id="shLibGrid"></div>
-      <p class="hint nat-foot">Built in: shaders from the <a href="https://github.com/Vidvox/ISF-Files" target="_blank" rel="noopener">ISF Files</a> collection (MIT licence; each credits its author when you pick it, and the list is in <a href="shaders/CREDITS.txt" target="_blank" rel="noopener">CREDITS.txt</a>) and a few made for Phosphor Loop. Effects are shown on a flamingo here; on the screen they work on the loop’s own picture.</p>
     </div>
   </div>
 

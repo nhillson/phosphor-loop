@@ -29,25 +29,14 @@ try {
   assert.ok(await body.isHidden(), 'the Shaders section starts folded');
   assert.equal(await T(() => window.__plShaders.lib.index), null, 'and nothing is fetched until it is opened');
   await page.locator('#shaderGroup .group-toggle').click();
-  // The library: a gallery of previews, Inputs and Effects, kinds and a search
-  await page.click('#shOpenIn');
-  await page.waitForFunction(() => !document.getElementById('shLib').hidden && document.querySelectorAll('#shLibGrid .nat-tile img').length > 20);
-  const nIn = await page.locator('#shLibGrid .nat-tile').count();
-  const firstImg = await page.locator('#shLibGrid .nat-tile img').first().evaluate((i) => new Promise((r) => (i.complete ? r(i.naturalWidth) : i.addEventListener('load', () => r(i.naturalWidth)))));
-  assert.equal(firstImg, 240, 'previews load');
-  await page.fill('#shLibSearch', 'checker');
-  assert.ok((await page.locator('#shLibGrid .nat-tile').count()) < nIn, 'search narrows it');
-  await page.fill('#shLibSearch', '');
-  await page.keyboard.press('Escape');
-  assert.ok(await page.locator('#shLib').isHidden());
-  step(`Shaders section folded until opened; the library shows ${nIn} input shaders with previews`);
+  await page.waitForFunction(() => document.querySelectorAll('#shList .sh-item').length > 20);
+  const nIn = await page.locator('#shList .sh-item').count();
+  step(`Shaders section folded until opened; ${nIn} input shaders listed`);
 
   // A built-in ISF input with settings: it draws, and its slider changes the loop's value
   const withFloat = await T(() => window.__plShaders.lib.index.find((e) => e.role === 'input' && e.kind === 'isf' && /Plasma|Noise|Sine|Random/.test(e.name))?.id
     || window.__plShaders.lib.index.find((e) => e.role === 'input' && e.kind === 'isf').id);
-  await page.click('#shOpenIn');
-  await page.locator(`#shLibGrid .nat-tile[data-id="${withFloat}"]`).click();
-  assert.ok(await page.locator('#shLib').isHidden(), 'picking closes the library');
+  await page.locator(`#shList .sh-item[data-id="${withFloat}"]`).click();
   await page.waitForFunction((id) => window.__plShaders.hosts.A.in?.id === id && window.__plShaders.hosts.A.in.host.frame > 2, withFloat, { timeout: 15000 });
   assert.equal(await T(() => window.__plShaders.loops.A.tgt.in1), 'shader');
   assert.equal(await T(() => window.__plShaders.hosts.A.in.host.error), null);
@@ -60,10 +49,10 @@ try {
   step(`a built-in input shader (${withFloat}) draws on loop A; its sliders work`);
 
   // An effect shader over the loop's finished picture
-  await page.click('#shOpenFx');
-  await page.waitForFunction(() => document.querySelectorAll('#shLibGrid .nat-tile').length > 20);
-  const fxId = await page.locator('#shLibGrid .nat-tile').first().getAttribute('data-id');
-  await page.locator('#shLibGrid .nat-tile').first().click();
+  await page.click('#shRole button[data-role="effect"]');
+  await page.waitForFunction(() => document.querySelectorAll('#shList .sh-item').length > 20);
+  const fxId = await page.locator('#shList .sh-item').first().getAttribute('data-id');
+  await page.locator('#shList .sh-item').first().click();
   await page.waitForFunction(() => !!window.__plShaders.loops.A.fxOut, null, { timeout: 15000 });
   assert.equal(await T(() => window.__plShaders.loops.A.tgt.fx), fxId);
   await page.click('#shFxOff'); await frames(3);
@@ -82,13 +71,7 @@ try {
   await page.waitForFunction(() => window.__plShaders.lib.mine.length === 1);
   await page.waitForFunction(() => window.__plShaders.hosts.A.in?.host.frame > 2, null, { timeout: 15000 });
   assert.equal(await T(() => window.__plShaders.loops.A.tgt.shader), await T(() => window.__plShaders.lib.mine[0].id));
-  await page.click('#shOpenIn');
-  await page.locator('#shLibTabs .chip', { hasText: 'Yours' }).click();
-  const mineTile = page.locator('#shLibGrid .nat-tile').first();
-  assert.equal(await mineTile.locator('span').last().textContent(), 'Test stripes', 'listed under Yours');
-  assert.match(await mineTile.locator('img').getAttribute('src'), /^data:image\/jpeg/, 'with a preview of its own');
-  await page.keyboard.press('Escape');
-  assert.ok(await page.locator('#shLib').isHidden(), 'Escape closes the library');
+  assert.ok(await page.locator('#shList h3', { hasText: 'Yours' }).count(), 'listed under Yours');
   step('pasting: a broken shader is turned away with the reason; a working one is kept and used');
 
   // Autopilot's looks can bring one in: a look that uses Shader without naming one gets one

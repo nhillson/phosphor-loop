@@ -90,10 +90,9 @@ SPOTIFY SONG SEQUENCER
   screen want different ones, the newer block's wins.
 
 SHADERS (SHADERTOY AND ISF)
-  The Shaders section (folded until opened) opens the shader library, a
-  gallery of previews by kind with a search, and puts a shader on the loop
-  chosen under Loops: as its input (Inputs) or as an effect over its finished
-  picture (Effects). Previews are made by tools/shaders/build.mjs. About 170 come built in (shaders/: ISF Files collection,
+  The Shaders section (folded until opened) puts a shader on the loop chosen
+  under Loops: as its input (Inputs) or as an effect over its finished
+  picture (Effects). About 170 come built in (shaders/: ISF Files collection,
   MIT licence, plus Phosphor Loop originals in shaders/st/), fetched only when
   used. Paste a shader takes Shadertoy code (Image tab only; music on
   iChannel0, the loop's picture on iChannel1, noise on iChannel2, the Picture

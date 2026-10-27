@@ -11,8 +11,7 @@
     "Audio Visualizer"
    ],
    "credit": "",
-   "audio": true,
-   "thumb": "thumbs/isf-audio-waveform-shape.jpg"
+   "audio": true
   },
   {
    "id": "isf/auto-color-tone",
@@ -24,8 +23,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-auto-color-tone.jpg"
+   "audio": false
   },
   {
    "id": "isf/bad-tv",
@@ -38,8 +36,7 @@
     "Retro"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-bad-tv.jpg"
+   "audio": false
   },
   {
    "id": "isf/basic-shape",
@@ -51,8 +48,7 @@
     "Geometry"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-basic-shape.jpg"
+   "audio": false
   },
   {
    "id": "isf/brick-pattern",
@@ -65,8 +61,7 @@
     "Color"
    ],
    "credit": "patriciogv",
-   "audio": false,
-   "thumb": "thumbs/isf-brick-pattern.jpg"
+   "audio": false
   },
   {
    "id": "isf/bright",
@@ -78,8 +73,7 @@
     "Color Adjustment"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-bright.jpg"
+   "audio": false
   },
   {
    "id": "isf/bump-distortion",
@@ -91,8 +85,7 @@
     "Distortion Effect"
    ],
    "credit": "by carter rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-bump-distortion.jpg"
+   "audio": false
   },
   {
    "id": "isf/cmyk-halftone-lookaround",
@@ -105,8 +98,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-cmyk-halftone-lookaround.jpg"
+   "audio": false
   },
   {
    "id": "isf/cmyk-halftone",
@@ -119,8 +111,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-cmyk-halftone.jpg"
+   "audio": false
   },
   {
    "id": "isf/channel-slide",
@@ -132,8 +123,7 @@
     "Color Effect"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-channel-slide.jpg"
+   "audio": false
   },
   {
    "id": "isf/checkerboard",
@@ -146,8 +136,7 @@
     "Color"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-checkerboard.jpg"
+   "audio": false
   },
   {
    "id": "isf/chroma-desaturation-mask",
@@ -160,8 +149,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-chroma-desaturation-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/chroma-mask",
@@ -174,8 +162,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-chroma-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/chroma-zoom",
@@ -188,8 +175,7 @@
     "Stylize"
    ],
    "credit": "by toneburst",
-   "audio": false,
-   "thumb": "thumbs/isf-chroma-zoom.jpg"
+   "audio": false
   },
   {
    "id": "isf/chromatic-aberration",
@@ -202,8 +188,7 @@
     "Distortion"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-chromatic-aberration.jpg"
+   "audio": false
   },
   {
    "id": "isf/circle-splash-distortion",
@@ -215,8 +200,7 @@
     "Distortion Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-circle-splash-distortion.jpg"
+   "audio": false
   },
   {
    "id": "isf/circle-warp",
@@ -228,8 +212,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-circle-warp.jpg"
+   "audio": false
   },
   {
    "id": "isf/circle-wrap-distortion",
@@ -241,8 +224,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-circle-wrap-distortion.jpg"
+   "audio": false
   },
   {
    "id": "isf/circular-feedback-mask",
@@ -254,8 +236,7 @@
     "Feedback"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-circular-feedback-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/collage",
@@ -267,8 +248,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-collage.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-history",
@@ -280,8 +260,7 @@
     "Color"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-color-history.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-levels",
@@ -293,8 +272,7 @@
     "Color Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-color-levels.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-monochrome",
@@ -307,8 +285,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-color-monochrome.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-posterize",
@@ -321,8 +298,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-color-posterize.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-replacement",
@@ -334,8 +310,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-color-replacement.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-scales",
@@ -347,8 +322,7 @@
     "Color"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-color-scales.jpg"
+   "audio": false
   },
   {
    "id": "isf/color-schemes",
@@ -360,8 +334,7 @@
     "Color"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-color-schemes.jpg"
+   "audio": false
   },
   {
    "id": "isf/comet-tails",
@@ -374,8 +347,7 @@
     "Glitch"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-comet-tails.jpg"
+   "audio": false
   },
   {
    "id": "isf/convergence",
@@ -388,8 +360,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-convergence.jpg"
+   "audio": false
   },
   {
    "id": "isf/corner-color-tint",
@@ -401,8 +372,7 @@
     "Color Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-corner-color-tint.jpg"
+   "audio": false
   },
   {
    "id": "isf/corner-colors",
@@ -414,8 +384,7 @@
     "Color"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-corner-colors.jpg"
+   "audio": false
   },
   {
    "id": "isf/crop-and-feather",
@@ -427,8 +396,7 @@
     "Geometry Adjustment"
    ],
    "credit": "ProjectileObjects modifed, based on VIDVOX crop",
-   "audio": false,
-   "thumb": "thumbs/isf-crop-and-feather.jpg"
+   "audio": false
   },
   {
    "id": "isf/cubic-warp",
@@ -440,8 +408,7 @@
     "Distortion Effect"
    ],
    "credit": "by carter rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-cubic-warp.jpg"
+   "audio": false
   },
   {
    "id": "isf/diagonal-blur",
@@ -453,8 +420,7 @@
     "Blur"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-diagonal-blur.jpg"
+   "audio": false
   },
   {
    "id": "isf/diagonalize",
@@ -467,8 +433,7 @@
     "Distortion Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-diagonalize.jpg"
+   "audio": false
   },
   {
    "id": "isf/dilate-fast",
@@ -480,8 +445,7 @@
     "Blur"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-dilate-fast.jpg"
+   "audio": false
   },
   {
    "id": "isf/dilate",
@@ -493,8 +457,7 @@
     "Blur"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-dilate.jpg"
+   "audio": false
   },
   {
    "id": "isf/dither-bayer",
@@ -507,8 +470,7 @@
     "Retro"
    ],
    "credit": "Hugh Kennedy, adapted by David Lublin",
-   "audio": false,
-   "thumb": "thumbs/isf-dither-bayer.jpg"
+   "audio": false
   },
   {
    "id": "isf/doodler-overlay",
@@ -520,8 +482,7 @@
     "Overlay"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-doodler-overlay.jpg"
+   "audio": false
   },
   {
    "id": "isf/doodler",
@@ -533,8 +494,7 @@
     "Drawing"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-doodler.jpg"
+   "audio": false
   },
   {
    "id": "isf/double-vision",
@@ -546,8 +506,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-double-vision.jpg"
+   "audio": false
   },
   {
    "id": "isf/dual-side-scroller-and-flip",
@@ -559,8 +518,7 @@
     "Geometry Adjustment"
    ],
    "credit": "Inspired by Side Scroller and Flip by BrianChasalow",
-   "audio": false,
-   "thumb": "thumbs/isf-dual-side-scroller-and-flip.jpg"
+   "audio": false
   },
   {
    "id": "isf/duotone",
@@ -572,8 +530,7 @@
     "Color Effect"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-duotone.jpg"
+   "audio": false
   },
   {
    "id": "isf/echo-trace",
@@ -585,8 +542,7 @@
     "Feedback"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-echo-trace.jpg"
+   "audio": false
   },
   {
    "id": "isf/edge-blowout",
@@ -598,8 +554,7 @@
     "Stylize"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-edge-blowout.jpg"
+   "audio": false
   },
   {
    "id": "isf/erode-fast",
@@ -611,8 +566,7 @@
     "Blur"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-erode-fast.jpg"
+   "audio": false
   },
   {
    "id": "isf/erode",
@@ -624,8 +578,7 @@
     "Blur"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-erode.jpg"
+   "audio": false
   },
   {
    "id": "isf/etch-a-sketch",
@@ -637,8 +590,7 @@
     "Drawing"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-etch-a-sketch.jpg"
+   "audio": false
   },
   {
    "id": "isf/exposure-adjust",
@@ -650,8 +602,7 @@
     "Color Adjustment"
    ],
    "credit": "by carter rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-exposure-adjust.jpg"
+   "audio": false
   },
   {
    "id": "isf/fft-color-lines",
@@ -663,8 +614,7 @@
     "Audio Visualizer"
    ],
    "credit": "by VIDVOX",
-   "audio": true,
-   "thumb": "thumbs/isf-fft-color-lines.jpg"
+   "audio": true
   },
   {
    "id": "isf/fft-filled-waveform",
@@ -676,8 +626,7 @@
     "Audio Visualizer"
    ],
    "credit": "by VIDVOX",
-   "audio": true,
-   "thumb": "thumbs/isf-fft-filled-waveform.jpg"
+   "audio": true
   },
   {
    "id": "isf/fft-spectrogram",
@@ -689,8 +638,7 @@
     "Audio Visualizer"
    ],
    "credit": "by VIDVOX",
-   "audio": true,
-   "thumb": "thumbs/isf-fft-spectrogram.jpg"
+   "audio": true
   },
   {
    "id": "isf/false-color",
@@ -702,8 +650,7 @@
     "Color Effect"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-false-color.jpg"
+   "audio": false
   },
   {
    "id": "isf/flip-h",
@@ -715,8 +662,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-flip-h.jpg"
+   "audio": false
   },
   {
    "id": "isf/flip-v",
@@ -728,8 +674,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-flip-v.jpg"
+   "audio": false
   },
   {
    "id": "isf/flipbook",
@@ -741,8 +686,7 @@
     "Stylize"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-flipbook.jpg"
+   "audio": false
   },
   {
    "id": "isf/frosted-glass",
@@ -755,8 +699,7 @@
     "Blur"
    ],
    "credit": "geeks3d",
-   "audio": false,
-   "thumb": "thumbs/isf-frosted-glass.jpg"
+   "audio": false
   },
   {
    "id": "isf/ghosting",
@@ -770,8 +713,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-ghosting.jpg"
+   "audio": false
   },
   {
    "id": "isf/god-rays",
@@ -783,8 +725,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-god-rays.jpg"
+   "audio": false
   },
   {
    "id": "isf/graph-paper",
@@ -797,8 +738,7 @@
     "Color"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-graph-paper.jpg"
+   "audio": false
   },
   {
    "id": "isf/grid-warp",
@@ -810,8 +750,7 @@
     "Geometry"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-grid-warp.jpg"
+   "audio": false
   },
   {
    "id": "isf/hatch-blur",
@@ -823,8 +762,7 @@
     "Blur"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-hatch-blur.jpg"
+   "audio": false
   },
   {
    "id": "isf/heart",
@@ -836,8 +774,7 @@
     "Geometry"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-heart.jpg"
+   "audio": false
   },
   {
    "id": "isf/horizverthold",
@@ -849,8 +786,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-horizverthold.jpg"
+   "audio": false
   },
   {
    "id": "isf/hyperspace",
@@ -862,8 +798,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-hyperspace.jpg"
+   "audio": false
   },
   {
    "id": "isf/interlace-mirror",
@@ -876,8 +811,7 @@
     "Retro"
    ],
    "credit": "by Carter Rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-interlace-mirror.jpg"
+   "audio": false
   },
   {
    "id": "isf/interlace",
@@ -890,8 +824,7 @@
     "Retro"
    ],
    "credit": "by Carter Rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-interlace.jpg"
+   "audio": false
   },
   {
    "id": "isf/jpeg-block-corruption",
@@ -904,8 +837,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-jpeg-block-corruption.jpg"
+   "audio": false
   },
   {
    "id": "isf/kaleidoscope-tile",
@@ -918,8 +850,7 @@
     "Tile Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-kaleidoscope-tile.jpg"
+   "audio": false
   },
   {
    "id": "isf/kaleidoscope",
@@ -932,8 +863,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-kaleidoscope.jpg"
+   "audio": false
   },
   {
    "id": "isf/key-frame-artifacts",
@@ -945,8 +875,7 @@
     "Glitch"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-key-frame-artifacts.jpg"
+   "audio": false
   },
   {
    "id": "isf/lgg",
@@ -958,8 +887,7 @@
     "Color Adjustment"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-lgg.jpg"
+   "audio": false
   },
   {
    "id": "isf/linear-gradient",
@@ -971,8 +899,7 @@
     "Color"
    ],
    "credit": "by Carter Rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-linear-gradient.jpg"
+   "audio": false
   },
   {
    "id": "isf/lines",
@@ -984,8 +911,7 @@
     "Geometry"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-lines.jpg"
+   "audio": false
   },
   {
    "id": "isf/long-exposure",
@@ -999,8 +925,7 @@
     "Film"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-long-exposure.jpg"
+   "audio": false
   },
   {
    "id": "isf/luminance-posterize",
@@ -1013,8 +938,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-luminance-posterize.jpg"
+   "audio": false
   },
   {
    "id": "isf/median",
@@ -1026,8 +950,7 @@
     "Blur"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-median.jpg"
+   "audio": false
   },
   {
    "id": "isf/meta-image",
@@ -1040,8 +963,7 @@
     "Tile Effect"
    ],
    "credit": "by Toneburst",
-   "audio": false,
-   "thumb": "thumbs/isf-meta-image.jpg"
+   "audio": false
   },
   {
    "id": "isf/mirror",
@@ -1053,8 +975,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-mirror.jpg"
+   "audio": false
   },
   {
    "id": "isf/motion-mask",
@@ -1066,8 +987,7 @@
     "Masking"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-motion-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/multi-hue-shift",
@@ -1079,8 +999,7 @@
     "Color Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-multi-hue-shift.jpg"
+   "audio": false
   },
   {
    "id": "isf/multi-pixellate",
@@ -1092,8 +1011,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-multi-pixellate.jpg"
+   "audio": false
   },
   {
    "id": "isf/multiframe-2x2",
@@ -1106,8 +1024,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-multiframe-2x2.jpg"
+   "audio": false
   },
   {
    "id": "isf/multiframe-3x3",
@@ -1120,8 +1037,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-multiframe-3x3.jpg"
+   "audio": false
   },
   {
    "id": "isf/noise-adapt",
@@ -1133,8 +1049,7 @@
     "Noise"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-noise-adapt.jpg"
+   "audio": false
   },
   {
    "id": "isf/noise-displace",
@@ -1147,8 +1062,7 @@
     "Noise"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-noise-displace.jpg"
+   "audio": false
   },
   {
    "id": "isf/noise-pixellate",
@@ -1161,8 +1075,7 @@
     "Noise"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-noise-pixellate.jpg"
+   "audio": false
   },
   {
    "id": "isf/noise",
@@ -1174,8 +1087,7 @@
     "Noise"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-noise.jpg"
+   "audio": false
   },
   {
    "id": "isf/pattern-glitch",
@@ -1187,8 +1099,7 @@
     "Glitch"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-pattern-glitch.jpg"
+   "audio": false
   },
   {
    "id": "isf/pixel-shifter",
@@ -1200,8 +1111,7 @@
     "Distortion Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-pixel-shifter.jpg"
+   "audio": false
   },
   {
    "id": "isf/pixellate",
@@ -1213,8 +1123,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-pixellate.jpg"
+   "audio": false
   },
   {
    "id": "isf/poly-star",
@@ -1226,8 +1135,7 @@
     "Geometry"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-poly-star.jpg"
+   "audio": false
   },
   {
    "id": "isf/posterize",
@@ -1241,8 +1149,7 @@
     "Color Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-posterize.jpg"
+   "audio": false
   },
   {
    "id": "isf/power-warp",
@@ -1254,8 +1161,7 @@
     "Distortion Effect"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-power-warp.jpg"
+   "audio": false
   },
   {
    "id": "isf/quad-mask",
@@ -1268,8 +1174,7 @@
     "Geometry Adjustment"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-quad-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/quad-tile",
@@ -1281,8 +1186,7 @@
     "Tile Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-quad-tile.jpg"
+   "audio": false
   },
   {
    "id": "isf/rgb-eq",
@@ -1294,8 +1198,7 @@
     "Color Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-rgb-eq.jpg"
+   "audio": false
   },
   {
    "id": "isf/rgb-halftone-lookaround",
@@ -1308,8 +1211,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-rgb-halftone-lookaround.jpg"
+   "audio": false
   },
   {
    "id": "isf/rgb-halftone",
@@ -1322,8 +1224,7 @@
     "Retro"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-rgb-halftone.jpg"
+   "audio": false
   },
   {
    "id": "isf/rgb-strobe",
@@ -1335,8 +1236,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-rgb-strobe.jpg"
+   "audio": false
   },
   {
    "id": "isf/rgb-trails-3-0",
@@ -1349,8 +1249,7 @@
     "Blur"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-rgb-trails-3-0.jpg"
+   "audio": false
   },
   {
    "id": "isf/rgba-swap",
@@ -1362,8 +1261,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-rgba-swap.jpg"
+   "audio": false
   },
   {
    "id": "isf/radial-gradient",
@@ -1375,8 +1273,7 @@
     "Color"
    ],
    "credit": "by Carter Rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-radial-gradient.jpg"
+   "audio": false
   },
   {
    "id": "isf/radial-replicate",
@@ -1388,8 +1285,7 @@
     "Kaleidoscope"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-radial-replicate.jpg"
+   "audio": false
   },
   {
    "id": "isf/random-checkerboard",
@@ -1402,8 +1298,7 @@
     "Color"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-random-checkerboard.jpg"
+   "audio": false
   },
   {
    "id": "isf/random-freeze",
@@ -1415,8 +1310,7 @@
     "Glitch"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-random-freeze.jpg"
+   "audio": false
   },
   {
    "id": "isf/random-lines",
@@ -1428,8 +1322,7 @@
     "Geometry"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-random-lines.jpg"
+   "audio": false
   },
   {
    "id": "isf/random-shape-blast",
@@ -1441,8 +1334,7 @@
     "Geometry"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-random-shape-blast.jpg"
+   "audio": false
   },
   {
    "id": "isf/random-squares-mask",
@@ -1454,8 +1346,7 @@
     "Masking"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-random-squares-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/random-stripes",
@@ -1468,8 +1359,7 @@
     "Color"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-random-stripes.jpg"
+   "audio": false
   },
   {
    "id": "isf/replicate-random",
@@ -1481,8 +1371,7 @@
     "Tile Effect"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-replicate-random.jpg"
+   "audio": false
   },
   {
    "id": "isf/replicate",
@@ -1494,8 +1383,7 @@
     "Tile Effect"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-replicate.jpg"
+   "audio": false
   },
   {
    "id": "isf/resize-glitch",
@@ -1508,8 +1396,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-resize-glitch.jpg"
+   "audio": false
   },
   {
    "id": "isf/ridgelines",
@@ -1522,8 +1409,7 @@
     "Noise"
    ],
    "credit": "by VIDVOX (simplex by Ashima Arts / Stefan Gustavson)",
-   "audio": false,
-   "thumb": "thumbs/isf-ridgelines.jpg"
+   "audio": false
   },
   {
    "id": "isf/ripples",
@@ -1535,8 +1421,7 @@
     "Distortion Effect"
    ],
    "credit": "by carter rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-ripples.jpg"
+   "audio": false
   },
   {
    "id": "isf/sepia-tone",
@@ -1549,8 +1434,7 @@
     "Retro"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-sepia-tone.jpg"
+   "audio": false
   },
   {
    "id": "isf/shake",
@@ -1563,8 +1447,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-shake.jpg"
+   "audio": false
   },
   {
    "id": "isf/shape-mask",
@@ -1576,8 +1459,7 @@
     "Masking"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-shape-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/shape-morph-feedback-mask",
@@ -1589,8 +1471,7 @@
     "Feedback"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-shape-morph-feedback-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/shape-morph-wrap",
@@ -1602,8 +1483,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-shape-morph-wrap.jpg"
+   "audio": false
   },
   {
    "id": "isf/shockwave-pulse",
@@ -1615,8 +1495,7 @@
     "Distortion Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-shockwave-pulse.jpg"
+   "audio": false
   },
   {
    "id": "isf/shockwave",
@@ -1628,8 +1507,7 @@
     "Distortion Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-shockwave.jpg"
+   "audio": false
   },
   {
    "id": "isf/side-scroller-and-flip",
@@ -1641,8 +1519,7 @@
     "Geometry Adjustment"
    ],
    "credit": "BrianChasalow",
-   "audio": false,
-   "thumb": "thumbs/isf-side-scroller-and-flip.jpg"
+   "audio": false
   },
   {
    "id": "isf/simplex-noise",
@@ -1655,8 +1532,7 @@
     "Noise"
    ],
    "credit": "by VIDVOX (simplex by Ashima Arts / Stefan Gustavson)",
-   "audio": false,
-   "thumb": "thumbs/isf-simplex-noise.jpg"
+   "audio": false
   },
   {
    "id": "isf/sine-warp-gradient",
@@ -1668,8 +1544,7 @@
     "Color"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-sine-warp-gradient.jpg"
+   "audio": false
   },
   {
    "id": "isf/sine-warp-tile",
@@ -1682,8 +1557,7 @@
     "Tile Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-sine-warp-tile.jpg"
+   "audio": false
   },
   {
    "id": "isf/sliding-strips",
@@ -1695,8 +1569,7 @@
     "Geometry Adjustment"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-sliding-strips.jpg"
+   "audio": false
   },
   {
    "id": "isf/slit-scan-mask",
@@ -1708,8 +1581,7 @@
     "Masking"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-slit-scan-mask.jpg"
+   "audio": false
   },
   {
    "id": "isf/slit-scan",
@@ -1721,8 +1593,7 @@
     "Glitch"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-slit-scan.jpg"
+   "audio": false
   },
   {
    "id": "isf/soft-flip",
@@ -1734,8 +1605,7 @@
     "Geometry Adjustment"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-soft-flip.jpg"
+   "audio": false
   },
   {
    "id": "isf/solarize",
@@ -1747,8 +1617,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-solarize.jpg"
+   "audio": false
   },
   {
    "id": "isf/sphere-map",
@@ -1760,8 +1629,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-sphere-map.jpg"
+   "audio": false
   },
   {
    "id": "isf/spiral",
@@ -1773,8 +1641,7 @@
     "Geometry"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-spiral.jpg"
+   "audio": false
   },
   {
    "id": "isf/star",
@@ -1786,8 +1653,7 @@
     "Geometry"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-star.jpg"
+   "audio": false
   },
   {
    "id": "isf/stripes",
@@ -1799,8 +1665,7 @@
     "Geometry"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-stripes.jpg"
+   "audio": false
   },
   {
    "id": "isf/strobe",
@@ -1812,8 +1677,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-strobe.jpg"
+   "audio": false
   },
   {
    "id": "isf/stylize-glitch",
@@ -1825,8 +1689,7 @@
     "Glitch"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-stylize-glitch.jpg"
+   "audio": false
   },
   {
    "id": "isf/toon",
@@ -1838,8 +1701,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-toon.jpg"
+   "audio": false
   },
   {
    "id": "isf/trapezoid-distortion",
@@ -1851,8 +1713,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-trapezoid-distortion.jpg"
+   "audio": false
   },
   {
    "id": "isf/triangle-mosaic",
@@ -1864,8 +1725,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-triangle-mosaic.jpg"
+   "audio": false
   },
   {
    "id": "isf/triangle-warp",
@@ -1877,8 +1737,7 @@
     "Distortion Effect"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-triangle-warp.jpg"
+   "audio": false
   },
   {
    "id": "isf/triangle",
@@ -1890,8 +1749,7 @@
     "Geometry"
    ],
    "credit": "by Carter Rosenberg",
-   "audio": false,
-   "thumb": "thumbs/isf-triangle.jpg"
+   "audio": false
   },
   {
    "id": "isf/triangles",
@@ -1903,8 +1761,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-triangles.jpg"
+   "audio": false
   },
   {
    "id": "isf/trio-tone",
@@ -1916,8 +1773,7 @@
     "Color Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-trio-tone.jpg"
+   "audio": false
   },
   {
    "id": "isf/triple-rotate",
@@ -1929,8 +1785,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-triple-rotate.jpg"
+   "audio": false
   },
   {
    "id": "isf/truchet-tile",
@@ -1942,8 +1797,7 @@
     "Geometry"
    ],
    "credit": "pjkarlik",
-   "audio": false,
-   "thumb": "thumbs/isf-truchet-tile.jpg"
+   "audio": false
   },
   {
    "id": "isf/twirl",
@@ -1955,8 +1809,7 @@
     "Distortion Effect"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-twirl.jpg"
+   "audio": false
   },
   {
    "id": "isf/vhs-glitch",
@@ -1969,8 +1822,7 @@
     "Retro"
    ],
    "credit": "David Lublin, original by Staffan Widegarn Åhlvik",
-   "audio": false,
-   "thumb": "thumbs/isf-vhs-glitch.jpg"
+   "audio": false
   },
   {
    "id": "isf/vu-meter",
@@ -1982,8 +1834,7 @@
     "Geometry"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-vu-meter.jpg"
+   "audio": false
   },
   {
    "id": "isf/vvmotionblur-3-0",
@@ -1995,8 +1846,7 @@
     "Blur"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-vvmotionblur-3-0.jpg"
+   "audio": false
   },
   {
    "id": "isf/vertical-tearing",
@@ -2008,8 +1858,7 @@
     "Glitch"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-vertical-tearing.jpg"
+   "audio": false
   },
   {
    "id": "isf/vibrance",
@@ -2021,8 +1870,7 @@
     "Color Adjustment"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-vibrance.jpg"
+   "audio": false
   },
   {
    "id": "isf/video-bricks",
@@ -2034,8 +1882,7 @@
     "Tile Effect"
    ],
    "credit": "adapted from patriciogv bricks.fs by vidvox",
-   "audio": false,
-   "thumb": "thumbs/isf-video-bricks.jpg"
+   "audio": false
   },
   {
    "id": "isf/video-snake",
@@ -2048,8 +1895,7 @@
     "Stylize"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-video-snake.jpg"
+   "audio": false
   },
   {
    "id": "isf/waveform-displace",
@@ -2062,8 +1908,7 @@
     "Distortion Effect"
    ],
    "credit": "icalvin102 (calvin@icalvin.de)",
-   "audio": true,
-   "thumb": "thumbs/isf-waveform-displace.jpg"
+   "audio": true
   },
   {
    "id": "isf/white-point-adjust",
@@ -2075,8 +1920,7 @@
     "Color Adjustment"
    ],
    "credit": "by zoidberg",
-   "audio": false,
-   "thumb": "thumbs/isf-white-point-adjust.jpg"
+   "audio": false
   },
   {
    "id": "isf/worley-cells",
@@ -2090,8 +1934,7 @@
     "Noise"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-worley-cells.jpg"
+   "audio": false
   },
   {
    "id": "isf/xyzoom",
@@ -2103,8 +1946,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-xyzoom.jpg"
+   "audio": false
   },
   {
    "id": "isf/y-c-time-blur",
@@ -2117,8 +1959,7 @@
     "Glitch"
    ],
    "credit": "VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-y-c-time-blur.jpg"
+   "audio": false
   },
   {
    "id": "isf/zoom",
@@ -2130,8 +1971,7 @@
     "Geometry Adjustment"
    ],
    "credit": "by VIDVOX",
-   "audio": false,
-   "thumb": "thumbs/isf-zoom.jpg"
+   "audio": false
   },
   {
    "id": "isf/zooming-feedback",
@@ -2144,8 +1984,7 @@
     "Feedback"
    ],
    "credit": "",
-   "audio": false,
-   "thumb": "thumbs/isf-zooming-feedback.jpg"
+   "audio": false
   },
   {
    "id": "isf/v002-bleach-bypass",
@@ -2158,8 +1997,7 @@
     "Film"
    ],
    "credit": "by v002",
-   "audio": false,
-   "thumb": "thumbs/isf-v002-bleach-bypass.jpg"
+   "audio": false
   },
   {
    "id": "isf/v002-crosshatch",
@@ -2171,8 +2009,7 @@
     "Halftone Effect"
    ],
    "credit": "by v002",
-   "audio": false,
-   "thumb": "thumbs/isf-v002-crosshatch.jpg"
+   "audio": false
   },
   {
    "id": "isf/v002-technicolor",
@@ -2186,8 +2023,7 @@
     "Color Effect"
    ],
    "credit": "by v002",
-   "audio": false,
-   "thumb": "thumbs/isf-v002-technicolor.jpg"
+   "audio": false
   },
   {
    "id": "isf/v002-vignette",
@@ -2199,8 +2035,7 @@
     "Film"
    ],
    "credit": "by v002",
-   "audio": false,
-   "thumb": "thumbs/isf-v002-vignette.jpg"
+   "audio": false
   },
   {
    "id": "isf/v002-crt-displacement",
@@ -2213,8 +2048,7 @@
     "Retro"
    ],
    "credit": "by vade",
-   "audio": false,
-   "thumb": "thumbs/isf-v002-crt-displacement.jpg"
+   "audio": false
   },
   {
    "id": "st/kaleido-flower",
@@ -2226,8 +2060,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": false,
-   "thumb": "thumbs/st-kaleido-flower.jpg"
+   "audio": false
   },
   {
    "id": "st/liquid-marble",
@@ -2239,8 +2072,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": false,
-   "thumb": "thumbs/st-liquid-marble.jpg"
+   "audio": false
   },
   {
    "id": "st/plasma-bloom",
@@ -2252,8 +2084,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": true,
-   "thumb": "thumbs/st-plasma-bloom.jpg"
+   "audio": true
   },
   {
    "id": "st/ripple-lens",
@@ -2265,8 +2096,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": true,
-   "thumb": "thumbs/st-ripple-lens.jpg"
+   "audio": true
   },
   {
    "id": "st/spectrum-bars",
@@ -2278,8 +2108,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": true,
-   "thumb": "thumbs/st-spectrum-bars.jpg"
+   "audio": true
   },
   {
    "id": "st/starfield-warp",
@@ -2291,8 +2120,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": false,
-   "thumb": "thumbs/st-starfield-warp.jpg"
+   "audio": false
   },
   {
    "id": "st/tunnel-rings",
@@ -2304,8 +2132,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": true,
-   "thumb": "thumbs/st-tunnel-rings.jpg"
+   "audio": true
   },
   {
    "id": "st/voronoi-cells",
@@ -2317,8 +2144,7 @@
     "Phosphor Loop"
    ],
    "credit": "Phosphor Loop",
-   "audio": false,
-   "thumb": "thumbs/st-voronoi-cells.jpg"
+   "audio": false
   }
  ]
 }
