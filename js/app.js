@@ -1752,7 +1752,7 @@ async function setSound(src) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { sndSay('This browser can’t use a microphone on this page.', true); return; }
     sndSay(loopback ? 'Looking for a loopback adapter. Allow audio input access if your browser asks…' : 'Waiting for you to allow the microphone…');
     try {
-      const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+      const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 } };
       if (loopback) {
         let ins = await listMics();
         if (request !== soundRequest) return;
@@ -1811,7 +1811,7 @@ async function setSound(src) {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { displaySurface: 'monitor' },   // opens the box on the screens tab, where system audio lives
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: false },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 }, suppressLocalAudioPlayback: false },
       systemAudio: 'include', selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include',
     });
     stream.getVideoTracks().forEach((t) => t.stop());   // only the sound is used
@@ -6889,7 +6889,8 @@ recMicBtn.addEventListener('click', () => {
   }[next], 6000);
 });
 const isLoopback = (label) => LOOPBACK.test(label || '');
-const noSoundFixes = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+// Stereo at 48 kHz, untouched: the browser's call-quality defaults (mono, noise and echo filters) spoil music
+const noSoundFixes = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 } };
 function soundErr(name) { const e = new Error(name); e.name = name; return e; }
 // This computer's sound for a video, when React to sound isn't already hearing it. Chrome and Edge get it by
 // sharing a screen with its sound (the screen's picture is dropped at once). Firefox and Safari can't, so they
@@ -6923,7 +6924,7 @@ async function openRecComputer() {
 }
 // A room microphone, never Stereo Mix and the like (those carry the computer's sound, not a voice)
 async function openRecMic() {
-  const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  const audio = { ...noSoundFixes };
   const picked = [...micSel.options].find((o) => o.value === micDeviceId);
   if (micDeviceId && picked && !isLoopback(picked.textContent)) audio.deviceId = { ideal: micDeviceId };
   let stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
@@ -6941,7 +6942,8 @@ async function openRecMic() {
 function blendSounds(tracks) {
   if (tracks.length < 2) return { track: tracks[0] || null, ctx: null };
   const AC = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AC();
+  let ctx;
+  try { ctx = new AC({ sampleRate: 48000 }); } catch (_) { ctx = new AC(); }
   const out = ctx.createMediaStreamDestination();
   tracks.forEach((t) => ctx.createMediaStreamSource(new MediaStream([t])).connect(out));
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -7030,7 +7032,10 @@ async function startRec() {
     if (blend.ctx) { try { blend.ctx.close(); } catch (_) {} }
   };
   try {
-    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 10000000 } : undefined);
+    // Sound at a music-quality rate instead of the browser's 128 kbps: AAC at 192 kbps (the most Windows' AAC
+    // encoder makes) or Opus at 256 kbps, both stereo, both sounding the same as the original to the ear
+    const audioBitsPerSecond = /mp4/.test(mime) ? 192000 : 256000;
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 10000000, audioBitsPerSecond } : undefined);
   } catch (e) { cleanUp(); recorder = null; recNote('Recording isn’t supported in this browser.'); return; }
   recChunks = [];
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
