@@ -160,16 +160,18 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
-           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
 const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
+// Halftone's slider: how far apart its dots are, in Standard-size pixels (3 to 24)
+const halftoneCell = (v) => 3 + 21 * clamp(v, 0, 100) / 100;
 // The sliders under Effects › Feeds on itself
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -837,6 +839,7 @@ function sliderText(k, v) {
     case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
     case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal': return v === 0 ? 'OFF' : String(v);
     case 'poster': return v === 0 ? 'OFF' : `${Math.round(posterSteps(v))} STEPS`;
+    case 'halftone': return v === 0 ? 'OFF' : `${Math.round(halftoneCell(v))} PX`;
     // How far back the far edge reaches
     case 'time': return v === 0 ? 'OFF' : `${twSpan(v).toFixed(1)} SEC`;
     default: return String(v);
@@ -1041,7 +1044,10 @@ $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
 // (laid over the finished picture once; see finalPass)
 $$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
   const key = g.dataset.where;
-  loops[edit].tgt[key] = b.dataset.final === '1';
+  const t = loops[edit].tgt;
+  t[key] = b.dataset.final === '1';
+  // Picking where with Halftone off turns it on, so the button always shows something
+  if (key === 'halftoneFinal' && !(t.halftone > 0)) t.halftone = 30;
   syncUI();
   showOSD(`${g.getAttribute('aria-label').replace(/^Where | works$/g, '').toUpperCase()} ${edit}`, b.dataset.final === '1' ? 'FINAL PASS' : 'WITHIN LOOPS');
 })));
@@ -1279,9 +1285,10 @@ function patchLoop(k, p, force) {
   n.subject = p.subject ?? (force ? 'off' : L.tgt.subject);
   // Looks saved before Color grading took Recolor's place still carry it; it's left behind
   delete n.recolor;
-  // Posterize stays through every new look (Autopilot, Surprise), and so does where each effect works (Final Pass
-  // or Within Loops); a preset, recipe or Neutral sets them
+  // Posterize and Halftone stay through every new look (Autopilot, Surprise), and so does where each effect works
+  // (Final Pass or Within Loops); a preset, recipe or Neutral sets them
   if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
+  if (!force && !('halftone' in p)) n.halftone = L.tgt.halftone || 0;
   if (!force) for (const w of Object.values(FINAL_FX)) if (!(w in p)) n[w] = !!L.tgt[w];
   // Soft trails stays through every new look too; a preset, recipe or Neutral sets it (on, unless saved off)
   if (!force && !('soft' in p)) n.soft = L.tgt.soft !== false;
@@ -2264,8 +2271,8 @@ function apOwnsMix(p) {
   return false;
 }
 // Who a control belongs to while Autopilot runs: loop k's setting, or a fader under Loops
-// Posterize is always yours: Autopilot never changes it
-const apOwns = (key, k) => (key === 'poster' ? false : key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
+// Posterize and Halftone are always yours: Autopilot never changes them
+const apOwns = (key, k) => (key === 'poster' || key === 'halftone' ? false : key === 'view' || MIX_SLIDERS.includes(key) ? apOwnsMix(key) : apRuns(k));
 
 /* ================= autopilot's eye ================= */
 // While Autopilot runs it keeps an eye on the picture. Every few hundredths of a second a tiny 64 x 36 copy is
@@ -7986,8 +7993,8 @@ function shownTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[
 // What loop k gives the mix: its picture, or that picture after its final pass (see finalPass)
 function mixTex(k) { const pz = loops[k].pz; return pz && pz.live ? pz.rt[pz.f].tex : shownTex(k); }
 // The effects that can work in the final pass instead of within the loop, each with the switch that says so.
-// Posterize starts in the final pass; the others start within the loop, where they've always been.
-const FINAL_FX = { poster: 'posterIn', mirror: 'mirrorFinal', warp: 'warpFinal', split: 'splitFinal', chroma: 'chromaFinal' };
+// Posterize and Halftone start in the final pass; the others start within the loop, where they've always been.
+const FINAL_FX = { poster: 'posterIn', halftone: 'halftoneFinal', mirror: 'mirrorFinal', warp: 'warpFinal', split: 'splitFinal', chroma: 'chromaFinal' };
 const isFinal = (t, fx) => (fx === 'poster' ? !t.posterIn : !!t[FINAL_FX[fx]]);
 // Loop k's final pass (FS_FINAL): its picture with the effects set to Final Pass laid over it once, drawn into a
 // pair of pictures of its own, taking turns, so Posterize can see the steps it drew last frame. Made when first
@@ -7996,11 +8003,12 @@ function finalPass(k) {
   const L = loops[k], t = L.tgt, c = L.cur;
   const amt = (fx, v) => (isFinal(t, fx) ? v : 0);
   const steps = amt('poster', c.poster > 0.5 ? posterSteps(c.poster) : 0);
+  const dots = amt('halftone', c.halftone > 0.5 ? halftoneCell(c.halftone) : 0);
   const mirror = t.mirrorFinal && mirrorAny(k);
   const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
   const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
   const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
-  const on = L.rt && loopOn(k) && (steps > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
+  const on = L.rt && loopOn(k) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
   if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
@@ -8020,6 +8028,7 @@ function finalPass(k) {
   set1f(finalProg, 'uChroma', chroma);
   set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   set1f(finalProg, 'uN', steps);
+  set1f(finalProg, 'uHalftone', dots);
   // Posterize has no steps of its own to remember on its first frame
   set1f(finalProg, 'uFresh', pz.stepped ? 0 : 1);
   pz.stepped = steps > 0;
@@ -8419,6 +8428,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uGrowTurn', Math.random() * 6.2831853);
   // Color filters set to work inside this loop (see "color filters")
   set1f(fbProg, 'uPoster', t.posterIn && c.poster > 0.5 ? posterSteps(c.poster) : 0);
+  set1f(fbProg, 'uHalftone', !t.halftoneFinal && c.halftone > 0.5 ? halftoneCell(c.halftone) : 0);
   setLoopGradeUniforms(f);
   set1f(fbProg, 'uAspText', textAspect);
   mirrorUniforms(fbProg, k, !t.mirrorFinal);
@@ -8599,7 +8609,7 @@ const SEQ_TRACK = [
 // the g… ones are its color grading, which in the sequencer belongs to each loop on its own.
 const SEQ_SLIDERS = [
   ['Loop', [['show', 'Show'], ['feed', 'Feed into other loop'], ['blend', 'Blend'], ['size', 'Input size']]],
-  ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['warp', 'Warp'], ['flow', 'Flow'],
+  ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],

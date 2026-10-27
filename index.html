@@ -458,23 +458,21 @@
             <div class="ends"><span>Off</span><span>Fast</span></div>
           </div>
           <div class="ctl">
-            <div class="ctl-head"><label for="poster">Posterize</label><output id="posterOut" for="poster"></output></div>
+            <div class="ctl-head"><label for="poster">Posterize</label><div class="seg seg-2 where-mini" id="posterWhere" role="group" aria-label="Where Posterize works"><button data-pin="0" aria-pressed="true">Final Pass</button><button data-pin="1" aria-pressed="false">Within Loops</button></div><output id="posterOut" for="poster"></output></div>
             <input type="range" id="poster" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Two steps</span></div>
-            <div class="seg seg-2" id="posterWhere" role="group" aria-label="Where Posterize works">
-              <button data-pin="0" aria-pressed="true">Final Pass</button>
-              <button data-pin="1" aria-pressed="false">Within Loops</button>
-            </div>
             <span class="hint">Flattens this loop’s colors into a few solid bands, like a screen print or a poster. Further right, fewer bands. Final Pass lays it over the loop like a lens, and the trails underneath stay smooth. Within Loops, the loop feeds on the banded picture, so trails fade in steps and the bands harden into flat blobs. Autopilot leaves it where you put it, through every new look.</span>
           </div>
           <div class="ctl">
-            <div class="ctl-head"><label for="warp">Warp</label><output id="warpOut" for="warp"></output></div>
+            <div class="ctl-head"><label for="halftone">Halftone</label><div class="seg seg-2 where-mini where" data-where="halftoneFinal" role="group" aria-label="Where Halftone works"><button data-final="1" aria-pressed="true">Final Pass</button><button data-final="0" aria-pressed="false">Within Loops</button></div><output id="halftoneOut" for="halftone"></output></div>
+            <input type="range" id="halftone" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Big dots</span></div>
+            <span class="hint">Turns this loop’s picture into dots, like newspaper printing: red, green and blue each get their own screen of dots, bigger where that color is brighter. Further right, bigger dots further apart. Final Pass lays the dots over the finished picture. Within Loops, the loop feeds on its dots, so trails fade as shrinking dots. Autopilot leaves it where you put it.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="warp">Warp</label><div class="seg seg-2 where-mini where" data-where="warpFinal" role="group" aria-label="Where Warp works"><button data-final="1" aria-pressed="false">Final Pass</button><button data-final="0" aria-pressed="true">Within Loops</button></div><output id="warpOut" for="warp"></output></div>
             <input type="range" id="warp" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wobbly</span></div>
-            <div class="seg seg-2 where" data-where="warpFinal" role="group" aria-label="Where Warp works">
-              <button data-final="1" aria-pressed="false">Final Pass</button>
-              <button data-final="0" aria-pressed="true">Within Loops</button>
-            </div>
             <span class="hint">Within Loops the wobble builds up echo after echo into melting swirls. Final Pass ripples the finished picture, like looking at it through water.</span>
           </div>
           <div class="ctl">
@@ -512,7 +510,7 @@
             <span class="hint">The picture grows patterns out of itself, like coral, zebra stripes or fingerprints. They start at its outlines and spread through everything lit. Keep Trails high.</span>
           </div>
           <div class="ctl">
-            <div class="ctl-head"><span class="lbl" id="mirrorLbl">Mirror</span><output id="mirrorOut"></output></div>
+            <div class="ctl-head"><span class="lbl" id="mirrorLbl">Mirror</span><div class="seg seg-2 where-mini where" data-where="mirrorFinal" role="group" aria-label="Where Mirror works"><button data-final="1" aria-pressed="false">Final Pass</button><button data-final="0" aria-pressed="true">Within Loops</button></div><output id="mirrorOut"></output></div>
             <div class="seg seg-5" id="mirror" role="group" aria-labelledby="mirrorLbl">
               <button data-mirror="0" aria-pressed="false">Off</button>
               <button data-mirror="2" aria-pressed="false">2</button>
@@ -529,20 +527,12 @@
             </div>
             <button class="btn" id="mirrorSpin" aria-pressed="false"><span class="led"></span>Spin</button>
             <span class="hint">How a new mirror comes in, over 3 seconds: Melt blends into it, Iris grows or shrinks the sides, Ripple spreads it out from the middle. Spin turns the pattern once round as it changes. Cut switches at once.</span>
-            <div class="seg seg-2 where" data-where="mirrorFinal" role="group" aria-label="Where Mirror works">
-              <button data-final="1" aria-pressed="false">Final Pass</button>
-              <button data-final="0" aria-pressed="true">Within Loops</button>
-            </div>
             <span class="hint">Within Loops the mirrored picture feeds back into itself, so Zoom and Spin fold it into a kaleidoscope. Final Pass simply mirrors the finished picture.</span>
           </div>
           <div class="ctl">
-            <div class="ctl-head"><label for="split">Split lines</label><output id="splitOut" for="split"></output></div>
+            <div class="ctl-head"><label for="split">Split lines</label><div class="seg seg-2 where-mini where" data-where="splitFinal" role="group" aria-label="Where Split lines works"><button data-final="1" aria-pressed="false">Final Pass</button><button data-final="0" aria-pressed="true">Within Loops</button></div><output id="splitOut" for="split"></output></div>
             <input type="range" id="split" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Far apart</span></div>
-            <div class="seg seg-2 where" data-where="splitFinal" role="group" aria-label="Where Split lines works">
-              <button data-final="1" aria-pressed="false">Final Pass</button>
-              <button data-final="0" aria-pressed="true">Within Loops</button>
-            </div>
             <span class="hint">Every other line of the picture slides left and the lines between slide right. Within Loops they keep sliding, echo after echo, into smeared streaks. Final Pass is a crisp glitch over the finished picture.</span>
           </div>
           <div class="ctl" id="timeCtl">
@@ -577,13 +567,9 @@
             <span class="hint">Zoom and Spin follow the picture itself: as it brightens it pulls back, as it darkens it pushes in, and lots of movement spins it faster. It finds its own rhythm, even with no music.</span>
           </div>
           <div class="ctl">
-            <div class="ctl-head"><label for="chroma">Color chase</label><output id="chromaOut" for="chroma"></output></div>
+            <div class="ctl-head"><label for="chroma">Color chase</label><div class="seg seg-2 where-mini where" data-where="chromaFinal" role="group" aria-label="Where Color chase works"><button data-final="1" aria-pressed="false">Final Pass</button><button data-final="0" aria-pressed="true">Within Loops</button></div><output id="chromaOut" for="chroma"></output></div>
             <input type="range" id="chroma" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wild</span></div>
-            <div class="seg seg-2 where" data-where="chromaFinal" role="group" aria-label="Where Color chase works">
-              <button data-final="1" aria-pressed="false">Final Pass</button>
-              <button data-final="0" aria-pressed="true">Within Loops</button>
-            </div>
             <span class="hint">Red is pushed around by the green parts, green by the blue and blue by the red, so the three colors keep chasing each other into rainbow fringes and braids. Final Pass pulls the colors apart once, over the finished picture, for rainbow edges like a misaligned old TV.</span>
           </div>
           <div class="ctl">
@@ -1135,6 +1121,7 @@
             <dt>Color shift</dt><dd>Moves each echo a little further round the rainbow.</dd>
             <dt>Final Pass or Within Loops</dt><dd>Mirror, Warp, Split lines, Color chase and Posterize each have this switch. Within Loops, the effect feeds back into the loop every frame, so it builds up echo after echo. Final Pass lays it over the loop's finished picture once, like a lens, and the loop underneath carries on untouched. Autopilot never changes the switch.</dd>
             <dt>Posterize</dt><dd>Flattens the loop's colors into a few solid bands, like a poster. Final Pass lays it over the loop; Within Loops makes the loop feed on the bands, so its trails fade in steps.</dd>
+            <dt>Halftone</dt><dd>Turns the loop's picture into dots, like newspaper printing, with a screen of dots each for red, green and blue. Final Pass lays the dots over the loop; Within Loops makes the loop feed on them, so its trails fade as shrinking dots.</dd>
             <dt>Warp</dt><dd>Wobbles the echoes like water.</dd>
             <dt>Flow</dt><dd>Slow currents curl the echoes into threads and swirls, like ink in water. Works best with Trails high.</dd>
             <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>

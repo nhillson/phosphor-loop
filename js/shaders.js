@@ -26,6 +26,17 @@ vec3 posterize(vec3 c, float n, float down) {
   float t = mix(0.5, 1.0, down);
   return (i + smoothstep(t - 0.15 - 0.15 * down, t + 0.15 - 0.15 * down, x - i)) / m;
 }
+// Halftone: red, green and blue each become a screen of round dots, like newspaper printing, each screen turned to
+// its own angle so the three don't line up. A dot's area matches how bright its color is there, so the picture keeps
+// its brightness. q is the spot in Standard-size pixels and cell the gap between dots in them.
+float htDot(vec2 q, float ang, float cell, float v) {
+  vec2 f = fract(rot(ang) * q / cell) - 0.5;
+  float r = sqrt(clamp(v, 0.0, 1.0)) * 0.72, aa = 0.8 / cell;
+  return (1.0 - smoothstep(r - aa, r + aa, length(f))) * smoothstep(0.0, 0.04, v);
+}
+vec3 halftone(vec3 c, vec2 q, float cell) {
+  return vec3(htDot(q, 0.26, cell, c.r), htDot(q, 1.31, cell, c.g), htDot(q, 0.79, cell, c.b));
+}
 // Color grading (see "color grading" in app.js): tone t (exposure in stops, contrast, gamma, saturation), color c
 // (hue in radians, sepia) and red, green and blue gains g
 vec3 gradeCol(vec3 col, vec4 t, vec2 c, vec3 g) {
@@ -151,7 +162,7 @@ uniform vec4 uBrush;
 uniform vec3 uBrushCol;
 // Color filters set to work inside the loop (see "color filters" in app.js): Posterize's steps (0: not here) and
 // how far the Color grading goes this frame (0: not here), with the grading itself
-uniform float uPoster, uGradeK;
+uniform float uPoster, uGradeK, uHalftone;
 uniform vec4 uGradeTone;
 uniform vec2 uGradeColor;
 uniform vec3 uGradeRGB;
@@ -881,6 +892,10 @@ void main() {
   // The grading only goes part of the way each frame; all of it every frame would pile up within a blink.
   if (uGradeK > 0.0) outc = mix(outc, gradeCol(outc, uGradeTone, uGradeColor, uGradeRGB), uGradeK);
   if (uPoster > 0.0) outc = posterize(outc, uPoster, 1.0);
+  // Halftone here only darkens the gaps between its dots and never lights them up, or the loop would feed on its
+  // own full-bright dots and burn to white. It goes part of the way each frame, so trails fade as dots that shrink
+  // instead of vanishing at once
+  if (uHalftone > 0.0) outc = mix(outc, min(outc, halftone(outc, gl_FragCoord.xy / uPxK, uHalftone)), 0.25);
   // Alpha: 1 less how much a Subject silhouette covers this spot this frame, so on screen it lies over the
   // other loops too (see FS_COMPOSITE)
   o = vec4(outc, 1.0 - cover);
@@ -917,7 +932,7 @@ void main() {
 // A loop's final pass: effects set to Final Pass are laid over the loop's finished picture once, on its way to the
 // screen, instead of feeding back into it every frame. Mirror folds it, Split lines slides every other line, Warp
 // ripples it like water and Color chase pulls its red, green and blue apart into rainbow fringes; then Posterize
-// snaps it to uN even steps (0: no Posterize here). Posterize remembers the steps it drew last frame (uLast) and
+// snaps it to uN even steps (0: no Posterize here) and Halftone turns it into dots uHalftone apart (0: none). Posterize remembers the steps it drew last frame (uLast) and
 // keeps each color on its old step until it's clearly past the edge into the next one, so a video's grain, or
 // anything hovering right on an edge, can't flip it back and forth every frame; it smooths the picture a touch
 // first for the same reason.
@@ -928,7 +943,7 @@ uniform vec2 uSim;
 uniform float uPxK, uTime;
 uniform float uMirror, uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;   // Mirror (uMirror 0 and uMirrorT 1: none)
 uniform float uSplit, uWarp, uChroma, uChromaTurn;
-uniform float uN, uFresh;
+uniform float uN, uFresh, uHalftone;
 out vec4 o;
 ${COMMON}
 ${MIRROR}
@@ -972,6 +987,7 @@ void main() {
     }
     c = lv / m;
   }
+  if (uHalftone > 0.0) c = halftone(c, gl_FragCoord.xy / uPxK, uHalftone);
   o = vec4(c, now.a);
 }`;
 
