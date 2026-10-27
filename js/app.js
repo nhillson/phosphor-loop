@@ -30,7 +30,7 @@ const HINT_KEEP = ['feedNote', 'hiddenHint', 'vidLoopText', 'limSum', 'apCheckSt
 const HINT_TARGET = { loopsHint: '#h-mix', dropHint: '#in1Lbl' };
 // The rows that open under an input (3D world, Text...) put their description on that input's button
 const ROW_INPUT = { 'row-3d': 'world', 'row-fractal': 'fractal', 'row-spectro': 'spectro', 'row-text': 'text', 'row-picture': 'picture',
-  'row-silhouette': 'silhouette', 'row-video': 'video', 'row-camera': 'camera', 'row-screen': 'screen', 'row-phone': 'phone', 'row-loop': 'loop' };
+  'row-video': 'video', 'row-camera': 'camera', 'row-screen': 'screen', 'row-phone': 'phone', 'row-loop': 'loop' };
 const TIP_DELAY = 1200;
 // The name to hover for a control's box: its label, else the box's first label-like line, else the box itself
 function tipLabel(box) {
@@ -151,15 +151,15 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, silhouette: 32 };
-const SRC_LABEL = { silhouette: 'Silhouette', wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31 };
+const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', dancerFX: false, dancerSize: 100, dancerClock: 'auto', dancerBpm: 104, in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
@@ -507,7 +507,6 @@ gl.useProgram(finalProg.p);
 set1i(finalProg, 'uNow', 0); set1i(finalProg, 'uLast', 1);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
-for (const [i, key] of KEYS.entries()) set1i(dispProg, 'uDancer' + key, i + 1);
 // Time warp gets its own program, so a graphics card that can't draw it only loses Time warp
 let twProg = null;
 try {
@@ -661,65 +660,6 @@ function mkVideo() {
   const v = document.createElement('video');
   v.muted = true; v.playsInline = true; v.autoplay = true;
   return v;
-}
-
-/* ================= built-in dancing silhouette ================= */
-const dancers = Object.fromEntries(KEYS.map(k => [k, { player: null, tex: makeSourceTex(), time: -1 }]));
-function dancerTex(k) { return dancers[k].tex; }
-function syncSilhouetteUI() {
-  const t = loops[edit].tgt;
-  $('#silhouetteClock').value = t.dancerClock || 'auto';
-  $('#silhouetteBpm').value = t.dancerBpm || 104;
-  $('#silhouetteBpm').disabled = t.dancerClock !== 'manual';
-  $('#silhouetteSize').value = t.dancerSize || 100; fillTrack($('#silhouetteSize'));
-  $('#silhouetteFX').setAttribute('aria-pressed', String(!!t.dancerFX));
-  $('#silhouetteFX').textContent = `Through loop effects: ${t.dancerFX ? 'On' : 'Off'}`;
-}
-for (const [id, key] of [['silhouetteClock', 'dancerClock'], ['silhouetteBpm', 'dancerBpm'], ['silhouetteSize', 'dancerSize']]) {
-  $('#' + id).addEventListener(id === 'silhouetteSize' ? 'input' : 'change', e => {
-    takeOver('in1'); const value = key === 'dancerClock' ? e.target.value : Number(e.target.value);
-    loops[edit].tgt[key] = key === 'dancerBpm' ? clamp(value || 104, 30, 300) : key === 'dancerSize' ? clamp(value || 100, 25, 150) : value;
-    syncSilhouetteUI();
-  });
-}
-$('#silhouetteFX').addEventListener('click', () => { takeOver('in1'); loops[edit].tgt.dancerFX = !loops[edit].tgt.dancerFX; syncSilhouetteUI(); });
-function silhouetteClock(t, now) {
-  if (t.dancerClock === 'manual') return { beat: now / 60000 * t.dancerBpm, bpm: t.dancerBpm, playing: true, label: 'Manual' };
-  const music = snd.rhythmSample;
-  return music?.gridBeat != null ? { beat: music.gridBeat + music.phase, bpm: music.bpm, playing: true, label: 'Audio' } : null;
-}
-function updateSilhouettes(now) {
-  for (const k of KEYS) {
-    const state = dancers[k], t = loops[k].tgt;
-    const active = loopOn(k) && (t.in1 === 'silhouette' || t.in2 === 'silhouette');
-    if (!active) { state.player?.pause(); continue; }
-    state.player ||= new PhosphorSilhouette();
-    if (frozen) state.player.pause();
-    else state.player.update(silhouetteClock(t, now));
-    const v = state.player.video;
-    if (v.readyState >= 2 && state.time !== v.currentTime && !v.seeking) {
-      uploadTo(state.tex, v); state.time = v.currentTime;
-    }
-    if (k === edit) {
-      const message = frozen ? 'Dancer frozen.' : state.player.status;
-      if ($('#silhouetteStatus').textContent !== message) $('#silhouetteStatus').textContent = message;
-    }
-  }
-}
-function bindCleanSilhouettes(weights) {
-  const sizes = [], opacity = [];
-  for (const [i, k] of KEYS.entries()) {
-    const t = loops[k].tgt, state = dancers[k];
-    gl.activeTexture(gl.TEXTURE0 + i + 1); gl.bindTexture(gl.TEXTURE_2D, state.tex);
-    sizes.push(clamp(t.dancerSize || 100, 25, 150) / 100);
-    const slot = t.in1 === 'silhouette' ? 1 : t.in2 === 'silhouette' ? 2 : 0;
-    const blend = clamp(loops[k].cur.blend, 0, 100) / 100;
-    const slotWeight = t.in2 === 'none' ? 1 : slot === 1 ? Math.min(1, 2 * (1 - blend)) : Math.min(1, 2 * blend);
-    opacity.push(slot && !t.dancerFX && state.time >= 0 ? (weights[k] || 0) * slotWeight : 0);
-  }
-  const sizeUniform = U(dispProg, 'uDancerSizes'), weightUniform = U(dispProg, 'uDancerWeights');
-  if (sizeUniform) gl.uniform4fv(sizeUniform, sizes);
-  if (weightUniform) gl.uniform4fv(weightUniform, opacity);
 }
 
 /* picture */
@@ -978,7 +918,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['text', 'Text (your words)'], ['silhouette', 'Dancing silhouette'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1133,8 +1073,6 @@ function uses(src) { return activeKeys().some((k) => loops[k].tgt.in1 === src ||
 // browser treats the camera or screen request as something the person asked for.
 function chooseSource(slot, src) {
   takeOver(slot);
-  if (src === 'silhouette' && slot === 'in1' && loops[edit].tgt.in1 !== 'silhouette' && loops[edit].tgt.in2 === 'none')
-    loops[edit].tgt.in2 = loops[edit].tgt.in1; // keep the existing look behind the clean overlay
   loops[edit].tgt[slot] = src;
   if (is3D(src)) lastWorld[sceneGroup(src)] = src;
   if (src === 'camera' && !cam.on) startCamera();
@@ -1282,8 +1220,8 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'silhouette']) $('#row-' + s).hidden = !usesHere(s);
-  syncTextUI(); syncSilhouetteUI();
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text']) $('#row-' + s).hidden = !usesHere(s);
+  syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
   $$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b) =>
@@ -6733,8 +6671,6 @@ $$('.panel .group').forEach((group) => {
   btn.addEventListener('click', () => set(body.hidden, true));
   foldControls.push(set);
 });
-// Loops that react stays in sight even with React to sound folded away
-{ const g = $('#soundGroup'), row = $('#sndLoops').closest('.ctl'); row.classList.add('snd-loops-ctl'); g.insertBefore(row, g.querySelector(':scope > .group-body')); }
 $('#foldAll').addEventListener('click', () => foldControls.forEach((set) => set(false, true)));
 $('#openAll').addEventListener('click', () => foldControls.forEach((set) => set(true, true)));
 
@@ -8394,8 +8330,8 @@ function runLoop(k, xf, brush, f) {
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
   const fly1 = is3D(t.in1) ? t.in1 : null;
   const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
-  const flyTex1 = t.in1 === 'silhouette' ? dancerTex(k) : fly1 ? draw3D(k, fly1, 0, scale) : null;
-  const flyTex2 = t.in2 === 'silhouette' ? dancerTex(k) : fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
+  const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
+  const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -8477,9 +8413,8 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
   set1f(fbProg, 'uXfeed', xf);
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
-  set1f(fbProg, 'uDancerSize', clamp(t.dancerSize || 100, 25, 150) / 100);
-  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : t.in1 === 'silhouette' && !t.dancerFX ? SRC_ID.none : resolveSrc(t.in1, t.motion));
-  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : t.in2 === 'silhouette' && !t.dancerFX ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
+  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
   set1f(fbProg, 'uScale', scale);
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
@@ -9572,7 +9507,6 @@ function frame() {
   analyzeSound(dt, now);
   drawMeter();
   seqTick(now);
-  updateSilhouettes(now);
   shapesTick(now, dt);
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
@@ -9668,7 +9602,6 @@ function frame() {
     if (m.color) hueKick = a * (E.high * 0.35 + E.beat * 0.3) * (snd.beats % 2 ? 1 : -1);
     if (m.warp) shake = a * E.beat * calm;
   }
-  bindCleanSilhouettes(W);
   set1f(dispProg, 'uPunch', punch);
   set1f(dispProg, 'uFlash', flash);
   set1f(dispProg, 'uHueKick', hueKick);

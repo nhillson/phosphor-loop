@@ -246,7 +246,6 @@
             <button data-src="sparks" aria-pressed="false">Sparks</button>
             <button data-src="ink" aria-pressed="false">Ink</button>
             <button data-src="patchwork" aria-pressed="false" title="Hand-inked tiles that turn, so their lines join into new paths, loops and weaves">Patchwork</button>
-            <button data-src="silhouette" aria-pressed="false" title="A realistic dancing silhouette, beat synced over the picture">Silhouette</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -288,14 +287,6 @@
             <span class="hint" id="specHint">Low sounds at the bottom, high at the top; the louder, the brighter. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</span>
           </div>
 
-          <div class="dev" id="row-silhouette" hidden>
-            <span class="dev-status" id="silhouetteStatus" role="status">Built-in dancer · source tempo 104 BPM.</span>
-            <label>Clock <select id="silhouetteClock"><option value="auto">Spotify / audio beat sync</option><option value="manual">Manual BPM</option></select></label>
-            <label>Manual BPM <input id="silhouetteBpm" type="number" min="30" max="300" step="0.1" value="104"></label>
-            <label>Dancer height <input id="silhouetteSize" type="range" min="25" max="150" step="1" value="100"></label>
-            <button class="btn small" id="silhouetteFX" aria-pressed="false">Through loop effects: Off</button>
-            <p class="hint">Clean mode places a solid black dancer over the picture, with no background or effects. Effects mode uses a light mask so trails and color can act on it. The bundled clip is silent.</p>
-          </div>
 
           <div class="dev" id="row-text" hidden>
             <label for="textIn" class="lbl">Your text</label>
@@ -1118,7 +1109,7 @@
           </dl></div>
           <div class="g-card"><h3>Loops</h3><dl>
             <dt>Tooltips and the mouse wheel</dt><dd>Rest the mouse on a control’s name for a little over a second and a description of it pops up. Hold Shift and roll the mouse wheel over any fader to move it, 2 a notch on a 0 to 100 fader. Without Shift the wheel just scrolls the controls.</dd>
-            <dt>Loops that react</dt><dd>At the top of React to sound, and still showing when that section is folded: one switch per loop. A loop switched off there keeps its own pace whatever the music does, while the loops switched on zoom, spin, change color and so on with it. The hits that shake or flash the whole picture are as strong as the share of the picture that comes from loops that react, so they stop altogether when every loop on screen is switched off. Presets remember these switches.</dd>
+            <dt>Loops that react</dt><dd>At the top of React to sound: one switch per loop. They fold away with the rest of the section. A loop switched off there keeps its own pace whatever the music does, while the loops switched on zoom, spin, change color and so on with it. The hits that shake or flash the whole picture are as strong as the share of the picture that comes from loops that react, so they stop altogether when every loop on screen is switched off. Presets remember these switches.</dd>
             <dt>How many loops and Show</dt><dd>Two loops, A and B, to start with; pick 3 loops or 4 loops under Loops to add loop C, then D. Each loop has its own Show fader: 100 shows it fully, 0 hides it, and loops that are showing are laid over each other. Loops C and D work just like A and B: C and D feed, push and dye each other the way A and B do (with three loops, C takes loop A as its other loop). Autopilot steers loops A and B; loops C and D keep whatever you give them. With Spread out controls on, each loop gets a column of its own, side by side (two loops share a column when the screen is too narrow).</dd>
             <dt>Feed A into B, Feed B into A</dt><dd>Pour one loop’s picture into the other loop’s trails. Use one for a one-way flow, or both and the loops trade shapes. The loop being fed has to be on screen and have some Trails; raising a feed brings that loop on screen, and if its Trails are at 0 a note offers to fix it.</dd>
             <dt>Loop A and Loop B tabs</dt><dd>Pick which loop the controls below change. A red light means that loop is on screen.</dd>
@@ -1343,7 +1334,6 @@
 <script src="js/audio/rhythm.js"></script>
 <script src="js/spotify.js"></script>
 <script src="js/timeline.js"></script>
-<script src="js/silhouette.js"></script>
 <script src="js/subject.js"></script>
 <script src="js/app.js"></script>
 

@@ -490,7 +490,6 @@
   .ctl { display: grid; gap: 2px; }
   /* Descriptions shown as hover tooltips instead (see hintsToTips) */
   .hint.as-tip { display: none !important; }
-  .snd-loops-ctl { margin-bottom: 10px; }
   [data-tip] { cursor: help; }
   button[data-tip] { cursor: pointer; }
   .tip-pop {

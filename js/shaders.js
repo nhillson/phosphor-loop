@@ -138,7 +138,6 @@ uniform float uCrystal;           // Crystal: how far each piece turns and zooms
 uniform vec4 uCells[5];           // Crystal: the centres of its ten pieces, two to a slot
 uniform float uGrow, uGrowR, uGrowTurn;   // Grow: how fast patterns grow this frame, how far apart their stripes sit (pixels), and a turn that changes every frame
 uniform float uAspText;   // the Text input's picture: how wide it is for its height
-uniform float uDancerSize;
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
@@ -785,11 +784,6 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this
   // pass (see draw3D) filling the screen
   if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 31)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
-  if (id == 32) {
-    vec2 q = p / (vec2(4.0 / 3.0, 1.0) * 0.90 * uDancerSize) + 0.5;
-    if (any(lessThan(q, vec2(0.0))) || any(greaterThan(q, vec2(1.0)))) return vec3(0.0);
-    return vec3(texture(scene, q).r * 0.7);
-  }
   if (id == 4) return still(uPic, uAspPic, p, 4);
   if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
   if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);
@@ -1019,8 +1013,6 @@ void main() {
 const FS_DISPLAY = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
-uniform sampler2D uDancerA, uDancerB, uDancerC, uDancerD;
-uniform vec4 uDancerSizes, uDancerWeights;
 uniform vec2 uRes;
 uniform float uTime, uStatic, uLines, uFlash, uPunch, uHueKick;
 uniform vec2 uShake;   // the music's jolt: its direction, times how hard
@@ -1040,12 +1032,6 @@ vec3 hueTurn(vec3 c, float a) {
   const vec3 k = vec3(0.57735027);
   float ca = cos(a);
   return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
-}
-float dancerMask(sampler2D mask, vec2 uv, float size) {
-  vec2 p = (uv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
-  vec2 q = p / (vec2(4.0 / 3.0, 1.0) * 0.90 * size) + 0.5;
-  if (any(lessThan(q, vec2(0.0))) || any(greaterThan(q, vec2(1.0)))) return 0.0;
-  return texture(mask, q).r;
 }
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
@@ -1076,13 +1062,7 @@ void main() {
   if (uGradeOn > 0.5) col = gradeCol(col, uGradeTone, uGradeColor, uGradeRGB);
   vec2 e = smoothstep(vec2(0.0), vec2(0.006), cuv) * smoothstep(vec2(1.0), vec2(0.994), cuv);
   col *= e.x * e.y;
-  // Clean silhouette is applied after every display effect, including flashes and shake.
-  float a = 0.0;
-  if (uDancerWeights.x > 0.0) a = max(a, dancerMask(uDancerA, uv, uDancerSizes.x) * uDancerWeights.x);
-  if (uDancerWeights.y > 0.0) a = max(a, dancerMask(uDancerB, uv, uDancerSizes.y) * uDancerWeights.y);
-  if (uDancerWeights.z > 0.0) a = max(a, dancerMask(uDancerC, uv, uDancerSizes.z) * uDancerWeights.z);
-  if (uDancerWeights.w > 0.0) a = max(a, dancerMask(uDancerD, uv, uDancerSizes.w) * uDancerWeights.w);
-  o = vec4(clamp(col, 0.0, 1.0) * (1.0 - a), 1.0);
+  o = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 
 

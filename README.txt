@@ -55,28 +55,6 @@ Everything works that way except the phone link: both loops,
 cross-feed, drawing, pictures, video files, your webcam and screen sharing.
 Use Chrome or Edge.
 
-DANCING SILHOUETTE
-  Choose Silhouette under Main input, or as the second input. It is a real
-  dancer extracted from the WebM supplied in static/. Only the dancer is drawn;
-  the colored background and original audio are removed. Picking it as the
-  main input keeps the previous input behind it when the second slot is free.
-  Clean mode is the default: a solid black dancer over the finished picture,
-  unaffected by feedback, color, mirror, flash or shake. Through loop effects
-  switches to a light matte so the ordinary trails, color and warps can act on
-  it. This mode intentionally changes the silhouette's appearance.
-  Clock uses the captured audio beat grid. Silence/lost beat lock holds the pose. Manual BPM
-  lets you preview without audio, starting at 104 BPM. Set Dancer height to fit.
-  Spotify pause and Freeze stop the dancer. The settings are saved in looks
-  and sequencer blocks, separately for each loop.
-  The built-in silent clip is a 16-beat loop (about 9.23 seconds at 104 BPM)
-  edited from full-body shots in the source. It has cuts between dancers,
-  with no blank frames, close-ups or title cards. A higher-resolution matte
-  and light edge smoothing reduce compression artifacts and jagged edges.
-  static/silhouette-mask-v2.mp4 is the processed matte used as transparency by
-  the renderer; tools/silhouette/build.py rebuilds it from the original WebM.
-  Only the processed matte is exposed by the local server or bundled offline.
-  Run npm run silhouette:test for browser and pixel-level checks.
-
 SPOTIFY SONG SEQUENCER
   Run npm start and open http://127.0.0.1:8000/. In your Spotify developer app,
   register that exact URL (including the final slash) as a redirect URI and
