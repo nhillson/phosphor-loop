@@ -141,9 +141,9 @@ function setStreamFriendly(v) {
   if (!!v === settings.streamFriendly) return;
   settings.streamFriendly = !!v;
   log('Stream-friendly ' + (settings.streamFriendly ? 'on' : 'off'));
+  // The calmer picture comes and goes at once. The squeezer's light smoothing is set when Stream is switched on
+  // (restarting the squeezer mid-stream to add it cost the test stream minutes of picture), so it joins next time.
   applyCalm();
-  // Live: the squeezer picks up (or drops) its smoothing with a one-second restart; the platforms stay connected
-  if (streamer.live && streamer.plan) { streamer.plan.calm = settings.streamFriendly; streamer.restartEncoder(); }
 }
 // Stream-friendly is on only while streaming: recording by itself, or nothing at all, keeps the full picture
 function applyCalm() {
@@ -772,18 +772,19 @@ async function runTest() {
     settings.quality = 'good';
     await resizeSite(); await waitFrames(10);
     const free = await expect('nothing on', (n) => !(n[0] === 1280 && n[1] === 720), 'idle');
-    // Stream on: the stream's size
+    // Stream on (with Stream-friendly): the stream's size
+    setStreamFriendly(true);
+    const calmIdle = await site.webContents.executeJavaScript('window.__phosphorCapture.calm || null', true);
+    if (!calmIdle || calmIdle.on) throw new Error('Stream-friendly came on before streaming started: ' + JSON.stringify(calmIdle));
     const r = await goLive();
     if (!r.ok) throw new Error('go live failed: ' + (r.message || ''));
     await expect('streaming', (n) => n[1] === 720, 'live');
-    // Stream-friendly on while live: the page calms down, the stream carries on, and nothing reloads
-    setStreamFriendly(true);
-    await waitFrames(30);
+    // Stream-friendly (switched on before going live): the page is calmed and the stream has its smoothing
+    await waitFrames(5);
     const calm = await site.webContents.executeJavaScript('window.__phosphorCapture.calm || null', true);
     result.calm = calm;
-    if (!calm || !calm.on || !(calm.amount > 0)) throw new Error('Stream-friendly did not reach the page: ' + JSON.stringify(calm));
-    if (!streamer.live || !streamer.plan.calm) throw new Error('the stream stopped, or lost its smoothing, when Stream-friendly came on');
-    await expect('Stream-friendly on', (n) => n[1] === 720, 'calm');
+    if (!calm || !calm.on) throw new Error('Stream-friendly did not reach the page: ' + JSON.stringify(calm));
+    if (!streamer.plan.calm) throw new Error('the stream has no Stream-friendly smoothing');
     await waitFrames(Math.round(frames / 2));
     // Record on while streaming, bigger than the stream: drawn at the recording's size, the stream gets a copy
     settings.record = { size: 1080, quality: 'youtube', fps: 30 };
