@@ -51,4 +51,4 @@ for (const h of [1440, 1080]) {
     console.log(lines[lines.length - 1]);
   }
 }
-if (process.env.GITHUB_ACTIONS) console.log('::notice title=core benchmark::' + lines.join('%0A'));
+if (process.env.GITHUB_ACTIONS) lines.forEach((l, i) => console.log(`::notice title=core benchmark ${i}::` + l));
