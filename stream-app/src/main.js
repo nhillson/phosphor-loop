@@ -390,11 +390,20 @@ async function stopLive() {
 }
 
 /* ---------- window ---------- */
+// Phosphor Loop's own Full screen: the picture fills the whole screen and the sidebar is hidden the whole time
+// (it doesn't come back on mouse movement); leaving full screen brings it back as it was
+let siteFull = false;
 function layout() {
   if (!win || win.isDestroyed()) return;
   const [w, h] = win.getContentSize();
-  const pw = settings.collapsed ? PANEL_COLLAPSED_W : PANEL_W;
+  const pw = siteFull ? 0 : settings.collapsed ? PANEL_COLLAPSED_W : PANEL_W;
   site.setBounds({ x: 0, y: 0, width: Math.max(100, w - pw), height: h });
+}
+function setSiteFull(on) {
+  if (siteFull === on || !win || win.isDestroyed()) return;
+  siteFull = on;
+  if (win.isFullScreen() !== on) win.setFullScreen(on);
+  layout();
 }
 
 function createWindow() {
@@ -414,6 +423,10 @@ function createWindow() {
   win.contentView.addChildView(site);
   layout();
   win.on('resize', layout);
+  site.webContents.on('enter-html-full-screen', () => setSiteFull(true));
+  site.webContents.on('leave-html-full-screen', () => setSiteFull(false));
+  // Leaving the window's full screen some other way (Esc handled by Windows, say) ends the page's too
+  win.on('leave-full-screen', () => { if (siteFull) { site.webContents.executeJavaScript('document.fullscreenElement && document.exitFullscreen()', true).catch(() => {}); setSiteFull(false); } });
 
   const wc = site.webContents;
   wc.setBackgroundThrottling(false);
@@ -880,6 +893,16 @@ async function runTest() {
     settings.quality = 'good';
     await resizeSite(); await waitFrames(10);
     const free = await expect('nothing on', (n) => !(n[0] === 1280 && n[1] === 720), 'idle');
+    // Phosphor Loop's Full screen hides the sidebar; leaving it brings the sidebar back
+    await site.webContents.executeJavaScript('document.documentElement.requestFullscreen().then(() => true, () => false)', true);
+    await waitFrames(10);
+    const fullW = site.getBounds().width, winW = win.getContentSize()[0];
+    result.fullScreen = { siteFull, siteWidth: fullW, windowWidth: winW };
+    if (!siteFull || fullW !== winW) throw new Error('the sidebar still shows in full screen: ' + JSON.stringify(result.fullScreen));
+    await site.webContents.executeJavaScript('document.exitFullscreen().then(() => true, () => false)', true);
+    await waitFrames(10);
+    if (siteFull || site.getBounds().width !== win.getContentSize()[0] - (settings.collapsed ? PANEL_COLLAPSED_W : PANEL_W)) throw new Error('the sidebar did not come back after full screen');
+    await resizeSite(); await waitFrames(10);
     // Stream on (with Stream-friendly): the stream's size
     setStreamFriendly(true);
     const calmIdle = await site.webContents.executeJavaScript('window.__phosphorCapture.calm || null', true);
