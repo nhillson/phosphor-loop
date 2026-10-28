@@ -867,7 +867,7 @@ async function runTest() {
   const frames = +(process.env.PHOSPHOR_TEST_FRAMES || 450);
   const result = { ok: false };
   // The test computer has no graphics card and draws only a frame or two a second, so the whole run gets a long ceiling
-  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 1800000);
+  const ceiling = setTimeout(() => { result.error = 'ceiling reached'; finish(); }, 2700000);
   async function finish() {
     clearTimeout(ceiling);
     try { if (out) fs.writeFileSync(out, JSON.stringify(result, null, 2)); } catch (_) {}
