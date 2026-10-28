@@ -1,0 +1,39 @@
+name: Stream app core benchmark
+
+# Times ways of spreading the stream app's picture steps over the processor's cores, with the same FFmpeg the app
+# ships. Run by hand from the Actions tab, or by pushing a change to the benchmark script.
+on:
+  workflow_dispatch:
+  push:
+    branches: [stream-app]
+    paths:
+      - 'stream-app/test/bench-cores.js'
+      - '.github/workflows/stream-app-bench.yml'
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: stream-app
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Get FFmpeg
+        shell: pwsh
+        run: |
+          $assets = gh release view latest -R BtbN/FFmpeg-Builds --json assets --jq '.assets[].name'
+          $name = $assets | Where-Object { $_ -match '^ffmpeg-n\d+\.\d+-latest-win64-gpl-\d+\.\d+\.zip$' } | Sort-Object | Select-Object -Last 1
+          if (-not $name) { $name = 'ffmpeg-master-latest-win64-gpl.zip' }
+          gh release download latest -R BtbN/FFmpeg-Builds -p $name -O ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffx
+          New-Item -ItemType Directory -Force vendor | Out-Null
+          Copy-Item (Get-ChildItem ffx -Recurse -Filter ffmpeg.exe | Select-Object -First 1).FullName vendor/ffmpeg.exe
+      - name: Benchmark
+        run: node test/bench-cores.js
+        env:
+          FFMPEG: ${{ github.workspace }}\stream-app\vendor\ffmpeg.exe
