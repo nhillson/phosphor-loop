@@ -330,6 +330,7 @@ streamer.on('multitrack-failed', (def, why) => {
 });
 
 let startingLive = false;
+let liveSize = null; // while live: the biggest size actually streamed, when that's smaller than the quality's (see goLive)
 async function goLive() {
   if (streamer.live || startingLive) return { ok: true };
   if (tune.running) { tell('The sharpness test is still running. Switch Stream on once it finishes (a minute or two).', 'warn'); return { ok: false }; }
@@ -350,6 +351,18 @@ async function goLive() {
     if (!(await waitForSite())) { tell('Phosphor Loop didn’t finish loading. Check the internet connection, then try again.', 'warn'); return { ok: false }; }
     // The picture may be bigger than the stream (a 4K recording running): each platform gets its sharp smaller copy
     const { plan, dests: routed } = await makePlan(dests);
+    // Draw the picture no bigger than the biggest stream actually sent (Twitch may answer a 1440p picture with 1080p
+    // qualities): a 1440p picture squeezed down to 1080p costs the computer far more and gains nothing. A recording
+    // that needs more keeps its size.
+    const top = plan.encodes.reduce((a, e) => (e.height > a.height ? e : a), { height: 0 });
+    if (top.height && top.height < plan.input.height) {
+      liveSize = { width: top.width, height: top.height };
+      await resizeSite();
+      await waitFrames(10);
+      const now = drawnSize();
+      if (now.height !== plan.input.height) log(`Picture drawn at ${now.width}x${now.height} (the biggest stream sent), not ${plan.input.width}x${plan.input.height}`);
+      plan.input = now;
+    }
     streamer.start(routed, plan);
     if (settings.autopilotOnLive) siteCall('autopilot').catch(() => {});
     applyCalm();
@@ -364,6 +377,7 @@ async function goLive() {
   } finally { startingLive = false; sendStatus(); }
 }
 async function stopLive() {
+  liveSize = null;
   if (!streamer.live) return;
   log('Stopping');
   try { await siteCall('stop'); } catch (_) {}
@@ -760,7 +774,7 @@ function captureConfig() {
   // screen's size, as Phosphor Loop's own Picture sharpness picks (up to 4K).
   const q = QUALITY[settings.quality];
   const want = [];
-  if (streamer.live || startingLive || tune.running) want.push(q);
+  if (streamer.live || startingLive || tune.running) want.push(liveSize && !tune.running ? { ...q, ...liveSize } : q);
   if (rec.plan) want.push(rec.plan);
   if (!want.length) return { width: q.width, height: q.height, fps: q.fps, renderHeight: lines(q.height), off: true };
   const big = want.reduce((a, b) => (b.height > a.height ? b : a));

@@ -158,6 +158,48 @@ function buildUrl(platform, { server, key }) {
   return `${scheme.toLowerCase()}://${host}${path}/${key}`;
 }
 
+// The squeezer's picture steps, done as little as possible. The colour conversion (the browser's BT.601 to BT.709,
+// with sharp colour edges) happens ONCE, at the biggest size any platform gets; every smaller size is then scaled
+// down from the next bigger one (a 1080p picture becomes 720p, that becomes 480p, and so on). Twitch's Enhanced
+// Broadcasting asks for five sizes at once; doing the full conversion five times from the full picture was too slow
+// on Nick's PC at 1440p (the squeeze fell to 0.6x real time, 17 frames a second).
+// The extra-sharp colour step (full_chroma_int) costs about twice as much; it's kept up to 1080p, where the processor
+// has time for it, and left out above (a 1440p or 4K conversion with it can't keep up on a fast desktop processor).
+// Stream-friendly's light smoothing is also done once, on the biggest picture.
+// Labels: [v<i>] is the finished picture for encode i.
+function buildGraph(plan, input = {}) {
+  const conv = 'in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv';
+  const sharp = 'accurate_rnd+full_chroma_int+full_chroma_inp', light = 'accurate_rnd+full_chroma_inp';
+  const iw = input.width || 0, ih = input.height || 0;
+  const sizeOf = (e) => ({ w: e.width || iw, h: e.height || ih });
+  // distinct sizes, biggest first
+  const sizes = [];
+  for (const e of plan.encodes) { const z = sizeOf(e); if (!sizes.some((x) => x.w === z.w && x.h === z.h)) sizes.push(z); }
+  sizes.sort((a, b) => b.h - a.h || b.w - a.w);
+  const parts = [];
+  sizes.forEach((z, k) => {
+    const users = plan.encodes.map((e, i) => ({ e, i })).filter(({ e }) => { const s = sizeOf(e); return s.w === z.w && s.h === z.h; });
+    const outs = users.length + (k + 1 < sizes.length ? 1 : 0);
+    let chain;
+    if (k === 0) {
+      const resize = iw && ih && (z.w !== iw || z.h !== ih);
+      chain = `[0:v:0]${plan.calm ? 'hqdn3d=1.5:1:4:3,' : ''}scale=${resize ? `w=${z.w}:h=${z.h}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}${Math.max(z.h, ih) > 1080 ? light : sharp}`;
+    } else {
+      // From the next bigger picture (already BT.709): sharp lanczos for 720p and up, a lighter filter below
+      chain = `[z${k - 1}]scale=w=${z.w}:h=${z.h}:flags=${z.h >= 720 ? 'lanczos' : 'bicubic'}+${light}`;
+    }
+    const labels = users.map(({ i }) => `[u${i}]`).concat(k + 1 < sizes.length ? [`[z${k}]`] : []);
+    parts.push(outs > 1 ? `${chain},split=${outs}${labels.join('')}` : `${chain}${labels[0]}`);
+    for (const { e, i } of users) {
+      const fmt = /_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p';
+      // A slower extra quality (Twitch's Enhanced Broadcasting can ask for 30 fps copies of a 60 fps picture)
+      const slower = e.fps && e.fps < plan.fps ? `fps=${e.fps},` : '';
+      parts.push(`[u${i}]${slower}format=${fmt}[v${i}]`);
+    }
+  });
+  return parts.join(';');
+}
+
 class Streamer extends EventEmitter {
   constructor({ ffmpeg, log = () => {} }) {
     super();
@@ -271,19 +313,7 @@ class Streamer extends EventEmitter {
     // tags say and what players expect) so Phosphor Loop's colours come out right. The flags keep colour edges
     // sharp (FFmpeg's defaults blur them). An encode smaller than the picture (Kick's 1080p copy of a 4K picture)
     // is scaled down in the same step, with a sharp filter.
-    const conv = 'in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv';
-    // Stream-friendly: a light smoothing of fine speckle and frame-to-frame shimmer before squeezing, so the
-    // platform's small bitrate goes on the shapes instead of noise. Recordings never pass through here.
-    const calm = plan.calm ? 'hqdn3d=1.5:1:4:3,' : '';
-    const n = plan.encodes.length;
-    const branches = plan.encodes.map((e, i) => {
-      const resize = e.width && e.height && (e.width !== input.width || e.height !== input.height);
-      const fmt = /_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p';
-      // A slower extra quality (Twitch's Enhanced Broadcasting can ask for 30 fps copies of a 60 fps picture)
-      const slower = e.fps && e.fps < plan.fps ? `fps=${e.fps},` : '';
-      return `[s${i}]${slower}${calm}scale=${resize ? `w=${e.width}:h=${e.height}:` : ''}${conv}:flags=${resize ? 'lanczos+' : ''}accurate_rnd+full_chroma_int+full_chroma_inp,format=${fmt}[v${i}]`;
-    });
-    const graph = `[0:v:0]split=${n}${plan.encodes.map((_, i) => `[s${i}]`).join('')};` + branches.join(';');
+    const graph = buildGraph(plan, input);
     const encArgs = [];
     plan.encodes.forEach((e, i) => {
       const fps = e.fps && e.fps < q.fps ? e.fps : q.fps;
@@ -507,4 +537,4 @@ function explain(tail, def, wasLive) {
   return `${def.name} stopped.`;
 }
 
-module.exports = { Streamer, buildUrl, encoderArgs, forStream, redactor, ENCODERS, TIERS, VARIANTS, HEVC_TIERS, AV1_TIERS, LIGHT, codecOfVariant };
+module.exports = { Streamer, buildGraph, buildUrl, encoderArgs, forStream, redactor, ENCODERS, TIERS, VARIANTS, HEVC_TIERS, AV1_TIERS, LIGHT, codecOfVariant };
