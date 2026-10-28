@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const { FR, makeDrone } = window.PhosphorFractals;
-const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
+const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
 const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.PhosphorHelpers;
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
@@ -151,15 +151,15 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false,
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
@@ -228,6 +228,7 @@ const STARTERS = [
   { name: 'Fractal', A: { in1: 'fractal', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Terrain', A: { in1: 'terrain', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Mount Ribbit', A: { in1: 'ribbit', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Sponge', A: { in1: 'sponge', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Coral', A: { in1: 'wave', form: 3, zoom: 14, trails: 92, color: 24, warp: 6, mirror: 6, blur: 0.1, grow: 60, growSize: 1 } },
@@ -397,6 +398,7 @@ const SCENES = {
   nebula:    { fs: FS_NEBULA,    label: 'Nebula',     speed: 2.0,   period: 400,           offB: 150, res: 0.5 },
   // A calm drift, so the kick only nudges it along a little
   city:      { fs: FS_CITY,      label: 'City',       speed: 2.2,   period: 3072,          offB: 1536, kick: 0.35 },
+  terrain:   { fs: FS_TERRAIN,   label: 'Terrain',    speed: 3.0,   period: 960,           offB: 480, res: 0.75 },
   // Walking, not flying: drawn by its own renderer (js/ribbit.js) with a hiker for each loop; see drawExt
   ribbit:    { ext: window.PhosphorRibbit || null, label: 'Mount Ribbit', speed: 1, period: 1e9, offB: 0, kick: 0.5 },
   // The fractal flights (under their own Fractals button): no set path, a wandering camera for each loop
@@ -434,6 +436,7 @@ const HINT_3D = {
   fractal: 'A flight down a hall folded out of spheres, where bubbles grow on bubbles, smaller without end.',
   nebula: 'A flight through glowing clouds of gas and dark dust, lit by a nearby star.',
   city: 'A slow drift sideways along a wet street at night, past shops, lamps and cars, with the skyline behind. The windows and lamps glow brighter with the music.',
+  terrain: 'A flight over endless land made of triangles, every edge drawn as a glowing wire: teal valleys, gold peaks, and a low sun under a starry nebula. It wanders between a winding canyon, rows of sharp ridges and open plains with flat-topped mesas. The land swells with the bass.',
   ribbit: 'A hike on Mount Ribbit, a frog king the size of a mountain sitting on a lily pad above the clouds. Gravity pulls towards whatever the hiker stands on, so he walks up the belly, over the eyes, onto the crown and upside down under the pad. W A S D walk, Shift runs, J jumps. With Walk by itself on, he tours the 14 flags on his own, and carries on 10 seconds after you let go of the keys. He hurries along with the bass.',
   sponge: 'A cube with a cross-shaped hole through it, and the same hole through every smaller cube, without end. The camera threads the holes and tunnels.',
   mandelbulb: 'The Mandelbrot set worked out in 3D: a glowing coral-like bulb with buds on buds on buds.',
@@ -510,6 +513,9 @@ function set1i(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1i(l, 
 const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev', 'uScene1', 'uScene2', 'uSpec', 'uText'];
 gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
+// Topo map's small softened picture shares uScene2's unit: it's only bound there while Topo map traces an input, when
+// the loop's pass has no second input to read from uScene2 (see topoPre)
+set1i(fbProg, 'uTopoTex', 13);
 gl.useProgram(compProg.p);
 set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1); set1i(compProg, 'uC', 2); set1i(compProg, 'uD', 3);
 gl.useProgram(finalProg.p);
@@ -928,7 +934,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1005,6 +1011,19 @@ function syncSubjectStatus() {
   const el = $('#subjectStatus'), t = loops[edit].tgt;
   const msg = subjectOn(t) ? PhosphorSubject.status() : 'Off: the picture comes in as it is.';
   if (el.textContent !== msg) el.textContent = msg;
+}
+$$('#topoFrom button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.topoPic = b.dataset.pic === '1';
+  syncUI();
+  showOSD('TOPO MAP', b.dataset.pic === '1' ? 'FROM THE PICTURE' : 'MADE-UP LAND');
+}));
+function syncTopoUI(t) {
+  $$('#topoFrom button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pic === '1') === !!t.topoPic)));
+  const tr = topoTrace(t);
+  $('#topoStatus').textContent = !t.topoPic ? 'Contour lines over land that slowly reshapes itself while the view drifts across it.'
+    : tr === 'loop' ? `Tracing loop ${otherLoop(edit)}’s picture. Pick a Second input to trace that instead.`
+    : `Tracing ${(SRC_LABEL[tr] || tr)}: bright parts are high ground. It isn’t shown as itself, only its contour lines.`;
 }
 $$('#specShape button').forEach((b) => b.addEventListener('click', () => {
   takeOver('in1');
@@ -1162,9 +1181,16 @@ $$('#loopCount button').forEach((b) => b.addEventListener('click', () => setLoop
 function weights(v) { return [Math.min(1, 2 * (1 - v / 100)), Math.min(1, 2 * v / 100)]; }
 // Whether loop k looks at the other loop's picture: as an input, or to be pushed or dyed by it.
 // The other loop then keeps running even when it isn't on screen.
+// Topo map with Height from the picture: the input it traces. That's the loop's other input, or with none, the
+// other loop's picture. null when Topo map draws its own land.
+function topoTrace(t) {
+  if (!t.topoPic || (t.in1 !== 'topo' && t.in2 !== 'topo')) return null;
+  const o = t.in1 === 'topo' ? t.in2 : t.in1;
+  return o === 'none' || o === 'topo' ? 'loop' : o;
+}
 function readsOther(k) {
   const L = loops[k];
-  return [L.tgt.in1, L.tgt.in2].includes('loop') || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
+  return [L.tgt.in1, L.tgt.in2].includes('loop') || topoTrace(L.tgt) === 'loop' || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
 }
 // A feed pours into the other loop, so if that loop isn't on screen, raising the slider slides
 // What you see to Both. (Only for the slider itself.)
@@ -1233,7 +1259,8 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo']) $('#row-' + s).hidden = !usesHere(s);
+  syncTopoUI(t);
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
@@ -1302,7 +1329,7 @@ function patchLoop(k, p, force) {
   // The mirror's Transition and Spin are yours: they stay through every new look (loadPreset brings back a preset's)
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
-  if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; }
+  if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
@@ -1335,10 +1362,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'picture', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'picture', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5,
+    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35,
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2033,7 +2060,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -2068,7 +2095,7 @@ $('#neutral').addEventListener('click', neutral);
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2169,7 +2196,7 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -2847,7 +2874,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'picture', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'picture', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3030,10 +3057,12 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
     if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
     if (sc.in1 === 'patchwork') sc.size = Math.round(rnd(55, 100));
+    if (sc.in1 === 'topo') sc.size = Math.round(rnd(55, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
     }
+    if ((sc.in1 === 'topo' || sc.in2 === 'topo') && !isPinned('in1', k)) sc.topoPic = Math.random() < 0.35;
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
       if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
@@ -3092,7 +3121,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -3518,6 +3547,7 @@ function tasteFeats(L) {
   if (L.motion && LIVE.includes(L.in1)) f.push('motion:on');
   if (b.zoom === 'out') f.push('edge:' + (L.edge ? 'fold' : 'dark'));
   if (L.in1 === 'spectro' || L.in2 === 'spectro') f.push('spec:' + (L.specRound ? 'round' : 'scroll'));
+  if (L.in1 === 'topo' || L.in2 === 'topo') f.push('topo:' + (L.topoPic ? 'picture' : 'land'));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -6155,6 +6185,16 @@ const RECIPES = [
     how: 'MOUNT RIBBIT · TRAILS 55 · COLOR 6',
     sw: 'radial-gradient(circle at 50% 42%,#9bd34a 0 26%,#3c8d5a 27% 52%,#f6c38c 53%)',
     patch: { A: { in1: 'ribbit', size: 100, zoom: 0, spin: 0, trails: 55, color: 6, blur: 0 } } },
+  { name: 'Contour drift', after: 'Under Topo map, switch Height from to The picture to trace another input’s brightness instead.',
+    text: 'A hiking map come to life: glowing contour lines over hills that rise, sink and slide past, leaving soft echoes behind.',
+    how: 'TOPO MAP · TRAILS 80 · COLOR 4',
+    sw: 'repeating-radial-gradient(circle at 40% 55%,#05070d 0 6px,#29b6ff 6px 7px,#05070d 7px 12px,#ffb840 12px 13px)',
+    patch: { A: { in1: 'topo', topoPic: false, size: 100, zoom: 0, spin: 0, trails: 80, color: 4, blur: 0 } } },
+  { name: 'Terrain flight', after: 'It wanders from canyon to ridges to plains about once a minute.',
+    text: 'A flight over land made of triangles, every edge a glowing wire: teal valleys, gold peaks and a low sun under a starry nebula.',
+    how: 'TERRAIN · EVERYTHING ELSE OFF',
+    sw: 'linear-gradient(180deg,#070a1c 0 30%,#ffd27a 33%,#1d6f80 38%,#e0a040 60%,#0c3b4f)',
+    patch: { A: { in1: 'terrain', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } } },
 ];
 function recipeBlocked(r) {
   if (!r.needs) return '';
@@ -8343,6 +8383,32 @@ function breathe(k, amt, dt) {
   B.s += (goalS - B.s) * e;
   return B;
 }
+// Topo map tracing an input: first that input is drawn as brightness into a small picture a quarter the size, which the
+// loop's own pass then reads, softened a little more, to trace smooth contour lines from. Read softly from a small
+// picture, a busy picture's fine grain blends away instead of breaking the lines into speckles. The same program
+// draws it (stopping right after the input), as the input's drawing code is too big to have twice in one program.
+function topoPre(L, dst, unit13, srcId) {
+  const w = Math.max(8, Math.ceil(simW / 4)), h = Math.max(8, Math.ceil(simH / 4));
+  let T = L.topoRT;
+  gl.activeTexture(gl.TEXTURE0 + 13);
+  if (!T || T.w !== w || T.h !== h) {
+    if (T) { gl.deleteTexture(T.tex); gl.deleteFramebuffer(T.fbo); }
+    T = L.topoRT = { ...makeTarget(w, h), w, h };
+  }
+  gl.bindTexture(gl.TEXTURE_2D, unit13);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, T.fbo);
+  gl.viewport(0, 0, w, h);
+  set2f(fbProg, 'uSim', w, h);
+  set1i(fbProg, 'uTopoPre', 1);
+  set1i(fbProg, 'uIn1', srcId);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  set1i(fbProg, 'uTopoPre', 0);
+  set1i(fbProg, 'uIn1', SRC_ID.topo);
+  set2f(fbProg, 'uSim', simW, simH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.bindTexture(gl.TEXTURE_2D, T.tex);
+}
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const otherK = otherLoop(k);
@@ -8459,8 +8525,20 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uFloor', useFloat ? 0 : 1.5 / 255);
   set1f(fbProg, 'uXfeed', xf);
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
-  set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
-  set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  // Topo map tracing another input draws only its lines: the input it traces isn't shown as itself
+  const traced = topoTrace(t);
+  if (traced) {
+    const slot = t.in1 === 'topo' ? 2 : 1, fly = slot === 1 ? flyTex1 : flyTex2;
+    set1i(fbProg, 'uIn1', SRC_ID.topo);
+    set1i(fbProg, 'uIn2', SRC_ID.none);
+    set1i(fbProg, 'uTopoSrc', is3D(traced) && !fly ? SRC_ID.none : resolveSrc(traced, t.motion));
+    // A traced 3D world is read from the first 3D picture's slot, whichever input it is
+    if (fly) { gl.activeTexture(gl.TEXTURE0 + 12); gl.bindTexture(gl.TEXTURE_2D, fly); }
+  } else {
+    set1i(fbProg, 'uTopoSrc', -1);
+    set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
+    set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+  }
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
   set1f(fbProg, 'uScale', scale);
   const inkOn = t.in1 === 'ink' || t.in2 === 'ink';
@@ -8498,6 +8576,7 @@ function runLoop(k, xf, brush, f) {
   if (shapeSw.n) { const l = U(fbProg, 'uSw[0]'); if (l) gl.uniform4fv(l, shapeSw.S); }
   const bc = hsv(((simT * 0.15) + (0.5 * LOOP_OFF[k])) % 1, 0.65, 1);
   set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
+  if (traced) topoPre(L, dst, texs[13], is3D(traced) && !(t.in1 === 'topo' ? flyTex2 : flyTex1) ? SRC_ID.none : resolveSrc(traced, t.motion));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   L.front = 1 - L.front;
   twStep(k, f / 60);

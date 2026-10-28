@@ -246,6 +246,7 @@
             <button data-src="sparks" aria-pressed="false">Sparks</button>
             <button data-src="ink" aria-pressed="false">Ink</button>
             <button data-src="patchwork" aria-pressed="false" title="Hand-inked tiles that turn, so their lines join into new paths, loops and weaves">Patchwork</button>
+            <button data-src="topo" aria-pressed="false" title="Glowing contour lines, like a hiking map, over land that reshapes itself as the view drifts">Topo map</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -287,6 +288,17 @@
             <span class="hint" id="specHint">Low sounds at the bottom, high at the top; the louder, the brighter. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</span>
           </div>
 
+
+          <div class="dev" id="row-topo" hidden>
+            <div class="ctl">
+              <span class="lbl" id="topoFromLbl" title="Made-up land draws its own hills. The picture traces how bright another input is, as if bright were high ground.">Height from</span>
+              <div class="seg seg-2" id="topoFrom" role="group" aria-labelledby="topoFromLbl">
+                <button data-pic="0" aria-pressed="true">Made-up land</button>
+                <button data-pic="1" aria-pressed="false">The picture</button>
+              </div>
+            </div>
+            <span class="hint" id="topoStatus"></span>
+          </div>
 
           <div class="dev" id="row-text" hidden>
             <label for="textIn" class="lbl">Your text</label>

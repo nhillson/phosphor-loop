@@ -253,6 +253,14 @@ TIPS
     Autopilot and Surprise me use them now and then, and the Fader limits
     menu lists them. Guide recipes: "Fractal garden", "Shattered mirror"
     and "Prism".
+  - Topo map: glowing contour lines, like a hiking map, seen from straight
+    above: cyan low down, gold higher up, rose on the peaks, every fifth line
+    bolder. The land slowly reshapes itself while the view drifts across it.
+    Input size zooms in and out. Under it, Height from: Made-up land draws
+    its own hills; The picture traces how bright another input is, as if
+    bright were high ground (pick that input under Second input; with none,
+    it traces the other loop's picture). The traced input isn't shown
+    itself, only its contour lines. Guide recipe: "Contour drift".
   - Text: press Text under "What feeds the loop" and type your own words in
     the Your text box (a band name, a title, the venue). They change as you
     type. Bold, Outline, Classic and Typewriter change the lettering, and long
@@ -444,7 +452,7 @@ TIPS
   - Ink in water: Ink under "What feeds the loop" drops colored ink that
     curls into threads. The Flow slider adds those swirling currents to any
     look.
-  - 3D worlds: 3D world under "What feeds the loop" takes you into one of ten.
+  - 3D worlds: 3D world under "What feeds the loop" takes you into one of eleven.
       Cubes: through floating cubes towards a glowing light.
       Horizon: low over a wet valley floor towards a striped sunset, with
         glowing grid mountains on both sides.
@@ -457,6 +465,10 @@ TIPS
       Nebula: through glowing clouds of gas and dark dust.
       City: drifting sideways along a wet street at night, past shops,
         lamps and cars, with rows of buildings and a skyline behind.
+      Terrain: over endless land made of triangles, every edge a glowing
+        wire: teal valleys, gold peaks, a low sun under a starry nebula. It
+        wanders from a winding canyon to rows of sharp ridges to open plains
+        with flat-topped mesas, about a minute each.
       Mount Ribbit: a hike on a frog king the size of a mountain, sitting
         on a lily pad above the clouds. Gravity pulls towards whatever the
         hiker stands on, so he walks up the belly, over the eyes, onto the
@@ -532,7 +544,7 @@ DEVELOPMENT: FILE LAYOUT AND STARTUP COST
   works without a server or build step. Each helper file exposes a single
   Phosphor namespace; app.js keeps its state private.
 
-  The opening 2D look compiles six rendering and analysis programs. The 15
+  The opening 2D look compiles six rendering and analysis programs. The 16
   optional 3D/fractal programs compile on first use and are reused afterward.
   Selecting a world for the first time may briefly pause for compilation.
   Splitting files improves maintenance and caching; it does not by itself

@@ -149,6 +149,9 @@ uniform float uCrystal;           // Crystal: how far each piece turns and zooms
 uniform vec4 uCells[5];           // Crystal: the centres of its ten pieces, two to a slot
 uniform float uGrow, uGrowR, uGrowTurn;   // Grow: how fast patterns grow this frame, how far apart their stripes sit (pixels), and a turn that changes every frame
 uniform float uAspText;   // the Text input's picture: how wide it is for its height
+uniform int uTopoSrc;     // Topo map, Height from the picture: the input it traces (-1: it draws its own land)
+uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, into uTopoTex, ahead of the loop's own pass
+uniform sampler2D uTopoTex;   // that small softened brightness, which the contour lines are traced from
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
@@ -782,6 +785,46 @@ vec3 seedPatch(vec2 p, float t) {
   gSpecA = mix(mix(1.0, 0.25, smoothstep(0.3, 0.97, uDecay)), 0.9, inked);
   return c;
 }
+// Topo map: contour lines like a hiking map, glowing on black, over land that slowly reshapes itself while the
+// view drifts across it. Every fifth line is drawn bolder, as on a real map. Low ground is drawn in cyan, high
+// ground in gold, the peaks in rose.
+float tnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float topoLand(vec2 q, float t) {
+  q += vec2(t * 0.045, t * 0.026);   // the drift
+  // A slow swirl bends the land, and two layers sliding against each other reshape the hills
+  q += 0.45 * vec2(tnoise(q * 0.45 + vec2(t * 0.02, 3.1)), tnoise(q * 0.45 + vec2(7.7, -t * 0.02))) - 0.225;
+  float h = 0.0, a = 0.55, fr = 1.0;
+  mat2 R = mat2(0.8, -0.6, 0.6, 0.8);
+  for (int i = 0; i < 3; i++) {
+    vec2 qq = q * fr;
+    h += a * mix(tnoise(qq + vec2(t * 0.05, 0.0) + float(i) * 13.7), tnoise(R * qq - vec2(0.0, t * 0.04) + float(i) * 5.3), 0.5);
+    q = R * q; a *= 0.48; fr *= 2.05;
+  }
+  return clamp((h - 0.18) * 1.65, 0.0, 1.0);
+}
+// Contour lines of the height h (0 to 1) with slope g (height per screen unit), N lines from bottom to top
+vec3 contours(float h, vec2 g, float N) {
+  float px = 1.0 / uSim.y;                       // one pixel, in screen units
+  float L = h * N, gl = length(g) * N * px;      // gl: how many lines a pixel crosses
+  float spacing = 1.0 / max(gl, 1e-5);           // pixels from one line to the next
+  float dpx = abs(fract(L + 0.5) - 0.5) * spacing;
+  bool bold = mod(floor(L + 0.5), 5.0) < 0.5;
+  float w = (bold ? 1.5 : 0.75) * uPxK;
+  float a = clamp(w - dpx + 0.5, 0.0, 1.0) + (bold ? 0.35 : 0.18) * exp(-dpx / (2.5 * uPxK));
+  a *= smoothstep(1.5 * uPxK, 4.0 * uPxK, spacing);   // where the lines crowd together they fade rather than fill in
+  vec3 c = mix(vec3(0.12, 0.72, 1.0), vec3(1.0, 0.72, 0.25), smoothstep(0.3, 0.72, h));
+  c = mix(c, vec3(1.0, 0.45, 0.6), smoothstep(0.82, 0.98, h));
+  return c * a * (bold ? 1.0 : 0.6);
+}
+vec3 seedTopo(vec2 p, float t) {
+  float h = topoLand(p * (5.0 / uScale), t);
+  // Its slope from the neighbouring pixels (the graphics chip works them out together), in screen units
+  vec2 g = vec2(dFdx(h), dFdy(h)) * uSim.y;
+  return contours(h, g, 16.0);
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -792,9 +835,10 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 12) return seedPatch(p, uTime);
   if (id == 22) return seedSpec(p);
   if (id == 24) return seedText(p, uTime);
+  if (id == 33) return seedTopo(p, uTime);
   // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this
   // pass (see draw3D) filling the screen
-  if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 31)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
+  if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);
   if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
   if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);
@@ -804,11 +848,54 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 10) return live(uOther, uOtherPrev, uSim.x / uSim.y, 0.0, p, 10, 0.5);
   return vec3(0.0);
 }
+// Topo map with Height from the picture: contour lines traced over how bright another input is, as if bright were
+// high ground. Its brightness is softened a little first, so grain doesn't break the lines up.
+vec3 topoTraced(vec2 p) {
+  vec2 ts = vec2(textureSize(uTopoTex, 0)), px = 1.0 / ts;
+  vec2 uv = p / vec2(uSim.x / uSim.y, 1.0) + 0.5;
+  // A 3 by 3 patch of the small picture, a little softer still, and its slope
+  float l[9];
+  for (int k = 0; k < 9; k++) l[k] = texture(uTopoTex, uv + vec2(float(k % 3) - 1.0, float(k / 3) - 1.0) * 1.2 * px).r;
+  float h = (l[4] * 4.0 + (l[1] + l[3] + l[5] + l[7]) * 2.0 + l[0] + l[2] + l[6] + l[8]) / 16.0;
+  float r = 1.2 / ts.y;   // the patch's spacing, in screen units
+  float gx = ((l[2] + 2.0 * l[5] + l[8]) - (l[0] + 2.0 * l[3] + l[6])) / (8.0 * r);
+  float gy = ((l[6] + 2.0 * l[7] + l[8]) - (l[0] + 2.0 * l[1] + l[2])) / (8.0 * r);
+  gSpecA = 0.0; gCutA = -1.0;
+  return contours(clamp(h, 0.0, 1.0), vec2(gx, gy), 10.0);
+}
 void main() {
   vec2 uv = gl_FragCoord.xy / uSim;
   float asp = uSim.x / uSim.y;
   vec2 p = (uv - 0.5) * vec2(asp, 1.0);
   vec2 pf = mirrorFold(p);
+  // Split lines: every other line of pixels slides left, the lines between slide right
+  float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
+  // The inputs. Topo map's small pass (see topoPre in js/app.js) runs only this far: the brightness of the
+  // input it traces, unfolded and unsplit, on a picture a quarter the size
+  bool pre = uTopoPre > 0;
+  vec2 ps = pre ? p : pf + vec2(uSplitOff * side, 0.0);
+  gSpecA = 0.0; gCutA = -1.0;
+  vec3 s;
+  if (uTopoSrc >= 0 && !pre) s = topoTraced(ps);
+  else s = source(uIn1, ps, uScene1);
+  if (pre) { o = vec4(vec3(luma(clamp(s, 0.0, 1.0))), 1.0); return; }
+  float specA = gSpecA, cut1 = gCutA;
+  if (uIn2 != 9) {
+    gSpecA = 0.0; gCutA = -1.0;
+    vec3 s2 = source(uIn2, ps, uScene2);
+    float cut2 = gCutA;
+    float w1 = min(1.0, 2.0 * (1.0 - uBlend)), w2 = min(1.0, 2.0 * uBlend);
+    specA = max(specA * w1, gSpecA * w2);
+    vec3 a = clamp(s * w1, 0.0, 1.0), b = clamp(s2 * w2, 0.0, 1.0);
+    // A Subject silhouette lies over the other input, which shows all round it; otherwise the two add their light
+    if (cut2 >= 0.0) s = a * (1.0 - cut2 * w2) + b;
+    else if (cut1 >= 0.0) s = b * (1.0 - cut1 * w1) + a;
+    else s = 1.0 - (1.0 - a) * (1.0 - b);
+    cut1 = max(cut1 * w1, cut2 * w2);
+  }
+  float cover = max(cut1, 0.0);
+  specA = max(specA, cover);
+  s *= uGain;
 
   // Where this pixel was one frame ago
   vec2 q = rot(uSpin) * (pf - uCenter) * exp(-uZoom) + uCenter;
@@ -824,8 +911,6 @@ void main() {
   if (uLook > 0.0) q = lookAt(q, asp);
   // Shapes that swallow: the picture round them is pulled in and wound round
   if (uSwN > 0) q += swallow(p);
-  // Split lines: every other line of pixels slides left, the lines between slide right
-  float side = mod(floor(gl_FragCoord.y / uPxK), 2.0) < 0.5 ? 1.0 : -1.0;
   q.x += uSplit * side;
   vec2 st = q / vec2(asp, 1.0) + 0.5;
   float inside = 1.0;
@@ -857,26 +942,6 @@ void main() {
   fb = max(hueRot(fb, uHue), 0.0);
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
-  vec2 ps = pf + vec2(uSplitOff * side, 0.0);
-  gSpecA = 0.0; gCutA = -1.0;
-  vec3 s = source(uIn1, ps, uScene1);
-  float specA = gSpecA, cut1 = gCutA;
-  if (uIn2 != 9) {
-    gSpecA = 0.0; gCutA = -1.0;
-    vec3 s2 = source(uIn2, ps, uScene2);
-    float cut2 = gCutA;
-    float w1 = min(1.0, 2.0 * (1.0 - uBlend)), w2 = min(1.0, 2.0 * uBlend);
-    specA = max(specA * w1, gSpecA * w2);
-    vec3 a = clamp(s * w1, 0.0, 1.0), b = clamp(s2 * w2, 0.0, 1.0);
-    // A Subject silhouette lies over the other input, which shows all round it; otherwise the two add their light
-    if (cut2 >= 0.0) s = a * (1.0 - cut2 * w2) + b;
-    else if (cut1 >= 0.0) s = b * (1.0 - cut1 * w1) + a;
-    else s = 1.0 - (1.0 - a) * (1.0 - b);
-    cut1 = max(cut1 * w1, cut2 * w2);
-  }
-  float cover = max(cut1, 0.0);
-  specA = max(specA, cover);
-  s *= uGain;
 
   float bd = sdSeg(pf, uBrush.xy, uBrush.zw);
   s += uBrushCol * (exp(-bd * bd / (0.011 * 0.011)) + 0.25 * exp(-bd / 0.02)) * uBrushOn;
@@ -1383,6 +1448,188 @@ void main() {
     col = mix(col, haze * 0.8, 1.0 - exp(-tt * 0.022));
   } else {
     col = sky(rd);
+  }
+  o = vec4(col, 1.0);
+}`;
+
+// Terrain: a flight over endless low-poly land, every face a flat triangle with its edges drawn as a glowing
+// wireframe: teal valleys, gold peaks with pale outlines, a sun low ahead under a starry nebula. The land wanders
+// between three kinds as the flight goes on: a canyon the flight threads, rows of sharp ridges it climbs over, and
+// open rolling plains with the odd flat-topped mesa.
+const FS_TERRAIN = `#version 300 es
+precision highp float;
+uniform vec2 uSim;
+uniform float uTime;     // seconds; sways the flight and drifts the light on the valley floors
+uniform float uTravel;   // how far the flight has come (wraps every ZP, where the land repeats exactly)
+uniform float uLens;     // how wide the lens is: tan of half the height of the view
+uniform float uGlow;     // how bright the sun and the lines are (the music pushes it up)
+uniform float uSeed;     // loop B flies over land of its own
+out vec4 o;
+const float ZP = 960.0;          // the land repeats after this far
+const float RS = 0.4;            // how far apart the rows of triangle corners sit (2400 rows in ZP)
+const float SS = 0.46188022;     // a triangle's side (RS / sin 60°)
+const float TAU = 6.2831853;
+float h21(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+// Smooth random hills that repeat every per squares going forward
+float vnoise(vec2 p, float per) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float z0 = mod(i.y, per), z1 = mod(i.y + 1.0, per);
+  float a = h21(vec2(i.x, z0) + uSeed), b = h21(vec2(i.x + 1.0, z0) + uSeed);
+  float c = h21(vec2(i.x, z1) + uSeed), d = h21(vec2(i.x + 1.0, z1) + uSeed);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+// The line the flight follows: it winds left and right, repeating every ZP
+float path(float z) { return 5.0 * sin(z * TAU * 3.0 / ZP) + 2.5 * sin(z * TAU * 8.0 / ZP + 1.3 + uSeed * 0.1); }
+// How much of each kind of land is here: canyon, ridges, plains (they take turns, about a minute each round)
+vec3 kinds(float z) {
+  float a = z * TAU * 5.0 / ZP + uSeed * 0.05;
+  vec3 w = 0.5 + 0.5 * cos(a - vec3(0.0, 2.0944, 4.1888));
+  w = w * w * w;
+  return w / (w.x + w.y + w.z);
+}
+float lift() { return 1.0 + (uGlow - 1.0) * 0.35; }   // the land swells a little with the music
+// The smooth land; the triangles take its height at their corners
+float land(vec2 p) {
+  vec3 w = kinds(p.y);
+  float dx = abs(p.x - path(p.y));
+  float base = vnoise(p * 0.1, 96.0);
+  float ridge = 1.0 - abs(2.0 * base - 1.0);
+  float detail = vnoise(p * 0.4 + 17.0, 384.0);
+  float mount = 0.6 * ridge * ridge + 0.4 * detail;
+  // Canyon: steep walls either side of a flat floor that the flight follows
+  float hC = smoothstep(1.6, 5.5, dx) * (3.2 + 5.5 * mount) + 0.25 * detail;
+  // Ridges: sharp crests everywhere, a little lower along the flight
+  float hR = (1.2 + 7.0 * ridge * ridge * ridge + 1.4 * detail) * mix(0.5, 1.0, smoothstep(0.5, 4.0, dx));
+  // Plains: low rolling ground, now and then a flat-topped mesa
+  float hP = 2.6 * base * base + 0.6 * detail;
+  if (w.z > 0.01) hP += 3.2 * smoothstep(0.66, 0.72, vnoise(p * 0.05 + 40.0, 48.0)) * smoothstep(1.5, 3.0, dx);
+  return (w.x * hC + w.y * hR + w.z * hP) * lift();
+}
+// The triangle under p: the height of its flat face here, and its three corners
+float tri(vec2 p, out vec3 A, out vec3 B, out vec3 C, out vec3 bc) {
+  float v = p.y / RS, u = p.x / SS - 0.5 * v;
+  vec2 i = floor(vec2(u, v)), f = vec2(u, v) - i;
+  vec2 ia, ib, ic;
+  if (f.x + f.y < 1.0) { ia = i; ib = i + vec2(1.0, 0.0); ic = i + vec2(0.0, 1.0); bc = vec3(1.0 - f.x - f.y, f.x, f.y); }
+  else { ia = i + 1.0; ib = i + vec2(0.0, 1.0); ic = i + vec2(1.0, 0.0); bc = vec3(f.x + f.y - 1.0, 1.0 - f.x, 1.0 - f.y); }
+  vec2 pa = vec2((ia.x + 0.5 * ia.y) * SS, ia.y * RS), pb = vec2((ib.x + 0.5 * ib.y) * SS, ib.y * RS), pc = vec2((ic.x + 0.5 * ic.y) * SS, ic.y * RS);
+  A = vec3(pa.x, land(pa), pa.y); B = vec3(pb.x, land(pb), pb.y); C = vec3(pc.x, land(pc), pc.y);
+  return dot(bc, vec3(A.y, B.y, C.y));
+}
+float triH(vec2 p) { vec3 A, B, C, bc; return tri(p, A, B, C, bc); }
+const vec3 SUN = vec3(0.0, 0.07, 0.9975);
+vec3 sky(vec3 rd) {
+  float y = rd.y;
+  vec3 c = mix(vec3(0.16, 0.24, 0.36), vec3(0.012, 0.015, 0.045), smoothstep(-0.02, 0.32, y));
+  // A nebula of purple and teal clouds
+  vec2 np = rd.xz / (max(y, 0.0) + 0.35) * 2.2;
+  float n1 = vnoise(np + 3.0, 1e4) * 0.6 + vnoise(np * 2.3 + 9.0, 1e4) * 0.4;
+  float n2 = vnoise(np * 0.7 + 21.0, 1e4);
+  vec3 neb = mix(vec3(0.42, 0.1, 0.45), vec3(0.06, 0.38, 0.42), smoothstep(0.3, 0.7, n2));
+  c += neb * smoothstep(0.35, 0.85, n1) * 0.55 * smoothstep(-0.02, 0.08, y) * (1.0 - smoothstep(0.35, 0.8, y));
+  // The sun, low ahead: a soft bright disc in a wide warm glow
+  float r = length(rd - SUN);
+  c += vec3(1.0, 0.85, 0.5) * (smoothstep(0.04, 0.025, r) * 0.9 + 0.7 * exp(-r * 14.0) + 0.22 * exp(-r * 3.5)) * uGlow;
+  // Stars
+  vec2 sg = rd.xz / max(y, 0.02) * 70.0, si = floor(sg);
+  float sh = h21(si + 7.0);
+  c += vec3(0.8, 0.85, 1.0) * step(0.986, sh) * smoothstep(0.12, 0.0, length(fract(sg) - 0.5)) * smoothstep(0.06, 0.3, y) * (0.5 + 0.5 * sin(uTime * 3.0 + sh * 50.0));
+  return c;
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uSim) / uSim.y;
+  float t = uTime, z = uTravel;
+  // Along the winding line, high enough to clear the land just ahead; now and then dipping low into a canyon,
+  // then rising up over the tops
+  float ground = 0.0, gmax = 0.0;
+  for (int k = 0; k < 5; k++) {
+    float zk = z + float(k) * 2.5;
+    float g = land(vec2(path(zk), zk));
+    ground += g * 0.2; gmax = max(gmax, g);
+  }
+  vec3 kw = kinds(z);
+  float high = 0.5 + 0.5 * sin(t * 0.06 + uSeed);
+  float alt = mix(ground, gmax, 0.7) + 4.2 + kw.y * 1.2 + 3.0 * high;
+  vec3 ro = vec3(path(z) + 0.5 * sin(t * 0.23), alt, z);
+  float za = z + 9.0;
+  vec3 aim = vec3(path(za), alt - 2.7 - 1.0 * high, za);
+  vec3 fw = normalize(aim - ro);
+  float turn = (path(z + 6.0) - 2.0 * path(z + 3.0) + path(z)) * 0.6;   // bank into the bends
+  float roll = clamp(-turn, -0.25, 0.25) + 0.03 * sin(t * 0.31);
+  vec3 upW = vec3(sin(roll), cos(roll), 0.0);
+  vec3 rt = normalize(cross(upW, fw)), up = cross(fw, rt);
+  vec2 sp = p * 2.0 * uLens;
+  vec3 rd = normalize(fw + sp.x * rt + sp.y * up);
+  float pix = 2.0 * uLens / uSim.y;
+
+  // March over the smooth land first (quick), then over the triangles themselves once it's close
+  const float FAR = 95.0;
+  float top = 14.0 * lift();
+  float tt = 0.05, tPrev = 0.05, hit = 0.0;
+  bool fine = false;
+  vec3 pos;
+  for (int i = 0; i < 110; i++) {
+    pos = ro + rd * tt;
+    float d;
+    if (!fine) {
+      d = pos.y - land(pos.xz) - 0.3;
+      if (d < 0.02 * tt + 0.02) { fine = true; continue; }
+    } else {
+      d = pos.y - triH(pos.xz);
+      if (d < 0.001 * tt) { hit = 1.0; break; }
+    }
+    if (tt > FAR || (pos.y > top && rd.y > 0.0)) break;
+    tPrev = tt;
+    // A step that lands under the land is fine: the crossing is pinned down afterwards between the last two
+    tt += fine ? max(d * 0.8, 0.008 * tt + 0.006) : max(d * 0.6, 0.012 * tt);
+  }
+  vec3 col;
+  vec3 haze = mix(vec3(0.2, 0.36, 0.46), vec3(0.1, 0.12, 0.25), smoothstep(0.0, 0.25, rd.y));
+  haze += vec3(1.0, 0.75, 0.45) * 0.25 * exp(-length(rd - SUN) * 4.0) * uGlow;
+  if (hit > 0.5) {
+    float a = tPrev, b = tt;
+    for (int i = 0; i < 6; i++) {
+      float m = 0.5 * (a + b);
+      vec3 q = ro + rd * m;
+      if (q.y - triH(q.xz) < 0.0) b = m; else a = m;
+    }
+    tt = b;
+    pos = ro + rd * tt;
+    vec3 A, B, C, bc;
+    tri(pos.xz, A, B, C, bc);
+    vec3 n = normalize(cross(C - A, B - A));
+    if (n.y < 0.0) n = -n;
+    float hn = clamp((A.y + B.y + C.y) / (3.0 * 8.0 * lift()), 0.0, 1.0);
+    // The faces: deep teal low, sea-green higher, gold and then rust on the peaks, each lit flat so the facets show
+    vec3 fc = mix(vec3(0.03, 0.22, 0.32), vec3(0.08, 0.45, 0.55), smoothstep(0.0, 0.3, hn));
+    fc = mix(fc, vec3(0.9, 0.58, 0.18), smoothstep(0.32, 0.55, hn));
+    fc = mix(fc, vec3(0.7, 0.3, 0.16), smoothstep(0.7, 0.95, hn));
+    float dif = max(dot(n, normalize(vec3(0.35, 0.8, 0.5))), 0.0);
+    col = fc * (0.28 + 0.85 * dif * dif);
+    // Light dappling across the low ground, slowly drifting
+    float dap = smoothstep(0.5, 0.85, vnoise(pos.xz * 0.3 + vec2(t * 0.15, 0.0), 1e4));
+    col += vec3(0.7, 0.9, 0.85) * 0.22 * dap * (1.0 - smoothstep(0.08, 0.3, hn));
+    // The sun ahead lights the faces turned towards it, so the slopes glow through
+    col += vec3(1.0, 0.7, 0.4) * 0.35 * pow(max(dot(n, SUN), 0.0), 2.0) * uGlow;
+    // The wireframe: a fine line along every edge of every triangle. Far off the lines blend into their average
+    // glow instead of flickering.
+    float foot = tt * pix / max(abs(dot(rd, n)), 0.25);
+    float e = min(bc.x, min(bc.y, bc.z)) * RS;
+    float w0 = 0.012, w = w0 + foot;
+    float line = (1.0 - smoothstep(0.0, w, e)) * (w0 / w);
+    vec3 lc = mix(vec3(0.45, 0.85, 0.95), vec3(1.0, 0.68, 0.86), smoothstep(0.25, 0.45, hn));
+    lc = mix(lc, vec3(1.0, 0.97, 0.88), smoothstep(0.45, 0.7, hn));
+    col = mix(col, lc * 1.25 * uGlow, clamp(line * 1.5, 0.0, 1.0));
+    col = mix(col, haze, 1.0 - exp(-tt * 0.011));
+  } else {
+    col = sky(rd);
+    // Haze along the horizon where the land meets the sky
+    col = mix(col, haze, smoothstep(0.06, 0.0, rd.y) * 0.8);
   }
   o = vec4(col, 1.0);
 }`;
@@ -2594,5 +2841,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();
