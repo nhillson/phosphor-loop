@@ -24,8 +24,9 @@ function uploadLine() {
     // Enhanced Broadcasting: Twitch picks the qualities when the stream starts, up to about 10.5 Mbps (more for 2K)
     if (p === 'twitch' && S.twitch.enhanced) {
       const two = q.height >= 1440;
-      total += two ? 15 : 10.5;
-      return `Twitch ${two ? 'up to 2K' : Math.min(q.height, 1080) + 'p'} with Enhanced Broadcasting (Twitch picks, up to about ${two ? 15 : 10.5} Mbps)`;
+      const extra = Math.max(0, (S.twitch.topMbps || 0) - (two ? 8 : 6));
+      total += (two ? 15 : 10.5) + extra;
+      return `Twitch ${two ? 'up to 2K' : Math.min(q.height, 1080) + 'p'} with Enhanced Broadcasting (${S.twitch.topMbps ? `top quality ${S.twitch.topMbps} Mbps` : 'Twitch picks'}, up to about ${Math.round((two ? 15 : 10.5) + extra)} Mbps)`;
     }
     const h = Math.min(q.height, MAX_H[p]);
     const table = h === q.height ? q : (q.fps > 30 ? quality.best : quality.better);
@@ -56,6 +57,8 @@ function renderSettings() {
   renderRec();
   $('#opt-yt-hevc').checked = !!S.youtube.hevc;
   $('#opt-tw-eb').checked = !!S.twitch.enhanced;
+  $('#twTopRow').hidden = !S.twitch.enhanced;
+  $$('[data-twtop]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.twtop === (S.twitch.topMbps || 0))));
   renderTwitchNote();
   $$('[data-q]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.q === S.quality)));
   $('#qualityHint').innerHTML = '';
@@ -114,6 +117,7 @@ function renderTwitchNote() {
   const d = (status.destinations || {}).twitch;
   const q = quality[S.quality] || {};
   $('#opt-tw-eb').disabled = !!status.live || !!status.starting;
+  $$('[data-twtop]').forEach((b) => { b.disabled = !!status.live || !!status.starting; });
   el.classList.toggle('on', !!(d && d.note));
   if (d && d.note) { el.textContent = d.note; return; }
   if (!S.twitch.enhanced) { el.textContent = 'Off: Twitch gets one normal stream (1080p at most, 6 Mbps).'; return; }
@@ -261,6 +265,7 @@ for (const p of PLATFORMS) {
 }
 $('#opt-yt-hevc').addEventListener('change', (e) => save({ youtube: { hevc: e.target.checked } }));
 $('#opt-tw-eb').addEventListener('change', (e) => save({ twitch: { enhanced: e.target.checked } }));
+$$('[data-twtop]').forEach((b) => b.addEventListener('click', () => save({ twitch: { topMbps: +b.dataset.twtop } })));
 $('#opt-calm').addEventListener('change', (e) => save({ streamFriendly: e.target.checked }));
 $$('[data-save]').forEach((b) => b.addEventListener('click', async () => {
   const p = b.dataset.save;

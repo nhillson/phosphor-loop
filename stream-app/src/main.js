@@ -51,7 +51,7 @@ if (!TEST && !app.requestSingleInstanceLock()) app.quit();
 const dataDir = () => app.getPath('userData');
 const settingsFile = () => path.join(dataDir(), 'settings.json');
 const DEFAULTS = {
-  twitch: { enabled: true, key: '', enhanced: true }, // enhanced: Twitch's Enhanced Broadcasting (Twitch picks the settings; 2K)
+  twitch: { enabled: true, key: '', enhanced: true, topMbps: 0 }, // topMbps: top Enhanced Broadcasting quality's bitrate (0 = Twitch's pick) // enhanced: Twitch's Enhanced Broadcasting (Twitch picks the settings; 2K)
   kick: { enabled: false, server: '', key: '' },
   youtube: { enabled: false, key: '', hevc: true }, // hevc: send YouTube the sharper HEVC format when the card can make it
   quality: 'better', startWithWindows: false, goLiveOnOpen: false, autopilotOnLive: false, collapsed: false,
@@ -86,7 +86,7 @@ function saveSettings() {
 }
 function publicSettings() {
   return {
-    twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key, enhanced: settings.twitch.enhanced },
+    twitch: { enabled: settings.twitch.enabled, hasKey: !!settings.twitch.key, enhanced: settings.twitch.enhanced, topMbps: settings.twitch.topMbps || 0 },
     kick: { enabled: settings.kick.enabled, server: settings.kick.server, hasKey: !!settings.kick.key },
     youtube: { enabled: settings.youtube.enabled, hasKey: !!settings.youtube.key, hevc: settings.youtube.hevc },
     quality: settings.quality, startWithWindows: settings.startWithWindows, goLiveOnOpen: settings.goLiveOnOpen,
@@ -295,8 +295,11 @@ async function enhancedPlan(d, { q, input, maxTracks }) {
     `${gpu ? `${gpu.model} [${gpu.vendor_id.toString(16)}:${gpu.device_id.toString(16)}] driver ${gpu.driver_version}` : 'no graphics card found'}${maxTracks ? `; at most ${maxTracks} qualities` : ''})`);
   const post = EB.buildPost({ key: d.secret, version: app.getVersion(), codecs, canvas, machine, maxTracks });
   const { config, warning } = await EB.requestConfig(post, { url: process.env.PHOSPHOR_TWITCH_CONFIG_URL || EB.CONFIG_URL });
-  const tracks = EB.tracksFrom(config, { input: size, fps: q.fps });
-  if (!tracks.length) throw new EB.TwitchError('Twitch sent no qualities for this picture');
+  const picked = EB.tracksFrom(config, { input: size, fps: q.fps });
+  if (!picked.length) throw new EB.TwitchError('Twitch sent no qualities for this picture');
+  // The top quality's bitrate, if Nick chose more than Twitch's pick (Twitch card › Top quality)
+  const { tracks, raised } = EB.raiseTop(picked, (+settings.twitch.topMbps || 0) * 1e6);
+  if (raised) log(`Twitch Enhanced Broadcasting: top quality raised from ${(raised.from / 1e6).toFixed(1)} to ${(raised.to / 1e6).toFixed(1)} Mbps (Top quality setting)`);
   const family = streamer.encoder.id;
   const encodes = tracks.map((t, i) => {
     const top = i === 0 || t.height >= 1080;
@@ -307,7 +310,7 @@ async function enhancedPlan(d, { q, input, maxTracks }) {
   const { url, secrets, configId } = EB.ingestUrl(config, d.secret);
   // If Twitch later turns the multitrack stream down, the best H.264 track (1080p or less) goes out as a normal stream
   let fallbackTrack = -1;
-  tracks.forEach((t, i) => { if (t.codec === 'h264' && t.height <= 1080 && t.bitrate <= 6500000 && (fallbackTrack < 0 || t.height > tracks[fallbackTrack].height)) fallbackTrack = i; });
+  picked.forEach((t, i) => { if (t.codec === 'h264' && t.height <= 1080 && t.bitrate <= 6500000 && (fallbackTrack < 0 || t.height > picked[fallbackTrack].height)) fallbackTrack = i; });
   const note = `Enhanced Broadcasting: ${EB.summary(tracks)}`;
   log(`Twitch Enhanced Broadcasting: config ${configId || '(no id)'}: ${EB.summary(tracks)} (` +
     tracks.map((t, i) => `${t.type}→${encodes[i].variant}`).join(', ') + `)${warning ? '; Twitch warns: ' + warning : ''}`);
@@ -764,6 +767,7 @@ ipcMain.handle('save', async (_e, patch) => {
     if ('enabled' in patch[p]) cur.enabled = !!patch[p].enabled;
     if ('hevc' in patch[p] && p === 'youtube') cur.hevc = !!patch[p].hevc;
     if ('enhanced' in patch[p] && p === 'twitch') cur.enhanced = !!patch[p].enhanced;
+    if ('topMbps' in patch[p] && p === 'twitch' && [0, 7, 8, 9].includes(+patch[p].topMbps)) cur.topMbps = +patch[p].topMbps;
     if ('server' in patch[p]) cur.server = String(patch[p].server || '').trim();
     if ('key' in patch[p]) cur.key = lock(String(patch[p].key || '').trim());
   }

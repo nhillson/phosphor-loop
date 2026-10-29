@@ -107,6 +107,16 @@ async function unit() {
   assert.deepEqual([big[0].width, big[0].height, big[0].fps], [1280, 720, 30]);
   ok('tracks from the answer');
 
+  // Top quality raised by Nick's choice: only the top track, only upwards, marked in the summary
+  const up = EB.raiseTop(t, 8000000);
+  assert.deepEqual(up.tracks.map((x) => x.bitrate), [8000000, 600000, 300000]);
+  assert.deepEqual(up.raised, { from: 1200000, to: 8000000 });
+  assert.ok(/\(raised\)/.test(EB.summary(up.tracks)));
+  assert.equal(EB.raiseTop(t, 0).raised, null);
+  assert.equal(EB.raiseTop(t, 1000000).raised, null); // never lowers
+  assert.equal(t[0].bitrate, 1200000); // the original is untouched
+  ok('top quality raised');
+
   // where to send: Twitch's server, its minted key, our key's own query items, and the config id
   const u = EB.ingestUrl(CONFIG, 'live_1_abc?bandwidthtest=true');
   assert.equal(u.url, 'rtmp://127.0.0.1:19371/app/live_minted_SECRET?x=1&bandwidthtest=true&clientConfigId=cfg-1234');

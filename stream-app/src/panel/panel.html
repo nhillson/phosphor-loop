@@ -65,6 +65,15 @@
           <p class="how" id="how-twitch" hidden>Your Twitch dashboard just opened in your web browser. Next to <b>Primary Stream key</b>, click <b>Copy</b>, then paste it in the box above and click Save.</p>
         </div>
         <label class="mini-toggle"><span>Enhanced Broadcasting (Twitch picks the settings; needed for 2K)</span><span class="switch"><input type="checkbox" id="opt-tw-eb"><span></span></span></label>
+        <div id="twTopRow">
+          <p class="sub-label">Top quality’s data rate</p>
+          <div class="seg seg4" id="twTop" role="radiogroup" aria-label="Twitch top quality data rate">
+            <button role="radio" data-twtop="0"><b>Auto</b><small>Twitch picks</small></button>
+            <button role="radio" data-twtop="7"><b>7</b><small>Mbps</small></button>
+            <button role="radio" data-twtop="8"><b>8</b><small>Mbps</small></button>
+            <button role="radio" data-twtop="9"><b>9</b><small>Mbps</small></button>
+          </div>
+        </div>
         <p class="dest-note" id="note-twitch"></p>
       </div>
     </div>

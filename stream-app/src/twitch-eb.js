@@ -208,10 +208,18 @@ async function systemInfo(electronGpu) {
   return describe(cachedWin, electronGpu);
 }
 
+// Nick's choice to send the top quality at more than Twitch picked (a Twitch engineer suggested about 8 Mbps for
+// 1080p H.265). Only ever raises, only the top track; returns the new tracks and what changed (for the log).
+function raiseTop(tracks, bps) {
+  if (!bps || !tracks.length || tracks[0].bitrate >= bps) return { tracks, raised: null };
+  const from = tracks[0].bitrate;
+  return { tracks: [{ ...tracks[0], bitrate: bps, raised: from }, ...tracks.slice(1)], raised: { from, to: bps } };
+}
+
 // A short line for the log and the panel: "1440p HEVC 8.0 + 1080p H.264 6.0 + 720p H.264 3.0 Mbps"
 const CODEC_NAME = { h264: 'H.264', hevc: 'HEVC', av1: 'AV1' };
 function summary(tracks) {
-  return tracks.map((t) => `${t.height}p${t.fps} ${CODEC_NAME[t.codec]} ${(t.bitrate / 1e6).toFixed(1)}`).join(' + ') + ' Mbps';
+  return tracks.map((t) => `${t.height}p${t.fps} ${CODEC_NAME[t.codec]} ${(t.bitrate / 1e6).toFixed(1)}${t.raised ? ' (raised)' : ''}`).join(' + ') + ' Mbps';
 }
 
-module.exports = { CONFIG_URL, codecOf, canvasFor, buildPost, requestConfig, tracksFrom, ingestUrl, describe, systemInfo, plain, summary, TwitchError, CODEC_NAME };
+module.exports = { raiseTop, CONFIG_URL, codecOf, canvasFor, buildPost, requestConfig, tracksFrom, ingestUrl, describe, systemInfo, plain, summary, TwitchError, CODEC_NAME };
