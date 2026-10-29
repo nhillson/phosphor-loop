@@ -272,7 +272,9 @@ class Streamer extends EventEmitter {
 
   // Can this computer make all of a plan's encodes at the same time? (A graphics card has a limit on how many it
   // makes at once, and Twitch's Enhanced Broadcasting can ask for five.) '' = yes, otherwise FFmpeg's reason.
-  tryPlan(plan, frames = 20) {
+  // Only whether the encoders open and run matters here (a card's limit shows up at once), not speed: a few frames are
+  // enough, and a check that only runs out of time (a busy computer) counts as a yes.
+  tryPlan(plan, frames = 6) {
     const input = plan.input || { width: 1280, height: 720 };
     const n = plan.encodes.length;
     const branches = plan.encodes.map((e, i) => `[s${i}]${e.fps && e.fps < plan.fps ? `fps=${e.fps},` : ''}scale=${e.width || input.width}:${e.height || input.height},format=${/_qsv$/.test(VARIANTS[e.variant] ? VARIANTS[e.variant].codec : '') ? 'nv12' : 'yuv420p'}[v${i}]`);
@@ -281,7 +283,10 @@ class Streamer extends EventEmitter {
     plan.encodes.forEach((e, i) => args.push('-map', `[v${i}]`, ...forStream(encoderArgs(e.variant, { fps: e.fps || plan.fps, bitrate: e.bitrate, gop: e.gop }), i)));
     args.push('-f', 'null', '-');
     return new Promise((res) => {
-      execFile(this.ffmpeg, args, { timeout: 45000, windowsHide: true }, (err, _o, stderr) => res(err ? String(stderr || err.message).trim().split('\n').slice(-2).join(' ') || 'failed' : ''));
+      execFile(this.ffmpeg, args, { timeout: 45000, windowsHide: true }, (err, _o, stderr) => {
+        if (err && err.killed) { this.log('Checking all encodes at once took too long (a busy computer); going ahead'); return res(''); }
+        res(err ? String(stderr || err.message).trim().split('\n').slice(-2).join(' ') || 'failed' : '');
+      });
     });
   }
 
