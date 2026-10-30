@@ -43,6 +43,9 @@ file don't rebuild the app.
 4g. **3D lighting** (the 3D lighting section over the finished picture, and 3D depth / smoothness / shine under each input's
    Adjust the picture; `reliefShade` in js/shaders.js): `python3 tests/relief_check.py` (about 1.5 minutes). It feeds
    `tests/media/person.webm` in and reaches into the app through `window.__plRelief`.
+4h. **Autopilot's mirror changes** (a new mirror level comes in through the loop's Transition over the Fade time,
+   from the mirror on screen; `mirrorGlideIn` / `L.mxSecs` in js/app.js): `python3 tests/ap_mirror_check.py`
+   (about a minute and a half).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

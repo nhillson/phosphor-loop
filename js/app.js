@@ -252,20 +252,38 @@ const loops = { A: mkLoop(), B: mkLoop(), C: mkLoop(), D: mkLoop() };
 // in the loop's Transition style (Cut switches at once), and with Spin on the pattern turns once round as it goes.
 // L.mx is the change under way: the mirror it's leaving, the one it's going to, and how far along it is (1 done).
 // A preset and Neutral cut straight to their mirror (mirrorCut).
+// Autopilot's mirror changes glide over its Fade time instead, alongside the rest of the new look (L.mxSecs, and
+// mirrorGlideIn for a loop it swaps in), so a new mirror level comes in through the loop's Transition too.
 const MIRROR_SECS = 3;
 const MIRROR_FX = { cut: 0, melt: 1, iris: 2, ripple: 3 };
 function mirrorCut(k) { const m = loops[k].tgt.mirror; loops[k].mx = { from: m, to: m, e: 1 }; }
+// The mirror loop k shows most just now: partway through a change, whichever side it's nearer
+function mirrorShown(k) {
+  const t = loops[k].tgt, m = loops[k].mx;
+  if (!m || m.e >= 1) return t.mirror;
+  return m.e < 0.5 ? m.from : m.to;
+}
+// Autopilot swapping loop k in over a loop showing mirror `from`: k comes in wearing that mirror and changes to its
+// own through its Transition while it fades in, over secs, rather than its new mirror just fading in over the old
+function mirrorGlideIn(k, from, secs) {
+  const t = loops[k].tgt;
+  loops[k].mx = { from, to: t.mirror, e: from === t.mirror || t.mirrorFx === 'cut' ? 1 : 0, secs };
+  loops[k].mxSecs = 0;
+}
 function mirrorStep(k, dt) {
-  const t = loops[k].tgt, m = loops[k].mx || (loops[k].mx = { from: t.mirror, to: t.mirror, e: 1 });
+  const L = loops[k], t = L.tgt, m = L.mx || (L.mx = { from: t.mirror, to: t.mirror, e: 1 });
   if (t.mirror !== m.to) {
     // Partway through a change: going back reverses it from where it is, anything else carries on from the
     // mirror that's showing most
     if (m.e < 1 && t.mirror === m.from) { m.from = m.to; m.e = 1 - m.e; }
     else { m.from = m.e < 0.5 ? m.from : m.to; m.e = 0; }
     m.to = t.mirror;
+    // How long this change takes: Autopilot's Fade time when Autopilot made it, otherwise the usual few seconds
+    m.secs = L.mxSecs || MIRROR_SECS;
+    L.mxSecs = 0;
   }
   if (m.from === m.to || t.mirrorFx === 'cut') m.e = 1;
-  if (m.e < 1) m.e = Math.min(1, m.e + dt / MIRROR_SECS);
+  if (m.e < 1) m.e = Math.min(1, m.e + dt / (m.secs || MIRROR_SECS));
 }
 // The shader's view of loop k's mirror change (see mirrorFold in js/shaders.js)
 // Loop k's mirror for a program: the loop's own (fbProg) or its final pass (finalProg); on is false where the
@@ -2266,6 +2284,9 @@ function saveAp() {
   try { localStorage.setItem(AP_KEY, JSON.stringify({ ...apSet, pins: [...ap.pins] })); } catch (_) {}
 }
 const apEverySec = () => 10 * Math.pow(12, apSet.every / 100) * (streamCalm ? 1.5 : 1);   // 10 seconds to 2 minutes; 30 by default
+// How long Autopilot's change of mirror takes: as long as the new look's fade (quicker for one cut in on the beat,
+// which comes in over about 1.5 seconds), and never quicker than an ordinary mirror change
+const apMirrorSecs = () => (ap.quick ? 1.5 : Math.max(MIRROR_SECS, apFadeSec()));
 const apFadeSec = () => 1.5 * Math.pow(20, apSet.fade / 100) * (streamCalm ? 1.5 : 1);    // 1.5 to 30 seconds; 10 by default
 // Each pin has a name: a setting under Mix the two loops is just its own ("view"); a loop's setting also says
 // which loop it holds: "zoom@A", "zoom@B", or "zoom@both" for one pinned on both loops with a right-click.
@@ -3130,6 +3151,8 @@ function glideLook(k) {
   apLimit(sc, k);
   capTrails(sc, other, k);
   patchLoop(k, sc, true);
+  // A new mirror level glides in through the loop's Transition over the same time as the rest of the look
+  L.mxSecs = L.mx && L.tgt.mirror !== L.mx.to ? apMirrorSecs() : 0;
   L.favMix = favMix || null;
 }
 // 3D worlds and Fractals need room to be seen. When Autopilot brings one in, that loop arrives clean (no Trails,
@@ -3254,6 +3277,8 @@ function apStep(now, onBeat) {
           if (!prepReady(hidden, now, rush)) { ap.next = now + 250; ap.quick = 0; apStatus(); return; }
         } else freshLook(hidden, shown);
         changed.add(hidden);
+        // Its mirror comes in through the Transition, from the mirror on screen now to its own
+        mirrorGlideIn(hidden, mirrorShown(shown), apMirrorSecs());
         ap.cameIn = { k: hidden, at: now, gen: loops[hidden].gen };
         came = hidden;
         // Both loops at once or just the new one, and how they feed each other: picked as a whole picture
