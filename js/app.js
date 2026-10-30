@@ -17,6 +17,8 @@ let simW = 768, simH = capCfg()?.renderHeight || SIM_H, simAspect = simW / simH;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+// Not part of a Spread out column's copy of a loop's settings (see "a column per loop")
+const notCopy = (el) => !el.closest('.loop-col');
 
 /* ================= hints as hover tooltips ================= */
 // The small grey descriptions under the controls are tucked away and shown as a tooltip when the mouse rests on the
@@ -1282,7 +1284,8 @@ function syncUI() {
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
-  $$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b) =>
+  // Only the real switches: each Spread out column's copy is brought up to date for its own loop (mirrorRefresh)
+  $$('.where[data-where]').filter(notCopy).forEach((g) => g.querySelectorAll('button').forEach((b) =>
     b.setAttribute('aria-pressed', String((b.dataset.final === '1') === !!t[g.dataset.where]))));
   $$('#timeShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.tshape === (t.timeShape ?? 0))));
   $$('#specShape button').forEach((b) => b.setAttribute('aria-pressed', String((+b.dataset.round === 1) === !!t.specRound)));
@@ -2791,7 +2794,7 @@ function withPins(sc, k, only) {
   }
   return sc;
 }
-function pinsChanged() { syncPins(); saveAp(); apStatus(); }
+function pinsChanged() { syncPins(); saveAp(); apStatus(); if (!mirroring) mirrorRefreshSoon(); }
 // Tapping a pin: pins or frees the setting on the loop being edited only
 function togglePin(key) {
   const P = PINS[key], name = P.name;
@@ -2864,8 +2867,10 @@ for (const key of Object.keys(PINS)) for (const anchor of key === 'in1' ? [$('#i
   head.insertBefore(b, head.querySelector('output'));
 }
 // The pins show the loop being edited: lit when the setting is pinned on it, and marked AB when it's pinned on both
+// Only the real pins are set here, for the loop being edited: each Spread out column's copies are brought up to date
+// for that column's own loop (mirrorRefresh), so a pin lights only under the loop it holds
 function syncPins() {
-  $$('.pin').forEach((b) => {
+  $$('.pin').filter(notCopy).forEach((b) => {
     const key = b.dataset.pin, P = PINS[key], name = P.name;
     const ab = edit === 'A' || edit === 'B';
     const on = isPinned(key, edit), both = !P.mix && ab && isPinned(key, 'A') && isPinned(key, 'B');
