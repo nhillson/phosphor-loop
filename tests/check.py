@@ -58,6 +58,21 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+WINDOWS_LIMITS_JS = """(() => {
+  const P = WebGL2RenderingContext.prototype, link = P.linkProgram;
+  const SAMPLERS = new Set(['SAMPLER_2D', 'SAMPLER_3D', 'SAMPLER_CUBE', 'SAMPLER_2D_ARRAY', 'SAMPLER_2D_SHADOW',
+    'INT_SAMPLER_2D', 'UNSIGNED_INT_SAMPLER_2D'].map((k) => WebGL2RenderingContext[k]));
+  P.linkProgram = function (prog) {
+    link.call(this, prog);
+    if (!this.getProgramParameter(prog, this.LINK_STATUS)) return;
+    let n = 0;
+    const count = this.getProgramParameter(prog, this.ACTIVE_UNIFORMS);
+    for (let i = 0; i < count; i++) { const u = this.getActiveUniform(prog, i); if (SAMPLERS.has(u.type)) n += u.size; }
+    if (n > 16) console.error('A graphics program reads ' + n + ' pictures; Windows allows only 16, so it would not start there');
+  };
+})();"""
+
+
 def serve():
     srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), functools.partial(QuietHandler, directory=ROOT))
     srv.daemon_threads = True
@@ -178,6 +193,10 @@ def main():
         b = p.chromium.launch(executable_path=os.environ.get('CHROME_PATH'), args=['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
         pg = b.new_page(viewport={'width': 1280, 'height': 800})
         pg.set_default_timeout(FAIL_FAST_MS)
+        # This workspace's software graphics let a program read up to 32 pictures, but Chrome and Edge on Windows
+        # allow only 16, and a program that reads more won't start there at all ("The screen couldn't start on this
+        # graphics card"). So every program the page builds is held to Windows' limit here too.
+        pg.add_init_script(WINDOWS_LIMITS_JS)
         pg.route(lambda u: u.rstrip('/').endswith(f':{port}') or u.split('?')[0].endswith('/index.html'),
                  lambda route: route.fulfill(status=200, content_type='text/html; charset=utf-8', body=html))
         # Fonts or files the workspace can't download aren't the app's fault; anything else is

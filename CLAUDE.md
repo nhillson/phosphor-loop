@@ -14,6 +14,8 @@ file don't rebuild the app.
    resolution, waits by frames, fails on any page error, an on-screen error message or a black picture, and
    presses Surprise, Autopilot, Neutral, the loop tabs and Clear. Never push when it fails. A broken shader
    fails it in about 20 s and names the line.
+   It also fails any graphics program that reads more than 16 pictures (textures): Chrome and Edge on Windows
+   allow only 16, and such a program won't start there at all, though this workspace's software graphics allow 32.
 3. **New or changed effects:** add `--shot "Recipe name"` (optionally `"Recipe|slider=value|..."`) for each
    one, at the default 120 frames. One picture each is enough; Nick judges the look himself.
 4. **Use Nick's computer for visual checks whenever it's linked** (the `mcp__remote-devices__Claude_Browser__*`

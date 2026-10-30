@@ -150,8 +150,9 @@ uniform vec4 uCells[5];           // Crystal: the centres of its ten pieces, two
 uniform float uGrow, uGrowR, uGrowTurn;   // Grow: how fast patterns grow this frame, how far apart their stripes sit (pixels), and a turn that changes every frame
 uniform float uAspText;   // the Text input's picture: how wide it is for its height
 uniform int uTopoSrc;     // Topo map, Height from the picture: the input it traces (-1: it draws its own land)
-uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, into uTopoTex, ahead of the loop's own pass
-uniform sampler2D uTopoTex;   // that small softened brightness, which the contour lines are traced from
+uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, ahead of the loop's own pass
+// That small softened brightness is read from uScene2 (see topoPre): this program already reads 16 pictures, the
+// most Windows graphics (Chrome and Edge there) allow in one program, so it can't have a 17th of its own
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
@@ -851,11 +852,11 @@ vec3 source(int id, vec2 p, sampler2D scene) {
 // Topo map with Height from the picture: contour lines traced over how bright another input is, as if bright were
 // high ground. Its brightness is softened a little first, so grain doesn't break the lines up.
 vec3 topoTraced(vec2 p) {
-  vec2 ts = vec2(textureSize(uTopoTex, 0)), px = 1.0 / ts;
+  vec2 ts = vec2(textureSize(uScene2, 0)), px = 1.0 / ts;
   vec2 uv = p / vec2(uSim.x / uSim.y, 1.0) + 0.5;
   // A 3 by 3 patch of the small picture, a little softer still, and its slope
   float l[9];
-  for (int k = 0; k < 9; k++) l[k] = texture(uTopoTex, uv + vec2(float(k % 3) - 1.0, float(k / 3) - 1.0) * 1.2 * px).r;
+  for (int k = 0; k < 9; k++) l[k] = texture(uScene2, uv + vec2(float(k % 3) - 1.0, float(k / 3) - 1.0) * 1.2 * px).r;
   float h = (l[4] * 4.0 + (l[1] + l[3] + l[5] + l[7]) * 2.0 + l[0] + l[2] + l[6] + l[8]) / 16.0;
   float r = 1.2 / ts.y;   // the patch's spacing, in screen units
   float gx = ((l[2] + 2.0 * l[5] + l[8]) - (l[0] + 2.0 * l[3] + l[6])) / (8.0 * r);

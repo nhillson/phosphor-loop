@@ -513,9 +513,9 @@ function set1i(prog, name, v) { const l = U(prog, name); if (l) gl.uniform1i(l, 
 const UNITS = ['uPrev', 'uOther', 'uPic', 'uVid0', 'uVid1', 'uCam0', 'uCam1', 'uScr0', 'uScr1', 'uPho0', 'uPho1', 'uOtherPrev', 'uScene1', 'uScene2', 'uSpec', 'uText'];
 gl.useProgram(fbProg.p);
 UNITS.forEach((name, i) => set1i(fbProg, name, i));
-// Topo map's small softened picture shares uScene2's unit: it's only bound there while Topo map traces an input, when
-// the loop's pass has no second input to read from uScene2 (see topoPre)
-set1i(fbProg, 'uTopoTex', 13);
+// Topo map's small softened picture is read through uScene2: it's only bound there while Topo map traces an input, when
+// the loop's pass has no second input to read from uScene2 (see topoPre). It can't have a picture slot of its own:
+// on Windows a program may read at most 16 pictures, and the feedback pass already reads 16.
 gl.useProgram(compProg.p);
 set1i(compProg, 'uA', 0); set1i(compProg, 'uB', 1); set1i(compProg, 'uC', 2); set1i(compProg, 'uD', 3);
 gl.useProgram(finalProg.p);
