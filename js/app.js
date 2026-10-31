@@ -5436,7 +5436,7 @@ function clipsApNote() {
   const hint = $('#clipsHint');
   hint.hidden = false;
   if (cx.mode === 'seq') {
-    hint.textContent = `Pick a clip to add to track ${seq.selTrack + 1} at the playhead: with its effects, or just the clip. Double-click adds it with its effects when it has some.`;
+    hint.textContent = `Pick a clip to add at the playhead: with its whole look (a block on every loop it used), with its loop’s look on track ${seq.selTrack + 1}, or just the clip. Double-click adds it with its whole look when it has one.`;
     return;
   }
   const none = clips.list && clips.list.length && !clipsAp().length;
@@ -5488,6 +5488,9 @@ function cxSide() {
   $('#cxUseFx').textContent = seqMode ? `Add to track ${seq.selTrack + 1} with its effects` : 'Use with its effects';
   $('#cxUseClip').textContent = seqMode ? 'Add just the clip' : 'Just the clip';
   $('#cxUseFx').disabled = !c.fx;
+  $('#cxUseAll').hidden = !seqMode;
+  $('#cxUseAll').disabled = !c.fx;
+  $('#cxUseFx').textContent = seqMode ? `Add to track ${seq.selTrack + 1} with its loop’s look` : 'Use with its effects';
   $('#cxUseFx').title = c.fx ? '' : 'This clip has no effects saved with it yet';
   $('#cxFacts').textContent = [`${fmtT(c.d || 0)} long`, c.w && c.h ? `${c.w}×${c.h}` : '', c.sound ? 'with sound' : '',
     c.by ? `by ${c.by}` : '', c.lic || '', c.page ? `from ${c.page}` : ''].filter(Boolean).join(' · ');
@@ -5546,7 +5549,7 @@ async function cxUse(c, withFx) {
   }
   if (cx.mode === 'seq') {
     closeClips();
-    seqPlaceClip(c, look);
+    if (withFx === 'whole') seqPlaceWhole(c, look); else seqPlaceClip(c, look);
     return;
   }
   closeClips();
@@ -5576,7 +5579,7 @@ clipsGrid.addEventListener('click', (e) => {
 clipsGrid.addEventListener('dblclick', (e) => {
   const t = e.target.closest('.nat-tile');
   const c = t && cxClip(t.dataset.id);
-  if (c) void cxUse(c, !!c.fx);
+  if (c) void cxUse(c, c.fx ? (cx.mode === 'seq' ? 'whole' : true) : false);
 });
 $('#cxSearch').addEventListener('input', () => { cx.q = $('#cxSearch').value; clipsFilter(); });
 $('#cxSort').addEventListener('change', () => { cx.sort = $('#cxSort').value; clipsFilter(); });
@@ -5669,6 +5672,7 @@ $('#cxFxOff').addEventListener('click', async () => {
 });
 $('#cxUseFx').addEventListener('click', () => { const c = cxClip([...cx.sel][0]); if (c) void cxUse(c, true); });
 $('#cxUseClip').addEventListener('click', () => { const c = cxClip([...cx.sel][0]); if (c) void cxUse(c, false); });
+$('#cxUseAll').addEventListener('click', () => { const c = cxClip([...cx.sel][0]); if (c) void cxUse(c, 'whole'); });
 // Copy to a drive…: the picked clips, or else all the ones shown. Phosphor Clips asks where (its window comes up).
 $('#cxCopy').addEventListener('click', async () => {
   const ids = cx.sel.size ? [...cx.sel] : cx.shown.map((c) => c.id);
@@ -5886,24 +5890,102 @@ function markBar() {
   el.style.width = (Math.max(0.005, b - a) * 100) + '%';
 }
 
-/* ================= Save to clip library: the marked part of the video, cut out into Phosphor Clips ================= */
-// Phosphor Clips (on this computer) does the cutting (its /snip, see clip-app/src/snip.js on the clip-app branch). For a
-// library clip it's sent only the clip's id and the marks; for a video of your own, the file itself (it stays on this
-// computer: the app is at 127.0.0.1). The snip lands in the library, so the Clip library gallery, Autopilot and the
-// sequencer's + Add clip can all use it.
+/* ================= ✂ Save clip (under the picture): trim the video playing and save it to Phosphor Clips ================= */
+// The button under the picture shows while a video is in. It opens the save panel there: a trim strip over the whole
+// video (drag the two handles, or Start here / End here as it plays; Play the part repeats just the trimmed part),
+// then a name, a folder, tags, and whether to save the whole look on screen with it. Phosphor Clips (on this
+// computer) does the cutting (its /snip, see clip-app/src/snip.js on the clip-app branch): a library clip is sent by
+// its id, a video of your own as the file itself (it stays on this computer: the app is at 127.0.0.1). The clip lands
+// in the library, where the clip explorer, Autopilot and the sequencer's + Add clip… can use it.
 const SNIP_CAT_KEY = 'phosphor-snip-cat';
-const snip = { busy: false };
+// a, b: the trimmed part (seconds); play: the video repeats just that part while the panel is open
+// autoName: the name follows the trim (video name, start–end) until you type one of your own
+const snip = { busy: false, open: false, a: 0, b: 0, play: true, drag: null, autoName: true, base: '' };
 const snipSay = (t) => { $('#snipStatus').textContent = t || ''; };
-// The part to snip: the marks of Repeat a section, or the whole video when nothing's marked
+const vidDur = () => { const v = vid.video; return v && isFinite(v.duration) && v.duration > 0 ? v.duration : 0; };
+const fmtT1 = (s) => { s = Math.max(0, s || 0); return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
+// The part to save: the trim handles
 function snipRange() {
-  const v = vid.video, d = v && isFinite(v.duration) ? v.duration : 0;
-  return { a: vidLoopA ?? 0, b: vidLoopB ?? d, d, whole: vidLoopA == null && vidLoopB == null };
+  const d = vidDur();
+  const a = clamp(snip.a, 0, d), b = clamp(snip.b || d, 0, d);
+  return { a, b, d, whole: a <= 0.05 && b >= d - 0.05 };
 }
 function snipWhatText() {
   const r = snipRange();
-  $('#snipWhat').textContent = r.whole
-    ? `Nothing marked, so the whole video (${fmtT(r.d)}). Mark start and Mark end above to save just a part.`
-    : `The marked part: ${fmtT(r.a)} to ${fmtT(r.b)} (${Math.max(0, r.b - r.a).toFixed(1)} seconds).`;
+  $('#snipWhat').textContent = r.whole ? `The whole video, ${r.d.toFixed(1)} seconds. Drag the handles to trim it.`
+    : `${fmtT1(r.a)} to ${fmtT1(r.b)}: ${Math.max(0, r.b - r.a).toFixed(1)} seconds.`;
+}
+// The trim strip: the kept part, the handles, where the video is
+function trimDraw() {
+  const d = vidDur();
+  if (!d) return;
+  const r = snipRange(), pa = (r.a / d) * 100, pb = (r.b / d) * 100;
+  $('#trimSel').style.left = pa + '%';
+  $('#trimSel').style.width = Math.max(0, pb - pa) + '%';
+  $('#trimA').style.left = pa + '%';
+  $('#trimB').style.left = pb + '%';
+  $('#trimAT').textContent = fmtT1(r.a);
+  $('#trimBT').textContent = fmtT1(r.b);
+  snipWhatText();
+  if (snip.autoName && snip.base) $('#snipName').value = `${snip.base} ${nameT(r.a)}–${nameT(r.b)}`.slice(0, 80);
+}
+function trimSet(which, t) {
+  const d = vidDur();
+  if (!d) return;
+  if (which === 'a') snip.a = clamp(t, 0, Math.max(0, (snip.b || d) - 0.2));
+  else snip.b = clamp(t, Math.min(d, snip.a + 0.2), d);
+  trimDraw();
+}
+// Each frame while the panel is open: the playhead, and the video kept inside the trimmed part
+function snipTick() {
+  const v = vid.video, d = vidDur();
+  if (!snip.open || !v || !d) return;
+  $('#trimHead').style.left = (v.currentTime / d) * 100 + '%';
+  if (snip.play && !snip.drag && !v.seeking) {
+    const r = snipRange();
+    if (v.currentTime >= r.b - 0.03 || v.currentTime < r.a - 0.25) v.currentTime = r.a;
+  }
+}
+const trimTimeAt = (e) => { const box = $('#trimBar').getBoundingClientRect(); return clamp((e.clientX - box.left) / box.width, 0, 1) * vidDur(); };
+for (const which of ['a', 'b']) {
+  const h = $(which === 'a' ? '#trimA' : '#trimB');
+  h.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); snip.drag = which; try { h.setPointerCapture(e.pointerId); } catch (_) { /* a pen or touch that's gone already */ } h.focus(); });
+  h.addEventListener('pointermove', (e) => {
+    if (snip.drag !== which) return;
+    const t = trimTimeAt(e);
+    trimSet(which, t);
+    if (vid.video) vid.video.currentTime = which === 'a' ? snip.a : Math.max(snip.a, snip.b - 0.05);
+  });
+  const end = () => { if (snip.drag === which) { snip.drag = null; if (vid.video) vid.video.currentTime = snip.a; } };
+  h.addEventListener('pointerup', end);
+  h.addEventListener('pointercancel', end);
+  // Arrow keys nudge a handle a tenth of a second (a second with Shift)
+  h.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault(); e.stopPropagation();
+    const step = (e.shiftKey ? 1 : 0.1) * (e.key === 'ArrowLeft' ? -1 : 1);
+    trimSet(which, (which === 'a' ? snip.a : snip.b) + step);
+    if (vid.video) vid.video.currentTime = which === 'a' ? snip.a : Math.max(snip.a, snip.b - 1);
+  });
+}
+// Clicking the strip moves the video there (inside the trimmed part while Play the part is on)
+$('#trimBar').addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.trim-h') || !vid.video) return;
+  const t = trimTimeAt(e);
+  vid.video.currentTime = snip.play ? clamp(t, snip.a, Math.max(snip.a, snip.b - 0.05)) : t;
+});
+$('#trimSetA').addEventListener('click', () => { if (vid.video) trimSet('a', vid.video.currentTime); });
+$('#trimSetB').addEventListener('click', () => { if (vid.video) { trimSet('b', vid.video.currentTime); vid.video.currentTime = snip.a; } });
+$('#trimAll').addEventListener('click', () => { snip.a = 0; snip.b = vidDur(); trimDraw(); });
+$('#trimPlay').addEventListener('click', () => { snip.play = !snip.play; $('#trimPlay').setAttribute('aria-pressed', String(snip.play)); });
+// The ✂ Save clip button shows while there's a video in (on a computer: Phosphor Clips is a Windows program)
+let snipBtnShown = null;
+function snipBtnSync() {
+  const show = !!vid.video && !!inMedia.vid && !APP && !inArtifact;
+  if (show === snipBtnShown) return;
+  snipBtnShown = show;
+  $('#snipOpen').hidden = !show;
+  if (!show && snip.open) snipCloseForm();
 }
 // Where the video playing came from: a library clip (its id), or a file of your own (the file)
 function snipSource() {
@@ -5917,8 +5999,8 @@ const baseName = (n) => String(n || 'Video').replace(/\.[a-z0-9]{2,4}$/i, '');
 // A time for a file name (Windows won't take a colon): 7s, 1m05s
 const nameT = (t) => { t = Math.max(0, Math.round(t)); const m = Math.floor(t / 60), x = t % 60; return m ? `${m}m${String(x).padStart(2, '0')}s` : `${x}s`; };
 async function snipOpenForm() {
-  const src = snipSource(), form = $('#snipForm');
-  if (!src) { snipSay('Play a video first: Clip library… or Choose a video… below.'); return; }
+  const src = snipSource(), form = $('#snipPanel');
+  if (!src) { snipSay('Put a video in first: Inputs › Video › Clip library… or Choose a video….'); return; }
   if (APP || inArtifact) { snipSay('Saving to the clip library works on a computer with Phosphor Clips, in Chrome or Edge.'); return; }
   try { localStorage.setItem(CLIP_ON_KEY, '1'); } catch (_) { /* fine */ }
   snipSay('Looking for Phosphor Clips on this computer…');
@@ -5933,30 +6015,43 @@ async function snipOpenForm() {
   const sel = $('#snipCat');
   folderOptions(sel, null);
   if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
-  const r = snipRange();
-  $('#snipName').value = `${baseName(src.name)} ${nameT(r.a)}–${nameT(r.b)}`.slice(0, 80);
+  // The trim starts as the part Repeat a section marks, or the whole video
+  snip.base = baseName(src.name);
+  snip.autoName = true;
+  const d = vidDur();
+  snip.a = vidLoopA ?? 0;
+  snip.b = vidLoopB ?? d;
+  snip.play = true;
+  $('#trimPlay').setAttribute('aria-pressed', 'true');
+  trimDraw();
+
   // A snip of a tagged clip starts with its tags; the suggestions are every tag in the library
   $('#snipTags').value = ((src.from && cxClip(src.from)?.tags) || []).join(', ');
   cxTagsBuild();
-  snipWhatText();
   snipSay('');
   form.hidden = false;
-  $('#snipOpen').hidden = true;
-  $('#snipName').focus();
-  $('#snipName').select();
+  snip.open = true;
+  $('#snipOpen').setAttribute('aria-pressed', 'true');
+  if (vid.video) { vid.video.currentTime = snip.a; vid.video.play().catch(() => {}); }
+  form.scrollIntoView({ block: 'nearest' });
 }
-function snipCloseForm() { $('#snipForm').hidden = true; $('#snipOpen').hidden = false; }
+function snipCloseForm() {
+  $('#snipPanel').hidden = true;
+  $('#snipOpen').setAttribute('aria-pressed', 'false');
+  snip.open = false;
+  snip.drag = null;
+}
 async function snipSave() {
   if (snip.busy) return;
   const src = snipSource(), r = snipRange();
   if (!src) { snipSay('The video has gone. Play it again, then save.'); return; }
-  if (!(r.b - r.a >= 0.2)) { snipSay('The marked part is too short. Mark the end further on.'); return; }
+  if (!(r.b - r.a >= 0.2)) { snipSay('The trimmed part is too short. Drag the end handle further on.'); return; }
   const name = $('#snipName').value.trim(), where = $('#snipCat').value, { c: cat, p: folder } = splitKey(where);
   try { localStorage.setItem(SNIP_CAT_KEY, where); } catch (_) { /* fine */ }
   const q = new URLSearchParams({ start: r.a.toFixed(3), name, cat, folder, sound: $('#snipSound').checked ? '1' : '0', tags: splitTags($('#snipTags').value).join(',') });
   // The effects on screen now (taken before the cut, so a change while it's cutting doesn't creep in)
   const look = $('#snipFx').checked ? clipLookNow() : null;
-  if (!r.whole && vidLoopB != null) q.set('end', r.b.toFixed(3));
+  if (r.b < r.d - 0.05) q.set('end', r.b.toFixed(3));
   let body = null;
   if (src.from) q.set('from', src.from);
   else {
@@ -6006,11 +6101,17 @@ async function snipSave() {
     $('#snipSave').disabled = false;
   }
 }
-$('#snipOpen').addEventListener('click', () => { void snipOpenForm(); });
+$('#snipOpen').addEventListener('click', () => { if (snip.open) snipCloseForm(); else void snipOpenForm(); });
+$('#snipName').addEventListener('input', () => { snip.autoName = false; });
+window.__plSnip = { time: () => (vid.video ? vid.video.currentTime : 0), get state() { return { ...snip }; } };   // for tests/snips_check.py
 $('#snipCancel').addEventListener('click', () => { snipCloseForm(); snipSay(''); });
-$('#snipForm').addEventListener('submit', (e) => { e.preventDefault(); void snipSave(); });
+$('#snipPanel').addEventListener('submit', (e) => { e.preventDefault(); void snipSave(); });
+// Keys typed in the panel stay there (not Phosphor Loop's shortcuts)
+$('#snipPanel').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); snipCloseForm(); } e.stopPropagation(); });
 $('#snipName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); $('#snipCancel').click(); } });
 function vcrTick() {
+  snipBtnSync();
+  snipTick();
   const v = vid.video;
   if (!v || scrubbing) return;
   if (vidLoopB != null && v.currentTime >= vidLoopB) v.currentTime = vidLoopA ?? 0;
@@ -10191,6 +10292,34 @@ function seqPlaceClip(c, look) {
   if (!usesIn(base, 'video')) { base.in1 = 'video'; base.size = 100; delete base.asInput; }
   const len = Math.max(4, Math.round((c.d || 16) * 10) / 10);
   seqPlace(look ? `${c.n} (with its effects)`.slice(0, 80) : c.n, base, { vid: { kind: 'clip', id: c.id, name: c.n, at: 0 } }, len);
+}
+// Add with its whole look: the picture saved with the clip, spread over the tracks. Every loop the look used (shown,
+// or feeding or feeding into one that is) gets a block on its own track at the playhead, all as long as the clip, each
+// with that loop's saved look; the ones that played the Video play the clip. The look's Show and feed faders and its
+// Color grading go into each block as steady automation. (3D lighting isn't part of the sequencer, so it stays as it is.)
+function seqPlaceWhole(c, look) {
+  const n = look.n === 3 || look.n === 4 ? look.n : 2;
+  const keys = ['A', 'B', 'C', 'D'].slice(0, n).filter((k) => look[k]);
+  const m = look.mix || {};
+  const showOf = (k) => (Number.isFinite(m[SHOW[k]]) ? m[SHOW[k]] : k === 'B' ? 0 : 100);
+  const feedOut = (k) => (Number.isFinite(m[FEED_INTO[otherLoop(k)]]) ? m[FEED_INTO[otherLoop(k)]] : 0);
+  const readsOtherLoop = (k) => keys.some((j) => j !== k && otherLoop(j) === k && usesIn(look[j], 'loop') && showOf(j) > 0.5);
+  const used = keys.filter((k) => showOf(k) > 0.5 || (feedOut(k) > 0.5 && showOf(otherLoop(k)) > 0.5) || readsOtherLoop(k));
+  if (!used.length) { seqNote('That clip’s saved look shows nothing on screen, so there’s nothing to add.'); return; }
+  const dur = seqDur(), a = r1(clamp(seq.t, 0, dur)), b = r1(Math.min(dur, a + Math.max(4, Math.round((c.d || 16) * 10) / 10)));
+  if (b - a < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
+  const steady = (key, v) => { const [lo, hi] = seqRange(key); return { key, pts: [[0, clamp((v - lo) / ((hi - lo) || 1), 0, 1)], [1, clamp((v - lo) / ((hi - lo) || 1), 0, 1)]] }; };
+  const g = look.grade || {};
+  const gradeAutos = Object.keys(GRADE_DEF).filter((k) => Number.isFinite(g[k]) && g[k] !== GRADE_DEF[k]).map((k) => steady(k, g[k]));
+  const made = used.map((k) => TL.cleanBlock({
+    track: KEYS.indexOf(k), a, b, label: `${c.n} (${k})`.slice(0, 80), look: JSON.parse(JSON.stringify(look[k])),
+    media: usesIn(look[k], 'video') ? { vid: { kind: 'clip', id: c.id, name: c.n, at: 0 } } : null,
+    autos: [steady('show', showOf(k)), steady('feed', feedOut(k)), ...gradeAutos],
+  })).filter(Boolean);
+  seqChange(() => seq.rec.blocks.push(...made));
+  seq.selId = made[0] ? made[0].id : null;
+  seqNote(`Added “${c.n}” with its whole look: ${made.length} block${made.length === 1 ? '' : 's'}, on ${used.map((k) => `track ${KEYS.indexOf(k) + 1}`).join(', ')} at ${fmtSeq(a, true)}.`
+    + (look.relief && Object.keys(look.relief).some((k) => look.relief[k] !== RELIEF_DEF[k]) ? ' Its 3D lighting isn’t something the sequencer changes, so set that by hand if you want it.' : ''));
 }
 $('#seqAddClip').addEventListener('click', () => { seqCloseMenus(); openClips('seq'); });
 function seqAddMarker() {

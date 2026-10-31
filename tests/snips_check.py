@@ -100,13 +100,23 @@ def main():
         def key(sel, k):
             pg.evaluate(f"document.querySelector({json.dumps(sel)}).dispatchEvent(new KeyboardEvent('keydown', {{ key: {json.dumps(k)}, bubbles: true }}))")
         def typein(sel, text, k='Enter'):
-            pg.fill(sel, text)
+            fill(sel, text)
             key(sel, k)
         def tile(name):
             return f"[...document.querySelectorAll('#clipsGrid .nat-tile')].find(t => t.querySelector('span:last-of-type').textContent === {json.dumps(name)})"
         def pick_tile(name, ctrl=False):
             pg.evaluate(f"{tile(name)}.dispatchEvent(new MouseEvent('click', {{ bubbles: true, ctrlKey: {str(ctrl).lower()} }}))")
             c.wait_frames(2, 'picked')
+        # Typing and picking from page scripts too (Playwright's own wait for the page can hang here)
+        def fill(sel, text):
+            pg.evaluate("([s, t]) => { const e = document.querySelector(s); e.focus(); e.value = t; e.dispatchEvent(new Event('input', { bubbles: true })); }", [sel, text])
+        def select(sel, val):
+            pg.evaluate("([s, v]) => { const e = document.querySelector(s); e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); }", [sel, val])
+        def shot(path):
+            try:
+                pg.screenshot(path=path, timeout=20000)
+            except Exception as e:
+                print('  note: no picture', os.path.basename(path), str(e).splitlines()[0])
         shown = lambda: J("[...document.querySelectorAll('#clipsGrid .nat-tile')].map(t => t.querySelector('span:last-of-type').textContent)")
         lib_clip = lambda name: next((x for x in library()['clips'] if x['n'] == name), None)
 
@@ -131,18 +141,27 @@ def main():
         bar = J("(() => { const m = document.querySelector('#vidMark'); return { shown: !m.hidden, left: parseFloat(m.style.left), width: parseFloat(m.style.width) }; })()")
         ok(bar['shown'] and abs(bar['left'] - 25) < 3 and abs(bar['width'] - 50) < 4, f'the marked part shows as a bar under the slider ({bar})')
 
-        # 2. Save to clip library, with tags and the effects on screen
+        # 2. ✂ Save clip (under the picture): the trim starts as Repeat a section's marks; tags and the whole look
         J("__plAp.loops.A.tgt.zoom = 37; __plAp.loops.A.tgt.mirror = 6;")
+        ok(J("!document.querySelector('#snipOpen').hidden && !!document.querySelector('.transport #snipOpen')"), '✂ Save clip shows under the picture while a video is in')
+        ok(J("!document.querySelector('#row-video #snipOpen')"), 'and no longer under Video')
         click('#snipOpen')
-        if until("!document.querySelector('#snipForm').hidden && document.querySelectorAll('#snipCat option').length >= 3", 'the save form did not open with the categories'):
+        if until("!document.querySelector('#snipPanel').hidden && document.querySelectorAll('#snipCat option').length >= 3", 'the save form did not open with the categories'):
             ok(J("document.querySelector('#snipName').value") == 'Swirl 1s–3s', 'the name is filled in: ' + J("document.querySelector('#snipName').value"))
             ok(J("document.querySelector('#snipCat').value") == 'abstract|', 'the folder starts as the clip’s own')
-            ok(J("document.querySelector('#snipFx').checked"), 'Save the effects on screen is on to start with')
-            pg.fill('#snipName', 'Swirl middle')
-            pg.select_option('#snipCat', 'water|')
-            pg.fill('#snipTags', 'Fractal, neon')
+            ok(J("document.querySelector('#snipFx').checked"), 'Save the whole look is on to start with')
+            ok(J("document.querySelector('#trimAT').textContent") == '0:01.0' and J("document.querySelector('#trimBT').textContent") == '0:03.0', 'the trim starts as the marked part')
+            tsel = J("(() => { const e = document.querySelector('#trimSel'); return [parseFloat(e.style.left), parseFloat(e.style.width)]; })()")
+            ok(abs(tsel[0] - 25) < 2 and abs(tsel[1] - 50) < 3, f'the trim strip shows it ({tsel})')
+            # Play the part keeps the video inside the trim
+            c.wait_frames(40, 'playing the part')
+            tnow = J("__plSnip.time()")
+            ok(0.9 <= tnow <= 3.05, f'the video stays inside the trimmed part ({tnow:.2f} s)')
+            fill('#snipName', 'Swirl middle')
+            select('#snipCat', 'water|')
+            fill('#snipTags', 'Fractal, neon')
             c.wait_frames(3, 'form')
-            pg.screenshot(path=os.path.join(out, 'snip-form.png'))
+            shot(os.path.join(out, 'snip-form.png'))
             click('#snipSave')
             if until("document.querySelector('#snipStatus').textContent.startsWith('Saved')", 'the snip was not saved', 60):
                 got = lib_clip('Swirl middle')
@@ -158,12 +177,35 @@ def main():
         if until("__plClips.own === true && __plClips.vidOn && document.querySelector('#vidStatus').textContent.includes('mine.webm')", 'the video file of your own did not go in'):
             click('#vidPlay')
             c.wait_frames(3, 'paused')
-            seek(0.5)
-            click('#vidIn')
             click('#snipOpen')
-            until("!document.querySelector('#snipForm').hidden", 'the save form did not open for your own video')
+            until("!document.querySelector('#snipPanel').hidden", 'the save form did not open for your own video')
+            ok(J("document.querySelector('#snipWhat').textContent").startswith('The whole video'), 'nothing marked: the trim starts as the whole video')
+            ok(J("document.querySelector('#snipName').value") == 'mine 0s–4s', 'named for the whole video')
+            # Trim with the keyboard on the start handle: Shift+right twice is 2 seconds in
+            for _ in range(2):
+                pg.evaluate("document.querySelector('#trimA').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }))")
+            c.wait_frames(2, 'trimmed')
+            ok(J("document.querySelector('#trimAT').textContent") == '0:02.0', 'the start handle moved to 2 s')
+            ok(J("document.querySelector('#snipName').value") == 'mine 2s–4s', 'the name follows the trim')
+            # Dragging the end handle back to 3.5 s and then out to the end again
+            drag = '''(frac) => { const bar = document.querySelector('#trimBar').getBoundingClientRect(), h = document.querySelector('#trimB');
+              const x = bar.left + bar.width * frac, y = bar.top + bar.height / 2;
+              h.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, pointerId: 7, bubbles: true }));
+              h.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, pointerId: 7, bubbles: true }));
+              h.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, pointerId: 7, bubbles: true })); }'''
+            try:
+                pg.evaluate(drag, 0.875)
+            except Exception:
+                pass
+            c.wait_frames(2, 'dragged')
+            ok(J("document.querySelector('#trimBT').textContent") == '0:03.5', 'dragging the end handle trims the end: ' + J("document.querySelector('#trimBT').textContent"))
+            click('#trimAll')
+            for _ in range(2):
+                pg.evaluate("document.querySelector('#trimA').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }))")
+            c.wait_frames(2, 'trimmed again')
+            shot(os.path.join(out, 'save-clip-panel.png'))
             J("document.querySelector('#snipFx').checked = false")
-            pg.fill('#snipTags', 'industrial')
+            fill('#snipTags', 'industrial')
             ok(J("document.querySelector('#snipCat').value") == 'water|', 'the last folder picked is remembered')
             click('#snipSave')
             if until("document.querySelector('#snipStatus').textContent.startsWith('Saved')", 'your own video’s snip was not saved', 60):
@@ -174,16 +216,16 @@ def main():
         click('#clipOpen')
         until("document.querySelectorAll('#clipsGrid .nat-tile').length === 4", 'the explorer did not show all 4 clips')
         ok(sorted(J("[...document.querySelectorAll('#cxTags .chip')].map(b => b.dataset.tag)")) == ['fractal', 'industrial', 'neon'], 'the tag chips list the library’s tags')
-        pg.fill('#cxSearch', 'neon')
+        fill('#cxSearch', 'neon')
         c.wait_frames(2, 'search')
         ok(shown() == ['Swirl middle'], f'searching a tag finds it ({shown()})')
-        pg.fill('#cxSearch', 'swirl')
+        fill('#cxSearch', 'swirl')
         c.wait_frames(2, 'search')
         ok(sorted(shown()) == ['Swirl', 'Swirl middle'], f'searching a name ({shown()})')
-        pg.fill('#cxSearch', 'swirl fractal')
+        fill('#cxSearch', 'swirl fractal')
         c.wait_frames(2, 'search')
         ok(shown() == ['Swirl middle'], f'every word has to match ({shown()})')
-        pg.fill('#cxSearch', '')
+        fill('#cxSearch', '')
         J("document.querySelector('#cxSearch').dispatchEvent(new Event('input'))")
         click("#cxTags [data-tag='industrial']")
         c.wait_frames(2, 'tag filter')
@@ -200,7 +242,7 @@ def main():
         ok('glow' in lib_clip('Swirl middle')['tags'] and lib_clip('Blue stripes')['tags'] == ['glow'], 'both clips got the tag')
         # One picked: rename, add and take off a tag
         pick_tile('Blue stripes')
-        pg.fill('#cxName', 'Blue lines')
+        fill('#cxName', 'Blue lines')
         J("document.querySelector('#cxName').dispatchEvent(new Event('change'))")
         until("__plClips.list.some(c => c.n === 'Blue lines')", 'renaming did not take')
         ok(lib_clip('Blue lines') is not None, 'renamed in Phosphor Clips')
@@ -210,7 +252,7 @@ def main():
         J("[...document.querySelectorAll('#cxTagList .cx-chip')].find(c => c.textContent.startsWith('#glow')).querySelector('button').click()")
         until("!(__plClips.list.find(c => c.n === 'Blue lines').tags || []).includes('glow')", 'taking a tag off did not take')
         c.wait_frames(5, 'explorer')
-        pg.screenshot(path=os.path.join(out, 'explorer.png'))
+        shot(os.path.join(out, 'explorer.png'))
 
         # 5. Effects: save the picture on screen to a clip, then use a clip with its effects
         J("__plAp.loops.A.tgt.zoom = -20; __plAp.loops.B.tgt.spin = 44;")
@@ -241,7 +283,8 @@ def main():
         until("!document.querySelector('#clips').hidden && document.querySelectorAll('#clipsGrid .nat-tile').length === 4", '+ Add clip… did not open the explorer')
         ok(J("document.querySelector('#clipsTitle').textContent") == 'Add a clip to track 1', 'the explorer says where the clip will go')
         pick_tile('Swirl middle')
-        ok(J("document.querySelector('#cxUseFx').textContent") == 'Add to track 1 with its effects', 'its buttons add to the track')
+        ok(J("document.querySelector('#cxUseFx').textContent") == 'Add to track 1 with its loop’s look', 'its buttons add to the track')
+        ok(J("!document.querySelector('#cxUseAll').hidden && !document.querySelector('#cxUseAll').disabled"), 'and Add with its whole look is offered')
         n0 = J("__plSeq.rec.blocks.length")
         click('#cxUseFx')
         c.wait_frames(3, 'block added')
@@ -260,7 +303,31 @@ def main():
         c.wait_frames(3, 'block added')
         bl = J("__plSeq.rec.blocks")[-1]
         ok(bl['label'] == 'mine 2s–4s' and bl['look']['zoom'] == 0 and bl['look']['in1'] == 'video', f"just the clip: the track's loop as it is, playing Video ({bl['label']})")
-        pg.screenshot(path=os.path.join(out, 'sequencer-with-clip.png'))
+        # Add with its whole look: a block on every loop the saved look used, with its mixing and grading
+        J("(() => { const s = document.querySelector('#showB'); s.value = '80'; s.dispatchEvent(new Event('input', { bubbles: true })); })()")
+        J("__plGrade.setGrade({ ...__plGrade.grade, gSat: 150 }); __plAp.loops.B.tgt.spin = 33;")
+        c.wait_frames(3, 'look set')
+        click('#seqAddClip')
+        until("!document.querySelector('#clips').hidden && document.querySelectorAll('#clipsGrid .nat-tile').length === 4", 'the explorer did not open for the whole look')
+        pick_tile('Blue lines')
+        click('#cxFxSave')
+        until("__plClips.list.find(c => c.n === 'Blue lines').fx === true", 'saving the look to Blue lines did not take')
+        J("__plGrade.setGrade({ ...__plGrade.grade, gSat: 100 }); __plAp.loops.B.tgt.spin = 0;")
+        n0 = J("__plSeq.rec.blocks.length")
+        click('#cxUseAll')
+        c.wait_frames(3, 'blocks added')
+        blocks = J("__plSeq.rec.blocks")[n0:]
+        ok(len(blocks) == 2 and sorted(b['track'] for b in blocks) == [0, 1], f"a block on track 1 and track 2 ({[b['track'] for b in blocks]})")
+        if len(blocks) == 2:
+            bA = next(b for b in blocks if b['track'] == 0); bB = next(b for b in blocks if b['track'] == 1)
+            ok(bA['a'] == bB['a'] and bA['b'] == bB['b'], 'side by side, the same length')
+            ok(bB['look'].get('spin') == 33, f"track 2 has loop B’s saved look (spin {bB['look'].get('spin')})")
+            ok(bA['look'].get('in1') == 'video' and bA.get('media', {}).get('vid', {}).get('kind') == 'clip' and not bB.get('media'), 'only the loop that played the video plays the clip')
+            autos = {a['key']: a['pts'][0][1] for a in bB['autos']}
+            ok(abs(autos.get('show', 0) - 0.8) < 0.01, f"loop B’s Show fader comes along ({autos.get('show')})")
+            sat = autos.get('gSat')
+            ok(sat is not None and sat > 0.5, f'its Color grading comes along ({sat})')
+        shot(os.path.join(out, 'sequencer-with-clip.png'))
 
         # 7. Copy to a drive
         click('#seqAddClip')
@@ -285,7 +352,7 @@ def main():
             c.wait_frames(2, 'folder')
         def newfolder(name):
             click('#cxNewFolder')
-            pg.fill('#cxNewName', name)
+            fill('#cxNewName', name)
             pg.evaluate("document.querySelector('#cxNewForm').requestSubmit()")
             until(f"!!({fold(name)}) && {fold(name)}.getAttribute('aria-current') === 'true'", f'the folder {name} was not made')
         go('All clips')
@@ -309,12 +376,12 @@ def main():
         ok(shown() == ['Swirl middle'], f'the inner folder shows just its own ({shown()})')
         counts = J("Object.fromEntries([...document.querySelectorAll('#clipsTabs .cx-fold')].map(b => [b.querySelector('span').textContent, +b.querySelector('b').textContent]))")
         ok(counts.get('Abstract') == 4 and counts.get('Fractals') == 3 and counts.get('Blue') == 1 and counts.get('Water') == 0, f'the tree counts what is inside ({counts})')
-        pg.fill('#cxSearch', 'neon')
+        fill('#cxSearch', 'neon')
         go('Fractals')
         ok(shown() == ['Swirl middle'], f'search works inside a folder ({shown()})')
-        pg.fill('#cxSearch', '')
+        fill('#cxSearch', '')
         c.wait_frames(5, 'tree')
-        pg.screenshot(path=os.path.join(out, 'explorer-folders.png'))
+        shot(os.path.join(out, 'explorer-folders.png'))
         click('#clipsClose')
 
         if errors:

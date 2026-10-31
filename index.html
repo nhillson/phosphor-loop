@@ -150,9 +150,46 @@
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <button class="btn" id="wideBtn" aria-pressed="false" title="Shrink the picture here to a small preview and spread the controls across the screen, so you can see more of them at once"><span class="led"></span>Spread out controls</button>
         <span class="spacer" aria-hidden="true"></span>
+        <button class="btn" id="snipOpen" aria-pressed="false" aria-controls="snipPanel" hidden title="Trim the video playing and save that part to your clip library (Phosphor Clips), with the whole look on screen">✂ Save clip…</button>
         <button class="btn" id="snap" hidden>Save picture</button>
         <button class="btn" id="recMic" aria-pressed="true" hidden title="Which sound goes into videos you record. Click to change it: Off, Mic, Computer or Both."><span class="led"></span><span id="recSoundLabel">Video sound: Both</span></button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden title="Record a video; press again to stop and save it (key V, works in full screen too)"><span class="led"></span><span id="recLabel">Record</span></button>
+      </div>
+      <div class="clip-saver">
+        <form class="snip-form" id="snipPanel" hidden aria-label="Save a clip">
+          <div class="snip-head"><b>Save a clip</b><span class="snip-what" id="snipWhat"></span></div>
+          <div class="trim">
+            <div class="trim-bar" id="trimBar" title="Click to move through the video; drag the purple handles to trim">
+              <div class="trim-sel" id="trimSel"></div>
+              <div class="trim-head" id="trimHead"></div>
+              <button type="button" class="trim-h" id="trimA" aria-label="Where the clip starts (arrow keys nudge it)"></button>
+              <button type="button" class="trim-h" id="trimB" aria-label="Where the clip ends (arrow keys nudge it)"></button>
+            </div>
+            <div class="trim-row">
+              <span class="tc" id="trimAT">0:00.0</span>
+              <span class="vcr-keys">
+                <button type="button" class="btn small" id="trimSetA" title="The clip starts where the video is now">Start here</button>
+                <button type="button" class="btn small" id="trimPlay" aria-pressed="true" title="Plays just the trimmed part, over and over">Play the part</button>
+                <button type="button" class="btn small" id="trimSetB" title="The clip ends where the video is now">End here</button>
+                <button type="button" class="btn small" id="trimAll" title="The whole video">Whole video</button>
+              </span>
+              <span class="tc" id="trimBT">0:00.0</span>
+            </div>
+          </div>
+          <div class="snip-fields">
+            <input class="seq-in" id="snipName" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Name" aria-label="Name for the clip">
+            <select id="snipCat" aria-label="Folder"></select>
+            <input class="seq-in" id="snipTags" type="text" maxlength="400" list="cxTagSuggest" autocomplete="off" spellcheck="false" placeholder="Tags, e.g. fractal, industrial" aria-label="Tags, commas between">
+          </div>
+          <div class="snip-opts">
+            <label class="snip-sound"><input type="checkbox" id="snipFx" checked> Save the whole look with it</label>
+            <label class="snip-sound"><input type="checkbox" id="snipSound"> Keep sound</label>
+            <span class="spacer"></span>
+            <button class="btn small" type="submit" id="snipSave">Save</button>
+            <button class="btn small" type="button" id="snipCancel">Cancel</button>
+          </div>
+        </form>
+        <p class="hint snip-status" id="snipStatus" role="status" aria-live="polite"></p>
       </div>
       <div class="session-bar" id="sessionBar" hidden>
         <div class="session-row">
@@ -369,22 +406,6 @@
                   <button class="btn small" id="vidAll" hidden>Whole video</button>
                 </div>
                 <span class="hint" id="vidLoopText">The whole video plays on repeat.</span>
-                <div class="snip">
-                  <button class="btn small" id="snipOpen" title="Cut the marked part out of this video and keep it in your clip library (Phosphor Clips), where Autopilot and the sequencer can use it">✂ Save to clip library…</button>
-                  <form class="snip-form" id="snipForm" hidden>
-                    <span class="snip-what" id="snipWhat"></span>
-                    <input class="seq-in" id="snipName" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Name" aria-label="Name for the snip">
-                    <select id="snipCat" aria-label="Folder"></select>
-                    <input class="seq-in" id="snipTags" type="text" maxlength="400" list="cxTagSuggest" autocomplete="off" spellcheck="false" placeholder="Tags, e.g. fractal, industrial" aria-label="Tags, commas between">
-                    <label class="snip-sound"><input type="checkbox" id="snipFx" checked> Save the effects on screen with it</label>
-                    <label class="snip-sound"><input type="checkbox" id="snipSound"> Keep sound</label>
-                    <span class="vcr-keys">
-                      <button class="btn small" type="submit" id="snipSave">Save</button>
-                      <button class="btn small" type="button" id="snipCancel">Cancel</button>
-                    </span>
-                  </form>
-                  <span class="hint snip-status" id="snipStatus" role="status" aria-live="polite"></span>
-                </div>
               </div>
             </div>
             <span class="pic-credit" id="clipCredit" hidden></span>
@@ -1134,7 +1155,7 @@
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery. Your own picture… loads a file of yours.</dd>
-            <dt>Video</dt><dd>Your own file, or a clip from your clip library. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section. <b>✂ Save to clip library</b> cuts the marked section out into your clip library (Phosphor Clips 1.7 or later, running on the same computer), into any folder, with tags and the effects on screen. <b>Clip library…</b> (and the sequencer’s <b>+ Add clip…</b>) opens the explorer: folders on the left, search names and tags, click a clip to tag, rename, move or save effects to it, and use it <b>with its effects</b> or as <b>just the clip</b>. <b>Copy to a drive…</b> takes clips with their tags and effects to another computer: drop the folders into its library folder.</dd>
+            <dt>Video</dt><dd>Your own file, or a clip from your clip library. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section. <b>✂ Save clip…</b> (under the picture, while a video is in) opens a trim strip: drag the handles, or Start here / End here as it plays, then save that part into your clip library (Phosphor Clips 1.7 or later, running on the same computer), into any folder, with tags and the whole look on screen. <b>Clip library…</b> (and the sequencer’s <b>+ Add clip…</b>) opens the explorer: folders on the left, search names and tags, click a clip to tag, rename, move or save effects to it, and use it <b>with its effects</b> or as <b>just the clip</b>. From the sequencer, <b>Add with its whole look</b> puts a block on every loop the look used, with its mixing and Color grading. <b>Copy to a drive…</b> takes clips with their tags and effects to another computer: drop the folders into its library folder.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
@@ -1338,6 +1359,7 @@
               </span>
             </div>
             <div class="cx-use">
+              <button class="btn" id="cxUseAll" hidden title="A block on every loop’s track that the saved look used, each with that loop’s look, plus its mixing and Color grading">Add with its whole look</button>
               <button class="btn" id="cxUseFx">Use with its effects</button>
               <button class="btn" id="cxUseClip">Just the clip</button>
             </div>

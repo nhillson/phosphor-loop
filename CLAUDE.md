@@ -50,11 +50,12 @@ file don't rebuild the app.
    class-wide updates like `syncPins` skip the column copies with `notCopy`): `python3 tests/pins_check.py` (about a minute).
 4j. **The clip explorer** (Clip library… and the sequencer's + Add clip… open it: folder tree of categories and subfolders,
    search over names and tags, tags, saved effects with Use with its effects / Just the clip, Copy to a drive, New folder,
-   moving clips) **and Save to clip library (snips)** (Video › Repeat a section). Phosphor Clips does the storing (sharing
+   moving clips, and in the sequencer Add with its whole look: a block per loop the saved look used, with Show/feed and
+   grading as steady automation) **and ✂ Save clip** (under the picture: trim strip, folder, tags, whole look). Phosphor Clips does the storing (sharing
    server: /snip, /clip/<id>, /look/<id>, /folder, /copy; clip-app/src/snip.js and library.js on the clip-app branch;
    each clip's tags and effects live in a <Name>.phosphor.json beside it). Test: `CLIPS_APP=<clip-app folder> python3
-   tests/snips_check.py` (about 3 minutes; runs the real sharing server and cutter, so ffmpeg must be installed). Click
-   from page scripts (`element.click()`), not Playwright's own click: it can wait forever on this page in the workspace
+   tests/snips_check.py` (about 4 minutes, 62 checks; runs the real sharing server and cutter, so ffmpeg must be installed). Click,
+   type and pick from page scripts (`element.click()`, set value + input event), not Playwright's own click or fill: it can wait forever on this page in the workspace
    browser. `tests/clips_check.py`'s last check (the last clip coming back after a reload) fails here when run after the
    rest of that test, also on versions before the explorer; it passes on its own.
 5. **Only test what the change touches.** A wording change needs only the safety check.

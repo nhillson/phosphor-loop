@@ -477,15 +477,30 @@
   .vid-track { position: relative; display: flex; align-items: center; min-width: 0; }
   .vid-track input { width: 100%; }
   .vid-mark { position: absolute; bottom: -5px; height: 4px; border-radius: 2px; background: var(--amber); opacity: .9; pointer-events: none; }
-  /* Save to clip library: the marked part cut out into Phosphor Clips */
-  .snip { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-  .snip > .btn { align-self: flex-start; }
-  .snip-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--well); }
+  /* Save clip (under the picture): trim the video playing, then save that part to Phosphor Clips with the look */
+  .clip-saver { display: flex; flex-direction: column; gap: 6px; }
+  .clip-saver:has(#snipPanel[hidden]):has(.snip-status:empty) { display: none; }
+  .snip-form { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--raise); }
   .snip-form[hidden] { display: none; }
   .snip-form select { margin: 0; }
+  .snip-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
   .snip-what { font-size: 13px; color: var(--dim); }
+  .snip-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+  .snip-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  .snip-opts .spacer { flex: 1; }
   .snip-sound { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .snip-status { margin: 0; }
   .snip-status:empty { display: none; }
+  .trim { display: flex; flex-direction: column; gap: 8px; }
+  .trim-bar { position: relative; height: 34px; border-radius: 6px; background: var(--well); border: 1px solid var(--line); cursor: pointer; touch-action: none; }
+  .trim-sel { position: absolute; top: 0; bottom: 0; background: rgba(139,26,184,.28); border-top: 2px solid var(--amber); border-bottom: 2px solid var(--amber); pointer-events: none; }
+  .trim-head { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 4px rgba(0,0,0,.8); pointer-events: none; }
+  .trim-h { position: absolute; top: -4px; bottom: -4px; width: 14px; margin-left: -7px; padding: 0; border: 0; border-radius: 4px; background: var(--amber); cursor: ew-resize; touch-action: none; }
+  .trim-h::after { content: ""; position: absolute; left: 6px; top: 30%; bottom: 30%; width: 2px; background: rgba(255,255,255,.7); }
+  .trim-h:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  .trim-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .trim-row .tc { font: 17px/1 var(--f-osd); color: var(--amber-ink); font-variant-numeric: tabular-nums; min-width: 6ch; }
+  @media (max-width: 700px) { .snip-fields { grid-template-columns: minmax(0, 1fr); } }
   details.adj { border-top: 1px solid var(--line); padding-top: 8px; }
   details.adj summary {
     cursor: pointer; font-weight: 600; font-size: 14px; color: var(--dim); list-style-position: inside;
