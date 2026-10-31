@@ -120,6 +120,11 @@ def main():
         shown = lambda: J("[...document.querySelectorAll('#clipsGrid .nat-tile')].map(t => t.querySelector('span:last-of-type').textContent)")
         lib_clip = lambda name: next((x for x in library()['clips'] if x['n'] == name), None)
 
+        # 0. The buttons that went: Save picture, Clear, Freeze, Full screen, Next look (their keys stay)
+        gone = J("['snap', 'clear', 'freeze', 'full', 'nextLookBar'].filter(id => document.getElementById(id))")
+        ok(gone == [], f'Save picture, Clear, Freeze, Full screen and Next look are gone from under the picture ({gone})')
+        ok(J("typeof __plClear === 'function' && !!document.getElementById('nextLook')"), 'Clear still works (C key), and Next look is still under Autopilot')
+
         # 1. The explorer: a library clip in with Just the clip, a part of it marked
         J("document.querySelector('#row-video').hidden = false")
         click('#clipOpen')
@@ -156,7 +161,9 @@ def main():
             # Play the part keeps the video inside the trim
             c.wait_frames(40, 'playing the part')
             tnow = J("__plSnip.time()")
-            ok(0.9 <= tnow <= 3.05, f'the video stays inside the trimmed part ({tnow:.2f} s)')
+            # It's pulled back each frame the app draws, so it can be past the end by up to one frame (half a second
+            # at the workspace's 2 frames a second; a sixtieth of a second on Nick's computers)
+            ok(0.9 <= tnow <= 3.6, f'the video stays inside the trimmed part ({tnow:.2f} s)')
             fill('#snipName', 'Swirl middle')
             select('#snipCat', 'water|')
             fill('#snipTags', 'Fractal, neon')
@@ -305,14 +312,14 @@ def main():
         ok(bl['label'] == 'mine 2s–4s' and bl['look']['zoom'] == 0 and bl['look']['in1'] == 'video', f"just the clip: the track's loop as it is, playing Video ({bl['label']})")
         # Add with its whole look: a block on every loop the saved look used, with its mixing and grading
         J("(() => { const s = document.querySelector('#showB'); s.value = '80'; s.dispatchEvent(new Event('input', { bubbles: true })); })()")
-        J("__plGrade.setGrade({ ...__plGrade.grade, gSat: 150 }); __plAp.loops.B.tgt.spin = 33;")
+        J("__plGrade.setGrade({ ...__plGrade.grade, gSat: 150 }); __plAp.loops.B.tgt.spin = 33; __plRelief.setRelief({ ...__plRelief.relief, rDepth: 40, rShine: 80 });")
         c.wait_frames(3, 'look set')
         click('#seqAddClip')
         until("!document.querySelector('#clips').hidden && document.querySelectorAll('#clipsGrid .nat-tile').length === 4", 'the explorer did not open for the whole look')
         pick_tile('Blue lines')
         click('#cxFxSave')
         until("__plClips.list.find(c => c.n === 'Blue lines').fx === true", 'saving the look to Blue lines did not take')
-        J("__plGrade.setGrade({ ...__plGrade.grade, gSat: 100 }); __plAp.loops.B.tgt.spin = 0;")
+        J("__plGrade.setGrade({ ...__plGrade.grade, gSat: 100 }); __plAp.loops.B.tgt.spin = 0; __plRelief.setRelief({ ...__plRelief.relief, rDepth: 0, rShine: 60 });")
         n0 = J("__plSeq.rec.blocks.length")
         click('#cxUseAll')
         c.wait_frames(3, 'blocks added')
@@ -327,6 +334,14 @@ def main():
             ok(abs(autos.get('show', 0) - 0.8) < 0.01, f"loop B’s Show fader comes along ({autos.get('show')})")
             sat = autos.get('gSat')
             ok(sat is not None and sat > 0.5, f'its Color grading comes along ({sat})')
+            ok(abs(autos.get('rDepth', -1) - 0.4) < 0.01 and abs(autos.get('rShine', -1) - 0.8) < 0.01, f"its 3D lighting comes along ({autos.get('rDepth')}, {autos.get('rShine')})")
+            # Playing it: the sequencer sets the 3D lighting on screen, over yours, without changing yours
+            J("__plAp.loops.A.tgt.zoom = 0")
+            click('#seqStop')
+            click('#seqPlay')
+            until("__plSeq.running && Math.abs(__plSeq.reliefNow().rDepth - 40) < 0.5", 'playing the blocks did not bring in their 3D lighting: ' + str(J("__plSeq.reliefNow()")), 30)
+            ok(J("__plRelief.relief.rDepth") == 0, 'your own 3D lighting setting stays as it was')
+            click('#seqStop')
         shot(os.path.join(out, 'sequencer-with-clip.png'))
 
         # 7. Copy to a drive

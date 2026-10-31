@@ -46,7 +46,7 @@ SLIDER_JS = """([id, v]) => { const el = document.getElementById(id); if (!el) t
 RECIPE_JS = """(n) => { const a = [...document.querySelectorAll('.g-recipe')].find(x => x.querySelector('h3').textContent === n);
   const b = a && a.querySelector('button'); if (!b) return false; b.click(); return true; }"""
 WORKOUT = [('#surprise', 10), ('#surprise', 10), ('#autopilot', 20), ('#autopilot', 3),
-           ('#neutral', 5), ('#tabB', 3), ('#tabA', 3), ('#clear', 5)]
+           ('#neutral', 5), ('#tabB', 3), ('#tabA', 3), ('js:__plClear()', 5)]
 
 
 class Stalled(Exception):
@@ -144,7 +144,10 @@ def run(c, a, base, problems):
     if not a.skip_workout:
         for sel, n in WORKOUT:
             try:
-                pg.click(sel)
+                if sel.startswith('js:'):
+                    pg.evaluate(sel[3:])
+                else:
+                    pg.click(sel)
             except Exception as e:
                 problems.append(f'could not press {sel}: {str(e).splitlines()[0]}')
                 continue
@@ -164,7 +167,7 @@ def run(c, a, base, problems):
                 pg.select_option(sel, val, timeout=FAIL_FAST_MS)
             else:
                 pg.evaluate(SLIDER_JS, [k.strip(), float(v)])
-        pg.click('#clear')
+        pg.evaluate('__plClear()')
         shot_fps = c.wait_frames(a.frames, f'recipe {name}')
         fname = '_'.join([name.replace(' ', '_').replace('/', '-')] + [re.sub(r'[^\w-]', '', s) for s in sets])
         path, lit = c.picture(fname)

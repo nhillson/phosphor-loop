@@ -51,7 +51,7 @@ def run(c, base, out, problems):
     # Only loop C on screen: it must draw something
     for k, v in (('showA', 0), ('showB', 0), ('showD', 0), ('showC', 100)):
         pg.evaluate(SLIDER_JS, [k, v])
-    pg.click('#clear')
+    pg.evaluate('__plClear()')
     c.wait_frames(40, 'loop C alone')
     _, lit = c.picture('loop-C-alone')
     expect(lit > 3, f'loop C on its own draws a picture (brightness {lit:.0f})')

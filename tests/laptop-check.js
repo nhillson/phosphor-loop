@@ -27,7 +27,7 @@ await (async () => {
     const btn = card && card.querySelector('button');
     if (!btn) return { problem: `no Guide recipe called "${RECIPE}"` };
     btn.click();
-    document.getElementById('clear').click();
+    window.__plClear();
   }
   const w = await waitFrames(FRAMES);
   out.framesDrawn = w.seen;

@@ -542,6 +542,7 @@ gl.useProgram(finalProg.p);
 set1i(finalProg, 'uNow', 0); set1i(finalProg, 'uLast', 1);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
+set1i(dispProg, 'uPoop', 1);
 // Time warp gets its own program, so a graphics card that can't draw it only loses Time warp
 let twProg = null;
 try {
@@ -2076,7 +2077,7 @@ const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
-  for (const k of KEYS) loopGrade[k] = null;
+  for (const k of KEYS) { loopGrade[k] = null; seqRelief[k] = null; }
   if (frozen) toggleFreeze(false);
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
@@ -4774,16 +4775,20 @@ syncApUI();
 const freezeBtn = $('#freeze');
 function toggleFreeze(force) {
   frozen = typeof force === 'boolean' ? force : !frozen;
-  freezeBtn.setAttribute('aria-pressed', String(frozen));
+  if (freezeBtn) freezeBtn.setAttribute('aria-pressed', String(frozen));
   if (frozen) showOSD('II', 'FROZEN');
 }
-freezeBtn.addEventListener('click', () => toggleFreeze());
+// Freeze, Clear, Full screen, Next look and Save picture no longer have buttons under the picture: Freeze is the
+// Space key, Clear the C key, Full screen the F key (and Exit in full screen), Next look the L key (and Next look under
+// Autopilot). The code below copes with the buttons being gone.
+if (freezeBtn) freezeBtn.addEventListener('click', () => toggleFreeze());
 function clearScreen() { clearTargets(); burst(); }
-$('#clear').addEventListener('click', clearScreen);
+window.__plClear = clearScreen;   // for the tests (Clear has no button any more: the C key)
+$('#clear')?.addEventListener('click', clearScreen);
 
 const fullBtn = $('#full');
 const fsEnabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
-if (!fsEnabled) fullBtn.hidden = true;
+if (!fsEnabled && fullBtn) fullBtn.hidden = true;
 function toggleFS() {
   if (!fsEnabled) return;
   const active = document.fullscreenElement || document.webkitFullscreenElement;
@@ -4795,7 +4800,7 @@ function toggleFS() {
     }
   } catch (e) { toast('Full screen isn’t available here.'); }
 }
-fullBtn.addEventListener('click', toggleFS);
+if (fullBtn) fullBtn.addEventListener('click', toggleFS);
 // In full screen the Exit button shows whenever the mouse moves or the picture is tapped, and fades
 // (with the mouse pointer) after a few still seconds, so it never sits on top of the picture for long
 const fsExit = $('#fsExit');
@@ -4823,7 +4828,7 @@ stage.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') fs
 fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
 ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
   const active = isFS();
-  fullBtn.textContent = active ? 'Exit full screen' : 'Full screen';
+  if (fullBtn) fullBtn.textContent = active ? 'Exit full screen' : 'Full screen';
   fsExit.hidden = !active;
   fsTasteShow();
   if (active) fsWake(4000);
@@ -7083,7 +7088,7 @@ presetForm.addEventListener('submit', async (e) => {
 });
 
 function loadPreset(pr, quiet) {
-  for (const k of KEYS) loopGrade[k] = null;
+  for (const k of KEYS) { loopGrade[k] = null; seqRelief[k] = null; }
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
   // A preset saved with three or four loops brings them back; any other is a look for two loops
@@ -7444,6 +7449,8 @@ function onKey(e) {
   const onControl = tag === 'BUTTON' || tag === 'INPUT';
   if (ribKey(e, true)) return;
   if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
+  // Shift+P: the secret plop (plain P is still Autopilot)
+  else if ((e.key === 'p' || e.key === 'P') && e.shiftKey && !e.repeat) plop();
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
   else if (e.key === 'l' || e.key === 'L') nextLook();
@@ -7457,6 +7464,144 @@ function onKey(e) {
 }
 window.addEventListener('keydown', onKey);
 
+/* ================= the plop (secret: Shift+P) ================= */
+// A big cartoon poop with googly eyes drops in from the top, lands with a squelch and a splat, wobbles proudly,
+// blinks, then melts down the screen, smearing brown into the loops as it goes. It's drawn on the finished picture
+// (so it's on the Output window, recordings and the stream too), with its sound out of this computer's speakers.
+// Nothing about it is saved; press it as often as you dare.
+// speed: 1 normally (the tests slow it down to take pictures on a slow computer)
+const poop = { t0: -1, x: 0, art: null, tex: null, smear: null, speed: 1, on: false, prevTex: null };
+function poopArt() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.scale(0.5, 0.5);   // drawn on a 512 grid, kept at 256 so it's cheap to send to the graphics chip every frame
+  const blob = (cx, cy, rx, ry, tipUp) => {
+    g.beginPath();
+    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    const gr = g.createRadialGradient(cx - rx * 0.35, cy - ry * 0.45, ry * 0.1, cx, cy, rx * 1.05);
+    gr.addColorStop(0, '#a8703f'); gr.addColorStop(0.55, '#7a4a22'); gr.addColorStop(1, '#4a2a10');
+    g.fillStyle = gr; g.fill();
+    g.lineWidth = 7; g.strokeStyle = '#33190a'; g.stroke();
+    // a shine
+    g.beginPath(); g.ellipse(cx - rx * 0.38, cy - ry * 0.35, rx * 0.22, ry * 0.16, -0.5, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(255,240,215,.45)'; g.fill();
+    if (tipUp) {
+      g.beginPath();
+      g.moveTo(cx - rx * 0.45, cy - ry * 0.55);
+      g.quadraticCurveTo(cx - rx * 0.1, cy - ry * 1.9, cx + rx * 0.35, cy - ry * 1.55);
+      g.quadraticCurveTo(cx + rx * 0.05, cy - ry * 1.2, cx + rx * 0.4, cy - ry * 0.6);
+      g.closePath();
+      g.fillStyle = '#8a5629'; g.fill(); g.lineWidth = 7; g.stroke();
+    }
+  };
+  blob(256, 395, 205, 92);
+  blob(256, 290, 160, 80);
+  blob(256, 200, 110, 66, true);
+  // googly eyes
+  for (const ex of [205, 307]) {
+    g.beginPath(); g.ellipse(ex, 278, 40, 46, 0, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 6; g.strokeStyle = '#33190a'; g.stroke();
+  }
+  // a big dopey grin with one tooth
+  g.beginPath(); g.moveTo(170, 362); g.quadraticCurveTo(256, 440, 342, 362); g.quadraticCurveTo(256, 404, 170, 362);
+  g.fillStyle = '#2a1206'; g.fill(); g.lineWidth = 6; g.strokeStyle = '#2a1206'; g.stroke();
+  g.fillStyle = '#fff'; g.fillRect(236, 372, 24, 18);
+  // stink lines
+  g.lineCap = 'round'; g.lineWidth = 8; g.strokeStyle = 'rgba(160,220,90,.85)';
+  for (const [sx, sy] of [[90, 140], [420, 120], [460, 230]]) {
+    g.beginPath(); g.moveTo(sx, sy + 60); g.bezierCurveTo(sx - 25, sy + 35, sx + 25, sy + 20, sx, sy); g.stroke();
+  }
+  return c;
+}
+// The eyes are drawn each frame (they look around, and blink), so the art is copied with pupils on top
+function poopFrame(t) {
+  const c = poop.frame || (poop.frame = document.createElement('canvas'));
+  if (c.width !== 256) c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, 256, 256);
+  g.drawImage(poop.art, 0, 0);
+  g.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  const blink = t > 1.4 && t < 1.55;
+  const look = Math.sin(t * 5) * 12, lookY = t < 0.6 ? -14 : 6;
+  for (const ex of [205, 307]) {
+    if (blink) { g.fillStyle = '#7a4a22'; g.beginPath(); g.ellipse(ex, 278, 41, 47, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#33190a'; g.lineWidth = 6; g.beginPath(); g.moveTo(ex - 32, 280); g.lineTo(ex + 32, 280); g.stroke(); continue; }
+    // googly: the pupils lag behind and jiggle
+    g.fillStyle = '#111'; g.beginPath(); g.arc(ex + look + (ex === 205 ? -4 : 6), 282 + lookY, 17, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(ex + look - 3, 276 + lookY, 5, 0, Math.PI * 2); g.fill();
+  }
+  return c;
+}
+// Squelch on landing, then a long, wobbly, deeply unnecessary trumpet (all made up on the spot, no sound files)
+function poopSound() {
+  let ctx;
+  try { ctx = poop.ctx || (poop.ctx = new (window.AudioContext || window.webkitAudioContext)()); } catch (_) { return; }
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  const now = ctx.currentTime + 0.45;   // it lands then
+  const out = ctx.createGain(); out.gain.value = 0.35; out.connect(ctx.destination);
+  // squelch: a drop of pitch, quickly
+  const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+  o1.type = 'sine'; o1.frequency.setValueAtTime(700, now); o1.frequency.exponentialRampToValueAtTime(90, now + 0.14);
+  g1.gain.setValueAtTime(0.9, now); g1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  o1.connect(g1).connect(out); o1.start(now); o1.stop(now + 0.2);
+  // the trumpet: a buzzy low note that wobbles, sags and splutters out
+  const t2 = now + 0.25, len = 1.1;
+  const o2 = ctx.createOscillator(), g2 = ctx.createGain(), bp = ctx.createBiquadFilter(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+  o2.type = 'sawtooth';
+  o2.frequency.setValueAtTime(115, t2); o2.frequency.linearRampToValueAtTime(70, t2 + len * 0.7); o2.frequency.linearRampToValueAtTime(95, t2 + len);
+  lfo.type = 'square'; lfo.frequency.setValueAtTime(22, t2); lfo.frequency.linearRampToValueAtTime(9, t2 + len);
+  lg.gain.value = 18; lfo.connect(lg).connect(o2.frequency);
+  bp.type = 'bandpass'; bp.frequency.value = 380; bp.Q.value = 1.8;
+  g2.gain.setValueAtTime(0.0001, t2); g2.gain.exponentialRampToValueAtTime(0.8, t2 + 0.05);
+  g2.gain.setValueAtTime(0.8, t2 + len * 0.55); g2.gain.linearRampToValueAtTime(0.25, t2 + len * 0.8);
+  g2.gain.linearRampToValueAtTime(0.6, t2 + len * 0.86); g2.gain.exponentialRampToValueAtTime(0.0001, t2 + len);
+  o2.connect(bp).connect(g2).connect(out);
+  o2.start(t2); lfo.start(t2); o2.stop(t2 + len + 0.05); lfo.stop(t2 + len + 0.05);
+}
+function plop() {
+  if (!poop.art) { poop.art = poopArt(); poop.tex = makeSourceTex(); }
+  poop.t0 = performance.now();
+  poop.x = rnd(-0.3, 0.3);
+  poopSound();
+  setTimeout(() => { showOSD('PLOP', ['OOPS', 'NICE', 'EW', 'SORRY', 'WHO DID THAT'][Math.floor(Math.random() * 5)]); burst(); }, 450);
+}
+// Each frame: where it is and how it's doing, for the screen pass; and while it melts, a brown smear for the loops
+function poopUniforms(now) {
+  const t = poop.t0 < 0 ? 99 : ((now - poop.t0) / 1000) * poop.speed;
+  if (t > 5.2) { if (poop.on) { set3f(dispProg, 'uPoopFx', 0, 0, 0); poop.on = false; } poop.smear = null; if (poop.t0 >= 0) poop.t0 = -1; return; }
+  poop.on = true;
+  const asp = canvas.width / canvas.height;
+  let h = 0.5, sy = 1, sx = 1, y = 0.08, wob = 0, melt = 0, a = 1;
+  // falling in (with a little stretch), then a squash and a bounce
+  if (t < 0.45) { const u = t / 0.45; y = 1.15 - u * u * (1.15 - 0.08); sy = 1.12; sx = 0.92; }
+  else if (t < 1.0) { const u = (t - 0.45) / 0.55, d = Math.exp(-5 * u) * Math.cos(u * 14); sy = 1 - 0.38 * d; sx = 1 + 0.3 * d; }
+  // a proud wobble, then melting away
+  if (t >= 0.8) wob = Math.sin((t - 0.8) * 7) * Math.max(0, 1 - (t - 0.8) / 2.2);
+  if (t > 2.7) { melt = Math.min(1, (t - 2.7) / 2.3); a = 1 - Math.pow(melt, 2.2); }
+  const hh = h * sy, ww = h * sx / asp;
+  const cx = poop.x / asp + 0.5;
+  // Slot 1 holds another loop's picture for the loops (uOther): what's there is put back after the screen is drawn
+  // (poopAfter), so the plop never leaks into the loops except through its brown smear
+  gl.activeTexture(gl.TEXTURE1);
+  poop.prevTex = gl.getParameter(gl.TEXTURE_BINDING_2D);
+  uploadTo(poop.tex, poopFrame(t));
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, poop.tex);
+  gl.activeTexture(gl.TEXTURE0);
+  set4f(dispProg, 'uPoopBox', cx - ww / 2, y, ww, hh);
+  set3f(dispProg, 'uPoopFx', a, melt, wob);
+  // While it melts, it smears brown into the loops underneath (through the same stroke as drawing on the picture)
+  if (melt > 0.02 && melt < 0.75) {
+    const px = poop.x + rnd(-0.12, 0.12), py = (y + hh * 0.35) - 0.5 - melt * 0.25;
+    poop.smear = [[px, py + 0.04], [px + rnd(-0.03, 0.03), py - 0.04]];
+  } else poop.smear = null;
+}
+function poopAfter() {
+  if (!poop.on) return;
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, poop.prevTex);
+  gl.activeTexture(gl.TEXTURE0);
+}
+window.__plPoop = { plop: () => plop(), get t0() { return poop.t0; }, set speed(v) { poop.speed = v; }, get on() { return poop.on; } };   // for the tests
+
 /* ================= saving ================= */
 const snapBtn = $('#snap');
 const recBtn = $('#rec');
@@ -7467,7 +7612,7 @@ let downloadsNS = null;
 let saveMode = 'none';
 function setSaveUI(mode) {
   saveMode = mode;
-  snapBtn.hidden = mode === 'none';
+  if (snapBtn) snapBtn.hidden = mode === 'none';
   recBtn.hidden = mode === 'none' || !canRecord;
   recMicBtn.hidden = recBtn.hidden || !canRecMic;
 }
@@ -7579,7 +7724,7 @@ async function offerFile(name, blob) {
   recNote(`Saved ${name} to your Downloads folder.`);
 }
 let snapPending = false;
-snapBtn.addEventListener('click', () => { snapPending = true; });
+if (snapBtn) snapBtn.addEventListener('click', () => { snapPending = true; });
 
 // A recording runs until Record is pressed again; there is no time limit.
 let recorder = null, recChunks = [], recStart = 0, recStopAt = 0, recTick = null, recStarting = false;
@@ -8123,6 +8268,10 @@ const GRADE_DEF = { gExposure: 0, gContrast: 100, gGamma: 100, gSat: 100, gHue: 
 const grade = { ...GRADE_DEF };
 // Each loop's own grading while the sequencer plays (null: none), drawn when the loops are mixed (see FS_COMPOSITE)
 const loopGrade = { A: null, B: null, C: null, D: null };
+// 3D lighting from the sequencer's blocks, per track (null: that track doesn't set it). Like Color grading, it sits
+// over your own 3D lighting settings without changing them, and holds when the sequence stops; Neutral and loading a
+// preset put it back to yours.
+const seqRelief = { A: null, B: null, C: null, D: null };
 const gradeEls = {};
 for (const k of Object.keys(GRADE_DEF)) gradeEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
 function gradeText(k, v) {
@@ -8212,13 +8361,30 @@ $('#reliefReset').addEventListener('click', () => setRelief(RELIEF_DEF));
 // by the next frame's loops too. Circling adds up a turn of its own, so changing its speed never makes it jump.
 const reliefL = [0, 0, 1];
 let reliefTurn = 0, reliefLast = 0;
+// The 3D lighting drawn now: yours, with whatever the sequencer's blocks set on top (a mix of the tracks that set
+// it, each counted as much as its loop shows)
+function reliefNow() {
+  const out = { ...relief };
+  for (const key of Object.keys(RELIEF_DEF)) {
+    let sum = 0, wt = 0;
+    for (const K of KEYS) {
+      const r = seqRelief[K];
+      if (!r || !(key in r) || !loopOn(K)) continue;
+      const w = Math.max(0.001, clamp(mix.tgt[SHOW[K]], 0, 100) / 100);
+      sum += r[key] * w; wt += w;
+    }
+    if (wt > 0) out[key] = sum / wt;
+  }
+  return out;
+}
 function setReliefUniforms(now) {
+  const R = reliefNow();
   const dt = reliefLast ? Math.min((now - reliefLast) / 1000, 0.25) : 0;
   reliefLast = now;
-  reliefTurn = (reliefTurn + dt * (relief.rSpin / 100) ** 2 * Math.PI / 2) % (2 * Math.PI);
-  const a = relief.rLight * Math.PI / 180 + reliefTurn, e = 40 * Math.PI / 180;
+  reliefTurn = (reliefTurn + dt * (R.rSpin / 100) ** 2 * Math.PI / 2) % (2 * Math.PI);
+  const a = R.rLight * Math.PI / 180 + reliefTurn, e = 40 * Math.PI / 180;
   reliefL[0] = Math.cos(a) * Math.cos(e); reliefL[1] = Math.sin(a) * Math.cos(e); reliefL[2] = Math.sin(e);
-  set3f(dispProg, 'uRelief', relief.rDepth / 100, 0.004 + 0.046 * relief.rSmooth / 100, relief.rShine / 100);
+  set3f(dispProg, 'uRelief', R.rDepth / 100, 0.004 + 0.046 * R.rSmooth / 100, R.rShine / 100);
   set3f(dispProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
 }
 window.__plRelief = { relief, setRelief, adj };
@@ -9259,7 +9425,8 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uBrushOn', on);
   set1i(fbProg, 'uSwN', shapeSw.n);
   if (shapeSw.n) { const l = U(fbProg, 'uSw[0]'); if (l) gl.uniform4fv(l, shapeSw.S); }
-  const bc = hsv(((simT * 0.15) + (0.5 * LOOP_OFF[k])) % 1, 0.65, 1);
+  // The stroke's color: a rainbow for your drawing, brown while the plop melts in
+  const bc = brush && brush === poop.smear ? [0.42, 0.24, 0.1] : hsv(((simT * 0.15) + (0.5 * LOOP_OFF[k])) % 1, 0.65, 1);
   set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
   if (traced) topoPre(L, dst, texs[13], is3D(traced) && !(t.in1 === 'topo' ? flyTex2 : flyTex1) ? SRC_ID.none : resolveSrc(traced, t.motion));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -9391,6 +9558,9 @@ const SEQ_SLIDERS = [
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
     ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
+  // 3D lighting is one for the whole picture: when blocks on several tracks set it, it's a mix of them, each counted
+  // as much as its loop shows (see reliefNow)
+  ['3D lighting', [['rDepth', '3D depth'], ['rSmooth', '3D smoothness'], ['rShine', 'Shine'], ['rLight', 'Light direction'], ['rSpin', 'Light spin']]],
 ];
 const SEQ_NAME = Object.fromEntries(SEQ_SLIDERS.flatMap(([, list]) => list));
 const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1'];
@@ -9733,7 +9903,7 @@ function seqShowMedia(bl) {
 }
 function seqApplyTrack(k, x, now) {
   const K = KEYS[k], L = loops[K], T = L.tgt;
-  if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); return; }
+  if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); seqRelief[K] = null; return; }
   const sig = x.other ? `${x.other.id}>${x.main.id}` : x.main.id;
   if (seq.applied[k] !== sig) {
     const wasCross = (seq.applied[k] || '').includes('>');
@@ -9773,21 +9943,24 @@ function seqApplyTrack(k, x, now) {
   };
   take(x.main, x.u, x.other ? x.w : 1);
   if (x.other) take(x.other, x.uOther, 1 - x.w);
-  const grade = {};
+  const grade = {}, rel = {};
   for (const [key, { sum, wt }] of Object.entries(vals)) {
     if (wt <= 0) continue;
     const v = sum / wt;
     if (key === 'show') show = v;
     else if (key === 'feed') feed = v;
     else if (key in GRADE_DEF) grade[key] = v;
+    else if (key in RELIEF_DEF) rel[key] = v;
     else if (key in T) T[key] = v;
   }
   mix.tgt[SHOW[K]] = clamp(show, 0, 100) * x.show;
   if (feed !== null) mix.tgt[FEED_INTO[otherLoop(K)]] = feed;
   seqGrade(K, Object.keys(grade).length ? grade : null);
+  seqRelief[K] = Object.keys(rel).length ? rel : null;
 }
 // Color grading inside the sequencer is each loop's own (see loopGrade); null puts that loop back to normal
 function seqGrade(K, g) { loopGrade[K] = g; }
+
 
 function seqTick(now) {
   const p = seqPos(now);
@@ -10201,7 +10374,7 @@ function seqPickSlider(bl, x, y) {
           if (has) bl.autos = bl.autos.filter((au) => au !== has);
           else {
             // The line starts at the block's own value for that slider
-            const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
+            const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : key in RELIEF_DEF ? relief[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
             const v = clamp((cur - lo) / ((hi - lo) || 1), 0, 1);
             bl.autos.push({ key, pts: [[0, v], [1, v]] });
           }
@@ -10295,8 +10468,8 @@ function seqPlaceClip(c, look) {
 }
 // Add with its whole look: the picture saved with the clip, spread over the tracks. Every loop the look used (shown,
 // or feeding or feeding into one that is) gets a block on its own track at the playhead, all as long as the clip, each
-// with that loop's saved look; the ones that played the Video play the clip. The look's Show and feed faders and its
-// Color grading go into each block as steady automation. (3D lighting isn't part of the sequencer, so it stays as it is.)
+// with that loop's saved look; the ones that played the Video play the clip. The look's Show and feed faders, its
+// Color grading and its 3D lighting go into each block as steady automation.
 function seqPlaceWhole(c, look) {
   const n = look.n === 3 || look.n === 4 ? look.n : 2;
   const keys = ['A', 'B', 'C', 'D'].slice(0, n).filter((k) => look[k]);
@@ -10311,6 +10484,9 @@ function seqPlaceWhole(c, look) {
   const steady = (key, v) => { const [lo, hi] = seqRange(key); return { key, pts: [[0, clamp((v - lo) / ((hi - lo) || 1), 0, 1)], [1, clamp((v - lo) / ((hi - lo) || 1), 0, 1)]] }; };
   const g = look.grade || {};
   const gradeAutos = Object.keys(GRADE_DEF).filter((k) => Number.isFinite(g[k]) && g[k] !== GRADE_DEF[k]).map((k) => steady(k, g[k]));
+  // Its 3D lighting too, when it had any (the depth is what turns it on)
+  const rl = look.relief || {};
+  if (Number.isFinite(rl.rDepth) && rl.rDepth > 0) gradeAutos.push(...Object.keys(RELIEF_DEF).filter((k) => Number.isFinite(rl[k])).map((k) => steady(k, rl[k])));
   const made = used.map((k) => TL.cleanBlock({
     track: KEYS.indexOf(k), a, b, label: `${c.n} (${k})`.slice(0, 80), look: JSON.parse(JSON.stringify(look[k])),
     media: usesIn(look[k], 'video') ? { vid: { kind: 'clip', id: c.id, name: c.n, at: 0 } } : null,
@@ -10318,8 +10494,7 @@ function seqPlaceWhole(c, look) {
   })).filter(Boolean);
   seqChange(() => seq.rec.blocks.push(...made));
   seq.selId = made[0] ? made[0].id : null;
-  seqNote(`Added “${c.n}” with its whole look: ${made.length} block${made.length === 1 ? '' : 's'}, on ${used.map((k) => `track ${KEYS.indexOf(k) + 1}`).join(', ')} at ${fmtSeq(a, true)}.`
-    + (look.relief && Object.keys(look.relief).some((k) => look.relief[k] !== RELIEF_DEF[k]) ? ' Its 3D lighting isn’t something the sequencer changes, so set that by hand if you want it.' : ''));
+  seqNote(`Added “${c.n}” with its whole look: ${made.length} block${made.length === 1 ? '' : 's'}, on ${used.map((k) => `track ${KEYS.indexOf(k) + 1}`).join(', ')} at ${fmtSeq(a, true)}.`);
 }
 $('#seqAddClip').addEventListener('click', () => { seqCloseMenus(); openClips('seq'); });
 function seqAddMarker() {
@@ -10410,7 +10585,7 @@ function seqSetOpen(open, save) {
   window.dispatchEvent(new Event('resize'));
 }
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
-window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; } };   // for tests/snips_check.py
+window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; } };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });
 
 /* ---------- Spotify: which song is playing ---------- */
@@ -10550,6 +10725,7 @@ function frame() {
     shapeSw = shapes.packSwallow(f);
     let brush = null;
     if (drawing && pCur) { brush = [pPrev, pCur]; pPrev = pCur; }
+    else if (poop.smear) brush = poop.smear;
     // A hidden loop also runs while Check each look is trying a look out on it, and while a loop that's running
     // is fed from it or reads it (as an input, or to be pushed or dyed by it)
     const trying = ap.prep ? ap.prep.k : null;
@@ -10616,7 +10792,9 @@ function frame() {
   set1f(dispProg, 'uLines', clamp(Math.floor(canvas.height / 2.6), 120, 288));
   setGradeUniforms();
   setReliefUniforms(now);
+  poopUniforms(now);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  poopAfter();
 
   if (window.__phosphorCapture?.onFrame) window.__phosphorCapture.onFrame(now);
   if (snapPending) {

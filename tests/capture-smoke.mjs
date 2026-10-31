@@ -41,8 +41,9 @@ try {
     assert.ok(stats.light > 3, `Black picture: ${stats.light}`);
     assert.equal(stats.hook, capture);
     if (capture) { assert.equal(stats.width,640); assert.equal(stats.height,360); }
-    for (const [selector, count] of [['#surprise',10],['#surprise',10],['#autopilot',20],['#autopilot',3],['#neutral',5],['#tabB',3],['#tabA',3],['#clear',5]]) {
-      await page.locator(selector).click({timeout:5000}); await frames(count);
+    for (const [selector, count] of [['#surprise',10],['#surprise',10],['#autopilot',20],['#autopilot',3],['#neutral',5],['#tabB',3],['#tabA',3],['js:__plClear()',5]]) {
+      if (selector.startsWith('js:')) await page.evaluate(selector.slice(3)); else await page.locator(selector).click({timeout:5000});
+      await frames(count);
     }
     assert.deepEqual(errors, []);
     console.log(`PASS: ${capture ? 'fixed capture resolution' : 'normal file:// startup'}; nonblack picture; control workout; no page errors.`);

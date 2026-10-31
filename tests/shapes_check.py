@@ -78,7 +78,7 @@ def main():
                 ok(lit > 3, f'{name} row: black picture')
             # 2. A black hole close up: bending the view, then swallowing the trails
             for name, sw in [('lens', 0), ('swallow', 100)]:
-                pg.click('#clear')
+                pg.evaluate('__plClear()')
                 pg.evaluate(ONE_JS, {'kind': 'sphere', 'color': '#0a0a0c', 'gravity': 85, 'disk': 70, 'tilt': 80, 'size': 55, 'swallow': sw})
                 c.wait_frames(120, f'black hole, {name}')
                 path, lit = c.picture('shapes-blackhole-' + name)

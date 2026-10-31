@@ -218,7 +218,7 @@ def main():
             # 5b. A real Autopilot run with the library there: a dozen new looks, then a picture
             seen_video = 0
             for i in range(12):
-                jsclick('#nextLookBar')
+                jsclick('#nextLook')
                 c.wait_frames(12, f'Autopilot look {i + 1}')
                 if pg.evaluate("['A', 'B'].some(k => __plClips.input(k, 'in1') === 'video' || __plClips.input(k, 'in2') === 'video')"):
                     seen_video += 1
