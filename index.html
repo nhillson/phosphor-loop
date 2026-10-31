@@ -103,10 +103,7 @@
             <button class="btn small" id="seqAddSaved" aria-haspopup="menu" aria-expanded="false" aria-controls="seqSavedMenu">+ Add saved look<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
             <div class="seq-menu" id="seqSavedMenu" role="menu" hidden></div>
           </span>
-          <span class="seq-menuwrap">
-            <button class="btn small" id="seqAddClip" aria-haspopup="menu" aria-expanded="false" aria-controls="seqClipMenu" title="A clip from your clip library (Phosphor Clips), played as this loop’s Video input">+ Add clip<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
-            <div class="seq-menu seq-clipmenu" id="seqClipMenu" role="menu" hidden></div>
-          </span>
+          <button class="btn small" id="seqAddClip" title="Opens your clip library to find a clip (search names and tags) and add it here, with or without its effects">+ Add clip…</button>
           <span class="seq-vsep" aria-hidden="true"></span>
           <button class="btn small" id="seqMarker" title="Add a section marker at the playhead (key M, works while playing)">+ Marker</button>
           <button class="btn small seq-recbtn" id="seqRec" aria-pressed="false" title="While the sequence plays, the look you have on the chosen loop is written into its track"><span class="led"></span>Record look changes</button>
@@ -377,7 +374,9 @@
                   <form class="snip-form" id="snipForm" hidden>
                     <span class="snip-what" id="snipWhat"></span>
                     <input class="seq-in" id="snipName" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Name" aria-label="Name for the snip">
-                    <select id="snipCat" aria-label="Category"></select>
+                    <select id="snipCat" aria-label="Folder"></select>
+                    <input class="seq-in" id="snipTags" type="text" maxlength="400" list="cxTagSuggest" autocomplete="off" spellcheck="false" placeholder="Tags, e.g. fractal, industrial" aria-label="Tags, commas between">
+                    <label class="snip-sound"><input type="checkbox" id="snipFx" checked> Save the effects on screen with it</label>
                     <label class="snip-sound"><input type="checkbox" id="snipSound"> Keep sound</label>
                     <span class="vcr-keys">
                       <button class="btn small" type="submit" id="snipSave">Save</button>
@@ -1135,7 +1134,7 @@
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery. Your own picture… loads a file of yours.</dd>
-            <dt>Video</dt><dd>Your own file, or a clip from your clip library. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section. <b>✂ Save to clip library</b> cuts the marked section out into your clip library (Phosphor Clips 1.6 or later, running on the same computer), where the gallery, Autopilot and the sequencer’s <b>+ Add clip</b> can use it.</dd>
+            <dt>Video</dt><dd>Your own file, or a clip from your clip library. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section. <b>✂ Save to clip library</b> cuts the marked section out into your clip library (Phosphor Clips 1.7 or later, running on the same computer), into any folder, with tags and the effects on screen. <b>Clip library…</b> (and the sequencer’s <b>+ Add clip…</b>) opens the explorer: folders on the left, search names and tags, click a clip to tag, rename, move or save effects to it, and use it <b>with its effects</b> or as <b>just the clip</b>. <b>Copy to a drive…</b> takes clips with their tags and effects to another computer: drop the folders into its library folder.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
@@ -1278,13 +1277,21 @@
     <div class="guide-bar nat-bar">
       <span class="wordmark" id="clipsTitle">Clip library</span>
       <span class="nat-count" id="clipsCount"></span>
+      <input class="seq-in cx-search" id="cxSearch" type="search" placeholder="Search names and tags, e.g. fractal industrial" aria-label="Search clips" autocomplete="off" spellcheck="false">
+      <select id="cxSort" aria-label="Order">
+        <option value="new">Newest first</option>
+        <option value="name">By name</option>
+        <option value="long">Longest first</option>
+        <option value="short">Shortest first</option>
+      </select>
       <span class="spacer"></span>
+      <button class="btn small" id="cxCopy" title="Copy clips, with their tags and effects, to a folder or drive (Phosphor Clips asks where)">Copy to a drive…</button>
       <button class="btn small" id="clipsShuffle">Shuffle</button>
       <button class="btn small" id="clipsFile">Choose a video file…</button>
       <button class="btn small" id="clipsClose">Close</button>
-      <div class="chips nat-tabs" id="clipsTabs" role="group" aria-label="Categories"></div>
+      <div class="chips cx-tags" id="cxTags" role="group" aria-label="Tags"></div>
     </div>
-    <div class="nat-inner">
+    <div class="nat-inner cx-inner">
       <div class="clips-msg" id="clipsMsg" hidden>
         <p id="clipsMsgText"></p>
         <div class="dev-actions">
@@ -1292,13 +1299,62 @@
           <a class="btn small" id="clipsGet" href="https://github.com/nhillson/phosphor-loop/releases/tag/clip-app-latest" target="_blank" rel="noopener">Get Phosphor Clips</a>
         </div>
       </div>
-      <div class="clips-ap" id="clipsAp" hidden>
-        <span class="lbl" id="clipsApLbl">Autopilot brings in clips from</span>
-        <div class="chips" id="clipsApCats" role="group" aria-labelledby="clipsApLbl"></div>
-      </div>
       <p class="hint" id="clipsHint" hidden></p>
-      <div class="nat-grid clips-grid" id="clipsGrid"></div>
-      <p class="hint nat-foot" id="clipsFoot" hidden>Your clips from Phosphor Clips on this computer. Clips you grab and save there show up here.</p>
+      <div class="cx-body">
+        <nav class="cx-tree" aria-label="Folders">
+          <div class="cx-treelist" id="clipsTabs" role="tree"></div>
+          <button class="btn small" id="cxNewFolder" title="A new folder inside the one picked here">+ New folder</button>
+          <form class="cx-newform" id="cxNewForm" hidden>
+            <input class="seq-in" id="cxNewName" type="text" maxlength="60" autocomplete="off" spellcheck="false" placeholder="Folder name" aria-label="New folder name">
+            <span class="hint" id="cxNewWhere"></span>
+          </form>
+        </nav>
+        <div class="cx-main">
+          <div class="nat-grid clips-grid" id="clipsGrid"></div>
+          <div class="cx-more" id="cxMore" hidden></div>
+          <p class="hint" id="cxNone" hidden>No clips match. Try fewer words, or another category.</p>
+          <div class="clips-ap" id="clipsAp" hidden>
+            <span class="lbl" id="clipsApLbl">Autopilot brings in clips from</span>
+            <div class="chips" id="clipsApCats" role="group" aria-labelledby="clipsApLbl"></div>
+          </div>
+          <p class="hint nat-foot" id="clipsFoot" hidden>Your clips from Phosphor Clips on this computer. Click a clip to see it and its tags; double-click to use it. Ctrl-click or Shift-click picks several.</p>
+        </div>
+        <aside class="cx-side" id="cxSide" hidden aria-label="The picked clip">
+          <video class="cx-video" id="cxVideo" muted loop playsinline></video>
+          <div class="cx-one" id="cxOne">
+            <input class="seq-in" id="cxName" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-label="Name">
+            <label class="cx-lbl">Folder<select id="cxCat" aria-label="Folder"></select></label>
+            <div class="cx-taged" id="cxTagEd">
+              <span class="lbl">Tags</span>
+              <div class="cx-chips" id="cxTagList"></div>
+              <input class="seq-in" id="cxTagIn" type="text" maxlength="30" list="cxTagSuggest" autocomplete="off" spellcheck="false" placeholder="Add a tag, then Enter" aria-label="Add a tag">
+              <datalist id="cxTagSuggest"></datalist>
+            </div>
+            <div class="cx-fx">
+              <span class="cx-fxstate" id="cxFxState"></span>
+              <span class="vcr-keys">
+                <button class="btn small" id="cxFxSave" title="Saves the whole picture on screen now (all loops, mixing, Color grading, 3D lighting) with this clip">Save the picture on screen as its effects</button>
+                <button class="btn small" id="cxFxOff" hidden>Take its effects off</button>
+              </span>
+            </div>
+            <div class="cx-use">
+              <button class="btn" id="cxUseFx">Use with its effects</button>
+              <button class="btn" id="cxUseClip">Just the clip</button>
+            </div>
+            <p class="hint cx-facts" id="cxFacts"></p>
+          </div>
+          <div class="cx-many" id="cxMany" hidden>
+            <b id="cxManyN"></b>
+            <div class="cx-taged">
+              <span class="lbl">Add a tag to all of them</span>
+              <input class="seq-in" id="cxManyTag" type="text" maxlength="30" list="cxTagSuggest" autocomplete="off" spellcheck="false" placeholder="Tag, then Enter" aria-label="Add a tag to the picked clips">
+            </div>
+            <label class="cx-lbl">Move them to<select id="cxManyMove" aria-label="Move the picked clips to"></select></label>
+            <button class="btn small" id="cxManyNone">Unpick them</button>
+          </div>
+          <p class="hint" id="cxSay" role="status" aria-live="polite"></p>
+        </aside>
+      </div>
     </div>
   </div>
 

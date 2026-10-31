@@ -841,6 +841,58 @@
   /* ---------- clip library ---------- */
   .clips-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
   .clips-grid .nat-tile { aspect-ratio: 16 / 9; }
+  /* ---------- the clip explorer ---------- */
+  .cx-search { flex: 1 1 260px; max-width: 460px; min-width: 0; }
+  .nat-bar select { margin: 0; width: auto; flex: none; }
+  .cx-tags { margin: 0; flex-basis: 100%; }
+  .cx-tags:empty { display: none; }
+  .cx-tags .chip { font-size: 13px; }
+  .cx-tags .chip b { font: 14px/1 var(--f-osd); color: var(--faint); font-weight: 400; }
+  .cx-body { display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cx-body:has(.cx-side:not([hidden])) { grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) minmax(280px, 360px); }
+  /* the folder tree: categories, then their subfolders */
+  .cx-tree { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 160px); overflow-y: auto; }
+  .cx-treelist { display: flex; flex-direction: column; gap: 1px; }
+  .cx-node { display: flex; align-items: center; gap: 2px; padding-left: calc(var(--d, 0) * 14px); }
+  .cx-node .cx-tw { width: 20px; flex: none; border: 0; background: none; color: var(--faint); cursor: pointer; padding: 4px 0; font-size: 11px; }
+  .cx-node .cx-tw:disabled { visibility: hidden; }
+  .cx-node .cx-fold { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; text-align: left; border: 0; border-radius: 5px; background: none; color: var(--dim); cursor: pointer; padding: 5px 8px; font: 14px var(--f-body); }
+  .cx-node .cx-fold span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cx-node .cx-fold b { font: 14px/1 var(--f-osd); color: var(--faint); font-weight: 400; }
+  .cx-node .cx-fold:hover { background: var(--raise); color: var(--ink); }
+  .cx-node .cx-fold[aria-current="true"] { background: var(--press-1); color: var(--press-ink); }
+  .cx-tree > .btn { align-self: flex-start; }
+  .cx-newform[hidden] { display: none; }
+  .cx-newform { display: flex; flex-direction: column; gap: 4px; }
+  .cx-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dim); }
+  .cx-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .cx-more { height: 1px; }
+  .cx-side { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); max-height: calc(100vh - 160px); overflow-y: auto; }
+  .cx-video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; object-fit: contain; }
+  .cx-one, .cx-many { display: flex; flex-direction: column; gap: 10px; }
+  .cx-one[hidden], .cx-many[hidden] { display: none; }
+  .cx-side select { margin: 0; }
+  .cx-taged { display: flex; flex-direction: column; gap: 6px; }
+  .cx-taged .lbl { font-size: 13px; color: var(--dim); }
+  .cx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cx-chips:empty::after { content: "No tags yet"; font-size: 13px; color: var(--faint); }
+  .cx-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 999px; background: var(--press-1); color: var(--press-ink); font-size: 13px; }
+  .cx-chip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 4px; font-size: 15px; line-height: 1; opacity: .75; }
+  .cx-chip button:hover { opacity: 1; }
+  .cx-fx { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .cx-fxstate { font-size: 14px; color: var(--dim); }
+  .cx-fxstate b { color: var(--amber-ink); font-weight: 600; }
+  .cx-use { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .cx-use .btn { flex: 1 1 140px; }
+  .cx-facts { font-size: 12.5px; }
+  .clips-grid .nat-tile[aria-selected="true"] { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
+  .nat-tile .cx-fxb { position: absolute; left: 5px; top: 5px; padding: 1px 6px; border-radius: 4px; background: var(--amber); color: #fff; font: 600 11px/1.5 var(--f-body); letter-spacing: .04em; }
+  .nat-tile .cx-tl { position: absolute; left: 0; right: 0; bottom: 21px; padding: 0 7px; font-size: 11px; color: #e7d6f2; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; background: none; }
+  @media (max-width: 900px) {
+    .cx-body, .cx-body:has(.cx-side:not([hidden])) { grid-template-columns: minmax(0, 1fr); }
+    .cx-side { position: static; max-height: none; order: -1; }
+    .cx-tree { position: static; max-height: 40vh; }
+  }
   .clip-dur { position: absolute; right: 5px; top: 5px; padding: 1px 6px; border-radius: 4px; background: rgba(0,0,0,.7);
     font: 14px/1.2 var(--f-osd); font-style: normal; color: #fff; }
   .clips-ap { display: flex; flex-direction: column; gap: 4px; }
@@ -961,10 +1013,6 @@
 .seq-menu > button:hover:not(:disabled), .seq-menu > button:focus-visible { background: var(--press-1); color: var(--press-ink); }
 .seq-menu > button:disabled { opacity: .45; cursor: default; }
 .seq-menu > button[aria-checked="true"]::after { content: "\2713"; color: var(--loop-a-ink); }
-.seq-clipmenu { min-width: 300px; }
-.seq-clipmenu > button { justify-content: flex-start; align-items: center; gap: 10px; }
-.seq-clipmenu img { width: 64px; height: 36px; object-fit: cover; border-radius: 3px; background: #000; flex: none; }
-.seq-clipmenu .len { margin-left: auto; font-size: 12px; color: var(--dim); }
 
 .seq-tl { display: flex; gap: 8px; min-width: 0; }
 .seq-heads .seq-card { gap: 8px; padding: 0 8px; font-size: 13px; }

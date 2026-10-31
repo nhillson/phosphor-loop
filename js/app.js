@@ -1132,7 +1132,7 @@ function chooseSource(slot, src) {
   if (src === 'phone') startPhoneLink();
   // No video in yet: the clip library once it's been set up in this browser (its gallery also offers a file),
   // otherwise straight to choosing a file
-  if (src === 'video' && !vid.on) { if (clipsWanted()) openClips(); else $('#vidFile').click(); }
+  if (src === 'video' && !vid.on) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
@@ -5152,6 +5152,8 @@ function clipList(fresh) {
         clips.base = base;
         clips.list = Array.isArray(d.clips) ? d.clips : [];
         clips.cats = Array.isArray(d.cats) ? d.cats : [];
+        // Subfolders inside the categories (Phosphor Clips 1.7 and later), empty ones too
+        clips.folders = Array.isArray(d.folders) ? d.folders.filter((f) => f && typeof f.c === 'string' && typeof f.p === 'string') : [];
         clips.at = performance.now();
         if (clips.cat !== 'all' && !clips.list.some((c) => c.c === clips.cat)) clips.cat = 'all';
         return clips.list;
@@ -5212,30 +5214,52 @@ function clipShuffle() {
     const shown = clipsShown().filter((c) => c.id !== clips.cur);
     if (shown.length) clipPick(pick(shown));
     else toast(clips.list.length ? 'There’s no other clip in this category.' : 'The clip library is empty. Save some clips with Phosphor Clips.');
-  }).catch(() => openClips());
+  }).catch(() => openClips('video'));
 }
 function clipsSay(html) {
   $('#clipsMsg').hidden = !html;
   $('#clipsMsgText').innerHTML = html || '';
 }
+/* ---------- the clip explorer: search, tags, saved effects ---------- */
+// The Clip library window is an explorer for a library of thousands: categories, a search over names and tags
+// (every word has to match), tags to click, an order, and a grid drawn a page at a time as you scroll. Clicking a
+// clip shows it at the side with its name, category, tags and saved effects, all changeable (saved in Phosphor Clips,
+// in the clip's settings file, so they travel with it). Double-click, or the two buttons, uses it: with its effects
+// (the whole picture saved with it, like a preset) or just the clip. Opened from the sequencer's + Add clip…, the
+// buttons add it to the chosen track instead. Ctrl-click and Shift-click pick several, to tag them or copy them.
+const CX_PAGE = 120;
+const cx = { mode: 'video', q: '', sort: 'new', tags: [], sel: new Set(), anchor: '', shown: [], drawn: 0, obs: null,
+  folder: lsGet('phosphor-clips-folder') || '', open: new Set() };
+const cxClip = (id) => (clips.list || []).find((c) => c.id === id) || null;
+const cxText = (c) => `${c.n} ${(c.tags || []).join(' ')} ${clipCatName(c.c)} ${c.p || ''} ${c.page || ''} ${c.by || ''}`.toLowerCase();
+// In the folder picked in the tree: its category, and that subfolder or any folder inside it
+const inFolder = (c, cat, sub) => (cat === 'all' || c.c === cat) && (!sub || c.p === sub || (c.p || '').startsWith(sub + '/'));
+function cxFiltered() {
+  const words = cx.q.toLowerCase().split(/[\s,]+/).filter(Boolean);
+  const list = (clips.list || []).filter((c) => inFolder(c, clips.cat, clips.cat === 'all' ? '' : cx.folder)
+    && cx.tags.every((t) => (c.tags || []).includes(t))
+    && (!words.length || (() => { const t = cxText(c); return words.every((w) => t.includes(w)); })()));
+  const by = {
+    new: (a, b) => String(b.added || '').localeCompare(String(a.added || '')),
+    name: (a, b) => a.n.localeCompare(b.n, undefined, { numeric: true, sensitivity: 'base' }),
+    long: (a, b) => (b.d || 0) - (a.d || 0),
+    short: (a, b) => (a.d || 0) - (b.d || 0),
+  }[cx.sort] || (() => 0);
+  return list.sort(by);
+}
+// Every tag in the library with how many clips have it, most used first
+function cxAllTags() {
+  const n = new Map();
+  for (const c of clips.list || []) for (const t of c.tags || []) n.set(t, (n.get(t) || 0) + 1);
+  return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
 function clipsBuild() {
   const list = clips.list || [];
   const count = (id) => (id === 'all' ? list.length : list.filter((c) => c.c === id).length);
   const cats = clips.cats.filter((c) => count(c.id) > 0);
-  clipsTabs.textContent = '';
-  for (const c of [{ id: 'all', n: 'All' }, ...cats]) {
-    const b = document.createElement('button');
-    b.className = 'chip';
-    b.dataset.cat = c.id;
-    b.innerHTML = `${escapeHTML(c.n)} <b>${count(c.id)}</b>`;
-    b.addEventListener('click', () => {
-      clips.cat = c.id;
-      try { localStorage.setItem(CLIP_TAB_KEY, c.id); } catch (_) { /* fine */ }
-      clipsFilter();
-      clipsDlg.scrollTop = 0;
-    });
-    clipsTabs.appendChild(b);
-  }
+  if (clips.cat !== 'all' && !clips.cats.some((c) => c.id === clips.cat)) clips.cat = 'all';
+  if (clips.cat === 'all' || !cxFolders(clips.cat).includes(cx.folder)) cx.folder = '';
+  cxTreeBuild();
   // Which categories Autopilot brings clips in from
   const apBox = $('#clipsApCats');
   apBox.textContent = '';
@@ -5253,37 +5277,422 @@ function clipsBuild() {
     });
     apBox.appendChild(b);
   }
-  $('#clipsAp').hidden = !cats.length;
-  clipsGrid.textContent = '';
-  const frag = document.createDocumentFragment();
-  for (const c of list) {
-    const b = document.createElement('button');
-    b.className = 'nat-tile';
-    b.dataset.id = c.id;
-    b.dataset.c = c.c;
-    b.title = `${c.n} (${clipCatName(c.c)})`;
-    const thumb = c.thumb ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : '';
-    b.innerHTML = `${thumb}<em class="clip-dur">${fmtT(c.d || 0)}</em><span>${escapeHTML(c.n)}</span>`;
-    frag.appendChild(b);
+  $('#clipsAp').hidden = !cats.length || cx.mode !== 'video';
+  cxTagsBuild();
+  // Picked clips that have gone from the library are unpicked
+  for (const id of [...cx.sel]) if (!cxClip(id)) cx.sel.delete(id);
+}
+/* the folder tree: All clips, each category, and the subfolders inside it (as deep as they go) */
+// Every subfolder of a category: the ones Phosphor Clips lists (empty ones too) and the ones its clips sit in, with
+// every folder above them
+function cxFolders(cat) {
+  const set = new Set();
+  const add = (p) => { const parts = String(p || '').split('/').filter(Boolean); for (let i = 1; i <= parts.length; i++) set.add(parts.slice(0, i).join('/')); };
+  for (const f of clips.folders || []) if (f.c === cat) add(f.p);
+  for (const c of clips.list || []) if (c.c === cat && c.p) add(c.p);
+  return [...set].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+}
+const cxKey = (cat, sub) => `${cat}|${sub}`;
+function cxTreeBuild() {
+  const box = clipsTabs, list = clips.list || [];
+  box.textContent = '';
+  // The folder picked stays visible: every folder above it is open
+  if (clips.cat !== 'all') {
+    cx.open.add(cxKey(clips.cat, ''));
+    const parts = cx.folder.split('/').filter(Boolean);
+    for (let i = 1; i < parts.length; i++) cx.open.add(cxKey(clips.cat, parts.slice(0, i).join('/')));
   }
+  const node = (cat, sub, name, n, depth, kids) => {
+    const row = document.createElement('div');
+    row.className = 'cx-node';
+    row.style.setProperty('--d', depth);
+    row.setAttribute('role', 'treeitem');
+    const key = cxKey(cat, sub), open = cx.open.has(key);
+    if (kids) row.setAttribute('aria-expanded', String(open));
+    const tw = document.createElement('button');
+    tw.type = 'button'; tw.className = 'cx-tw'; tw.disabled = !kids;
+    tw.textContent = open ? '▾' : '▸';
+    tw.setAttribute('aria-label', open ? `Close ${name}` : `Open ${name}`);
+    tw.addEventListener('click', () => { if (cx.open.has(key)) cx.open.delete(key); else cx.open.add(key); cxTreeBuild(); });
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'cx-fold'; b.dataset.cat = cat; b.dataset.sub = sub;
+    b.setAttribute('aria-current', String(clips.cat === cat && (cat === 'all' || cx.folder === sub)));
+    b.innerHTML = `<span>${escapeHTML(name)}</span><b>${n}</b>`;
+    b.addEventListener('click', () => cxGoFolder(cat, sub));
+    row.append(tw, b);
+    box.appendChild(row);
+    return open;
+  };
+  node('all', '', 'All clips', list.length, 0, false);
+  for (const c of clips.cats) {
+    const folders = cxFolders(c.id);
+    const mine = list.filter((x) => x.c === c.id);
+    const walk = (sub, depth) => {
+      // depth: how many folders down this one is (0: the category itself)
+      const kids = folders.filter((f) => f.split('/').length === depth + 1 && (!sub || f.startsWith(sub + '/')));
+      const n = mine.filter((x) => inFolder(x, c.id, sub)).length;
+      const open = node(c.id, sub, sub ? sub.split('/').pop() : c.n, n, depth, kids.length > 0);
+      if (open) for (const k of kids) walk(k, depth + 1);
+    };
+    walk('', 0);
+  }
+}
+function cxGoFolder(cat, sub) {
+  clips.cat = cat;
+  cx.folder = cat === 'all' ? '' : sub;
+  try { localStorage.setItem(CLIP_TAB_KEY, cat); localStorage.setItem('phosphor-clips-folder', cx.folder); } catch (_) { /* fine */ }
+  if (cat !== 'all') cx.open.add(cxKey(cat, sub));
+  $('#cxNewForm').hidden = true;
+  cxTreeBuild();
+  clipsFilter();
+  clipsDlg.scrollTop = 0;
+}
+// Folder pickers (a clip's folder, Move them to, the snip's folder): every category and every folder in it,
+// as "cat|sub/folder"
+function folderOptions(sel, value, first) {
+  sel.textContent = '';
+  if (first) { const o = document.createElement('option'); o.value = ''; o.textContent = first; sel.appendChild(o); }
+  for (const c of clips.cats) {
+    const o = document.createElement('option'); o.value = cxKey(c.id, ''); o.textContent = c.n; sel.appendChild(o);
+    for (const f of cxFolders(c.id)) {
+      const x = document.createElement('option');
+      x.value = cxKey(c.id, f);
+      x.textContent = `${'\u2003'.repeat(f.split('/').length)}${f.split('/').pop()}`;
+      x.title = [c.n, ...f.split('/')].join(' › ');
+      sel.appendChild(x);
+    }
+  }
+  if (value != null) sel.value = value;
+}
+const splitKey = (v) => { const i = String(v).indexOf('|'); return i < 0 ? { c: String(v), p: '' } : { c: v.slice(0, i), p: v.slice(i + 1) }; };
+// The tag chips: the 40 most used, plus any being filtered by; clicking one filters by it (several: all of them)
+function cxTagsBuild() {
+  const all = cxAllTags();
+  cx.tags = cx.tags.filter((t) => all.some(([x]) => x === t));
+  const box = $('#cxTags');
+  box.textContent = '';
+  const top = all.slice(0, 40).map(([t]) => t);
+  for (const t of cx.tags) if (!top.includes(t)) top.push(t);
+  for (const t of top) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.tag = t;
+    b.innerHTML = `#${escapeHTML(t)} <b>${all.find(([x]) => x === t)?.[1] || 0}</b>`;
+    b.setAttribute('aria-pressed', String(cx.tags.includes(t)));
+    b.addEventListener('click', () => {
+      cx.tags = cx.tags.includes(t) ? cx.tags.filter((x) => x !== t) : [...cx.tags, t];
+      b.setAttribute('aria-pressed', String(cx.tags.includes(t)));
+      clipsFilter();
+    });
+    box.appendChild(b);
+  }
+  const dl = $('#cxTagSuggest');
+  dl.textContent = '';
+  for (const [t] of all) { const o = document.createElement('option'); o.value = t; dl.appendChild(o); }
+}
+function cxTile(c) {
+  const b = document.createElement('button');
+  b.className = 'nat-tile';
+  b.dataset.id = c.id;
+  b.dataset.c = c.c;
+  b.title = `${c.n} (${clipCatName(c.c)})${c.tags && c.tags.length ? ' · ' + c.tags.map((t) => '#' + t).join(' ') : ''}`;
+  b.setAttribute('aria-selected', String(cx.sel.has(c.id)));
+  b.setAttribute('aria-current', String(c.id === clips.cur));
+  const thumb = c.thumb ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : '';
+  b.innerHTML = `${thumb}<em class="clip-dur">${fmtT(c.d || 0)}</em>${c.fx ? '<i class="cx-fxb" title="Effects saved with it">FX</i>' : ''}`
+    + `${c.tags && c.tags.length ? `<span class="cx-tl">${escapeHTML(c.tags.map((t) => '#' + t).join(' '))}</span>` : ''}<span>${escapeHTML(c.n)}</span>`;
+  return b;
+}
+// Draws the next page of tiles (more come as the bottom scrolls into view)
+function cxDrawMore() {
+  const frag = document.createDocumentFragment();
+  const to = Math.min(cx.shown.length, cx.drawn + CX_PAGE);
+  for (let i = cx.drawn; i < to; i++) frag.appendChild(cxTile(cx.shown[i]));
+  cx.drawn = to;
   clipsGrid.appendChild(frag);
+  $('#cxMore').hidden = cx.drawn >= cx.shown.length;
+}
+function clipsFilter() {
+  for (const b of clipsTabs.querySelectorAll('.cx-fold')) b.setAttribute('aria-current', String(b.dataset.cat === clips.cat && (clips.cat === 'all' || b.dataset.sub === cx.folder)));
+  cx.shown = cxFiltered();
+  cx.drawn = 0;
+  clipsGrid.textContent = '';
+  cxDrawMore();
+  const n = cx.shown.length, all = (clips.list || []).length;
+  $('#clipsCount').textContent = clips.list ? (n === all ? `${n} CLIP${n === 1 ? '' : 'S'}` : `${n} OF ${all}`) : '';
+  $('#cxNone').hidden = !clips.list || !!n || !all;
+  cxCopyLabel();
+  if (!cx.obs && 'IntersectionObserver' in window) {
+    cx.obs = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting) && cx.drawn < cx.shown.length) cxDrawMore(); }, { root: clipsDlg, rootMargin: '600px' });
+    cx.obs.observe($('#cxMore'));
+  }
+}
+function cxCopyLabel() {
+  const n = cx.sel.size || cx.shown.length;
+  $('#cxCopy').textContent = cx.sel.size ? `Copy ${n} picked to a drive…` : cx.shown.length < (clips.list || []).length ? `Copy these ${n} to a drive…` : 'Copy to a drive…';
+  $('#cxCopy').disabled = !n;
 }
 function clipsApNote() {
   const hint = $('#clipsHint');
   hint.hidden = false;
+  if (cx.mode === 'seq') {
+    hint.textContent = `Pick a clip to add to track ${seq.selTrack + 1} at the playhead: with its effects, or just the clip. Double-click adds it with its effects when it has some.`;
+    return;
+  }
   const none = clips.list && clips.list.length && !clipsAp().length;
   hint.textContent = none
-    ? `Tap a clip to feed it into loop ${edit}. No category is ticked, so Autopilot won’t bring in clips.`
-    : `Tap a clip to feed it into loop ${edit}. Autopilot puts in a new clip from the ticked categories every few looks; a video file of your own stays put.`;
+    ? 'No category is ticked at the bottom, so Autopilot won’t bring in clips.'
+    : 'Autopilot puts in a new clip from the categories ticked at the bottom every few looks; a video file of your own stays put.';
 }
-function clipsFilter() {
-  for (const b of clipsTabs.children) b.setAttribute('aria-pressed', String(b.dataset.cat === clips.cat));
-  for (const t of clipsGrid.children) t.hidden = clips.cat !== 'all' && t.dataset.c !== clips.cat;
-  const n = clipsShown().length;
-  $('#clipsCount').textContent = clips.list ? `${n} CLIP${n === 1 ? '' : 'S'}` : '';
+/* the picked clip(s), at the side */
+const cxSay = (t) => { $('#cxSay').textContent = t || ''; };
+function cxMarkSel() {
+  for (const t of clipsGrid.children) t.setAttribute('aria-selected', String(cx.sel.has(t.dataset.id)));
+  cxCopyLabel();
+  cxSide();
 }
+function cxSide() {
+  const side = $('#cxSide'), v = $('#cxVideo');
+  const n = cx.sel.size;
+  side.hidden = !n;
+  if (!n) { v.pause(); v.removeAttribute('src'); v.load(); return; }
+  $('#cxOne').hidden = n !== 1;
+  $('#cxMany').hidden = n === 1;
+  if (n > 1) {
+    v.pause(); v.removeAttribute('src'); v.load(); v.hidden = true;
+    $('#cxManyN').textContent = `${n} clips picked`;
+    folderOptions($('#cxManyMove'), '', 'Pick a folder…');
+    return;
+  }
+  const c = cxClip([...cx.sel][0]);
+  if (!c) return;
+  v.hidden = false;
+  const src = `${clips.base}/clip/${encodeURIComponent(c.id)}`;
+  if (v.dataset.id !== c.id) { v.dataset.id = c.id; v.src = src; v.play().catch(() => {}); }
+  if (document.activeElement !== $('#cxName')) $('#cxName').value = c.n;
+  folderOptions($('#cxCat'), cxKey(c.c, c.p || ''));
+  const tl = $('#cxTagList');
+  tl.textContent = '';
+  for (const t of c.tags || []) {
+    const chip = document.createElement('span');
+    chip.className = 'cx-chip';
+    chip.innerHTML = `#${escapeHTML(t)}<button type="button" aria-label="Take off the tag ${escapeHTML(t)}">×</button>`;
+    chip.querySelector('button').addEventListener('click', () => cxEdit(c, { tags: (c.tags || []).filter((x) => x !== t) }));
+    tl.appendChild(chip);
+  }
+  $('#cxFxState').innerHTML = c.fx ? '<b>Effects saved with it.</b> “Use with its effects” brings back the whole picture they were saved with.'
+    : 'No effects saved with it yet.';
+  $('#cxFxSave').textContent = c.fx ? 'Save the picture on screen instead' : 'Save the picture on screen as its effects';
+  $('#cxFxOff').hidden = !c.fx;
+  const seqMode = cx.mode === 'seq';
+  $('#cxUseFx').textContent = seqMode ? `Add to track ${seq.selTrack + 1} with its effects` : 'Use with its effects';
+  $('#cxUseClip').textContent = seqMode ? 'Add just the clip' : 'Just the clip';
+  $('#cxUseFx').disabled = !c.fx;
+  $('#cxUseFx').title = c.fx ? '' : 'This clip has no effects saved with it yet';
+  $('#cxFacts').textContent = [`${fmtT(c.d || 0)} long`, c.w && c.h ? `${c.w}×${c.h}` : '', c.sound ? 'with sound' : '',
+    c.by ? `by ${c.by}` : '', c.lic || '', c.page ? `from ${c.page}` : ''].filter(Boolean).join(' · ');
+}
+// Changes a clip in Phosphor Clips (name, category, tags or effects) and shows the result
+async function cxEdit(c, changes, quiet) {
+  try {
+    const r = await fetch(`${clips.base}/clip/${encodeURIComponent(c.id)}`, { method: 'POST', cache: 'no-store', targetAddressSpace: 'loopback',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes) });
+    let j = null;
+    try { j = await r.json(); } catch (_) { /* no reason given */ }
+    if (!r.ok || !j || !j.ok) {
+      cxSay(j && j.message ? `Couldn’t change it: ${j.message}` : r.status === 404 || r.status === 405
+        ? 'This Phosphor Clips is too old for tags and effects. Install the newest one (1.7 or later).' : 'Couldn’t change it. Is Phosphor Clips still running?');
+      return null;
+    }
+    const i = clips.list.findIndex((x) => x.id === c.id);
+    if (i >= 0) clips.list[i] = j.clip;
+    if (changes.look !== undefined) cxLooks.delete(c.id);
+    if (!quiet) {
+      const tile = clipsGrid.querySelector(`.nat-tile[data-id="${CSS.escape(c.id)}"]`);
+      if (tile) tile.replaceWith(cxTile(j.clip));
+      if (changes.tags !== undefined) cxTagsBuild();
+      // Moved to another folder: the tree's counts change, and it may leave the folder shown
+      if (changes.c !== undefined || changes.p !== undefined) { clipsBuild(); clipsFilter(); }
+      cxSide();
+    }
+    return j.clip;
+  } catch (_) {
+    cxSay('Couldn’t reach Phosphor Clips. Is it running on this computer?');
+    return null;
+  }
+}
+// The effects saved with a clip (asked of Phosphor Clips once, then remembered while the page is open)
+const cxLooks = new Map();
+async function cxLook(c) {
+  if (cxLooks.has(c.id)) return cxLooks.get(c.id);
+  const r = await fetch(`${clips.base}/look/${encodeURIComponent(c.id)}`, clipFetchOpts());
+  const j = await r.json();
+  const look = j && j.look && typeof j.look === 'object' ? j.look : null;
+  cxLooks.set(c.id, look);
+  return look;
+}
+// The whole picture on screen, as effects to save with a clip: a preset's snapshot, plus which loops play the Video
+function clipLookNow() {
+  return { ...snapshot(), vid: activeKeys().filter((k) => usesIn(loops[k].tgt, 'video')) };
+}
+const lookUsesVideo = (look) => ['A', 'B', 'C', 'D'].some((k) => usesIn(look && look[k], 'video'));
+// Uses a clip: in the Video input (with its effects: the picture saved with it comes back, like loading a preset,
+// then the clip plays in it), or as a block in the sequencer
+async function cxUse(c, withFx) {
+  let look = null;
+  if (withFx) {
+    try { look = await cxLook(c); } catch (_) { cxSay('Couldn’t read its effects. Is Phosphor Clips still running?'); return; }
+    if (!look) { cxSay('This clip has no effects saved with it.'); return; }
+  }
+  if (cx.mode === 'seq') {
+    closeClips();
+    seqPlaceClip(c, look);
+    return;
+  }
+  closeClips();
+  if (look) {
+    loadPreset({ id: '', name: c.n, data: look });
+    await clipPick(c, lookUsesVideo(look));
+  } else await clipPick(c);
+}
+function cxPick(id, e) {
+  if (e && (e.ctrlKey || e.metaKey)) {
+    if (cx.sel.has(id)) cx.sel.delete(id); else cx.sel.add(id);
+    cx.anchor = id;
+  } else if (e && e.shiftKey && cx.anchor) {
+    const ids = cx.shown.map((c) => c.id), a = ids.indexOf(cx.anchor), b = ids.indexOf(id);
+    if (a >= 0 && b >= 0) for (let i = Math.min(a, b); i <= Math.max(a, b); i++) cx.sel.add(ids[i]);
+  } else {
+    cx.sel = new Set([id]);
+    cx.anchor = id;
+  }
+  cxSay('');
+  cxMarkSel();
+}
+clipsGrid.addEventListener('click', (e) => {
+  const t = e.target.closest('.nat-tile');
+  if (t) cxPick(t.dataset.id, e);
+});
+clipsGrid.addEventListener('dblclick', (e) => {
+  const t = e.target.closest('.nat-tile');
+  const c = t && cxClip(t.dataset.id);
+  if (c) void cxUse(c, !!c.fx);
+});
+$('#cxSearch').addEventListener('input', () => { cx.q = $('#cxSearch').value; clipsFilter(); });
+$('#cxSort').addEventListener('change', () => { cx.sort = $('#cxSort').value; clipsFilter(); });
+$('#cxName').addEventListener('change', () => {
+  const c = cxClip([...cx.sel][0]), n = $('#cxName').value.trim();
+  if (c && n && n !== c.n) void cxEdit(c, { n });
+});
+$('#cxName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#cxName').blur(); });
+$('#cxCat').addEventListener('change', () => { const c = cxClip([...cx.sel][0]); if (c) void cxEdit(c, splitKey($('#cxCat').value)); });
+$('#cxManyMove').addEventListener('change', async () => {
+  const to = $('#cxManyMove').value;
+  if (!to) return;
+  const ids = [...cx.sel];
+  let n = 0;
+  for (const id of ids) {
+    const c = cxClip(id);
+    if (!c) continue;
+    cxSay(`Moving ${++n} of ${ids.length}…`);
+    if (!(await cxEdit(c, splitKey(to), true))) return;
+  }
+  cxSay(`Moved ${ids.length} clips to ${$('#cxManyMove').selectedOptions[0]?.title || $('#cxManyMove').selectedOptions[0]?.textContent.trim()}.`);
+  clipsBuild();
+  clipsFilter();
+  cxSide();
+});
+// + New folder: inside the folder picked in the tree
+$('#cxNewFolder').addEventListener('click', () => {
+  const f = $('#cxNewForm');
+  if (!f.hidden) { f.hidden = true; return; }
+  if (clips.cat === 'all') { cxSay(''); toast('Pick a category (or a folder in one) on the left first: the new folder goes inside it.'); return; }
+  $('#cxNewWhere').textContent = `Inside ${[clipCatName(clips.cat), ...cx.folder.split('/').filter(Boolean)].join(' › ')}. Enter makes it.`;
+  f.hidden = false;
+  $('#cxNewName').value = '';
+  $('#cxNewName').focus();
+});
+$('#cxNewName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); $('#cxNewForm').hidden = true; } });
+$('#cxNewForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('#cxNewName').value.trim().replace(/[\\/]+/g, ' ');
+  if (!name) return;
+  const want = cx.folder ? `${cx.folder}/${name}` : name;
+  try {
+    const r = await fetch(`${clips.base}/folder`, { method: 'POST', cache: 'no-store', targetAddressSpace: 'loopback',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ c: clips.cat, p: want }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.ok) { toast(j && j.message ? j.message : r.status === 404 ? 'This Phosphor Clips is too old for folders. Install the newest one (1.7 or later).' : 'Couldn’t make the folder.'); return; }
+    await clipList(true);
+    $('#cxNewForm').hidden = true;
+    clipsBuild();
+    cxGoFolder(j.c, j.p);
+  } catch (_) { toast('Couldn’t reach Phosphor Clips. Is it running on this computer?'); }
+});
+// Tags: Enter or a comma adds what's typed (several at once with commas between)
+const splitTags = (s) => String(s || '').toLowerCase().split(',').map((t) => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
+$('#cxTagIn').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();
+  const c = cxClip([...cx.sel][0]), add = splitTags($('#cxTagIn').value);
+  if (!c || !add.length) return;
+  $('#cxTagIn').value = '';
+  void cxEdit(c, { tags: [...(c.tags || []), ...add.filter((t) => !(c.tags || []).includes(t))] });
+});
+$('#cxManyTag').addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const add = splitTags($('#cxManyTag').value);
+  if (!add.length) return;
+  $('#cxManyTag').value = '';
+  const ids = [...cx.sel];
+  let n = 0;
+  for (const id of ids) {
+    const c = cxClip(id);
+    if (!c) continue;
+    cxSay(`Tagging ${++n} of ${ids.length}…`);
+    if (!(await cxEdit(c, { tags: [...(c.tags || []), ...add.filter((t) => !(c.tags || []).includes(t))] }, true))) return;
+  }
+  cxSay(`Added ${add.map((t) => '#' + t).join(' ')} to ${ids.length} clips.`);
+  cxTagsBuild();
+  clipsFilter();
+});
+$('#cxManyNone').addEventListener('click', () => { cx.sel.clear(); cxMarkSel(); });
+$('#cxFxSave').addEventListener('click', async () => {
+  const c = cxClip([...cx.sel][0]);
+  if (!c) return;
+  if (await cxEdit(c, { look: clipLookNow() })) cxSay(`Saved the picture on screen as “${c.n}”’s effects.`);
+});
+$('#cxFxOff').addEventListener('click', async () => {
+  const c = cxClip([...cx.sel][0]);
+  if (c && (await cxEdit(c, { look: null }))) cxSay('Its effects are off. The clip itself is still there.');
+});
+$('#cxUseFx').addEventListener('click', () => { const c = cxClip([...cx.sel][0]); if (c) void cxUse(c, true); });
+$('#cxUseClip').addEventListener('click', () => { const c = cxClip([...cx.sel][0]); if (c) void cxUse(c, false); });
+// Copy to a drive…: the picked clips, or else all the ones shown. Phosphor Clips asks where (its window comes up).
+$('#cxCopy').addEventListener('click', async () => {
+  const ids = cx.sel.size ? [...cx.sel] : cx.shown.map((c) => c.id);
+  if (!ids.length) return;
+  $('#cxCopy').disabled = true;
+  const say = (t) => { if (cx.sel.size) cxSay(t); else if (t) toast(t); };
+  say('Phosphor Clips is asking where to copy them (look for its window)…');
+  try {
+    const r = await fetch(`${clips.base}/copy`, { method: 'POST', cache: 'no-store', targetAddressSpace: 'loopback',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+    let j = null;
+    try { j = await r.json(); } catch (_) { /* no reason */ }
+    if (j && j.ok) say(`Copied ${j.copied} clip${j.copied === 1 ? '' : 's'} to ${j.folder}${j.skipped ? ` (${j.skipped} were there already)` : ''}. On the other computer, drop the category folders inside into its library folder.`);
+    else if (j && j.canceled) say('');
+    else say(j && j.message ? j.message : r.status === 404 ? 'This Phosphor Clips is too old to copy clips. Install the newest one (1.7 or later).' : 'Couldn’t copy them. Is Phosphor Clips still running?');
+  } catch (_) { say('Couldn’t reach Phosphor Clips. Is it running on this computer?'); }
+  cxCopyLabel();
+});
 let clipsReturn = null;
-function openClips() {
+// mode: 'video' (the Video input's Clip library…) or 'seq' (the sequencer's + Add clip…)
+function openClips(mode) {
+  cx.mode = mode === 'seq' ? 'seq' : 'video';
+  $('#clipsTitle').textContent = cx.mode === 'seq' ? `Add a clip to track ${seq.selTrack + 1}` : 'Clip library';
+  $('#clipsFile').hidden = cx.mode === 'seq';
   try { localStorage.setItem(CLIP_ON_KEY, '1'); } catch (_) { /* fine */ }
   if (clipsDlg.hidden) {
     clipsReturn = document.activeElement;
@@ -5308,13 +5717,16 @@ function openClips() {
     }
     clipsSay('');
     clipsApNote();
-    clipsKeepOneReady();
-    const cur = clipsGrid.querySelector('[aria-current="true"]:not([hidden])');
-    if (cur) cur.scrollIntoView({ block: 'center' }); else clipsDlg.scrollTop = 0;
+    cxSide();
+    if (cx.mode === 'video') clipsKeepOneReady();
+    clipsDlg.scrollTop = 0;
+    if (matchMedia('(pointer: fine)').matches) $('#cxSearch').focus({ preventScroll: true });
   }).catch(() => {
     if (clipsDlg.hidden) return;
     clipsGrid.textContent = '';
     clipsTabs.textContent = '';
+    $('#cxTags').textContent = '';
+    $('#cxSide').hidden = true;
     $('#clipsAp').hidden = true;
     $('#clipsHint').hidden = true;
     $('#clipsFoot').hidden = true;
@@ -5325,26 +5737,26 @@ function openClips() {
 }
 function closeClips() {
   if (clipsDlg.hidden) return;
+  const v = $('#cxVideo');
+  v.pause(); v.removeAttribute('src'); v.load(); delete v.dataset.id;
   clipsDlg.hidden = true;
   document.documentElement.style.overflow = '';
   if (clipsReturn && clipsReturn.focus) clipsReturn.focus();
 }
 if (APP) $('#clipOpen').hidden = true;   // Phosphor Clips is a Windows program; the phone has no library to reach
-$('#clipOpen').addEventListener('click', openClips);
+$('#clipOpen').addEventListener('click', () => openClips('video'));
 $('#clipShuffle').addEventListener('click', clipShuffle);
 $('#clipsClose').addEventListener('click', closeClips);
-$('#clipsRetry').addEventListener('click', openClips);
+$('#clipsRetry').addEventListener('click', () => openClips(cx.mode));
 $('#clipsShuffle').addEventListener('click', () => { clipShuffle(); closeClips(); });
 $('#clipsFile').addEventListener('click', () => { closeClips(); $('#vidFile').click(); });
-clipsGrid.addEventListener('click', (e) => {
-  const t = e.target.closest('.nat-tile');
-  if (!t) return;
-  const c = (clips.list || []).find((x) => x.id === t.dataset.id);
-  if (c) clipPick(c);
-  closeClips();
-});
 clipsDlg.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { e.stopPropagation(); closeClips(); }
+  if (e.key === 'Escape') { e.stopPropagation(); if (cx.sel.size && !e.target.closest('input')) { cx.sel.clear(); cxMarkSel(); } else closeClips(); }
+  else if (e.key === 'Enter' && e.target.closest('.nat-tile')) {
+    e.stopPropagation();
+    const c = cxClip(e.target.closest('.nat-tile').dataset.id);
+    if (c) { e.preventDefault(); void cxUse(c, !!c.fx); }
+  }
   else e.stopPropagation(); // keep the keys from firing while browsing
 });
 // Video loops that came back with the page but whose clip can't (Phosphor Clips isn't running): back to a pattern
@@ -5514,16 +5926,18 @@ async function snipOpenForm() {
     snipSay('Phosphor Clips isn’t answering. Start it on this computer (it sits by the clock), then try again. If the browser asks whether this site may reach apps on this device, press Allow.');
     return;
   }
-  const sel = $('#snipCat'), keep = lsGet(SNIP_CAT_KEY) || (src.from && (clips.list || []).find((c) => c.id === src.from)?.c) || '';
-  sel.textContent = '';
-  for (const c of clips.cats) {
-    const o = document.createElement('option');
-    o.value = c.id; o.textContent = c.n;
-    sel.appendChild(o);
-  }
-  if (keep && clips.cats.some((c) => c.id === keep)) sel.value = keep;
+  // The folder: the last one saved to, or else the clip's own; any category or folder inside one
+  const from = src.from && cxClip(src.from);
+  let keep = lsGet(SNIP_CAT_KEY) || (from ? cxKey(from.c, from.p || '') : '');
+  if (keep && !keep.includes('|')) keep = cxKey(keep, '');
+  const sel = $('#snipCat');
+  folderOptions(sel, null);
+  if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
   const r = snipRange();
   $('#snipName').value = `${baseName(src.name)} ${nameT(r.a)}–${nameT(r.b)}`.slice(0, 80);
+  // A snip of a tagged clip starts with its tags; the suggestions are every tag in the library
+  $('#snipTags').value = ((src.from && cxClip(src.from)?.tags) || []).join(', ');
+  cxTagsBuild();
   snipWhatText();
   snipSay('');
   form.hidden = false;
@@ -5537,9 +5951,11 @@ async function snipSave() {
   const src = snipSource(), r = snipRange();
   if (!src) { snipSay('The video has gone. Play it again, then save.'); return; }
   if (!(r.b - r.a >= 0.2)) { snipSay('The marked part is too short. Mark the end further on.'); return; }
-  const name = $('#snipName').value.trim(), cat = $('#snipCat').value;
-  try { localStorage.setItem(SNIP_CAT_KEY, cat); } catch (_) { /* fine */ }
-  const q = new URLSearchParams({ start: r.a.toFixed(3), name, cat, sound: $('#snipSound').checked ? '1' : '0' });
+  const name = $('#snipName').value.trim(), where = $('#snipCat').value, { c: cat, p: folder } = splitKey(where);
+  try { localStorage.setItem(SNIP_CAT_KEY, where); } catch (_) { /* fine */ }
+  const q = new URLSearchParams({ start: r.a.toFixed(3), name, cat, folder, sound: $('#snipSound').checked ? '1' : '0', tags: splitTags($('#snipTags').value).join(',') });
+  // The effects on screen now (taken before the cut, so a change while it's cutting doesn't creep in)
+  const look = $('#snipFx').checked ? clipLookNow() : null;
   if (!r.whole && vidLoopB != null) q.set('end', r.b.toFixed(3));
   let body = null;
   if (src.from) q.set('from', src.from);
@@ -5568,11 +5984,21 @@ async function snipSave() {
         : 'Couldn’t save it. Is Phosphor Clips still running?');
       return;
     }
+    // The effects go to the new clip separately (they're too big to send in the snip's address)
+    let fxNote = '';
+    if (look) {
+      try {
+        const e = await fetch(`${clips.base}/clip/${encodeURIComponent(j.clip.id)}`, { method: 'POST', cache: 'no-store', targetAddressSpace: 'loopback',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ look }) });
+        const ej = await e.json().catch(() => null);
+        fxNote = e.ok && ej && ej.ok ? ', with the effects on screen' : ' (its effects couldn’t be saved: this Phosphor Clips is too old for them; install 1.7 or later)';
+      } catch (_) { fxNote = ' (its effects couldn’t be saved)'; }
+    }
     snipCloseForm();
-    snipSay(`Saved “${j.clip.n}” to ${j.cat || clipCatName(j.clip.c)} in your clip library. It’s in Clip library… and the sequencer’s + Add clip.`);
+    snipSay(`Saved “${j.clip.n}” to ${[j.cat || clipCatName(j.clip.c), ...String(j.clip.p || '').split('/').filter(Boolean)].join(' › ')}${fxNote}. It’s in Clip library… and the sequencer’s + Add clip….`);
     toast(`Saved “${j.clip.n}” to the clip library.`);
     await clipList(true).catch(() => {});
-    if (!clipsDlg.hidden) { clipsBuild(); clipsFilter(); clipMark(); }
+    if (!clipsDlg.hidden) { clipsBuild(); clipsFilter(); }
   } catch (_) {
     snipSay('Couldn’t reach Phosphor Clips. Is it running on this computer?');
   } finally {
@@ -9751,40 +10177,22 @@ $('#seqAddCurrent').addEventListener('click', () => {
   const K = KEYS[seq.selTrack];
   seqPlace('', loopOn(K) ? loops[K].tgt : loops[edit].tgt, true);
 });
-// + Add clip: a clip from the clip library as a block on the chosen track. The block is the track's loop as it looks
-// now with Video as its main input (unless it already uses Video), playing that clip from its start; it lasts as
-// long as the clip (at least 4 seconds), and its ends drag like any block's.
-function seqPlaceClip(c) {
-  const K = KEYS[seq.selTrack], look = JSON.parse(JSON.stringify(loopOn(K) ? loops[K].tgt : loops[edit].tgt));
-  if (!usesIn(look, 'video')) { look.in1 = 'video'; look.size = 100; delete look.asInput; }
+// + Add clip…: opens the clip explorer (search, tags) to pick a clip for the chosen track. The block plays that
+// clip from its start as the Video input and lasts as long as the clip (at least 4 seconds). With its effects, the
+// block's look is the loop that played the clip in the picture saved with it; just the clip, it's the track's loop
+// as it looks now with Video as its main input (unless it already uses Video).
+function seqPlaceClip(c, look) {
+  const K = KEYS[seq.selTrack];
+  let base;
+  if (look) {
+    const from = (Array.isArray(look.vid) && look.vid.find((k) => look[k])) || ['A', 'B', 'C', 'D'].find((k) => usesIn(look[k], 'video')) || 'A';
+    base = JSON.parse(JSON.stringify(look[from] || {}));
+  } else base = JSON.parse(JSON.stringify(loopOn(K) ? loops[K].tgt : loops[edit].tgt));
+  if (!usesIn(base, 'video')) { base.in1 = 'video'; base.size = 100; delete base.asInput; }
   const len = Math.max(4, Math.round((c.d || 16) * 10) / 10);
-  seqPlace(c.n, look, { vid: { kind: 'clip', id: c.id, name: c.n, at: 0 } }, len);
+  seqPlace(look ? `${c.n} (with its effects)`.slice(0, 80) : c.n, base, { vid: { kind: 'clip', id: c.id, name: c.n, at: 0 } }, len);
 }
-async function seqBuildClips(menu) {
-  menu.innerHTML = '<div class="mh">Looking for Phosphor Clips on this computer…</div>';
-  try { localStorage.setItem(CLIP_ON_KEY, '1'); } catch (_) { /* fine */ }
-  try { await clipList(true); } catch (_) {
-    menu.innerHTML = '<div class="mh">Phosphor Clips isn’t answering. Start it on this computer (it sits by the clock), then open this again.</div>';
-    return;
-  }
-  if (menu.hidden) return;
-  menu.innerHTML = '';
-  const list = clips.list || [];
-  if (!list.length) { menu.innerHTML = '<div class="mh">The clip library is empty. Save clips with Phosphor Clips, or with ✂ Save to clip library under Video.</div>'; return; }
-  for (const cat of clips.cats) {
-    const mine = list.filter((c) => c.c === cat.id);
-    if (!mine.length) continue;
-    const h = document.createElement('div'); h.className = 'mh'; h.textContent = cat.n; menu.appendChild(h);
-    for (const c of mine) {
-      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.dataset.clip = c.id;
-      b.title = `${c.n} (${fmtT(c.d || 0)})`;
-      b.innerHTML = `${c.thumb ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : ''}<span>${escapeHTML(c.n)}</span><span class="len">${fmtT(c.d || 0)}</span>`;
-      b.addEventListener('click', () => { seqCloseMenus(); seqPlaceClip(c); });
-      menu.appendChild(b);
-    }
-  }
-  menu.querySelector('button')?.focus();
-}
+$('#seqAddClip').addEventListener('click', () => { seqCloseMenus(); openClips('seq'); });
 function seqAddMarker() {
   const m = { id: TL.id(), t: r1(clamp(seq.t, 0, seqDur())), name: `Marker ${seq.rec.markers.length + 1}` };
   seqChange(() => seq.rec.markers.push(m)); seqNote(`Marker added at ${fmtSeq(m.t, true)}. Double-click it to rename.`);
@@ -9792,7 +10200,7 @@ function seqAddMarker() {
 $('#seqMarker').addEventListener('click', seqAddMarker);
 
 // Drop-down menus: Add saved look, Load sequence
-const seqMenus = [[$('#seqAddSaved'), $('#seqSavedMenu')], [$('#seqAddClip'), $('#seqClipMenu')], [$('#seqLoad'), $('#seqLoadMenu')]];
+const seqMenus = [[$('#seqAddSaved'), $('#seqSavedMenu')], [$('#seqLoad'), $('#seqLoadMenu')]];
 function seqCloseMenus() { seqMenus.forEach(([b, m]) => { m.hidden = true; b.setAttribute('aria-expanded', 'false'); }); }
 function seqMenuItem(menu, label, run) {
   const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.textContent = label;
@@ -9829,10 +10237,8 @@ seqMenus.forEach(([btn, menu]) => {
   btn.addEventListener('click', () => {
     const open = menu.hidden; seqCloseMenus();
     if (!open) return;
-    menu.hidden = false; btn.setAttribute('aria-expanded', 'true');
-    if (menu.id === 'seqClipMenu') { void seqBuildClips(menu); return; }
     if (menu.id === 'seqLoadMenu') seqBuildLoad(menu); else seqBuildSaved(menu);
-    menu.querySelector('button')?.focus();
+    menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); menu.querySelector('button')?.focus();
   });
   menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { seqCloseMenus(); btn.focus(); } });
 });

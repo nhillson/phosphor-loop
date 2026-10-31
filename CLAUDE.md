@@ -48,10 +48,15 @@ file don't rebuild the app.
    (about a minute and a half).
 4i. **Pins per loop** (a pin lights only under the loop it holds, on the tabs and in Spread out controls' columns;
    class-wide updates like `syncPins` skip the column copies with `notCopy`): `python3 tests/pins_check.py` (about a minute).
-4j. **Save to clip library (snips) and the sequencer's + Add clip** (Video › Repeat a section › ✂ Save to clip library;
-   Phosphor Clips' `POST /snip`, clip-app/src/snip.js on the clip-app branch): `CLIPS_APP=<clip-app folder> python3
-   tests/snips_check.py` (about 1.5 minutes; runs the real sharing server and cutter, so ffmpeg must be installed). In the
-   sequencer, click with `element.click()` from page scripts: Playwright's own click waits forever on that page here.
+4j. **The clip explorer** (Clip library… and the sequencer's + Add clip… open it: folder tree of categories and subfolders,
+   search over names and tags, tags, saved effects with Use with its effects / Just the clip, Copy to a drive, New folder,
+   moving clips) **and Save to clip library (snips)** (Video › Repeat a section). Phosphor Clips does the storing (sharing
+   server: /snip, /clip/<id>, /look/<id>, /folder, /copy; clip-app/src/snip.js and library.js on the clip-app branch;
+   each clip's tags and effects live in a <Name>.phosphor.json beside it). Test: `CLIPS_APP=<clip-app folder> python3
+   tests/snips_check.py` (about 3 minutes; runs the real sharing server and cutter, so ffmpeg must be installed). Click
+   from page scripts (`element.click()`), not Playwright's own click: it can wait forever on this page in the workspace
+   browser. `tests/clips_check.py`'s last check (the last clip coming back after a reload) fails here when run after the
+   rest of that test, also on versions before the explorer; it passes on its own.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

@@ -148,6 +148,8 @@ def main():
         errors = []
         pg.on('pageerror', lambda e: errors.append(str(e)))
         c = check.Check(pg, a.out)
+        # Clicks from a page script: Playwright's own click can wait forever on this page in the workspace browser
+        jsclick = lambda sel: pg.locator(sel).first.evaluate('e => e.click()')
         ok = lambda cond, what: None if cond else problems.append(what)
 
         def until(js, what, ceiling_s=20):
@@ -169,21 +171,22 @@ def main():
         # 2. The gallery: categories, Autopilot's categories, tiles
         pg.evaluate("document.querySelector('[data-src=video]').click()")   # the Video input with no video: opens a file chooser for now
         pg.evaluate("document.querySelector('#row-video').hidden = false")
-        pg.click('#clipOpen')
+        jsclick('#clipOpen')
         if until("document.querySelectorAll('#clipsGrid .nat-tile').length === 2", 'the gallery did not show the 2 clips'):
-            tabs = pg.evaluate("[...document.querySelectorAll('#clipsTabs .chip')].map(b => b.textContent.trim())")
-            ok(sorted(tabs) == ['Abstract 1', 'All 2', 'Water 1'] and tabs[0] == 'All 2', f'category tabs: {tabs}')
+            tabs = pg.evaluate("[...document.querySelectorAll('#clipsTabs .cx-fold')].map(b => b.querySelector('span').textContent + ' ' + b.querySelector('b').textContent)")
+            ok(sorted(tabs) == ['Abstract 1', 'All clips 2', 'Other 0', 'Water 1'] and tabs[0] == 'All clips 2', f'the folder tree: {tabs}')
             apc = pg.evaluate("[...document.querySelectorAll('#clipsApCats .chip')].map(b => b.textContent.trim() + ':' + b.getAttribute('aria-pressed'))")
             ok(sorted(apc) == ['Abstract:true', 'Water:true'], f"Autopilot's categories: {apc}")
             until("[...document.querySelectorAll('#clipsGrid img')].every(i => i.complete && i.naturalWidth > 0)", 'the thumbnails did not load')
             c.wait_frames(5, 'gallery')
             pg.screenshot(path=os.path.join(a.out, 'gallery.png'))
-            pg.click('#clipsTabs .chip:has-text("Water")')
+            jsclick('#clipsTabs .cx-fold:has-text("Water")')
             ok(pg.evaluate("[...document.querySelectorAll('#clipsGrid .nat-tile')].filter(t => !t.hidden).length") == 1, 'the Water tab did not show just its clip')
-            pg.click('#clipsTabs .chip:has-text("All")')
+            jsclick('#clipsTabs .cx-fold:has-text("All clips")')
 
-            # 3. Picking a clip feeds it in as Video
-            pg.click(f"#clipsGrid .nat-tile[data-id='{swirl['id']}']")
+            # 3. Picking a clip and pressing Just the clip feeds it in as Video
+            jsclick(f"#clipsGrid .nat-tile[data-id='{swirl['id']}']")   # picks it (shown at the side)
+            jsclick('#cxUseClip')
             if until(f"__plClips.vidOn && __plClips.vidFrames > 5 && __plClips.cur === '{swirl['id']}'", 'the picked clip did not play into the loop'):
                 c.wait_frames(30, 'clip playing')
                 ok(pg.evaluate("__plClips.input(__plClips.edit, 'in1') === 'video' || __plClips.input(__plClips.edit, 'in2') === 'video'"), 'the loop did not switch to Video')
@@ -194,11 +197,11 @@ def main():
                 pg.screenshot(path=os.path.join(a.out, 'controls.png'))
 
             # 4. Autopilot's categories: untick Water
-            pg.click('#clipOpen')
+            jsclick('#clipOpen')
             until("document.querySelectorAll('#clipsApCats .chip').length === 2", 'the gallery did not open again')
-            pg.click('#clipsApCats .chip:has-text("Water")')
+            jsclick('#clipsApCats .chip:has-text("Water")')
             ok(pg.evaluate("JSON.parse(localStorage.getItem('phosphor-clips-ap-off')).includes('water')"), 'unticking Water was not kept')
-            pg.click('#clipsClose')
+            jsclick('#clipsClose')
 
             # 5. Autopilot brings a clip in when a look uses Video and none is in, only from ticked categories
             pg.evaluate("__plClips.detachVideo(); __plClips.setInput('A', 'in1', 'video'); __plClips.setInput('B', 'in1', 'wave'); __plClips.setInput('B', 'in2', 'none');")
@@ -215,7 +218,7 @@ def main():
             # 5b. A real Autopilot run with the library there: a dozen new looks, then a picture
             seen_video = 0
             for i in range(12):
-                pg.click('#nextLookBar')
+                jsclick('#nextLookBar')
                 c.wait_frames(12, f'Autopilot look {i + 1}')
                 if pg.evaluate("['A', 'B'].some(k => __plClips.input(k, 'in1') === 'video' || __plClips.input(k, 'in2') === 'video')"):
                     seen_video += 1
@@ -223,7 +226,7 @@ def main():
             _, light = c.picture('autopilot-with-clips')
             ok(light > 3, f'the picture went black during the Autopilot run ({light:.1f})')
             print(f'  Autopilot: {seen_video} of 12 looks used Video')
-            pg.click('#autopilot') if pg.evaluate("document.querySelector('#autopilot').getAttribute('aria-pressed') === 'true'") else None
+            jsclick('#autopilot') if pg.evaluate("document.querySelector('#autopilot').getAttribute('aria-pressed') === 'true'") else None
 
             # 6. A video file of your own stays put
             pg.evaluate("""fetch('http://127.0.0.1:47811/clip/' + __plClips.list[0].id).then(r => r.blob()).then(b => __plClips.loadFile(new File([b], 'mine.webm', { type: 'video/webm' })))""")
@@ -244,12 +247,12 @@ def main():
         stop()
         stopped = True
         pg.evaluate("document.querySelector('#row-video').hidden = false")   # the Video controls (the page reopened on other inputs)
-        pg.click('#clipOpen')
+        jsclick('#clipOpen')
         until("!document.querySelector('#clipsMsg').hidden && document.querySelector('#clipsMsgText').textContent.includes('isn’t answering')", 'no message when Phosphor Clips is not running')
         c.wait_frames(5, 'message')
         pg.screenshot(path=os.path.join(a.out, 'not-running.png'))
         ok(pg.evaluate("document.querySelector('#clipsGrid').children.length === 0 && !document.querySelector('#clipsRetry').hidden"), 'the not-running message is incomplete')
-        pg.click('#clipsClose')
+        jsclick('#clipsClose')
         if errors:
             problems.extend('page error: ' + e for e in errors)
         b.close()
