@@ -64,6 +64,9 @@ jobs:
           NET: '1'
           RESULTS: ${{ github.workspace }}\clip-app\test-out\engine.json
 
+      - name: Test snips from Phosphor Loop (a part of a library clip, a part of a video sent over)
+        run: node test/snip-test.js
+
       - name: Test the picture recogniser (downloads the model once)
         id: vision
         continue-on-error: true

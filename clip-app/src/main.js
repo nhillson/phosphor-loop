@@ -12,6 +12,7 @@ const E = require('./engine.js');
 const { Library } = require('./library.js');
 const { Vision, combine } = require('./vision.js');
 const { startServer } = require('./server.js');
+const Snip = require('./snip.js');
 
 const TEST = process.env.CLIPS_TEST === '1';
 const START_PAGE = pathToFileURL(path.join(__dirname, 'start', 'index.html')).href;
@@ -938,6 +939,14 @@ async function startSharing() {
   sharing = await startServer({
     getLibrary: () => library, version: app.getVersion(), log, ports,
     onOpen: (o) => openFromChrome(o, 'button'),
+    // A part of the video playing in Phosphor Loop, cut and filed in the library (see snip.js)
+    onSnip: async (req, params) => {
+      const ask = Snip.readAsk(params);
+      await fsp.mkdir(jobsDir(), { recursive: true });
+      const r = await Snip.makeSnip({ tools, library, work: jobsDir(), req, ask, settings, log });
+      sendLibrary();
+      return r;
+    },
     // The Chrome button says hello when it's added to Chrome (and when Chrome starts), so the setup helper can say it
     // worked and an old button can be spotted
     onHello: (_origin, body) => {

@@ -11,6 +11,12 @@
 //   POST /open          { kind: 'page' | 'video' | 'gif' | 'link' | 'grab', url, title, t, src, referer, marks, d, v }
 //                       -> opens it in the app ('grab': straight to a download of the marked part)
 //   POST /hello         { v } the button saying it's in Chrome (so the setup helper can say it worked)
+// And snips from Phosphor Loop (Video › Repeat a section › Save to clip library; see snip.js):
+//   POST /snip?from=<clip id>&start=&end=&name=&cat=&sound=0|1   a part of a library clip
+//   POST /snip?start=&end=&name=&cat=&sound=&src=<file name>      a part of the video in the body (a file of your own)
+//                       -> { ok, clip, cat } once it's cut and in the library
+//   Only Nick's own Phosphor Loop (nhillson.github.io), pages on this computer and files opened directly may send
+//   snips, since they write into the library.
 // /ping also says which version of the button's files Phosphor Clips has (button), so the button can update itself.
 // Only a browser extension may send these (or a program on this computer that says who it is with the
 // X-Phosphor-Clips header), so no website can make Phosphor Clips open things.
@@ -27,6 +33,13 @@ function allowedOrigin(origin) {
   if (!origin) return true;   // typed into the address bar, or a program on this computer
   if (origin === 'null') return true;   // a page opened straight from a file (Phosphor Loop's index.html, say)
   return /^https:\/\/[a-z0-9-]+\.github\.io$/i.test(origin) || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
+}
+
+// Who may add snips to the library: Nick's own Phosphor Loop site, a page on this computer, or a page opened from a file
+function snipOrigin(origin) {
+  if (!origin) return true;
+  if (origin === 'null') return true;
+  return /^https:\/\/nhillson\.github\.io$/i.test(origin) || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
 }
 
 // A browser extension: Chrome and Edge (chrome-extension://), Firefox (moz-extension://)
@@ -75,10 +88,14 @@ function libraryJson(lib, version) {
   return {
     app: 'Phosphor Clips', version,
     cats: d.cats.map((c) => ({ id: c.id, n: c.n, count: d.clips.filter((x) => x.c === c.id).length })),
-    clips: d.clips.map((c) => ({
-      id: c.id, n: c.n, c: c.c, d: c.d, w: c.w, h: c.h, fps: c.fps, sound: !!c.sound, thumb: !!c.t,
-      by: c.by || '', lic: c.lic || '', src: c.src || '', page: c.page || '', added: c.added || '',
-    })),
+    clips: d.clips.map(clipJson),
+  };
+}
+// One clip as Phosphor Loop sees it (no file paths)
+function clipJson(c) {
+  return {
+    id: c.id, n: c.n, c: c.c, d: c.d, w: c.w, h: c.h, fps: c.fps, sound: !!c.sound, thumb: !!c.t,
+    by: c.by || '', lic: c.lic || '', src: c.src || '', page: c.page || '', added: c.added || '',
   };
 }
 
@@ -108,14 +125,15 @@ function sendFile(req, res, file, headers) {
 
 // getLibrary() returns the open Library (it can change when the library folder is changed). onOpen(request, origin)
 // opens something sent from Chrome and returns { ok, message }. onHello(origin) hears the Chrome button say hello.
-function startServer({ getLibrary, onOpen = null, onHello = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
+// onSnip(req, params) makes a snip from Phosphor Loop (see snip.js) and returns { clip, catName }.
+function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin;
     let p = '';
     try { p = new URL(req.url, 'http://127.0.0.1').pathname; } catch (_) { res.writeHead(400); res.end(); return; }
-    const isOpen = p === '/open' || p === '/hello';
+    const isOpen = p === '/open' || p === '/hello', isSnip = p === '/snip';
     // The Chrome button may only ask whether the app is there and send things to open
-    const ok = isOpen ? !origin || extensionOrigin(origin) : allowedOrigin(origin) || (p === '/ping' && extensionOrigin(origin));
+    const ok = isOpen ? !origin || extensionOrigin(origin) : isSnip ? snipOrigin(origin) : allowedOrigin(origin) || (p === '/ping' && extensionOrigin(origin));
     const headers = { 'Vary': 'Origin' };
     if (origin) {
       if (!ok) { res.writeHead(403); res.end(); return; }
@@ -124,7 +142,7 @@ function startServer({ getLibrary, onOpen = null, onHello = null, pingInfo = nul
     }
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
-        ...headers, 'Access-Control-Allow-Methods': isOpen ? 'POST' : 'GET, HEAD',
+        ...headers, 'Access-Control-Allow-Methods': isOpen || isSnip ? 'POST' : 'GET, HEAD',
         'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] || '*',
         // Browsers check this before a website may talk to a program on this computer
         'Access-Control-Allow-Private-Network': 'true', 'Access-Control-Allow-Local-Network': 'true', 'Access-Control-Max-Age': '600',
@@ -144,6 +162,21 @@ function startServer({ getLibrary, onOpen = null, onHello = null, pingInfo = nul
         return;
       }
       handleOpen(req, res, headers, onOpen).catch((e) => { log('open: ' + e.message); try { res.writeHead(500); res.end(); } catch (_) { /* gone */ } });
+      return;
+    }
+    if (isSnip) {
+      const json = (code, o) => { res.writeHead(code, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
+      if (req.method !== 'POST') { res.writeHead(405, { ...headers, Allow: 'POST' }); res.end(); return; }
+      if (!onSnip) { req.resume(); json(503, { ok: false, message: 'Phosphor Clips is still starting.' }); return; }
+      let params;
+      try { params = new URL(req.url, 'http://127.0.0.1').searchParams; } catch (_) { req.resume(); json(400, { ok: false, message: 'That wasn’t understood.' }); return; }
+      Promise.resolve().then(() => onSnip(req, params)).then((r) => {
+        json(200, { ok: true, clip: clipJson(r.clip), cat: r.catName });
+      }, (e) => {
+        log('snip: ' + e.message);
+        req.resume();
+        json(e.status && e.status >= 400 && e.status < 600 ? e.status : 500, { ok: false, message: e.message || 'The snip couldn’t be made.' });
+      });
       return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, headers); res.end(); return; }
@@ -192,4 +225,4 @@ function startServer({ getLibrary, onOpen = null, onHello = null, pingInfo = nul
   });
 }
 
-module.exports = { startServer, allowedOrigin, extensionOrigin, PORTS };
+module.exports = { startServer, allowedOrigin, extensionOrigin, snipOrigin, PORTS };

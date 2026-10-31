@@ -36,6 +36,19 @@ there. Chrome 142+ asks once whether the site may reach apps on this device (Loc
 Phosphor Stream (Electron 38, Chromium 140) doesn't ask; if it moves to Electron 39+ its permission allow-list in
 `stream-app/src/main.js` needs the local/loopback network permission too.
 
+## Snips from Phosphor Loop (`src/snip.js`)
+
+In Phosphor Loop, under **Video › Repeat a section**, mark a start and an end on the video playing, then **Save to
+clip library**: name it, pick a category, and Phosphor Clips cuts that part out and files it like a clip saved in the
+trimmer (H.264 MP4, at the size picked in the trimmer last, sound only if *Keep sound* is ticked there).
+- A library clip: Phosphor Loop sends only its id and the marks (`POST /snip?from=<id>&start=&end=&name=&cat=&sound=`);
+  the snip keeps the clip's credit and says which part of the original it is.
+- A video of your own: Phosphor Loop sends the file in the request (`POST /snip?start=&end=&...&src=<file name>`, up to
+  8 GB); only the snip is kept.
+- Only `https://nhillson.github.io`, localhost pages and file pages may send snips (they write into the library);
+  reading the library stays open to any `*.github.io`. Phosphor Clips must be running on the same computer.
+- Test: `node test/snip-test.js`.
+
 ## Send to Phosphor Clips (the Chrome button, `chrome-button/`)
 
 A Chrome (or Edge) extension that hands what you're watching to Phosphor Clips on the same computer:

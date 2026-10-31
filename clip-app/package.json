@@ -1,7 +1,7 @@
 {
   "name": "phosphor-clips",
   "productName": "Phosphor Clips",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Grab videos and GIFs from the web, trim them and sort them into a clip library for Phosphor Loop",
   "author": "Nick Hillson",
   "license": "UNLICENSED",
@@ -11,6 +11,7 @@
   "scripts": {
     "start": "electron .",
     "test:engine": "node test/engine-test.js",
+    "test:snip": "node test/snip-test.js",
     "test:vision": "node test/vision-test.js",
     "test:app": "node test/app-test.js",
     "dist": "electron-builder --win nsis --x64 --publish never"
