@@ -58,11 +58,14 @@ trimmer (H.264 MP4, at the size picked in the trimmer last, sound only if *Keep 
 - Both live in a **settings file** beside the clip, `<Name>.phosphor.json` (tags, effects, category, credit);
   `library.json` keeps only the tags and whether there are effects (`fx`). Renaming, moving or deleting a clip here
   takes its settings file along.
+- **Subfolders**: inside a category folder, as deep as you like (`Abstract/Fractals/Blue`). Make them in Phosphor
+  Loop's explorer (*New folder*) or in File Explorer; move clips between them from the explorer, or drag them in File
+  Explorer (picked up on the next look). Snips can be saved straight into one.
 - **Copy to a drive…** (Library page: the clips shown; or from Phosphor Loop's explorer: the clips picked there)
-  copies each clip and its settings file into `Phosphor Clips/<Category>/` on the folder or drive you pick. On the
+  copies each clip and its settings file into `Phosphor Clips/<Category>/<subfolders>/` on the folder or drive you pick. On the
   other computer, drop those category folders into its library folder (or press *Look again*): the clips come in
   with their tags, effects and credit.
-- Addresses (sharing server): `POST /clip/<id>` `{ n?, c?, tags?, look? }`, `GET /look/<id>`, `POST /copy` `{ ids }`
+- Addresses (sharing server): `POST /clip/<id>` `{ n?, c?, p?, tags?, look? }`, `POST /folder` `{ c, p }`, `GET /look/<id>`, `POST /copy` `{ ids }`
   (opens the folder picker here); like `/snip`, only from nhillson.github.io, localhost pages and file pages.
 
 ## Send to Phosphor Clips (the Chrome button, `chrome-button/`)

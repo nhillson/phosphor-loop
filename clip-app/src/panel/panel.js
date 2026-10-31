@@ -648,7 +648,7 @@ function renderLibrary() {
   // Every word has to match the name, a tag, where it came from or who made it
   const words = q.split(/\s+/).filter(Boolean);
   const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat)
-    && words.every((w) => (c.n + ' ' + (c.tags || []).join(' ') + ' ' + (c.page || '') + ' ' + (c.by || '')).toLowerCase().includes(w)));
+    && words.every((w) => (c.n + ' ' + (c.tags || []).join(' ') + ' ' + (c.p || '') + ' ' + (c.page || '') + ' ' + (c.by || '')).toLowerCase().includes(w)));
   S.libShown = shown.map((c) => c.id);
   $('#libCopy').disabled = !shown.length || S.copying;
   $('#libCopy').textContent = S.copying ? 'Copying…' : shown.length && shown.length < lib.clips.length ? `Copy these ${shown.length} to a drive…` : 'Copy to a drive…';
@@ -661,7 +661,7 @@ function clipCard(c) {
   const card = el('div', 'clip');
   const pic = el('div', 'pic');
   if (c.thumb) pic.style.backgroundImage = `url("${c.thumb}")`;
-  if (S.libCat === 'all') pic.appendChild(el('span', 'tag', catName(c.c)));
+  if (S.libCat === 'all' || c.p) pic.appendChild(el('span', 'tag', [S.libCat === 'all' ? catName(c.c) : '', ...(c.p ? c.p.split('/') : [])].filter(Boolean).join(' › ')));
   pic.appendChild(el('span', 'dur', fmtLen(c.d || 0)));
   card.appendChild(pic);
   const meta = el('div', 'meta');

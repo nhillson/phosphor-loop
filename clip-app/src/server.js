@@ -15,7 +15,8 @@
 //   POST /snip?from=<clip id>&start=&end=&name=&cat=&sound=0|1   a part of a library clip
 //   POST /snip?start=&end=&name=&cat=&sound=&src=<file name>      a part of the video in the body (a file of your own)
 //                       -> { ok, clip, cat } once it's cut and in the library
-//   POST /clip/<id>     { n?, c?, tags?, look? } changes a clip's name, category, tags or saved effects (look: the
+//   POST /folder        { c, p } makes a subfolder p (Fractals/Blue) in category c -> { ok, c, p }
+//   POST /clip/<id>     { n?, c?, p?, tags?, look? } changes a clip's name, category, subfolder (p), tags or saved effects (look: the
 //                       whole Phosphor Loop picture, like a preset; null takes them off) -> { ok, clip }
 //   GET  /look/<id>     { ok, look } the effects saved with a clip (null if none)
 //   POST /copy          { ids } copies those clips, with their settings files, to a folder Nick picks in Phosphor
@@ -28,6 +29,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const { subOf } = require('./library.js');
 
 const PORTS = [47811, 47812, 47813];
 const TYPES = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska', '.jpg': 'image/jpeg' };
@@ -95,6 +97,8 @@ function libraryJson(lib, version) {
     app: 'Phosphor Clips', version,
     cats: d.cats.map((c) => ({ id: c.id, n: c.n, count: d.clips.filter((x) => x.c === c.id).length })),
     clips: d.clips.map(clipJson),
+    // Every subfolder inside the categories, empty ones too: { c: category id, p: Fractals/Blue }
+    folders: (d.dirs || []).map((x) => ({ c: x.c, p: x.p })),
   };
 }
 // One clip as Phosphor Loop sees it (no file paths)
@@ -102,7 +106,7 @@ function clipJson(c) {
   return {
     id: c.id, n: c.n, c: c.c, d: c.d, w: c.w, h: c.h, fps: c.fps, sound: !!c.sound, thumb: !!c.t,
     by: c.by || '', lic: c.lic || '', src: c.src || '', page: c.page || '', added: c.added || '',
-    tags: c.tags || [], fx: !!c.fx,
+    tags: c.tags || [], fx: !!c.fx, p: subOf(c.f),
   };
 }
 
@@ -134,7 +138,7 @@ function sendFile(req, res, file, headers) {
 // opens something sent from Chrome and returns { ok, message }. onHello(origin) hears the Chrome button say hello.
 // onSnip(req, params) makes a snip from Phosphor Loop (see snip.js) and returns { clip, catName }. onEdit(id, changes)
 // changes a clip and returns it. onCopy(ids) asks where to copy those clips and returns { ok, copied, skipped, folder }.
-function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null, onEdit = null, onCopy = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
+function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null, onEdit = null, onCopy = null, onFolder = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin;
     let p = '';
@@ -143,7 +147,7 @@ function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null,
     // Changes to the library: a snip, a copy, or an edit (POST to a clip's own address, whose GET is its video)
     const editId = /^\/clip\/[a-z0-9-]+$/i.test(p) ? p.split('/')[2] : '';
     const posting = req.method === 'POST' || (req.method === 'OPTIONS' && /POST/i.test(req.headers['access-control-request-method'] || ''));
-    const isWrite = isSnip || p === '/copy' || (editId && posting);
+    const isWrite = isSnip || p === '/copy' || p === '/folder' || (editId && posting);
     // The Chrome button may only ask whether the app is there and send things to open
     const ok = isOpen ? !origin || extensionOrigin(origin) : isWrite ? snipOrigin(origin) : allowedOrigin(origin) || (p === '/ping' && extensionOrigin(origin));
     const headers = { 'Vary': 'Origin' };
@@ -154,7 +158,7 @@ function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null,
     }
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
-        ...headers, 'Access-Control-Allow-Methods': isOpen || isSnip || p === '/copy' ? 'POST' : editId ? 'GET, HEAD, POST' : 'GET, HEAD',
+        ...headers, 'Access-Control-Allow-Methods': isOpen || isSnip || p === '/copy' || p === '/folder' ? 'POST' : editId ? 'GET, HEAD, POST' : 'GET, HEAD',
         'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] || '*',
         // Browsers check this before a website may talk to a program on this computer
         'Access-Control-Allow-Private-Network': 'true', 'Access-Control-Allow-Local-Network': 'true', 'Access-Control-Max-Age': '600',
@@ -191,16 +195,17 @@ function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null,
       });
       return;
     }
-    if (p === '/copy' || (editId && req.method === 'POST')) {
+    if (p === '/copy' || p === '/folder' || (editId && req.method === 'POST')) {
       const json = (code, o) => { res.writeHead(code, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
       if (req.method !== 'POST') { res.writeHead(405, { ...headers, Allow: 'POST' }); res.end(); return; }
-      const fn = editId ? onEdit : onCopy;
+      const fn = editId ? onEdit : p === '/folder' ? onFolder : onCopy;
       if (!fn) { req.resume(); json(503, { ok: false, message: 'Phosphor Clips is still starting.' }); return; }
       readBody(req, MAX_EDIT).then((text) => {
         let b;
         try { b = JSON.parse(text || '{}'); } catch (_) { throw Object.assign(new Error('That wasn’t understood.'), { status: 400 }); }
         if (!b || typeof b !== 'object') throw Object.assign(new Error('That wasn’t understood.'), { status: 400 });
         if (editId) return fn(editId, b).then((clip) => ({ ok: true, clip: clipJson(clip) }));
+        if (p === '/folder') return Promise.resolve(fn(String(b.c || ''), String(b.p || ''))).then((f) => ({ ok: true, ...f }));
         if (!Array.isArray(b.ids) || !b.ids.length) throw Object.assign(new Error('Pick some clips to copy first.'), { status: 400 });
         return fn(b.ids.map(String).slice(0, 100000));
       }).then((r) => json(200, r), (e) => {

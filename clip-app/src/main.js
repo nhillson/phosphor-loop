@@ -9,7 +9,7 @@ const fsp = fs.promises;
 const { pathToFileURL } = require('node:url');
 const { execFile } = require('node:child_process');
 const E = require('./engine.js');
-const { Library } = require('./library.js');
+const { Library, subOf } = require('./library.js');
 const { Vision, combine } = require('./vision.js');
 const { startServer } = require('./server.js');
 const Snip = require('./snip.js');
@@ -170,7 +170,7 @@ const fileUrl = (p, bust) => (p ? pathToFileURL(p).href + (bust ? '?v=' + bust :
 function clipForPanel(c) {
   let t = 0;
   try { t = c.t ? Math.round(fs.statSync(library.thumbAbs(c)).mtimeMs) : 0; } catch (_) { /* no thumbnail yet */ }
-  return { ...c, url: fileUrl(library.abs(c)), thumb: t ? fileUrl(library.thumbAbs(c), t) : '' };
+  return { ...c, p: subOf(c.f), url: fileUrl(library.abs(c)), thumb: t ? fileUrl(library.thumbAbs(c), t) : '' };
 }
 function libraryForPanel() {
   if (!library) return null;
@@ -953,6 +953,7 @@ async function startSharing() {
       const ch = {};
       if (typeof b.n === 'string' && b.n.trim()) ch.n = b.n.trim().slice(0, 80);
       if (typeof b.c === 'string' && b.c) ch.c = b.c;
+      if (typeof b.p === 'string') ch.p = b.p;
       if (b.tags !== undefined) ch.tags = b.tags;
       if (b.look !== undefined) ch.look = b.look;
       const clip = await library.updateClip(id, ch);
@@ -961,6 +962,8 @@ async function startSharing() {
     },
     // Phosphor Loop's clip explorer: Copy to a drive… for the clips picked there
     onCopy: (ids) => copyClips(ids),
+    // Phosphor Loop's clip explorer: New folder
+    onFolder: async (c, p) => { const f = await library.addFolder(c, p); sendLibrary(); return f; },
     // The Chrome button says hello when it's added to Chrome (and when Chrome starts), so the setup helper can say it
     // worked and an old button can be spotted
     onHello: (_origin, body) => {

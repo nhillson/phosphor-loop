@@ -8,6 +8,9 @@
 // files into a category folder of another library (on another computer, say) and that library picks up the tags and
 // effects too. library.json keeps the tags and whether there are effects (fx); the effects themselves stay in the
 // settings file, so library.json stays small with thousands of clips.
+// Inside a category folder there can be subfolders, as deep as you like (Abstract/Fractals/Blue): a clip's subfolder is
+// the part of its file path between the category folder and its name (subOf). Empty folders are kept in the list too
+// (dirs), so a folder made for clips still to come shows up in Phosphor Loop.
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
@@ -17,6 +20,14 @@ const { DEFAULT_CATEGORIES, slug } = require('./categories.js');
 const VIDEO_EXT = /\.(mp4|m4v|webm|mov|mkv)$/i;
 const INDEX = 'library.json';
 const SIDE = '.phosphor.json';
+const MAX_DEPTH = 8;
+// A subfolder path made safe: each part a name Windows takes, no "..", joined with /
+function cleanSub(p) {
+  return String(p || '').split(/[\\/]+/).map((x) => x.trim()).filter((x) => x && x !== '.' && x !== '..')
+    .slice(0, MAX_DEPTH).map((x) => safeName(x, '').slice(0, 60)).filter(Boolean).join('/');
+}
+// The subfolder a clip's file sits in, inside its category folder ('' at the top of the category)
+const subOf = (f) => String(f || '').split('/').slice(1, -1).join('/');
 // Tags: lower case, single spaces, no commas, up to 40 of them
 function cleanTags(tags) {
   const out = [];
@@ -73,6 +84,8 @@ class Library {
   indexFile() { return path.join(this.dir, INDEX); }
   cat(id) { return this.data.cats.find((c) => c.id === id); }
   catFolder(cat) { return path.join(this.dir, safeName(cat.n, cat.id)); }
+  // A folder inside a category: its category folder, then the subfolder
+  subFolder(cat, sub) { return path.join(this.catFolder(cat), ...cleanSub(sub).split('/').filter(Boolean)); }
   abs(clip) { return path.join(this.dir, ...clip.f.split('/')); }
   thumbAbs(clip) { return clip.t ? path.join(this.dir, ...clip.t.split('/')) : ''; }
   // The clip's settings file: beside it, with the same name
@@ -138,6 +151,7 @@ class Library {
   scan() {
     return this.serial(async () => {
       const onDisk = new Map();   // file path relative to the library → category id
+      const dirs = [];            // every subfolder: { c: category id, p: its path inside the category }
       const folders = new Map(this.data.cats.map((c) => [safeName(c.n, c.id).toLowerCase(), c.id]));
       let entries = [];
       try { entries = await fsp.readdir(this.dir, { withFileTypes: true }); } catch (_) { /* empty */ }
@@ -146,9 +160,19 @@ class Library {
         if (e.isFile() && VIDEO_EXT.test(e.name)) { onDisk.set(e.name, 'other'); continue; }
         if (!e.isDirectory()) continue;
         let id = folders.get(e.name.toLowerCase());
-        let files = [];
-        try { files = await fsp.readdir(path.join(this.dir, e.name)); } catch (_) { continue; }
-        files = files.filter((f) => VIDEO_EXT.test(f));
+        // Every video in the category folder and its subfolders (and every subfolder, empty or not)
+        const files = [], subs = [];
+        const walk = async (relDir, depth) => {
+          let list = [];
+          try { list = await fsp.readdir(path.join(this.dir, e.name, ...relDir.split('/').filter(Boolean)), { withFileTypes: true }); } catch (_) { return; }
+          for (const x of list) {
+            if (x.name.startsWith('.')) continue;
+            const r = relDir ? relDir + '/' + x.name : x.name;
+            if (x.isFile() && VIDEO_EXT.test(x.name)) files.push(r);
+            else if (x.isDirectory() && depth < MAX_DEPTH && !/\.renaming$/.test(x.name)) { subs.push(r); await walk(r, depth + 1); }
+          }
+        };
+        await walk('', 1);
         if (!id) {
           if (!files.length) continue;
           id = this.uniqueCatId(slug(e.name));
@@ -157,7 +181,9 @@ class Library {
           this.log('library: new category from folder ' + e.name);
         }
         for (const f of files) onDisk.set(e.name + '/' + f, id);
+        dirs.push(...subs.map((p) => ({ c: id, p })));
       }
+      this.data.dirs = dirs;
       const byName = new Map();
       for (const k of onDisk.keys()) {
         const b = k.split('/').pop().toLowerCase();
@@ -230,8 +256,9 @@ class Library {
   addClip(file, meta) {
     return this.serial(async () => {
       const cat = this.cat(meta.c) || this.cat('other');
-      const folder = this.catFolder(cat);
+      const folder = this.subFolder(cat, meta.p);
       await fsp.mkdir(folder, { recursive: true });
+      this.noteDir(cat.id, meta.p);
       const dest = await this.uniquePath(folder, meta.n || 'clip', path.extname(file) || '.mp4');
       await moveFile(file, dest);
       const clip = {
@@ -257,9 +284,12 @@ class Library {
       const cat = changes.c ? this.cat(changes.c) : this.cat(clip.c);
       if (!cat) throw new Error('That category doesn’t exist.');
       const name = changes.n != null ? safeName(changes.n) : clip.n;
-      if (cat.id !== clip.c || name !== clip.n) {
+      // The subfolder: as asked; else the same one when the category stays, the top of the new category when it changes
+      const sub = changes.p !== undefined ? cleanSub(changes.p) : cat.id === clip.c ? subOf(clip.f) : '';
+      if (cat.id !== clip.c || name !== clip.n || sub !== subOf(clip.f)) {
         const from = this.abs(clip), sideFrom = this.sideAbs(clip);
-        const dest = await this.uniquePath(this.catFolder(cat), name, path.extname(from), from);
+        this.noteDir(cat.id, sub);
+        const dest = await this.uniquePath(this.subFolder(cat, sub), name, path.extname(from), from);
         if (dest !== from) await moveFile(from, dest);
         clip.f = rel(path.relative(this.dir, dest));
         clip.n = path.basename(dest).replace(/\.[^.]+$/, '');
@@ -267,7 +297,7 @@ class Library {
         // Its settings file goes with it
         if (await exists(sideFrom) && sideFrom !== this.sideAbs(clip)) await moveFile(sideFrom, this.sideAbs(clip));
       }
-      const sideChanged = changes.tags !== undefined || changes.look !== undefined || changes.n != null || changes.c;
+      const sideChanged = changes.tags !== undefined || changes.look !== undefined || changes.n != null || changes.c || changes.p !== undefined;
       if (changes.tags !== undefined) {
         const tags = cleanTags(changes.tags);
         if (tags.length) clip.tags = tags; else delete clip.tags;
@@ -288,6 +318,32 @@ class Library {
       if (clip.t) await fsp.rm(this.thumbAbs(clip), { force: true }).catch(() => {});
       this.data.clips = this.data.clips.filter((c) => c !== clip);
       await this.write();
+    });
+  }
+
+  /* ---------- subfolders ---------- */
+  // Remembers a subfolder (so it's listed even while empty)
+  noteDir(c, sub) {
+    sub = cleanSub(sub);
+    if (!sub) return;
+    if (!this.data.dirs) this.data.dirs = [];
+    const parts = sub.split('/');
+    for (let i = 1; i <= parts.length; i++) {
+      const p = parts.slice(0, i).join('/');
+      if (!this.data.dirs.some((d) => d.c === c && d.p === p)) this.data.dirs.push({ c, p });
+    }
+  }
+  // Makes a subfolder in a category (and any above it)
+  addFolder(c, sub) {
+    return this.serial(async () => {
+      const cat = this.cat(c);
+      if (!cat) throw new Error('That category doesn’t exist.');
+      const p = cleanSub(sub);
+      if (!p) throw new Error('Give the folder a name.');
+      await fsp.mkdir(this.subFolder(cat, p), { recursive: true });
+      this.noteDir(cat.id, p);
+      await this.write();
+      return { c: cat.id, p };
     });
   }
 
@@ -334,8 +390,7 @@ class Library {
         }
         for (const c of this.data.clips) {
           if (c.c !== cat.id) continue;
-          const f = c.f.split('/').pop();
-          c.f = rel(path.relative(this.dir, path.join(newFolder, f)));
+          c.f = rel(path.relative(this.dir, path.join(newFolder, ...c.f.split('/').slice(1))));
         }
       }
       await this.write();
@@ -354,13 +409,17 @@ class Library {
       for (const c of this.data.clips) {
         if (c.c !== id) continue;
         const from = this.abs(c), sideFrom = this.sideAbs(c);
-        const dest = await this.uniquePath(this.catFolder(other), c.n, path.extname(from));
+        const sub = subOf(c.f);
+        await fsp.mkdir(this.subFolder(other, sub), { recursive: true });
+        const dest = await this.uniquePath(this.subFolder(other, sub), c.n, path.extname(from));
         if (await exists(from)) await moveFile(from, dest);
         c.f = rel(path.relative(this.dir, dest));
         c.c = 'other';
         if (await exists(sideFrom)) { await moveFile(sideFrom, this.sideAbs(c)); await this.writeSide(c); }
       }
-      try { if (!(await fsp.readdir(folder)).length) await fsp.rmdir(folder); } catch (_) { /* gone already */ }
+      // The emptied folder goes, subfolders and all (only if nothing but empty folders is left)
+      try { await rmEmptyTree(folder); } catch (_) { /* something's still in it: it stays */ }
+      this.data.dirs = (this.data.dirs || []).filter((d) => d.c !== id);
       this.data.cats = this.data.cats.filter((c) => c !== cat);
       await this.write();
     });
@@ -380,7 +439,7 @@ Library.prototype.copyTo = async function copyTo(dest, ids, onProgress = () => {
   for (const c of list) {
     onProgress(++i, list.length, c);
     const cat = this.cat(c.c) || { n: 'Other', id: 'other' };
-    const folder = path.join(root, safeName(cat.n, cat.id));
+    const folder = path.join(root, safeName(cat.n, cat.id), ...subOf(c.f).split('/').filter(Boolean));
     await fsp.mkdir(folder, { recursive: true });
     const from = this.abs(c), to = path.join(folder, path.basename(from));
     let st;
@@ -396,6 +455,15 @@ Library.prototype.copyTo = async function copyTo(dest, ids, onProgress = () => {
   return { copied, skipped, folder: root };
 };
 
+// Removes a folder whose tree holds nothing but empty folders
+async function rmEmptyTree(dir) {
+  for (const e of await fsp.readdir(dir, { withFileTypes: true })) {
+    if (!e.isDirectory()) throw new Error('not empty');
+    await rmEmptyTree(path.join(dir, e.name));
+  }
+  await fsp.rmdir(dir);
+}
+
 const round = (n) => (Number.isFinite(+n) ? Math.round(+n * 100) / 100 : undefined);
 
-module.exports = { Library, safeName, cleanTags, VIDEO_EXT, SIDE };
+module.exports = { Library, safeName, cleanTags, cleanSub, subOf, VIDEO_EXT, SIDE };

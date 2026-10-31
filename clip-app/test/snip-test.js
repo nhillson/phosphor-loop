@@ -38,6 +38,7 @@ const make = (file, secs, extra = []) => {
     getLibrary: () => lib, version: 'test', ports: [47911],
     onSnip: (req, params) => Snip.makeSnip({ tools, library: lib, work, req, ask: Snip.readAsk(params), settings: { maxHeight: 720 } }),
     onEdit: (id, b) => lib.updateClip(id, b),
+    onFolder: (c, p) => lib.addFolder(c, p),
     onCopy: async (ids) => ({ ok: true, ...(await lib.copyTo(copyTo, ids)) }),
   });
   const base = `http://127.0.0.1:${sh.port}`;
@@ -188,6 +189,40 @@ const make = (file, secs, extra = []) => {
     assert.deepEqual(await lib2.lookOf(got), LOOK, 'effects intact');
     const lo = lib2.data.clips.find((x) => x.n === 'Long one');
     assert.equal(lo.by, 'Someone', 'credit came along');
+  });
+
+  await test('subfolders: snip into one, make one, move a clip, copy keeps them, another library picks them up', async () => {
+    const j = await (await post({ from: orig.id, start: 1, end: 3, name: 'Deep', cat: 'abstract', folder: 'Fractals/Blue', tags: 'fractal' })).json();
+    assert.equal(j.ok, true, JSON.stringify(j));
+    assert.equal(j.clip.p, 'Fractals/Blue');
+    const c = lib.data.clips.find((x) => x.id === j.clip.id);
+    assert.ok(lib.abs(c).includes(path.join('Abstract', 'Fractals', 'Blue')), lib.abs(c));
+    const f = await (await fetch(`${base}/folder`, { method: 'POST', body: JSON.stringify({ c: 'abstract', p: 'Industrial/../Rust' }), headers: { Origin: 'https://nhillson.github.io' } })).json();
+    assert.equal(f.ok, true); assert.equal(f.p, 'Industrial/Rust', 'no climbing out with ..');
+    let lj = await (await fetch(base + '/library.json')).json();
+    const ps = lj.folders.filter((x) => x.c === 'abstract').map((x) => x.p).sort();
+    assert.deepEqual(ps, ['Fractals', 'Fractals/Blue', 'Industrial', 'Industrial/Rust'], 'folders listed, empty ones too: ' + ps);
+    const e = await (await edit(c.id, { p: 'Industrial/Rust' })).json();
+    assert.equal(e.clip.p, 'Industrial/Rust');
+    assert.ok(fs.existsSync(path.join(dir, 'Abstract', 'Industrial', 'Rust', 'Deep.mp4')) && fs.existsSync(path.join(dir, 'Abstract', 'Industrial', 'Rust', 'Deep.phosphor.json')), 'moved with its settings file');
+    // Moved in File Explorer into a new subfolder: picked up there on the next look
+    fs.mkdirSync(path.join(dir, 'Abstract', 'Moved'));
+    fs.renameSync(path.join(dir, 'Abstract', 'Industrial', 'Rust', 'Deep.mp4'), path.join(dir, 'Abstract', 'Moved', 'Deep.mp4'));
+    await lib.scan();
+    assert.equal(lib.data.clips.find((x) => x.id === c.id).f, 'Abstract/Moved/Deep.mp4', 'followed the move');
+    // Copied to a drive and into another library, folders and all
+    copyTo = path.join(work, 'USB 2'); fs.mkdirSync(copyTo);
+    const r = await (await fetch(`${base}/copy`, { method: 'POST', body: JSON.stringify({ ids: [c.id] }), headers: { Origin: 'null' } })).json();
+    assert.equal(r.copied, 1);
+    assert.ok(fs.existsSync(path.join(copyTo, 'Phosphor Clips', 'Abstract', 'Moved', 'Deep.mp4')), 'subfolder kept on the drive');
+    const dir3 = path.join(work, 'lib3');
+    const lib3 = new Library(dir3, { probe: (x) => E.probe(tools, x) });
+    await lib3.open();
+    fs.cpSync(path.join(copyTo, 'Phosphor Clips'), dir3, { recursive: true });
+    await lib3.scan();
+    const got = lib3.data.clips.find((x) => x.n === 'Deep');
+    assert.ok(got && got.f === 'Abstract/Moved/Deep.mp4' && got.c === 'abstract', 'in its subfolder: ' + (got && got.f));
+    assert.deepEqual(got.tags, ['fractal']);
   });
 
   sh.close();

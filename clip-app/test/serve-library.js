@@ -35,6 +35,7 @@ const { startServer } = require('../src/server.js');
     onSnip: (req, params) => Snip.makeSnip({ tools, library: lib, work: os.tmpdir(), req, ask: Snip.readAsk(params), log: (s) => console.log('  ' + s) }),
     // Edits from Phosphor Loop's clip explorer, and Copy to a drive… into CLIPS_COPY_TO (the real app asks where)
     onEdit: (id, b) => lib.updateClip(id, b),
+    onFolder: (c, p) => lib.addFolder(c, p),
     onCopy: async (ids) => (process.env.CLIPS_COPY_TO ? { ok: true, ...(await lib.copyTo(process.env.CLIPS_COPY_TO, ids)) } : { ok: false, canceled: true }),
   });
   if (!sh) { console.log('FAILED port ' + port); process.exit(1); }
