@@ -48,6 +48,10 @@ file don't rebuild the app.
    (about a minute and a half).
 4i. **Pins per loop** (a pin lights only under the loop it holds, on the tabs and in Spread out controls' columns;
    class-wide updates like `syncPins` skip the column copies with `notCopy`): `python3 tests/pins_check.py` (about a minute).
+4j. **Save to clip library (snips) and the sequencer's + Add clip** (Video › Repeat a section › ✂ Save to clip library;
+   Phosphor Clips' `POST /snip`, clip-app/src/snip.js on the clip-app branch): `CLIPS_APP=<clip-app folder> python3
+   tests/snips_check.py` (about 1.5 minutes; runs the real sharing server and cutter, so ffmpeg must be installed). In the
+   sequencer, click with `element.click()` from page scripts: Playwright's own click waits forever on that page here.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

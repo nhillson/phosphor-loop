@@ -473,6 +473,19 @@
   .vcr-time { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
   .vcr-time .tc { font: 19px/1 var(--f-osd); color: var(--amber-ink); font-variant-numeric: tabular-nums; min-width: 4ch; }
   .vcr-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* The marked part of the video, as a bar under the position slider */
+  .vid-track { position: relative; display: flex; align-items: center; min-width: 0; }
+  .vid-track input { width: 100%; }
+  .vid-mark { position: absolute; bottom: -5px; height: 4px; border-radius: 2px; background: var(--amber); opacity: .9; pointer-events: none; }
+  /* Save to clip library: the marked part cut out into Phosphor Clips */
+  .snip { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .snip > .btn { align-self: flex-start; }
+  .snip-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--well); }
+  .snip-form[hidden] { display: none; }
+  .snip-form select { margin: 0; }
+  .snip-what { font-size: 13px; color: var(--dim); }
+  .snip-sound { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .snip-status:empty { display: none; }
   details.adj { border-top: 1px solid var(--line); padding-top: 8px; }
   details.adj summary {
     cursor: pointer; font-weight: 600; font-size: 14px; color: var(--dim); list-style-position: inside;
@@ -948,6 +961,10 @@
 .seq-menu > button:hover:not(:disabled), .seq-menu > button:focus-visible { background: var(--press-1); color: var(--press-ink); }
 .seq-menu > button:disabled { opacity: .45; cursor: default; }
 .seq-menu > button[aria-checked="true"]::after { content: "\2713"; color: var(--loop-a-ink); }
+.seq-clipmenu { min-width: 300px; }
+.seq-clipmenu > button { justify-content: flex-start; align-items: center; gap: 10px; }
+.seq-clipmenu img { width: 64px; height: 36px; object-fit: cover; border-radius: 3px; background: #000; flex: none; }
+.seq-clipmenu .len { margin-left: auto; font-size: 12px; color: var(--dim); }
 
 .seq-tl { display: flex; gap: 8px; min-width: 0; }
 .seq-heads .seq-card { gap: 8px; padding: 0 8px; font-size: 13px; }

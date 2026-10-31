@@ -103,6 +103,10 @@
             <button class="btn small" id="seqAddSaved" aria-haspopup="menu" aria-expanded="false" aria-controls="seqSavedMenu">+ Add saved look<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
             <div class="seq-menu" id="seqSavedMenu" role="menu" hidden></div>
           </span>
+          <span class="seq-menuwrap">
+            <button class="btn small" id="seqAddClip" aria-haspopup="menu" aria-expanded="false" aria-controls="seqClipMenu" title="A clip from your clip library (Phosphor Clips), played as this loop’s Video input">+ Add clip<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+            <div class="seq-menu seq-clipmenu" id="seqClipMenu" role="menu" hidden></div>
+          </span>
           <span class="seq-vsep" aria-hidden="true"></span>
           <button class="btn small" id="seqMarker" title="Add a section marker at the playhead (key M, works while playing)">+ Marker</button>
           <button class="btn small seq-recbtn" id="seqRec" aria-pressed="false" title="While the sequence plays, the look you have on the chosen loop is written into its track"><span class="led"></span>Record look changes</button>
@@ -340,7 +344,7 @@
             <div class="vcr" id="vcr" hidden>
               <div class="vcr-time">
                 <span class="tc" id="vidTime">0:00</span>
-                <input type="range" id="vidPos" min="0" max="1000" step="1" value="0" aria-label="Position in the video">
+                <span class="vid-track"><input type="range" id="vidPos" min="0" max="1000" step="1" value="0" aria-label="Position in the video"><span class="vid-mark" id="vidMark" hidden></span></span>
                 <span class="tc" id="vidDur">0:00</span>
               </div>
               <div class="vcr-keys">
@@ -368,6 +372,20 @@
                   <button class="btn small" id="vidAll" hidden>Whole video</button>
                 </div>
                 <span class="hint" id="vidLoopText">The whole video plays on repeat.</span>
+                <div class="snip">
+                  <button class="btn small" id="snipOpen" title="Cut the marked part out of this video and keep it in your clip library (Phosphor Clips), where Autopilot and the sequencer can use it">✂ Save to clip library…</button>
+                  <form class="snip-form" id="snipForm" hidden>
+                    <span class="snip-what" id="snipWhat"></span>
+                    <input class="seq-in" id="snipName" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Name" aria-label="Name for the snip">
+                    <select id="snipCat" aria-label="Category"></select>
+                    <label class="snip-sound"><input type="checkbox" id="snipSound"> Keep sound</label>
+                    <span class="vcr-keys">
+                      <button class="btn small" type="submit" id="snipSave">Save</button>
+                      <button class="btn small" type="button" id="snipCancel">Cancel</button>
+                    </span>
+                  </form>
+                  <span class="hint snip-status" id="snipStatus" role="status" aria-live="polite"></span>
+                </div>
               </div>
             </div>
             <span class="pic-credit" id="clipCredit" hidden></span>
@@ -1117,7 +1135,7 @@
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery. Your own picture… loads a file of yours.</dd>
-            <dt>Video</dt><dd>Your own file. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section.</dd>
+            <dt>Video</dt><dd>Your own file, or a clip from your clip library. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section. <b>✂ Save to clip library</b> cuts the marked section out into your clip library (Phosphor Clips 1.6 or later, running on the same computer), where the gallery, Autopilot and the sequencer’s <b>+ Add clip</b> can use it.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
