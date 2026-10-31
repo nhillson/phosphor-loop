@@ -32,7 +32,11 @@ const { startServer } = require('../src/server.js');
   // Snips from Phosphor Loop are cut and filed the real way (snip.js)
   const Snip = require('../src/snip.js');
   const sh = await startServer({ getLibrary: () => lib, version: 'test', ports: [port],
-    onSnip: (req, params) => Snip.makeSnip({ tools, library: lib, work: os.tmpdir(), req, ask: Snip.readAsk(params), log: (s) => console.log('  ' + s) }) });
+    onSnip: (req, params) => Snip.makeSnip({ tools, library: lib, work: os.tmpdir(), req, ask: Snip.readAsk(params), log: (s) => console.log('  ' + s) }),
+    // Edits from Phosphor Loop's clip explorer, and Copy to a drive… into CLIPS_COPY_TO (the real app asks where)
+    onEdit: (id, b) => lib.updateClip(id, b),
+    onCopy: async (ids) => (process.env.CLIPS_COPY_TO ? { ok: true, ...(await lib.copyTo(process.env.CLIPS_COPY_TO, ids)) } : { ok: false, canceled: true }),
+  });
   if (!sh) { console.log('FAILED port ' + port); process.exit(1); }
   console.log('READY ' + sh.port + ' ' + JSON.stringify(lib.data.clips.map((c) => ({ id: c.id, n: c.n, c: c.c }))));
 })().catch((e) => { console.log('FAILED ' + e.message); process.exit(1); });
