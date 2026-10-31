@@ -645,7 +645,13 @@ function renderLibrary() {
   if (S.tab !== 'lib') return;
   stopHoverVideos();
   const q = S.libQuery.trim().toLowerCase();
-  const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat) && (!q || (c.n + ' ' + (c.page || '') + ' ' + (c.by || '')).toLowerCase().includes(q)));
+  // Every word has to match the name, a tag, where it came from or who made it
+  const words = q.split(/\s+/).filter(Boolean);
+  const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat)
+    && words.every((w) => (c.n + ' ' + (c.tags || []).join(' ') + ' ' + (c.page || '') + ' ' + (c.by || '')).toLowerCase().includes(w)));
+  S.libShown = shown.map((c) => c.id);
+  $('#libCopy').disabled = !shown.length || S.copying;
+  $('#libCopy').textContent = S.copying ? 'Copying…' : shown.length && shown.length < lib.clips.length ? `Copy these ${shown.length} to a drive…` : 'Copy to a drive…';
   const grid = $('#grid');
   grid.textContent = '';
   for (const c of shown) grid.appendChild(clipCard(c));
@@ -660,7 +666,8 @@ function clipCard(c) {
   card.appendChild(pic);
   const meta = el('div', 'meta');
   meta.appendChild(el('b', '', c.n));
-  meta.appendChild(el('span', '', [c.w && c.h ? c.w + '×' + c.h : '', c.sound ? 'with sound' : ''].filter(Boolean).join(' · ')));
+  meta.appendChild(el('span', '', [c.w && c.h ? c.w + '×' + c.h : '', c.sound ? 'with sound' : '', c.fx ? 'with effects' : ''].filter(Boolean).join(' · ')));
+  if (c.tags && c.tags.length) meta.appendChild(el('span', 'tags', c.tags.map((t) => '#' + t).join(' ')));
   card.appendChild(meta);
   card.addEventListener('mouseenter', () => {
     if (pic.querySelector('video')) return;
@@ -676,6 +683,21 @@ function clipCard(c) {
 function stopHoverVideos() { $$('#grid video').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); }); }
 $('#libSearch').addEventListener('input', () => { S.libQuery = $('#libSearch').value; renderLibrary(); });
 $('#libOpen').addEventListener('click', () => api.call('lib:open'));
+// Copy to a drive…: the clips shown (category and search), each with its settings file (tags, effects, category)
+$('#libCopy').addEventListener('click', async () => {
+  const ids = S.libShown || [];
+  if (!ids.length) return;
+  const r = await call('lib:copy', ids);
+  if (r && !r.ok && !r.canceled && r.message) toast(r.message, 'bad', 6000);
+});
+api.on('lib-copying', (m) => {
+  S.copying = !!m;
+  const b = $('#libCopy');
+  b.disabled = !!m;
+  b.textContent = m ? (m.done ? `Copying ${m.done} of ${m.count}…` : 'Copying…') : 'Copy to a drive…';
+  if (!m) renderLibrary();
+});
+api.on('notice', (n) => { if (n && n.text) toast(n.text, n.kind || '', 9000); });
 $('#libChange').addEventListener('click', async () => {
   const r = await call('lib:choose');
   if (r && r.ok && r.message) toast(r.message, 'ok', 6000);
@@ -728,12 +750,14 @@ function openClip(id) {
   sel.textContent = '';
   for (const cat of S.lib.cats) { const o = el('option', '', cat.n); o.value = cat.id; sel.appendChild(o); }
   sel.value = c.c;
+  $('#cmTags').value = (c.tags || []).join(', ');
   const facts = $('#cmFacts');
   facts.textContent = '';
   const fact = (k, v) => { if (!v) return; facts.appendChild(el('dt', '', k)); facts.appendChild(el('dd', '', v)); };
   fact('Length', fmtLen(c.d || 0));
   fact('Size', c.w && c.h ? c.w + ' × ' + c.h + (c.fps ? ', ' + Math.round(c.fps) + ' frames a second' : '') : '');
   fact('Sound', c.sound ? 'Yes' : 'No');
+  fact('Effects', c.fx ? 'Saved with it (Phosphor Loop uses them with “Use with its effects”)' : '');
   fact('From', [c.page, c.site].filter(Boolean).join(' · '));
   fact('By', c.by);
   fact('Licence', c.lic);
@@ -760,6 +784,12 @@ $('#cmCat').addEventListener('change', async () => {
   const r = await call('lib:update', { id: clipOpen, c: $('#cmCat').value });
   if (r && r.ok) toast('Moved to ' + catName(r.clip.c) + '.', 'ok', 2500);
 });
+// Tags: typed with commas between them; saved in the clip's settings file too, so they travel with it
+$('#cmTags').addEventListener('change', async () => {
+  const r = await call('lib:update', { id: clipOpen, tags: $('#cmTags').value });
+  if (r && r.ok) { $('#cmTags').value = (r.clip.tags || []).join(', '); toast('Tags saved.', 'ok', 2000); }
+});
+$('#cmTags').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#cmTags').blur(); });
 $('#cmShow').addEventListener('click', () => api.call('lib:show', clipOpen));
 $('#cmSource').addEventListener('click', () => {
   const c = S.lib.clips.find((x) => x.id === clipOpen);

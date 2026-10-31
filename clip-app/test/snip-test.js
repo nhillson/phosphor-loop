@@ -33,9 +33,12 @@ const make = (file, secs, extra = []) => {
   await lib.open();
   const orig = await lib.addClip(make(path.join(work, 'orig.mp4'), 10), { n: 'Long one', c: 'abstract', d: 10, w: 640, h: 360,
     src: 'https://example.com/v', by: 'Someone', lic: 'CC BY', part: [20, 30] });
+  let copyTo = null;
   const sh = await startServer({
     getLibrary: () => lib, version: 'test', ports: [47911],
     onSnip: (req, params) => Snip.makeSnip({ tools, library: lib, work, req, ask: Snip.readAsk(params), settings: { maxHeight: 720 } }),
+    onEdit: (id, b) => lib.updateClip(id, b),
+    onCopy: async (ids) => ({ ok: true, ...(await lib.copyTo(copyTo, ids)) }),
   });
   const base = `http://127.0.0.1:${sh.port}`;
   const post = (q, body, origin = 'https://nhillson.github.io') => fetch(`${base}/snip?${new URLSearchParams(q)}`, {
@@ -107,6 +110,84 @@ const make = (file, secs, extra = []) => {
     assert.equal(lib.data.clips.length, n + 2);
     // Reading the library is still open to other github.io pages, as before
     assert.equal((await fetch(base + '/library.json', { headers: { Origin: 'https://someone.github.io' } })).status, 200);
+  });
+
+  // ---------- tags, saved effects, copying to a drive ----------
+  const LOOK = { A: { in1: 'video', zoom: 12, mirror: 4 }, B: { in1: 'fractal', spin: 30 }, mix: { view: 50 }, grade: { gSat: 140 }, relief: { rDepth: 30 } };
+  const edit = (id, b, origin = 'https://nhillson.github.io') => fetch(`${base}/clip/${id}`, { method: 'POST', body: JSON.stringify(b),
+    headers: { Origin: origin, 'Content-Type': 'application/json' } });
+  let tagged;
+  await test('a snip with tags, then its effects saved to it', async () => {
+    const j = await (await post({ from: orig.id, start: 0, end: 2, name: 'Tagged', cat: 'abstract', tags: 'Fractal, industrial,  neon glow ,fractal' })).json();
+    assert.equal(j.ok, true, JSON.stringify(j));
+    assert.deepEqual(j.clip.tags, ['fractal', 'industrial', 'neon glow'], 'tags tidied');
+    assert.equal(j.clip.fx, false);
+    tagged = j.clip.id;
+    const r = await edit(tagged, { look: LOOK });
+    const e = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(e));
+    assert.equal(e.clip.fx, true, 'marked as having effects');
+    const lk = await (await fetch(`${base}/look/${tagged}`)).json();
+    assert.deepEqual(lk.look, LOOK, 'the effects come back as saved');
+    const c = lib.data.clips.find((x) => x.id === tagged);
+    const side = JSON.parse(fs.readFileSync(lib.sideAbs(c), 'utf8'));
+    assert.deepEqual(side.tags, ['fractal', 'industrial', 'neon glow']);
+    assert.deepEqual(side.look, LOOK);
+    assert.equal(side.category, 'Abstract');
+    assert.ok(!JSON.stringify(lib.data).includes('"zoom":12'), 'library.json keeps only that there are effects, not the effects');
+    return path.basename(lib.sideAbs(c));
+  });
+
+  await test('renaming, moving and retagging keeps the settings file with the clip', async () => {
+    const r = await edit(tagged, { n: 'Neon swirl', c: 'water', tags: ['neon', 'swirl'] });
+    const e = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(e));
+    assert.equal(e.clip.n, 'Neon swirl'); assert.equal(e.clip.c, 'water'); assert.deepEqual(e.clip.tags, ['neon', 'swirl']);
+    const c = lib.data.clips.find((x) => x.id === tagged);
+    assert.ok(fs.existsSync(lib.sideAbs(c)) && /Water/.test(lib.sideAbs(c)), 'settings file moved: ' + lib.sideAbs(c));
+    const side = JSON.parse(fs.readFileSync(lib.sideAbs(c), 'utf8'));
+    assert.deepEqual(side.look, LOOK, 'effects kept'); assert.deepEqual(side.tags, ['neon', 'swirl']); assert.equal(side.category, 'Water');
+    assert.ok(!fs.readdirSync(path.join(dir, 'Abstract')).some((f) => f.startsWith('Tagged')), 'nothing left behind');
+    const lj = await (await fetch(base + '/library.json')).json();
+    const lc = lj.clips.find((x) => x.id === tagged);
+    assert.deepEqual(lc.tags, ['neon', 'swirl']); assert.equal(lc.fx, true);
+  });
+
+  await test('taking the effects off, and edits only from Nick’s site', async () => {
+    const other = lib.data.clips.find((x) => x.id !== tagged && x.id !== orig.id);
+    await edit(other.id, { look: LOOK });
+    let e = await (await edit(other.id, { look: null })).json();
+    assert.equal(e.clip.fx, false);
+    assert.equal((await (await fetch(`${base}/look/${other.id}`)).json()).look, null);
+    assert.ok(!fs.existsSync(lib.sideAbs(lib.data.clips.find((x) => x.id === other.id))), 'no tags and no effects: no settings file');
+    assert.equal((await edit(tagged, { tags: ['x'] }, 'https://someone.github.io')).status, 403);
+    const pre = await fetch(`${base}/clip/${tagged}`, { method: 'OPTIONS', headers: { Origin: 'https://someone.github.io', 'Access-Control-Request-Method': 'POST' } });
+    assert.equal(pre.status, 403, 'other sites can’t even ask to edit');
+    assert.equal((await fetch(`${base}/clip/${tagged}`, { headers: { Origin: 'https://someone.github.io' } })).status, 200, 'but can still play clips, as before');
+  });
+
+  await test('Copy to a drive, then into another library: tags and effects come along', async () => {
+    copyTo = path.join(work, 'USB drive');
+    fs.mkdirSync(copyTo);
+    const r = await (await fetch(`${base}/copy`, { method: 'POST', body: JSON.stringify({ ids: [tagged, orig.id] }), headers: { Origin: 'http://127.0.0.1:8000' } })).json();
+    assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.copied, 2);
+    const files = fs.readdirSync(path.join(copyTo, 'Phosphor Clips', 'Water')).sort();
+    assert.deepEqual(files, ['Neon swirl.mp4', 'Neon swirl.phosphor.json']);
+    assert.ok(fs.existsSync(path.join(copyTo, 'Phosphor Clips', 'Abstract', 'Long one.phosphor.json')), 'a clip without tags gets a settings file too (its credit and category)');
+    const again = await (await fetch(`${base}/copy`, { method: 'POST', body: JSON.stringify({ ids: [tagged] }), headers: { Origin: 'null' } })).json();
+    assert.equal(again.skipped, 1, 'already there: skipped');
+    // stream-pc: drop the category folders into its library folder
+    const dir2 = path.join(work, 'stream-pc library');
+    const lib2 = new Library(dir2, { probe: (f) => E.probe(tools, f) });
+    await lib2.open();
+    fs.cpSync(path.join(copyTo, 'Phosphor Clips'), dir2, { recursive: true });
+    await lib2.scan();
+    const got = lib2.data.clips.find((x) => x.n === 'Neon swirl');
+    assert.ok(got, 'picked up');
+    assert.equal(got.c, 'water'); assert.deepEqual(got.tags, ['neon', 'swirl']); assert.equal(got.fx, true);
+    assert.deepEqual(await lib2.lookOf(got), LOOK, 'effects intact');
+    const lo = lib2.data.clips.find((x) => x.n === 'Long one');
+    assert.equal(lo.by, 'Someone', 'credit came along');
   });
 
   sh.close();

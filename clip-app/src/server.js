@@ -15,8 +15,13 @@
 //   POST /snip?from=<clip id>&start=&end=&name=&cat=&sound=0|1   a part of a library clip
 //   POST /snip?start=&end=&name=&cat=&sound=&src=<file name>      a part of the video in the body (a file of your own)
 //                       -> { ok, clip, cat } once it's cut and in the library
+//   POST /clip/<id>     { n?, c?, tags?, look? } changes a clip's name, category, tags or saved effects (look: the
+//                       whole Phosphor Loop picture, like a preset; null takes them off) -> { ok, clip }
+//   GET  /look/<id>     { ok, look } the effects saved with a clip (null if none)
+//   POST /copy          { ids } copies those clips, with their settings files, to a folder Nick picks in Phosphor
+//                       Clips (a drive, say) -> { ok, copied, skipped, folder } or { ok: false, canceled: true }
 //   Only Nick's own Phosphor Loop (nhillson.github.io), pages on this computer and files opened directly may send
-//   snips, since they write into the library.
+//   snips, edits and copies, since they change the library.
 // /ping also says which version of the button's files Phosphor Clips has (button), so the button can update itself.
 // Only a browser extension may send these (or a program on this computer that says who it is with the
 // X-Phosphor-Clips header), so no website can make Phosphor Clips open things.
@@ -27,6 +32,7 @@ const path = require('node:path');
 const PORTS = [47811, 47812, 47813];
 const TYPES = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska', '.jpg': 'image/jpeg' };
 const MAX_BODY = 16 * 1024;
+const MAX_EDIT = 4 * 1024 * 1024;   // an edit's JSON (saved effects are a few kilobytes)
 
 // Which web pages may read the library
 function allowedOrigin(origin) {
@@ -53,14 +59,14 @@ function mayOpen(req) {
   return req.headers['x-phosphor-clips'] === '1';
 }
 
-function readBody(req) {
+function readBody(req, max = MAX_BODY) {
   return new Promise((resolve, reject) => {
     const parts = [];
     let size = 0;
     // Too much is read to the end and dropped, so the answer (413) still gets back
-    req.on('data', (d) => { size += d.length; if (size <= MAX_BODY) parts.push(d); });
+    req.on('data', (d) => { size += d.length; if (size <= max) parts.push(d); });
     req.on('end', () => {
-      if (size > MAX_BODY) reject(Object.assign(new Error('too big'), { status: 413 }));
+      if (size > max) reject(Object.assign(new Error('too big'), { status: 413 }));
       else resolve(Buffer.concat(parts).toString('utf8'));
     });
     req.on('error', reject);
@@ -96,6 +102,7 @@ function clipJson(c) {
   return {
     id: c.id, n: c.n, c: c.c, d: c.d, w: c.w, h: c.h, fps: c.fps, sound: !!c.sound, thumb: !!c.t,
     by: c.by || '', lic: c.lic || '', src: c.src || '', page: c.page || '', added: c.added || '',
+    tags: c.tags || [], fx: !!c.fx,
   };
 }
 
@@ -125,15 +132,20 @@ function sendFile(req, res, file, headers) {
 
 // getLibrary() returns the open Library (it can change when the library folder is changed). onOpen(request, origin)
 // opens something sent from Chrome and returns { ok, message }. onHello(origin) hears the Chrome button say hello.
-// onSnip(req, params) makes a snip from Phosphor Loop (see snip.js) and returns { clip, catName }.
-function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
+// onSnip(req, params) makes a snip from Phosphor Loop (see snip.js) and returns { clip, catName }. onEdit(id, changes)
+// changes a clip and returns it. onCopy(ids) asks where to copy those clips and returns { ok, copied, skipped, folder }.
+function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null, onEdit = null, onCopy = null, pingInfo = null, version = '', log = () => {}, ports = PORTS }) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin;
     let p = '';
     try { p = new URL(req.url, 'http://127.0.0.1').pathname; } catch (_) { res.writeHead(400); res.end(); return; }
     const isOpen = p === '/open' || p === '/hello', isSnip = p === '/snip';
+    // Changes to the library: a snip, a copy, or an edit (POST to a clip's own address, whose GET is its video)
+    const editId = /^\/clip\/[a-z0-9-]+$/i.test(p) ? p.split('/')[2] : '';
+    const posting = req.method === 'POST' || (req.method === 'OPTIONS' && /POST/i.test(req.headers['access-control-request-method'] || ''));
+    const isWrite = isSnip || p === '/copy' || (editId && posting);
     // The Chrome button may only ask whether the app is there and send things to open
-    const ok = isOpen ? !origin || extensionOrigin(origin) : isSnip ? snipOrigin(origin) : allowedOrigin(origin) || (p === '/ping' && extensionOrigin(origin));
+    const ok = isOpen ? !origin || extensionOrigin(origin) : isWrite ? snipOrigin(origin) : allowedOrigin(origin) || (p === '/ping' && extensionOrigin(origin));
     const headers = { 'Vary': 'Origin' };
     if (origin) {
       if (!ok) { res.writeHead(403); res.end(); return; }
@@ -142,7 +154,7 @@ function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null,
     }
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
-        ...headers, 'Access-Control-Allow-Methods': isOpen || isSnip ? 'POST' : 'GET, HEAD',
+        ...headers, 'Access-Control-Allow-Methods': isOpen || isSnip || p === '/copy' ? 'POST' : editId ? 'GET, HEAD, POST' : 'GET, HEAD',
         'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] || '*',
         // Browsers check this before a website may talk to a program on this computer
         'Access-Control-Allow-Private-Network': 'true', 'Access-Control-Allow-Local-Network': 'true', 'Access-Control-Max-Age': '600',
@@ -179,6 +191,24 @@ function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null,
       });
       return;
     }
+    if (p === '/copy' || (editId && req.method === 'POST')) {
+      const json = (code, o) => { res.writeHead(code, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
+      if (req.method !== 'POST') { res.writeHead(405, { ...headers, Allow: 'POST' }); res.end(); return; }
+      const fn = editId ? onEdit : onCopy;
+      if (!fn) { req.resume(); json(503, { ok: false, message: 'Phosphor Clips is still starting.' }); return; }
+      readBody(req, MAX_EDIT).then((text) => {
+        let b;
+        try { b = JSON.parse(text || '{}'); } catch (_) { throw Object.assign(new Error('That wasn’t understood.'), { status: 400 }); }
+        if (!b || typeof b !== 'object') throw Object.assign(new Error('That wasn’t understood.'), { status: 400 });
+        if (editId) return fn(editId, b).then((clip) => ({ ok: true, clip: clipJson(clip) }));
+        if (!Array.isArray(b.ids) || !b.ids.length) throw Object.assign(new Error('Pick some clips to copy first.'), { status: 400 });
+        return fn(b.ids.map(String).slice(0, 100000));
+      }).then((r) => json(200, r), (e) => {
+        log((editId ? 'edit: ' : 'copy: ') + e.message);
+        json(e.status && e.status >= 400 && e.status < 600 ? e.status : 500, { ok: false, message: e.message || 'That didn’t work.' });
+      });
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, headers); res.end(); return; }
     const lib = getLibrary();
     if (p === '/ping') {
@@ -192,6 +222,14 @@ function startServer({ getLibrary, onOpen = null, onHello = null, onSnip = null,
     if (p === '/library.json') {
       res.writeHead(200, { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(req.method === 'HEAD' ? undefined : JSON.stringify(libraryJson(lib, version)));
+      return;
+    }
+    const lk = /^\/look\/([a-z0-9-]+)$/i.exec(p);
+    if (lk) {
+      const clip = lib.data.clips.find((c) => c.id === lk[1]);
+      const json = (code, o) => { res.writeHead(code, { ...headers, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(req.method === 'HEAD' ? undefined : JSON.stringify(o)); };
+      if (!clip) { json(404, { ok: false, message: 'That clip isn’t in the library any more.' }); return; }
+      lib.lookOf(clip).then((look) => json(200, { ok: true, look }), () => json(200, { ok: true, look: null }));
       return;
     }
     const m = /^\/(clip|thumb)\/([a-z0-9-]+)$/i.exec(p);

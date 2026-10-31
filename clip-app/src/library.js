@@ -3,6 +3,11 @@
 // an MP4, plus library.json listing every clip with its name, category, size, length and where it came from (in the
 // same style as Phosphor Loop's nature/pictures.json, so Phosphor Loop can read it later). Thumbnails live in
 // .thumbs. The folders are the truth: clips moved, added or deleted in File Explorer are picked up on the next look.
+// Each clip can have a settings file beside it, <Name>.phosphor.json: its tags, the Phosphor Loop effects saved with
+// it (the whole picture, like a preset), its category and where it came from. It travels with the clip: copy both
+// files into a category folder of another library (on another computer, say) and that library picks up the tags and
+// effects too. library.json keeps the tags and whether there are effects (fx); the effects themselves stay in the
+// settings file, so library.json stays small with thousands of clips.
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
@@ -11,6 +16,17 @@ const { DEFAULT_CATEGORIES, slug } = require('./categories.js');
 
 const VIDEO_EXT = /\.(mp4|m4v|webm|mov|mkv)$/i;
 const INDEX = 'library.json';
+const SIDE = '.phosphor.json';
+// Tags: lower case, single spaces, no commas, up to 40 of them
+function cleanTags(tags) {
+  const out = [];
+  for (const t of Array.isArray(tags) ? tags : String(tags || '').split(',')) {
+    const x = String(t || '').toLowerCase().replace(/[,\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 30);
+    if (x && !out.includes(x)) out.push(x);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
 const THUMBS = '.thumbs';
 
 // A name Windows accepts as a file or folder name
@@ -59,6 +75,42 @@ class Library {
   catFolder(cat) { return path.join(this.dir, safeName(cat.n, cat.id)); }
   abs(clip) { return path.join(this.dir, ...clip.f.split('/')); }
   thumbAbs(clip) { return clip.t ? path.join(this.dir, ...clip.t.split('/')) : ''; }
+  // The clip's settings file: beside it, with the same name
+  sideAbs(clip) { return this.abs(clip).replace(/\.[^.\\/]+$/, '') + SIDE; }
+  async readSide(clip) {
+    try { const d = JSON.parse(await fsp.readFile(this.sideAbs(clip), 'utf8')); return d && typeof d === 'object' ? d : null; } catch (_) { return null; }
+  }
+  // Writes the clip's settings file from what the library knows, with these effects (undefined: keep the file's own;
+  // null: none). No tags, no effects: no file.
+  async writeSide(clip, look) {
+    const file = this.sideAbs(clip);
+    if (look === undefined) look = ((await this.readSide(clip)) || {}).look || null;
+    clip.fx = !!look;
+    if (!look && !(clip.tags && clip.tags.length)) { await fsp.rm(file, { force: true }).catch(() => {}); return; }
+    const cat = this.cat(clip.c);
+    const d = {
+      app: 'Phosphor Clips', kind: 'clip settings', version: 1, name: clip.n, category: cat ? cat.n : '', tags: clip.tags || [],
+      src: clip.src || '', page: clip.page || '', by: clip.by || '', lic: clip.lic || '', part: clip.part || undefined, look: look || null,
+    };
+    const tmp = file + '.tmp';
+    await fsp.writeFile(tmp, JSON.stringify(d, null, 1));
+    await fsp.rename(tmp, file);
+  }
+  // A clip that's new to the library (dropped into a folder, copied from another computer) takes what its settings
+  // file says: tags, whether there are effects, where it came from
+  async takeSide(clip) {
+    const d = await this.readSide(clip);
+    if (!d) return;
+    clip.tags = cleanTags(d.tags);
+    clip.fx = !!(d.look && typeof d.look === 'object');
+    for (const k of ['src', 'page', 'by', 'lic']) if (typeof d[k] === 'string' && d[k] && !clip[k]) clip[k] = d[k].slice(0, 400);
+    if (Array.isArray(d.part) && !clip.part) clip.part = d.part.slice(0, 2);
+  }
+  // The effects saved with a clip (or null)
+  async lookOf(clip) {
+    const d = await this.readSide(clip);
+    return d && d.look && typeof d.look === 'object' ? d.look : null;
+  }
 
   async open() {
     await fsp.mkdir(this.dir, { recursive: true });
@@ -137,10 +189,11 @@ class Library {
             Object.assign(clip, { d: round(p.duration), w: p.width, h: p.height, fps: p.fps, sound: p.hasAudio });
           } catch (e) { this.log('library: couldn’t read ' + f + ': ' + e.message); continue; }
         }
+        await this.takeSide(clip);
         await this.makeThumb(clip);
         this.data.clips.push(clip);
         changed = true;
-        this.log('library: found ' + f);
+        this.log('library: found ' + f + (clip.fx ? ' (with effects)' : '') + (clip.tags && clip.tags.length ? ' (tags: ' + clip.tags.join(', ') + ')' : ''));
       }
       for (const c of this.data.clips) if (!c.t || !(await exists(this.thumbAbs(c)))) { if (await this.makeThumb(c)) changed = true; }
       if (changed || !(await exists(this.indexFile()))) await this.write();
@@ -187,6 +240,9 @@ class Library {
         src: meta.src || '', page: meta.page || '', by: meta.by || '', lic: meta.lic || '', site: meta.site || '',
         part: meta.part || undefined, crop: meta.crop || undefined, guess: meta.guess || undefined, added: new Date().toISOString(),
       };
+      const tags = cleanTags(meta.tags);
+      if (tags.length) clip.tags = tags;
+      if (tags.length || meta.look) await this.writeSide(clip, meta.look || null);
       await this.makeThumb(clip, meta.thumbAt);
       this.data.clips.push(clip);
       await this.write();
@@ -202,13 +258,22 @@ class Library {
       if (!cat) throw new Error('That category doesn’t exist.');
       const name = changes.n != null ? safeName(changes.n) : clip.n;
       if (cat.id !== clip.c || name !== clip.n) {
-        const from = this.abs(clip);
+        const from = this.abs(clip), sideFrom = this.sideAbs(clip);
         const dest = await this.uniquePath(this.catFolder(cat), name, path.extname(from), from);
         if (dest !== from) await moveFile(from, dest);
         clip.f = rel(path.relative(this.dir, dest));
         clip.n = path.basename(dest).replace(/\.[^.]+$/, '');
         clip.c = cat.id;
+        // Its settings file goes with it
+        if (await exists(sideFrom) && sideFrom !== this.sideAbs(clip)) await moveFile(sideFrom, this.sideAbs(clip));
       }
+      const sideChanged = changes.tags !== undefined || changes.look !== undefined || changes.n != null || changes.c;
+      if (changes.tags !== undefined) {
+        const tags = cleanTags(changes.tags);
+        if (tags.length) clip.tags = tags; else delete clip.tags;
+      }
+      if (changes.look !== undefined && changes.look !== null && typeof changes.look !== 'object') throw new Error('Those effects weren’t understood.');
+      if (sideChanged) await this.writeSide(clip, changes.look);
       await this.write();
       return clip;
     });
@@ -219,6 +284,7 @@ class Library {
       const clip = this.data.clips.find((c) => c.id === id);
       if (!clip) return;
       await this.trash(this.abs(clip));
+      if (await exists(this.sideAbs(clip))) await this.trash(this.sideAbs(clip)).catch(() => {});
       if (clip.t) await fsp.rm(this.thumbAbs(clip), { force: true }).catch(() => {});
       this.data.clips = this.data.clips.filter((c) => c !== clip);
       await this.write();
@@ -287,11 +353,12 @@ class Library {
       const folder = this.catFolder(cat);
       for (const c of this.data.clips) {
         if (c.c !== id) continue;
-        const from = this.abs(c);
+        const from = this.abs(c), sideFrom = this.sideAbs(c);
         const dest = await this.uniquePath(this.catFolder(other), c.n, path.extname(from));
         if (await exists(from)) await moveFile(from, dest);
         c.f = rel(path.relative(this.dir, dest));
         c.c = 'other';
+        if (await exists(sideFrom)) { await moveFile(sideFrom, this.sideAbs(c)); await this.writeSide(c); }
       }
       try { if (!(await fsp.readdir(folder)).length) await fsp.rmdir(folder); } catch (_) { /* gone already */ }
       this.data.cats = this.data.cats.filter((c) => c !== cat);
@@ -300,6 +367,35 @@ class Library {
   }
 }
 
+/* ---------- copying clips to a drive ---------- */
+// Copies these clips, each with its settings file (written fresh, so the category and credit go too), into
+// <dest>/Phosphor Clips/<Category>/, the same layout as a library: copy those category folders into another
+// library's folder and it picks them all up, tags and effects included. A clip already there (same name, same size)
+// is skipped. Returns { copied, skipped, folder }.
+Library.prototype.copyTo = async function copyTo(dest, ids, onProgress = () => {}) {
+  const root = path.join(dest, 'Phosphor Clips');
+  const want = new Set(ids);
+  const list = this.data.clips.filter((c) => want.has(c.id));
+  let copied = 0, skipped = 0, i = 0;
+  for (const c of list) {
+    onProgress(++i, list.length, c);
+    const cat = this.cat(c.c) || { n: 'Other', id: 'other' };
+    const folder = path.join(root, safeName(cat.n, cat.id));
+    await fsp.mkdir(folder, { recursive: true });
+    const from = this.abs(c), to = path.join(folder, path.basename(from));
+    let st;
+    try { st = await fsp.stat(from); } catch (_) { skipped++; continue; }
+    const there = await fsp.stat(to).catch(() => null);
+    if (!there || there.size !== st.size) { await fsp.copyFile(from, to + '.part'); await fsp.rename(to + '.part', to); copied++; } else skipped++;
+    // The settings file, always: tags, effects, category and credit
+    const look = await this.lookOf(c);
+    const d = { app: 'Phosphor Clips', kind: 'clip settings', version: 1, name: c.n, category: cat.n, tags: c.tags || [],
+      src: c.src || '', page: c.page || '', by: c.by || '', lic: c.lic || '', part: c.part || undefined, look };
+    await fsp.writeFile(to.replace(/\.[^.\\/]+$/, '') + SIDE, JSON.stringify(d, null, 1));
+  }
+  return { copied, skipped, folder: root };
+};
+
 const round = (n) => (Number.isFinite(+n) ? Math.round(+n * 100) / 100 : undefined);
 
-module.exports = { Library, safeName, VIDEO_EXT };
+module.exports = { Library, safeName, cleanTags, VIDEO_EXT, SIDE };

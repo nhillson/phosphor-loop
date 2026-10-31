@@ -196,6 +196,7 @@ main { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
 .clip .meta { padding: 8px 10px 10px; }
 .clip .meta b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clip .meta span { color: var(--dim); font-size: 12px; }
+.clip .meta span.tags { display: block; color: var(--accent-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .libempty { position: absolute; inset: 140px 0 auto; text-align: center; color: var(--dim); }
 .libempty .big { font-size: 20px; color: var(--text); margin-bottom: 8px; }
 .libfoot { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12.5px; background: var(--bar); }

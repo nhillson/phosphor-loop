@@ -20,7 +20,7 @@ class SnipError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
 }
 
-// What Phosphor Loop asked for, from the address's ?from=&start=&end=&name=&cat=&sound=&src=
+// What Phosphor Loop asked for, from the address's ?from=&start=&end=&name=&cat=&sound=&src=&tags=
 function readAsk(params) {
   const num = (k) => (params.has(k) && params.get(k) !== '' ? +params.get(k) : null);
   const ask = {
@@ -31,6 +31,8 @@ function readAsk(params) {
     sound: params.get('sound') === '1',
     // Where a video of your own came from (its file name), kept as the clip's page title
     src: String(params.get('src') || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+    // Tags, comma separated (the effects come separately, in a POST to /clip/<id>: they're too big for an address)
+    tags: String(params.get('tags') || ''),
   };
   if (ask.from && !/^[a-z0-9-]+$/i.test(ask.from)) throw new SnipError('That clip isn’t in the library.');
   if (ask.start == null || !Number.isFinite(ask.start) || ask.start < 0) throw new SnipError('Mark where the snip starts.');
@@ -88,6 +90,7 @@ async function makeSnip({ tools, library, work, req, ask, settings = {}, log = (
       src: from ? from.src || '' : '', page: from ? from.page || from.n : ask.src, by: from ? from.by || '' : '',
       lic: from ? from.lic || '' : '', site: from ? from.site || '' : '',
       part: from ? [round3(off + ask.start), round3(off + end)] : [round3(ask.start), round3(end)],
+      tags: ask.tags,
       thumbAt: made.probe.duration / 2,
     });
     log(`snip: saved ${clip.f} (${clip.w}x${clip.h}, ${clip.d} s, ${made.encoder}) from ${from ? 'clip ' + from.f : 'a video sent from Phosphor Loop'}`);

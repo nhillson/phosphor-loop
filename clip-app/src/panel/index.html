@@ -156,7 +156,8 @@
     <div class="libbar">
       <div class="chips" id="libCats"></div>
       <div class="libtools">
-        <input id="libSearch" type="search" placeholder="Find a clip" spellcheck="false">
+        <input id="libSearch" type="search" placeholder="Find a clip (name or tag)" spellcheck="false">
+        <button class="btn small" id="libCopy" title="Copy the clips shown here, with their tags and effects, to a folder or drive">Copy to a drive…</button>
         <button class="btn small" id="catNew">+ New category</button>
         <button class="btn small ghost" id="catEdit">Edit categories</button>
       </div>
@@ -186,6 +187,7 @@
     <div class="cmbody">
       <label class="field"><span>Name</span><input id="cmName" maxlength="80" spellcheck="false"></label>
       <label class="field"><span>Category</span><select id="cmCat"></select></label>
+      <label class="field"><span>Tags</span><input id="cmTags" maxlength="400" spellcheck="false" placeholder="fractal, industrial, neon"></label>
       <dl class="facts" id="cmFacts"></dl>
       <div class="cmbuttons">
         <button class="btn ghost" id="cmShow">Show in folder</button>

@@ -882,11 +882,12 @@ function setupIpc() {
     }
   });
 
-  handle('lib:update', async ({ id, n, c }) => { const clip = await library.updateClip(id, { n, c }); sendLibrary(); return { ok: true, clip: clipForPanel(clip) }; });
+  handle('lib:update', async ({ id, n, c, tags }) => { const clip = await library.updateClip(id, { n, c, ...(tags !== undefined ? { tags } : {}) }); sendLibrary(); return { ok: true, clip: clipForPanel(clip) }; });
   handle('lib:remove', async (id) => { await library.removeClip(id); sendLibrary(); return { ok: true }; });
   handle('lib:show', (id) => { const c = library.data.clips.find((x) => x.id === id); if (c) shell.showItemInFolder(library.abs(c)); });
   handle('lib:open', () => shell.openPath(library.dir));
   handle('lib:rescan', async () => { await library.scan(); sendLibrary(); return { ok: true }; });
+  handle('lib:copy', (ids) => copyClips(Array.isArray(ids) ? ids : []));
   handle('lib:choose', async () => {
     const r = await dialog.showOpenDialog(win, { title: 'Where should the clip library be? (A whole drive is fine)', defaultPath: library.dir, properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled || !r.filePaths[0]) return { ok: false };
@@ -947,6 +948,19 @@ async function startSharing() {
       sendLibrary();
       return r;
     },
+    // Phosphor Loop's clip explorer: a clip's name, category, tags or saved effects
+    onEdit: async (id, b) => {
+      const ch = {};
+      if (typeof b.n === 'string' && b.n.trim()) ch.n = b.n.trim().slice(0, 80);
+      if (typeof b.c === 'string' && b.c) ch.c = b.c;
+      if (b.tags !== undefined) ch.tags = b.tags;
+      if (b.look !== undefined) ch.look = b.look;
+      const clip = await library.updateClip(id, ch);
+      sendLibrary();
+      return clip;
+    },
+    // Phosphor Loop's clip explorer: Copy to a drive… for the clips picked there
+    onCopy: (ids) => copyClips(ids),
     // The Chrome button says hello when it's added to Chrome (and when Chrome starts), so the setup helper can say it
     // worked and an old button can be spotted
     onHello: (_origin, body) => {
@@ -965,6 +979,30 @@ async function startSharing() {
   updateTray();
 }
 
+// Copies clips (with their settings files) to a folder Nick picks, a drive say: Phosphor Clips/<Category>/... there,
+// ready to drop into another computer's library folder
+async function copyClips(ids) {
+  const n = ids.filter((id) => library.data.clips.some((c) => c.id === id)).length;
+  if (!n) return { ok: false, message: 'Those clips aren’t in the library any more.' };
+  showWindow();
+  const r = await dialog.showOpenDialog(win, {
+    title: `Copy ${n} clip${n === 1 ? '' : 's'} where? (An external drive is fine: they go in a "Phosphor Clips" folder there)`,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true, message: 'Not copied.' };
+  send('lib-copying', { count: n, to: r.filePaths[0] });
+  try {
+    const out = await library.copyTo(r.filePaths[0], ids, (i, total) => send('lib-copying', { count: total, done: i, to: r.filePaths[0] }));
+    log(`copy: ${out.copied} clip(s) to ${out.folder}${out.skipped ? ', ' + out.skipped + ' already there' : ''}`);
+    send('lib-copying', null);
+    send('notice', { text: `Copied ${out.copied} clip${out.copied === 1 ? '' : 's'} to ${out.folder}${out.skipped ? ` (${out.skipped} already there)` : ''}. On the other computer, drop the category folders into its library folder.`, kind: 'ok' });
+    return { ok: true, ...out };
+  } catch (e) {
+    send('lib-copying', null);
+    log('copy failed: ' + e.message);
+    return { ok: false, message: 'Couldn’t copy them: ' + e.message };
+  }
+}
 function showWindow() {
   if (!win) return;
   if (win.isMinimized()) win.restore();

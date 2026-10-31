@@ -49,6 +49,22 @@ trimmer (H.264 MP4, at the size picked in the trimmer last, sound only if *Keep 
   reading the library stays open to any `*.github.io`. Phosphor Clips must be running on the same computer.
 - Test: `node test/snip-test.js`.
 
+## Tags, saved effects, and copying clips to another computer
+
+- **Tags** (`fractal`, `industrial`, `neon glow`…): set in Phosphor Loop's clip explorer, in the snip form, or in
+  the clip window here (Library › a clip › Tags, commas between). The Library search finds clips by name or tag.
+- **Saved effects**: Phosphor Loop can save the whole picture (all loops, mixing, Color grading, 3D lighting, like a
+  preset) with a clip; its explorer then offers *Use with its effects* or *Just the clip*.
+- Both live in a **settings file** beside the clip, `<Name>.phosphor.json` (tags, effects, category, credit);
+  `library.json` keeps only the tags and whether there are effects (`fx`). Renaming, moving or deleting a clip here
+  takes its settings file along.
+- **Copy to a drive…** (Library page: the clips shown; or from Phosphor Loop's explorer: the clips picked there)
+  copies each clip and its settings file into `Phosphor Clips/<Category>/` on the folder or drive you pick. On the
+  other computer, drop those category folders into its library folder (or press *Look again*): the clips come in
+  with their tags, effects and credit.
+- Addresses (sharing server): `POST /clip/<id>` `{ n?, c?, tags?, look? }`, `GET /look/<id>`, `POST /copy` `{ ids }`
+  (opens the folder picker here); like `/snip`, only from nhillson.github.io, localhost pages and file pages.
+
 ## Send to Phosphor Clips (the Chrome button, `chrome-button/`)
 
 A Chrome (or Edge) extension that hands what you're watching to Phosphor Clips on the same computer:
