@@ -1108,11 +1108,6 @@ uniform float uGradeOn;
 // and shine, and which way the light comes from
 uniform vec3 uRelief;
 uniform vec3 uReliefL;
-// The secret plop (Shift+P, see "the plop" in app.js): its picture, where it sits on screen (left, bottom, width,
-// height, 0 to 1) and how it's doing: how much shows, how far it has melted, how it wobbles
-uniform sampler2D uPoop;
-uniform vec4 uPoopBox;
-uniform vec3 uPoopFx;
 out vec4 o;
 ${COMMON}
 vec3 hueTurn(vec3 c, float a) {
@@ -1147,19 +1142,6 @@ void main() {
   // Color grading set to work on screen: the finished picture only, never fed back into the loops (set to work
   // inside the loops, it's drawn in each loop instead and uGradeOn is 0 here)
   if (uGradeOn > 0.5) col = gradeCol(col, uGradeTone, uGradeColor, uGradeRGB);
-  if (uPoopFx.x > 0.0) {
-    vec2 q = (uv - uPoopBox.xy) / uPoopBox.zw;
-    // A wobble that leans the top over, and as it melts, drips that run down at their own speeds
-    q.x -= uPoopFx.z * q.y * q.y * 0.12;
-    float m = uPoopFx.y;
-    float drip = m * (0.55 + 0.45 * sin(q.x * 23.0 + 1.7) * sin(q.x * 9.0 - 0.4)) * 1.3;
-    q.y += drip * (1.15 - q.y * 0.5);
-    q.x = 0.5 + (q.x - 0.5) / (1.0 + m * 0.35);
-    if (q.x > 0.0 && q.x < 1.0 && q.y > 0.0 && q.y < 1.0) {
-      vec4 pp = texture(uPoop, q);
-      col = mix(col, pp.rgb, pp.a * uPoopFx.x);
-    }
-  }
   vec2 e = smoothstep(vec2(0.0), vec2(0.006), cuv) * smoothstep(vec2(1.0), vec2(0.994), cuv);
   col *= e.x * e.y;
   o = vec4(clamp(col, 0.0, 1.0), 1.0);

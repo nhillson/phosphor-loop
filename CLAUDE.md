@@ -58,9 +58,6 @@ file don't rebuild the app.
    type and pick from page scripts (`element.click()`, set value + input event), not Playwright's own click or fill: it can wait forever on this page in the workspace
    browser. `tests/clips_check.py`'s last check (the last clip coming back after a reload) fails here when run after the
    rest of that test, also on versions before the explorer; it passes on its own.
-4k. **The secret plop** (Shift+P; "the plop" in js/app.js, drawn in FS_DISPLAY with uPoop on texture unit 1, which is
-   put back afterwards because the loops' uOther lives there; its brown smear goes into the loops through the drawing
-   stroke). Not in the Guide on purpose. For pictures on the slow workspace browser, set `__plPoop.speed = 0.06`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
