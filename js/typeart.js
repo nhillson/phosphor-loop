@@ -38,19 +38,14 @@ const FONTS = {
   bold:       { label: 'Bold', css: 'Consolas, "Cascadia Mono", Menlo, "DejaVu Sans Mono", "Liberation Mono", monospace', weight: 'bold' },
   serif:      { label: 'Book', css: 'Georgia, "Times New Roman", "Liberation Serif", serif', weight: 'normal' },
 };
-// The color schemes. glow: light on black; paper: ink on cream paper. ink: the color each layer prints in
-// (null: the picture's own colors there).
+// The color schemes, light on black. ink: the color each layer glows in (null: the picture's own colors there).
 const COLORS = {
-  picture: { label: 'The picture’s colors', paper: false, ink: null },
-  white:   { label: 'White', paper: false, ink: [[1, 1, 1]] },
-  green:   { label: 'Terminal green', paper: false, ink: [[0.35, 1, 0.45]] },
-  neon:    { label: 'Neon layers', paper: false, ink: [[1, 0.25, 0.75], [0.2, 0.9, 1], [1, 0.9, 0.25]] },
-  purple:  { label: 'Phosphor purple', paper: false, ink: [[0.75, 0.35, 1]] },
-  paper:   { label: 'Typewriter on paper', paper: true, ink: [[0.08, 0.07, 0.1]] },
-  paperc:  { label: 'Colored ink on paper', paper: true, ink: null },
-  print:   { label: 'Print inks on paper', paper: true, ink: [[0.1, 0.62, 0.85], [0.88, 0.12, 0.5], [0.95, 0.82, 0.1]] },
+  picture: { label: 'The picture’s colors', ink: null },
+  white:   { label: 'White', ink: [[1, 1, 1]] },
+  green:   { label: 'Terminal green', ink: [[0.35, 1, 0.45]] },
+  neon:    { label: 'Neon layers', ink: [[1, 0.25, 0.75], [0.2, 0.9, 1], [1, 0.9, 0.25]] },
+  purple:  { label: 'Phosphor purple', ink: [[0.75, 0.35, 1]] },
 };
-const PAPER = [0.95, 0.92, 0.84];
 const DEFAULTS = { tAmt: 0, tSet: 'keyboard', tSet2: 'same', tFont: 'typewriter', tSize: 35, tLayers: 2, tSpread: 0,
   tColor: 'picture', tInk: 0, tContrast: 100, tEdge: 0, tShimmer: 15, tHold: 50, tBg: 0, tCustom: 'PHOSPHOR', tInside: false, tInvert: false };
 
@@ -160,8 +155,7 @@ uniform vec4 uAt0, uAt1, uAt2;       // each sheet: columns, glyph width, sheet 
 uniform float uLod0, uLod1, uLod2;
 uniform int uLayers;
 uniform vec3 uInk0, uInk1, uInk2;
-uniform float uInkPic, uPaper, uBg, uMix;
-uniform vec3 uPaperCol;
+uniform float uInkPic, uBg, uMix;
 out vec4 o;
 float glyph(sampler2D idx, sampler2D atlas, vec2 cell, vec2 off, vec4 at, float lod, vec2 p, out vec2 cc) {
   vec2 q = (p - off) / cell;
@@ -181,18 +175,14 @@ float glyph(sampler2D idx, sampler2D atlas, vec2 cell, vec2 off, vec4 at, float 
 vec3 inkOf(vec3 fixedInk, vec2 cc) {
   if (uInkPic < 0.5) return fixedInk;
   vec3 c = texture(uPrep, cc / uOut).rgb;
-  // glowing letters at full brightness in the picture's hue; on paper, the picture's color as a darker ink
-  if (uPaper > 0.5) return c * 0.85;
+  // glowing letters at full brightness in the picture's hue
   return c / max(max(c.r, max(c.g, c.b)), 0.08);
 }
-vec3 lay(vec3 acc, float cov, vec3 ink) {
-  if (uPaper > 0.5) return acc * (1.0 - cov * (1.0 - ink));
-  return acc + (1.0 - acc) * cov * ink;
-}
+vec3 lay(vec3 acc, float cov, vec3 ink) { return acc + (1.0 - acc) * cov * ink; }
 void main() {
   vec2 p = gl_FragCoord.xy;
   vec3 src = texture(uSrc, p / uOut).rgb;
-  vec3 acc = uPaper > 0.5 ? mix(uPaperCol, src, uBg) : src * uBg;
+  vec3 acc = src * uBg;
   vec2 cc;
   float g = glyph(uIdx0, uAtlas0, uCell0, uOff0, uAt0, uLod0, p, cc);
   if (g > 0.0) acc = lay(acc, g, inkOf(uInk0, cc));
@@ -498,9 +488,7 @@ function create(gl) {
     f2(render, 'uOut', outW, outH);
     i1(render, 'uLayers', pl.n);
     f1(render, 'uInkPic', pl.col.ink ? 0 : 1);
-    f1(render, 'uPaper', pl.col.paper ? 1 : 0);
-    f3(render, 'uPaperCol', PAPER);
-    f1(render, 'uBg', clamp(t.tBg, 0, 100) / 100 * (pl.col.paper ? 0.6 : 0.5));
+    f1(render, 'uBg', clamp(t.tBg, 0, 100) / 100 * 0.5);
     f1(render, 'uMix', clamp(amount, 0, 1));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.activeTexture(gl.TEXTURE0);
