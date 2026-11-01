@@ -38,6 +38,7 @@
           <div class="screen" id="screenWrap">
             <canvas id="screen" width="768" height="576" aria-label="Video feedback screen. Drag on it to draw light."></canvas>
             <div class="osd" id="osd" aria-hidden="true"><span class="osd-a"></span><span class="osd-b"></span></div>
+            <div class="trim-peek" id="trimPeek" hidden aria-hidden="true"><canvas id="trimPeekPic"></canvas><span class="trim-peek-t" id="trimPeekT"></span></div>
             <div class="rec-ind" id="recInd" hidden><span class="dot">●</span> REC <span id="recTime">0:00</span></div>
             <div class="tip" id="fsNote" hidden></div>
             <div class="tip" id="tip">Drag on the screen to draw light into the loop. New here? Open the Guide.</div>
@@ -154,7 +155,14 @@
         <form class="snip-form" id="snipPanel" hidden aria-label="Save a clip">
           <div class="snip-head"><b>Save a clip</b><span class="snip-what" id="snipWhat"></span></div>
           <div class="trim">
-            <div class="trim-bar" id="trimBar" title="Click to move through the video; drag the purple handles to trim">
+            <div class="trim-over" id="trimOver" title="The whole video: the trimmed part, and (outlined) the stretch the strip below shows. Click to move through the video.">
+              <div class="trim-over-sel" id="trimOverSel"></div>
+              <div class="trim-over-view" id="trimOverView"></div>
+              <div class="trim-over-head" id="trimOverHead"></div>
+            </div>
+            <div class="trim-bar" id="trimBar" title="Click to move through the video; drag the purple handles to trim. Push a handle against an end to see further.">
+              <span class="trim-vt trim-v0" id="trimV0"></span>
+              <span class="trim-vt trim-v1" id="trimV1"></span>
               <div class="trim-sel" id="trimSel"></div>
               <div class="trim-head" id="trimHead"></div>
               <button type="button" class="trim-h" id="trimA" aria-label="Where the clip starts (arrow keys nudge it)"></button>

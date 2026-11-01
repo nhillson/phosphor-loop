@@ -140,6 +140,11 @@
     box-shadow: 0 0 0 2px #09080a;
   }
   .screen canvas { display: block; touch-action: none; cursor: crosshair; }
+  /* Save clip: while a trim handle is dragged, the plain video frame at that handle covers the picture */
+  .trim-peek { position: absolute; inset: 0; z-index: 4; background: #000; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  .trim-peek[hidden] { display: none; }
+  .trim-peek canvas { width: 100%; height: 100%; object-fit: contain; cursor: default; }
+  .trim-peek-t { position: absolute; left: 12px; bottom: 10px; padding: 3px 9px; border-radius: 5px; background: rgba(0,0,0,.72); font: 20px/1.2 var(--f-osd); color: var(--amber-ink); }
   /* Handles on the picture's frame: right edge for width, bottom edge for height, corner for both */
   .rz { position: absolute; z-index: 6; touch-action: none; }
   .rz-r { top: 18px; bottom: 18px; right: -5px; width: 12px; cursor: ew-resize; }
@@ -494,10 +499,19 @@
   .trim { display: flex; flex-direction: column; gap: 8px; }
   .trim-bar { position: relative; height: 34px; border-radius: 6px; background: var(--well); border: 1px solid var(--line); cursor: pointer; touch-action: none; }
   .trim-sel { position: absolute; top: 0; bottom: 0; background: rgba(139,26,184,.28); border-top: 2px solid var(--amber); border-bottom: 2px solid var(--amber); pointer-events: none; }
-  .trim-head { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 4px rgba(0,0,0,.8); pointer-events: none; }
-  .trim-h { position: absolute; top: -4px; bottom: -4px; width: 14px; margin-left: -7px; padding: 0; border: 0; border-radius: 4px; background: var(--amber); cursor: ew-resize; touch-action: none; }
+  .trim-head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 4px rgba(0,0,0,.8); pointer-events: none; }
+  .trim-h { position: absolute; top: 0; bottom: 0; width: 14px; margin-left: -7px; padding: 0; border: 0; border-radius: 4px; background: var(--amber); cursor: ew-resize; touch-action: none; }
   .trim-h::after { content: ""; position: absolute; left: 6px; top: 30%; bottom: 30%; width: 2px; background: rgba(255,255,255,.7); }
   .trim-h:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  /* the whole video, above the strip: the trimmed part, and the stretch the strip is zoomed in on */
+  .trim-over { position: relative; height: 8px; border-radius: 4px; background: var(--well); border: 1px solid var(--line); cursor: pointer; }
+  .trim-over-sel { position: absolute; top: 0; bottom: 0; background: var(--amber); opacity: .75; border-radius: 3px; pointer-events: none; }
+  .trim-over-view { position: absolute; top: -3px; bottom: -3px; border: 1.5px solid rgba(255,255,255,.8); border-radius: 4px; pointer-events: none; }
+  .trim-over-head { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #fff; pointer-events: none; }
+  .trim-over[data-whole="1"] .trim-over-view { display: none; }
+  .trim-bar { overflow: hidden; }
+  .trim-vt { position: absolute; bottom: 2px; font: 12px/1 var(--f-osd); color: var(--faint); pointer-events: none; z-index: 1; }
+  .trim-v0 { left: 5px; } .trim-v1 { right: 5px; }
   .trim-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
   .trim-row .tc { font: 17px/1 var(--f-osd); color: var(--amber-ink); font-variant-numeric: tabular-nums; min-width: 6ch; }
   @media (max-width: 700px) { .snip-fields { grid-template-columns: minmax(0, 1fr); } }

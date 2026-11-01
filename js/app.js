@@ -5163,7 +5163,9 @@ function clipList(fresh) {
         return clips.list;
       } catch (e) { why = e; } finally { clearTimeout(t); }
     }
-    clips.list = null;
+    // Asked again and no answer (busy for a moment, or closed): the clips it gave last time stay listed, so the explorer
+    // and edits don't trip over an empty library; only a page that never heard from it has none
+    if (!clips.list) clips.list = null;
     throw why || new Error('Phosphor Clips didn’t answer');
   })();
   clips.req.then(() => { clips.req = null; }, () => { clips.req = null; });
@@ -5511,7 +5513,7 @@ async function cxEdit(c, changes, quiet) {
         ? 'This Phosphor Clips is too old for tags and effects. Install the newest one (1.7 or later).' : 'Couldn’t change it. Is Phosphor Clips still running?');
       return null;
     }
-    const i = clips.list.findIndex((x) => x.id === c.id);
+    const i = (clips.list || []).findIndex((x) => x.id === c.id);
     if (i >= 0) clips.list[i] = j.clip;
     if (changes.look !== undefined) cxLooks.delete(c.id);
     if (!quiet) {
@@ -5904,7 +5906,8 @@ function markBar() {
 const SNIP_CAT_KEY = 'phosphor-snip-cat';
 // a, b: the trimmed part (seconds); play: the video repeats just that part while the panel is open
 // autoName: the name follows the trim (video name, start–end) until you type one of your own
-const snip = { busy: false, open: false, a: 0, b: 0, play: true, drag: null, autoName: true, base: '' };
+// v0, v1: the stretch of the video the strip shows now (zoomed in on a short trim), easing towards view (its target)
+const snip = { busy: false, open: false, a: 0, b: 0, play: true, drag: null, autoName: true, base: '', v0: 0, v1: 0, view: null, px: 0, lastTick: 0 };
 const snipSay = (t) => { $('#snipStatus').textContent = t || ''; };
 const vidDur = () => { const v = vid.video; return v && isFinite(v.duration) && v.duration > 0 ? v.duration : 0; };
 const fmtT1 = (s) => { s = Math.max(0, s || 0); return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
@@ -5919,15 +5922,38 @@ function snipWhatText() {
   $('#snipWhat').textContent = r.whole ? `The whole video, ${r.d.toFixed(1)} seconds. Drag the handles to trim it.`
     : `${fmtT1(r.a)} to ${fmtT1(r.b)}: ${Math.max(0, r.b - r.a).toFixed(1)} seconds.`;
 }
-// The trim strip: the kept part, the handles, where the video is
+// The stretch the strip should show: all of the video, or, when the trimmed part is much shorter (under 40% of it),
+// that part with some room either side, so short trims can be set finely
+function trimViewFor() {
+  const d = vidDur(), r = snipRange(), span = r.b - r.a;
+  if (!d || span >= 0.4 * d) return [0, d];
+  const pad = Math.max(span * 0.35, 0.75);
+  let lo = Math.max(0, r.a - pad), hi = Math.min(d, r.b + pad);
+  const want = Math.min(d, Math.max(hi - lo, 2.5));
+  if (hi - lo < want) { const c = (lo + hi) / 2; lo = c - want / 2; hi = c + want / 2; if (lo < 0) { hi -= lo; lo = 0; } if (hi > d) { lo -= hi - d; hi = d; } }
+  return [Math.max(0, lo), Math.min(d, hi)];
+}
+const trimAt = (t) => ((t - snip.v0) / Math.max(1e-6, snip.v1 - snip.v0)) * 100;
+// The trim strip: the kept part, the handles, where the video is; and above it the whole video
 function trimDraw() {
   const d = vidDur();
   if (!d) return;
-  const r = snipRange(), pa = (r.a / d) * 100, pb = (r.b / d) * 100;
-  $('#trimSel').style.left = pa + '%';
-  $('#trimSel').style.width = Math.max(0, pb - pa) + '%';
-  $('#trimA').style.left = pa + '%';
-  $('#trimB').style.left = pb + '%';
+  if (!(snip.v1 > snip.v0)) { [snip.v0, snip.v1] = trimViewFor(); }
+  if (!snip.drag) snip.view = trimViewFor();
+  const r = snipRange(), pa = trimAt(r.a), pb = trimAt(r.b);
+  const cl = (x) => clamp(x, -2, 102);
+  $('#trimSel').style.left = cl(pa) + '%';
+  $('#trimSel').style.width = Math.max(0, cl(pb) - cl(pa)) + '%';
+  $('#trimA').style.left = cl(pa) + '%';
+  $('#trimB').style.left = cl(pb) + '%';
+  const whole = snip.v0 <= 0.01 && snip.v1 >= d - 0.01;
+  $('#trimV0').textContent = whole ? '' : fmtT1(snip.v0);
+  $('#trimV1').textContent = whole ? '' : fmtT1(snip.v1);
+  $('#trimOver').dataset.whole = whole ? '1' : '0';
+  $('#trimOverSel').style.left = (r.a / d) * 100 + '%';
+  $('#trimOverSel').style.width = ((r.b - r.a) / d) * 100 + '%';
+  $('#trimOverView').style.left = (snip.v0 / d) * 100 + '%';
+  $('#trimOverView').style.width = ((snip.v1 - snip.v0) / d) * 100 + '%';
   $('#trimAT').textContent = fmtT1(r.a);
   $('#trimBT').textContent = fmtT1(r.b);
   snipWhatText();
@@ -5940,27 +5966,108 @@ function trimSet(which, t) {
   else snip.b = clamp(t, Math.min(d, snip.a + 0.2), d);
   trimDraw();
 }
-// Each frame while the panel is open: the playhead, and the video kept inside the trimmed part
+// Each frame while the panel is open: the strip's zoom (easing to fit the trim, or widening while a handle is pushed
+// against an end), the playhead, and the video kept inside the trimmed part
 function snipTick() {
   const v = vid.video, d = vidDur();
   if (!snip.open || !v || !d) return;
-  $('#trimHead').style.left = (v.currentTime / d) * 100 + '%';
-  if (snip.play && !snip.drag && !v.seeking) {
+  const now = performance.now(), dt = snip.lastTick ? Math.min(0.1, (now - snip.lastTick) / 1000) : 0.016;
+  snip.lastTick = now;
+  if (snip.drag) {
+    // A handle pushed against an end of the strip: the strip widens that way (faster the further past it the
+    // pointer is), and the handle follows to the new edge
+    const box = $('#trimBar').getBoundingClientRect(), f = (snip.px - box.left) / box.width, w = snip.v1 - snip.v0;
+    let grew = false;
+    if (f > 0.97 && snip.v1 < d) { snip.v1 = Math.min(d, snip.v1 + w * dt * (1.2 + 3 * Math.max(0, f - 1))); grew = true; }
+    if (f < 0.03 && snip.v0 > 0) { snip.v0 = Math.max(0, snip.v0 - w * dt * (1.2 + 3 * Math.max(0, -f))); grew = true; }
+    if (grew) {
+      snip.view = [snip.v0, snip.v1];
+      trimSet(snip.drag, snip.v0 + clamp(f, 0, 1) * (snip.v1 - snip.v0));
+      peekSeek(snip.drag === 'a' ? snip.a : Math.max(snip.a, snip.b - 0.04));
+    }
+  } else if (snip.view) {
+    // Easing to the view that fits the trim
+    const k = 1 - Math.exp(-dt * 9), [t0, t1] = snip.view;
+    if (Math.abs(snip.v0 - t0) > 0.002 || Math.abs(snip.v1 - t1) > 0.002) {
+      snip.v0 += (t0 - snip.v0) * k; snip.v1 += (t1 - snip.v1) * k;
+      if (Math.abs(snip.v0 - t0) < 0.002 && Math.abs(snip.v1 - t1) < 0.002) { snip.v0 = t0; snip.v1 = t1; }
+      trimDraw();
+    }
+  }
+  if (peek.on && peek.hideAt && now >= peek.hideAt && !snip.drag) peekStop();
+  const hp = trimAt(v.currentTime);
+  $('#trimHead').style.left = hp + '%';
+  $('#trimHead').hidden = hp < 0 || hp > 100;
+  $('#trimOverHead').style.left = (v.currentTime / d) * 100 + '%';
+  if (snip.play && !snip.drag && !peek.on && !v.seeking) {
     const r = snipRange();
     if (v.currentTime >= r.b - 0.03 || v.currentTime < r.a - 0.25) v.currentTime = r.a;
   }
 }
-const trimTimeAt = (e) => { const box = $('#trimBar').getBoundingClientRect(); return clamp((e.clientX - box.left) / box.width, 0, 1) * vidDur(); };
+/* The peek: while a handle is dragged (or nudged with the arrow keys), the video holds still at that handle and its
+   plain frame (no effects) covers the picture, with the time and which end it is, so you can see exactly where the
+   clip starts or ends. Let go and the picture comes back, playing the part from its start. */
+const peek = { on: false, which: '', want: null, wasPaused: true, hideAt: 0, busy: false };
+function peekDraw() {
+  const v = vid.video;
+  if (!peek.on || !v || !v.videoWidth) return;
+  const c = $('#trimPeekPic');
+  if (c.width !== v.videoWidth || c.height !== v.videoHeight) { c.width = v.videoWidth; c.height = v.videoHeight; }
+  try { c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); } catch (_) { /* not ready */ }
+  $('#trimPeekT').textContent = `${peek.which === 'a' ? 'Starts' : 'Ends'} ${fmtT1(v.currentTime)}`;
+}
+// Seeks to the latest asked-for time, one seek at a time (a fast drag asks far more often than a video can seek)
+function peekSeek(t) {
+  const v = vid.video;
+  if (!v) return;
+  peek.want = t;
+  if (peek.busy) return;
+  peek.busy = true;
+  const go = () => {
+    const want = peek.want;
+    peek.want = null;
+    v.currentTime = clamp(want, 0, Math.max(0, vidDur() - 0.04));
+    // (if a seek never says it's done, the next one goes ahead anyway after a moment)
+    let done = false;
+    const next = () => { if (done) return; done = true; peekDraw(); if (peek.want != null) go(); else peek.busy = false; };
+    v.addEventListener('seeked', next, { once: true });
+    setTimeout(next, 700);
+  };
+  go();
+}
+function peekStart(which) {
+  const v = vid.video;
+  if (!v) return;
+  if (!peek.on) { peek.wasPaused = v.paused; v.pause(); }
+  peek.on = true;
+  peek.which = which;
+  peek.hideAt = 0;
+  $('#trimPeek').hidden = false;
+  peekSeek(which === 'a' ? snip.a : Math.max(snip.a, snip.b - 0.04));
+}
+function peekStop(soon) {
+  if (!peek.on) return;
+  // after an arrow-key nudge it stays up a moment, then goes
+  if (soon) { peek.hideAt = performance.now() + 900; return; }
+  peek.on = false;
+  peek.hideAt = 0;
+  $('#trimPeek').hidden = true;
+  const v = vid.video;
+  if (v) { v.currentTime = snip.a; if (!peek.wasPaused) v.play().catch(() => {}); }
+}
+const trimTimeAt = (e) => { const box = $('#trimBar').getBoundingClientRect(); return snip.v0 + clamp((e.clientX - box.left) / box.width, 0, 1) * (snip.v1 - snip.v0); };
 for (const which of ['a', 'b']) {
   const h = $(which === 'a' ? '#trimA' : '#trimB');
-  h.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); snip.drag = which; try { h.setPointerCapture(e.pointerId); } catch (_) { /* a pen or touch that's gone already */ } h.focus(); });
+  h.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); snip.drag = which; snip.px = e.clientX; peekStart(which); try { h.setPointerCapture(e.pointerId); } catch (_) { /* a pen or touch that's gone already */ } h.focus(); });
   h.addEventListener('pointermove', (e) => {
     if (snip.drag !== which) return;
+    snip.px = e.clientX;
     const t = trimTimeAt(e);
     trimSet(which, t);
-    if (vid.video) vid.video.currentTime = which === 'a' ? snip.a : Math.max(snip.a, snip.b - 0.05);
+    peekSeek(which === 'a' ? snip.a : Math.max(snip.a, snip.b - 0.04));
   });
-  const end = () => { if (snip.drag === which) { snip.drag = null; if (vid.video) vid.video.currentTime = snip.a; } };
+  // Let go: the strip zooms to fit the new trim
+  const end = () => { if (snip.drag === which) { snip.drag = null; trimDraw(); peekStop(); } };
   h.addEventListener('pointerup', end);
   h.addEventListener('pointercancel', end);
   // Arrow keys nudge a handle a tenth of a second (a second with Shift)
@@ -5969,13 +6076,20 @@ for (const which of ['a', 'b']) {
     e.preventDefault(); e.stopPropagation();
     const step = (e.shiftKey ? 1 : 0.1) * (e.key === 'ArrowLeft' ? -1 : 1);
     trimSet(which, (which === 'a' ? snip.a : snip.b) + step);
-    if (vid.video) vid.video.currentTime = which === 'a' ? snip.a : Math.max(snip.a, snip.b - 1);
+    peekStart(which);
+    peekStop(true);
   });
 }
 // Clicking the strip moves the video there (inside the trimmed part while Play the part is on)
 $('#trimBar').addEventListener('pointerdown', (e) => {
   if (e.target.closest('.trim-h') || !vid.video) return;
   const t = trimTimeAt(e);
+  vid.video.currentTime = snip.play ? clamp(t, snip.a, Math.max(snip.a, snip.b - 0.05)) : t;
+});
+// The overview: click to move through the whole video
+$('#trimOver').addEventListener('pointerdown', (e) => {
+  if (!vid.video) return;
+  const box = $('#trimOver').getBoundingClientRect(), t = clamp((e.clientX - box.left) / box.width, 0, 1) * vidDur();
   vid.video.currentTime = snip.play ? clamp(t, snip.a, Math.max(snip.a, snip.b - 0.05)) : t;
 });
 $('#trimSetA').addEventListener('click', () => { if (vid.video) trimSet('a', vid.video.currentTime); });
@@ -6000,8 +6114,13 @@ function snipSource() {
   return null;
 }
 const baseName = (n) => String(n || 'Video').replace(/\.[a-z0-9]{2,4}$/i, '');
-// A time for a file name (Windows won't take a colon): 7s, 1m05s
-const nameT = (t) => { t = Math.max(0, Math.round(t)); const m = Math.floor(t / 60), x = t % 60; return m ? `${m}m${String(x).padStart(2, '0')}s` : `${x}s`; };
+// A time for a file name (Windows won't take a colon): 7s, 2.5s, 1m05s, 1m05.5s (tenths only when there are any)
+const nameT = (t) => {
+  t = Math.max(0, Math.round(t * 10) / 10);
+  const m = Math.floor(t / 60), x = Math.round((t - m * 60) * 10) / 10;
+  const xs = Number.isInteger(x) ? String(x) : x.toFixed(1);
+  return m ? `${m}m${xs.padStart(Number.isInteger(x) ? 2 : 4, '0')}s` : `${xs}s`;
+};
 async function snipOpenForm() {
   const src = snipSource(), form = $('#snipPanel');
   if (!src) { snipSay('Put a video in first: Inputs › Video › Clip library… or Choose a video….'); return; }
@@ -6027,6 +6146,8 @@ async function snipOpenForm() {
   snip.b = vidLoopB ?? d;
   snip.play = true;
   $('#trimPlay').setAttribute('aria-pressed', 'true');
+  snip.v0 = 0; snip.v1 = 0; snip.drag = null;
+  [snip.v0, snip.v1] = trimViewFor();
   trimDraw();
 
   // A snip of a tagged clip starts with its tags; the suggestions are every tag in the library
@@ -6040,6 +6161,7 @@ async function snipOpenForm() {
   form.scrollIntoView({ block: 'nearest' });
 }
 function snipCloseForm() {
+  peekStop();
   $('#snipPanel').hidden = true;
   $('#snipOpen').setAttribute('aria-pressed', 'false');
   snip.open = false;
@@ -6107,7 +6229,7 @@ async function snipSave() {
 }
 $('#snipOpen').addEventListener('click', () => { if (snip.open) snipCloseForm(); else void snipOpenForm(); });
 $('#snipName').addEventListener('input', () => { snip.autoName = false; });
-window.__plSnip = { time: () => (vid.video ? vid.video.currentTime : 0), get state() { return { ...snip }; } };   // for tests/snips_check.py
+window.__plSnip = { time: () => (vid.video ? vid.video.currentTime : 0), get state() { return { ...snip }; }, get peek() { return { on: peek.on, which: peek.which }; } };   // for tests/snips_check.py
 $('#snipCancel').addEventListener('click', () => { snipCloseForm(); snipSay(''); });
 $('#snipPanel').addEventListener('submit', (e) => { e.preventDefault(); void snipSave(); });
 // Keys typed in the panel stay there (not Phosphor Loop's shortcuts)

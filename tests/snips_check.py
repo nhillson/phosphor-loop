@@ -211,6 +211,46 @@ def main():
                 pg.evaluate("document.querySelector('#trimA').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }))")
             c.wait_frames(2, 'trimmed again')
             shot(os.path.join(out, 'save-clip-panel.png'))
+            # Zoom: a part much shorter than the video (2.0 to 2.5 s of 4 s) makes the strip zoom in on it
+            key = lambda sel, k, shift=False: pg.evaluate(f"document.querySelector('{sel}').dispatchEvent(new KeyboardEvent('keydown', {{ key: '{k}', shiftKey: {str(shift).lower()}, bubbles: true }}))")
+            key('#trimB', 'ArrowLeft', True)
+            for _ in range(5):
+                key('#trimB', 'ArrowLeft')
+            ok(J("__plSnip.peek.on && __plSnip.peek.which === 'b'"), 'nudging a handle shows its frame too')
+            c.wait_frames(12, 'zooming in')
+            st = J("__plSnip.state")
+            ok(abs(st['a'] - 2.0) < 0.01 and abs(st['b'] - 2.5) < 0.01, f"trimmed to 2.0–2.5 s ({st['a']:.2f}–{st['b']:.2f})")
+            nm = J("document.querySelector('#snipName').value")
+            ok(nm == 'mine 2s–2.5s', f'the name keeps the tenths a short part needs ({nm})')
+            ok(st['v0'] > 0.5 and st['v1'] < 3.6 and (st['v1'] - st['v0']) < 3, f"the strip zoomed in on it ({st['v0']:.2f}–{st['v1']:.2f} s)")
+            tsel = J("parseFloat(document.querySelector('#trimSel').style.width)")
+            ok(tsel > 14, f'the short part fills more of the strip ({tsel:.0f}%, was 12.5%)')
+            ok(J("document.querySelector('#trimV0').textContent !== '' && document.querySelector('#trimOver').dataset.whole === '0'"), 'the strip shows its own start and end times, and the overview outlines it')
+            shot(os.path.join(out, 'save-clip-zoomed.png'))
+            # Pushing the end handle past the right end widens the strip and lengthens the clip
+            v1before = st['v1']
+            pg.evaluate('''() => { const bar = document.querySelector('#trimBar').getBoundingClientRect(), h = document.querySelector('#trimB');
+              const y = bar.top + bar.height / 2, x0 = bar.left + bar.width * ((__plSnip.state.b - __plSnip.state.v0) / (__plSnip.state.v1 - __plSnip.state.v0));
+              h.dispatchEvent(new PointerEvent('pointerdown', { clientX: x0, clientY: y, pointerId: 9, bubbles: true }));
+              h.dispatchEvent(new PointerEvent('pointermove', { clientX: bar.right + 40, clientY: y, pointerId: 9, bubbles: true })); }''')
+            c.wait_frames(10, 'pushing past the end')
+            pk = J("({ ...__plSnip.peek, shown: !document.querySelector('#trimPeek').hidden, t: document.querySelector('#trimPeekT').textContent, paused: !!document.querySelector('video') || true })")
+            ok(pk['on'] and pk['shown'] and pk['t'].startswith('Ends '), f"while dragging, the picture shows the video frame at the handle ({pk['t']})")
+            shot(os.path.join(out, 'save-clip-peek.png'))
+            st2 = J("__plSnip.state")
+            ok(st2['v1'] > v1before + 0.2 and st2['b'] > 2.5 + 0.2, f"the strip widened ({v1before:.2f} → {st2['v1']:.2f} s) and the clip got longer (end {st2['b']:.2f} s)")
+            pg.evaluate("() => document.querySelector('#trimB').dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, bubbles: true }))")
+            c.wait_frames(12, 'fitting again')
+            ok(J("document.querySelector('#trimPeek').hidden && !__plSnip.peek.on"), 'let go: the picture comes back')
+            st3 = J("__plSnip.state")
+            ok(st3['v0'] <= st3['a'] and st3['v1'] >= st3['b'], f"let go: the strip fits the new trim ({st3['v0']:.2f}–{st3['v1']:.2f} around {st3['a']:.2f}–{st3['b']:.2f})")
+            # Back to 2–4 s for the save below (the whole video shows again: half of it isn't much shorter)
+            click('#trimAll')
+            for _ in range(2):
+                key('#trimA', 'ArrowRight', True)
+            c.wait_frames(12, 'whole view again')
+            st4 = J("__plSnip.state")
+            ok(st4['v0'] == 0 and abs(st4['v1'] - 4) < 0.05, f"a part half the video long shows the whole video ({st4['v0']:.2f}–{st4['v1']:.2f})")
             J("document.querySelector('#snipFx').checked = false")
             fill('#snipTags', 'industrial')
             ok(J("document.querySelector('#snipCat').value") == 'water|', 'the last folder picked is remembered')
