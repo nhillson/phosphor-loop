@@ -135,6 +135,7 @@ function renderStatus() {
   if (status.starting) state = 'starting';
   else if (status.live) state = anyLive ? 'live' : (states.includes('retrying') ? 'retrying' : 'starting');
   $('#onair').dataset.state = state;
+  $('#opt-clickThrough').checked = !!status.clickThrough;
   if (S) renderRec();
   $('#stripDot').classList.toggle('live', state === 'live');
 
@@ -267,6 +268,7 @@ $('#opt-yt-hevc').addEventListener('change', (e) => save({ youtube: { hevc: e.ta
 $('#opt-tw-eb').addEventListener('change', (e) => save({ twitch: { enhanced: e.target.checked } }));
 $$('[data-twtop]').forEach((b) => b.addEventListener('click', () => save({ twitch: { topMbps: +b.dataset.twtop } })));
 $('#opt-calm').addEventListener('change', (e) => save({ streamFriendly: e.target.checked }));
+$('#opt-clickThrough').addEventListener('change', (e) => window.app.clickThrough(e.target.checked));
 $$('[data-save]').forEach((b) => b.addEventListener('click', async () => {
   const p = b.dataset.save;
   const key = $(`#key-${p}`).value.trim();

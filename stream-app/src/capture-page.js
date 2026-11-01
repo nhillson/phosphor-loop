@@ -6,6 +6,17 @@
 module.exports = function capturePageSource() {
   return `(() => {
   if (window.phosphorStreamCapture) return;
+  // Tell the app what the page is about to ask for, so Share another window… gets the app's window picker
+  // (Share this tab and the computer's sound keep working as before)
+  const md = navigator.mediaDevices;
+  if (md && md.getDisplayMedia && !md.__psWrapped && window.phosphorStream && window.phosphorStream.wantDisplay) {
+    const orig = md.getDisplayMedia.bind(md);
+    md.getDisplayMedia = (opts = {}) => {
+      try { window.phosphorStream.wantDisplay(opts.preferCurrentTab ? 'self' : (opts.audio ? 'sound' : 'pick')); } catch (_) {}
+      return orig(opts);
+    };
+    md.__psWrapped = true;
+  }
   const S = { frames: 0, chain: Promise.resolve(), rec: null, video: null };
   const count = () => { S.frames++; requestAnimationFrame(count); };
   requestAnimationFrame(count);

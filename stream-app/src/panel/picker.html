@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Phosphor Stream: pick a window</title>
+<link rel="stylesheet" href="picker.css">
+</head>
+<body>
+<header>
+  <h1>What should Phosphor Loop film?</h1>
+  <p>Pick any open program. It keeps feeding in even when it sits behind Phosphor Loop. Don’t minimize it, or its picture freezes.</p>
+</header>
+<main>
+  <h2 id="hWin">Windows</h2>
+  <ul class="grid" id="windows" aria-labelledby="hWin"></ul>
+  <p class="empty" id="noWindows" hidden>No other windows are open. Open the program you want, then press Share another window… again.</p>
+  <h2 id="hScr">Whole screen</h2>
+  <ul class="grid" id="screens" aria-labelledby="hScr"></ul>
+</main>
+<footer>
+  <button id="cancel">Cancel</button>
+  <button id="share" class="primary" disabled>Share</button>
+</footer>
+<script src="picker.js"></script>
+</body>
+</html>

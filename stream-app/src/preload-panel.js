@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('app', {
   record: (on) => ipcRenderer.invoke('record', on),
   discard: () => ipcRenderer.invoke('record-discard'),
   openRecordings: () => ipcRenderer.invoke('open-recordings'),
+  clickThrough: (on) => ipcRenderer.invoke('click-through', !!on),
   onTune: (fn) => ipcRenderer.on('tune', (_e, t) => fn(t)),
   onStatus: (fn) => ipcRenderer.on('status', (_e, s) => fn(s)),
   onNotice: (fn) => ipcRenderer.on('notice', (_e, n) => fn(n)),

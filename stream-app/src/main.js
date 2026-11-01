@@ -1,7 +1,7 @@
 'use strict';
 // Phosphor Stream: one window with Phosphor Loop on the left and the streaming controls on the right.
 const { app, BrowserWindow, WebContentsView, ipcMain, session, desktopCapturer, safeStorage, shell, dialog,
-  powerSaveBlocker } = require('electron');
+  powerSaveBlocker, globalShortcut } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFile } = require('node:child_process');
@@ -44,6 +44,8 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// Share another window…: film a window even while it sits behind Phosphor Loop (Windows' own window capture)
+app.commandLine.appendSwitch('enable-features', 'WebRtcAllowWgcWindowCapturer');
 
 if (!TEST && !app.requestSingleInstanceLock()) app.quit();
 
@@ -119,11 +121,12 @@ function ffmpegPath() {
   return fs.existsSync(local) ? local : 'ffmpeg';
 }
 const streamer = new Streamer({ ffmpeg: ffmpegPath(), log });
+let clickThrough = false; // Click through (see below); never saved, so it's always off when the app opens
 let win, site, sleepBlock = null, notice = null, captureInfo = null, probing = null;
 
 function fullStatus() {
   const v = streamer.encoder && VARIANTS[streamer.encoder.variant];
-  return { ...streamer.status(), rec: recStatus(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned') };
+  return { ...streamer.status(), rec: recStatus(), notice, starting: !!startingLive, setting: v ? v.label : '', tuned: !!(streamer.encoder && streamer.encoder.tier === 'tuned'), clickThrough };
 }
 function sendStatus() {
   if (!win || win.isDestroyed()) return;
@@ -426,6 +429,8 @@ function createWindow() {
   win.contentView.addChildView(site);
   layout();
   win.on('resize', layout);
+  clickKeys(win.webContents);
+  clickKeys(site.webContents);
   site.webContents.on('enter-html-full-screen', () => setSiteFull(true));
   site.webContents.on('leave-html-full-screen', () => setSiteFull(false));
   // Leaving the window's full screen some other way (Esc handled by Windows, say) ends the page's too
@@ -482,14 +487,118 @@ function permissions() {
     'pointerLock', 'window-management', 'notifications', 'keyboardLock', 'speaker-selection']);
   ses.setPermissionRequestHandler((_wc, perm, cb) => cb(allowed.has(perm)));
   ses.setPermissionCheckHandler((_wc, perm) => allowed.has(perm));
-  // "Share this computer's sound" never shows a picker here: the app hands over Windows' sound directly
-  ses.setDisplayMediaRequestHandler((_req, cb) => {
+  // "Share this computer's sound" never shows a picker here: the app hands over Windows' sound directly.
+  // Phosphor Loop's Screen › Share another window… opens the app's own window picker (every open program).
+  ses.setDisplayMediaRequestHandler((req, cb) => {
+    const w = wantDisplay && Date.now() - wantDisplay.at < 15000 ? wantDisplay.kind : null;
+    wantDisplay = null;
+    if (w === 'pick' && !req.audioRequested) {
+      pickWindow().then((src) => cb(src ? { video: src } : {})).catch((e) => { log('Window picker failed: ' + e.message); cb({}); });
+      return;
+    }
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
       if (!sources.length) return cb({});
       cb(process.platform === 'win32' ? { video: sources[0], audio: 'loopback' } : { video: sources[0] });
     }).catch(() => cb({}));
   });
 }
+
+/* ---------- Share another window…: the window picker ---------- */
+// The page says what it's about to ask for just before asking (capture-page.js): 'pick' for Share another window…,
+// 'self' for Share this tab, 'sound' for the computer's sound
+let wantDisplay = null, picker = null;
+ipcMain.on('want-display', (e, kind) => { wantDisplay = { kind: String(kind || ''), at: Date.now() }; e.returnValue = true; });
+
+async function pickWindow() {
+  if (picker && !picker.isDestroyed()) picker.close();
+  const sources = await desktopCapturer.getSources({ types: ['window', 'screen'], thumbnailSize: { width: 384, height: 216 }, fetchWindowIcons: true });
+  const own = new Set();
+  try { own.add(win.getMediaSourceId()); } catch (_) {}
+  for (const b of BrowserWindow.getAllWindows()) { try { if (/^Phosphor Stream/.test(b.getTitle())) own.add(b.getMediaSourceId()); } catch (_) {} }
+  const list = sources.filter((s) => !own.has(s.id) && (s.id.startsWith('screen:') || s.name.trim()));
+  const items = list.map((s, i) => ({
+    i, kind: s.id.startsWith('screen:') ? 'screen' : 'window',
+    name: s.id.startsWith('screen:') ? (sources.filter((x) => x.id.startsWith('screen:')).length > 1 ? s.name : 'Your whole screen') : s.name,
+    thumb: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : '',
+    icon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : '',
+  }));
+  log(`Window picker: ${items.filter((x) => x.kind === 'window').length} windows, ${items.filter((x) => x.kind === 'screen').length} screens`);
+  return new Promise((resolve) => {
+    let done = false;
+    const finishPick = (i) => {
+      if (done) return;
+      done = true;
+      const src = Number.isInteger(i) ? list[i] : null;
+      log(src ? `Window picker: sharing "${src.name}"` : 'Window picker: cancelled');
+      if (picker && !picker.isDestroyed()) picker.close();
+      picker = null;
+      resolve(src || null);
+    };
+    picker = new BrowserWindow({
+      parent: win, modal: true, width: 900, height: 640, minWidth: 520, minHeight: 360, backgroundColor: '#0b090e',
+      title: 'Phosphor Stream: pick a window', autoHideMenuBar: true, show: false, alwaysOnTop: clickThrough,
+      webPreferences: { preload: path.join(__dirname, 'preload-picker.js'), contextIsolation: true, sandbox: true },
+    });
+    picker.removeMenu();
+    const ch = 'picker-choice', onChoice = (e, i) => { if (picker && e.sender === picker.webContents) finishPick(i); };
+    ipcMain.on(ch, onChoice);
+    picker.on('closed', () => { ipcMain.removeListener(ch, onChoice); finishPick(null); });
+    picker.webContents.once('did-finish-load', () => {
+      picker.webContents.send('picker-items', items);
+      if (TEST) picker.showInactive(); else picker.show();
+    });
+    picker.loadFile(path.join(__dirname, 'panel', 'picker.html'));
+  });
+}
+
+/* ---------- Click through: the mouse passes through to the window behind ---------- */
+// While it's on, Phosphor Stream stays in front (so a click on the window behind doesn't bring that window forward)
+// and Ctrl+Shift+X works from anywhere to switch it off. It always starts off when the app opens.
+const CLICK_KEY = 'CommandOrControl+Shift+X';
+function setClickThrough(on) {
+  on = !!on;
+  if (!win || win.isDestroyed() || clickThrough === on) return { ok: true, on: clickThrough };
+  clickThrough = on;
+  win.setIgnoreMouseEvents(on);
+  win.setAlwaysOnTop(on, 'screen-saver');
+  if (on) {
+    try { if (!globalShortcut.register(CLICK_KEY, () => setClickThrough(false))) log('Click through: Ctrl+Shift+X is taken by another program'); } catch (e) { log('Click through key: ' + e.message); }
+  } else {
+    try { globalShortcut.unregister(CLICK_KEY); } catch (_) {}
+    win.focus();
+  }
+  log('Click through ' + (on ? 'on' : 'off'));
+  siteToast(on ? 'Click through is on: your clicks go to the window behind. Press <b>Ctrl + Shift + X</b> to switch it off.' : 'Click through is off.');
+  sendStatus();
+  return { ok: true, on };
+}
+// A short message over the picture that fades away (it never catches the mouse)
+function siteToast(html) {
+  if (!site || site.webContents.isDestroyed()) return;
+  site.webContents.executeJavaScript(`(() => {
+    let t = document.getElementById('phosphorStreamToast');
+    if (!t) {
+      t = document.createElement('div'); t.id = 'phosphorStreamToast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:48px;transform:translateX(-50%);z-index:2147483647;pointer-events:none;max-width:min(560px,90vw);'
+        + 'padding:12px 18px;border-radius:12px;background:rgba(21,17,26,.92);border:1px solid #8b1ab8;color:#ece4f2;'
+        + 'font:15px/1.4 "Segoe UI",system-ui,sans-serif;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .6s';
+      document.body.appendChild(t);
+    }
+    t.innerHTML = ${JSON.stringify(html)}; t.style.opacity = '1';
+    clearTimeout(t._h); t._h = setTimeout(() => { t.style.opacity = '0'; }, 4500);
+  })()`, true).catch(() => {});
+}
+// Ctrl+Shift+X while Phosphor Stream itself has the keyboard (switching on, or off again)
+function clickKeys(wc) {
+  wc.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.control && input.shift && !input.alt && String(input.key).toLowerCase() === 'x') {
+      e.preventDefault();
+      if (!input.isAutoRepeat) setClickThrough(!clickThrough);
+    }
+  });
+}
+ipcMain.handle('click-through', (_e, on) => setClickThrough(on));
+app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch (_) {} });
 
 /* ---------- the computer (for the log) ---------- */
 let gpuName = '', gpuDevices = [];
@@ -865,6 +974,97 @@ async function pageFps(n = 30) {
   return +(n / ((Date.now() - t0) / 1000)).toFixed(1);
 }
 
+/* ---------- self-test: Share another window… and Click through ---------- */
+// A plain green window sits BEHIND Phosphor Stream. The page asks to share a window the way Phosphor Loop's
+// Share another window… does, the test clicks that window's tile in the picker, and the picture that arrives must be
+// green (the hidden window, not whatever covers it). Then Click through on and off: the window must let clicks
+// pass (Windows' "transparent to the mouse" flag), stay in front, and have Ctrl+Shift+X ready.
+async function windowTests(result) {
+  const shots = process.env.PHOSPHOR_TEST_SHOTS;
+  const wt = result.windowShare = {};
+  const [wx, wy] = win.getPosition(), [ww, wh] = win.getSize();
+  const target = new BrowserWindow({ x: wx + 200, y: wy + 150, width: 480, height: 320, show: false, title: 'PS window target', backgroundColor: '#00ff00', autoHideMenuBar: true });
+  target.removeMenu();
+  await target.loadURL('data:text/html,<title>PS window target</title><body style="margin:0;background:%2300ff00"></body>');
+  target.showInactive();
+  win.moveTop();
+  await waitFrames(10, 30000);
+  const asked = site.webContents.executeJavaScript(`(async () => {
+    try {
+      const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false, selfBrowserSurface: 'include', surfaceSwitching: 'include' });
+      const v = document.createElement('video'); v.muted = true; v.srcObject = s; await v.play();
+      window.__psShare = { s, v };
+      return { ok: true, label: s.getVideoTracks()[0].label, surface: (s.getVideoTracks()[0].getSettings() || {}).displaySurface || '' };
+    } catch (e) { return { ok: false, error: e.name + ': ' + e.message }; }
+  })()`, true);
+  // Wait (by frames) for the picker and its tiles, then pick the green window
+  let tiles = 0;
+  for (let k = 0; k < 300 && !tiles; k++) {
+    await waitFrames(1, 10000);
+    if (picker && !picker.isDestroyed()) tiles = await picker.webContents.executeJavaScript('document.querySelectorAll(".tile").length', true).catch(() => 0);
+  }
+  wt.tiles = tiles;
+  if (!tiles) throw new Error('the window picker never showed any windows');
+  wt.names = await picker.webContents.executeJavaScript('[...document.querySelectorAll(".tile")].map((b) => b.title)', true);
+  if (wt.names.some((n) => /^Phosphor Stream$/.test(n))) throw new Error('the picker offered Phosphor Stream itself: ' + wt.names.join(', '));
+  if (shots) {
+    await picker.webContents.executeJavaScript('(() => { const b = [...document.querySelectorAll(".tile")].find((x) => x.title === "PS window target"); b && b.click(); })()', true);
+    await waitFrames(2, 10000);
+    fs.writeFileSync(path.join(shots, 'window-picker.png'), (await picker.webContents.capturePage()).toPNG());
+  }
+  const clicked = await picker.webContents.executeJavaScript('(() => { const b = [...document.querySelectorAll(".tile")].find((x) => x.title === "PS window target"); if (!b) return false; b.click(); document.getElementById("share").click(); return true; })()', true);
+  if (!clicked) throw new Error('the green test window is not in the picker: ' + wt.names.join(', '));
+  Object.assign(wt, await asked);
+  if (!wt.ok) throw new Error('sharing the picked window failed: ' + wt.error);
+  // Let some frames of the shared window arrive, with Phosphor Stream still covering it
+  win.moveTop();
+  await waitFrames(30, 60000);
+  wt.coveredWhenRead = true;
+  wt.pixel = await site.webContents.executeJavaScript(`(() => {
+    const { v } = window.__psShare; const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const g = c.getContext('2d'); g.drawImage(v, 0, 0, 64, 64); const d = g.getImageData(24, 24, 16, 16).data;
+    let r = 0, gr = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gr += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4; return { r: Math.round(r / n), g: Math.round(gr / n), b: Math.round(b / n), w: v.videoWidth, h: v.videoHeight };
+  })()`, true);
+  if (shots) {
+    const frame = await site.webContents.executeJavaScript(`(() => { const { v } = window.__psShare; const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0); return c.toDataURL('image/png'); })()`, true);
+    fs.writeFileSync(path.join(shots, 'window-shared-frame.png'), Buffer.from(frame.split(',')[1], 'base64'));
+  }
+  const px = wt.pixel;
+  log(`Self-test: shared window ${px.w}x${px.h}, middle colour ${px.r},${px.g},${px.b}`);
+  if (!(px.g > 180 && px.r < 90 && px.b < 90)) throw new Error(`the shared window's picture isn't the hidden green window (middle colour ${px.r},${px.g},${px.b})`);
+  await site.webContents.executeJavaScript('window.__psShare.s.getTracks().forEach((t) => t.stop()); delete window.__psShare; true', true);
+  target.close();
+
+  // Click through
+  const ct = result.clickThrough = {};
+  const exStyle = () => new Promise((res) => {
+    const h = win.getNativeWindowHandle();
+    const hwnd = h.length >= 8 ? h.readBigUInt64LE(0).toString() : String(h.readUInt32LE(0));
+    const ps = `Add-Type -Name W -Namespace U -MemberDefinition '[DllImport("user32.dll")] public static extern System.IntPtr GetWindowLongPtr(System.IntPtr h, int i);'; [U.W]::GetWindowLongPtr([System.IntPtr]${hwnd}, -20).ToInt64()`;
+    execFile('powershell.exe', ['-NoProfile', '-Command', ps], { timeout: 60000, windowsHide: true }, (err, out) => res(err ? null : +String(out).trim()));
+  });
+  setClickThrough(true);
+  await waitFrames(2, 10000);
+  const onStyle = await exStyle();
+  ct.on = { status: fullStatus().clickThrough, onTop: win.isAlwaysOnTop(), key: globalShortcut.isRegistered(CLICK_KEY), transparent: onStyle === null ? 'unknown' : !!(onStyle & 0x20) };
+  if (shots) fs.writeFileSync(path.join(shots, 'click-through-on.png'), (await site.webContents.capturePage()).toPNG());
+  setClickThrough(false);
+  await waitFrames(2, 10000);
+  const offStyle = await exStyle();
+  ct.off = { status: fullStatus().clickThrough, onTop: win.isAlwaysOnTop(), key: globalShortcut.isRegistered(CLICK_KEY), transparent: offStyle === null ? 'unknown' : !!(offStyle & 0x20) };
+  // Ctrl+Shift+X typed into Phosphor Stream switches it on (soft check: typed keys from a test may skip that step)
+  site.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'X', modifiers: ['control', 'shift'] });
+  site.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'X', modifiers: ['control', 'shift'] });
+  await waitFrames(2, 10000);
+  ct.keyTurnsOn = clickThrough;
+  setClickThrough(false);
+  log('Self-test: click through ' + JSON.stringify(ct));
+  if (!ct.on.status || !ct.on.onTop || !ct.on.key || ct.on.transparent === false) throw new Error('Click through did not switch on properly: ' + JSON.stringify(ct.on));
+  if (ct.off.status || ct.off.onTop || ct.off.key || ct.off.transparent === true) throw new Error('Click through did not switch off properly: ' + JSON.stringify(ct.off));
+  if (await site.webContents.executeJavaScript('window.__keepMarker || 0', true) !== 42) throw new Error('the window tests reloaded the page');
+}
+
 /* ---------- self-test used by the build (never runs for Nick) ---------- */
 async function runTest() {
   const out = process.env.PHOSPHOR_TEST_OUT;
@@ -974,6 +1174,7 @@ async function runTest() {
     }
     result.pageFpsAfter = await pageFps();
     log(`Self-test: page drew ${result.pageFpsBefore} frames a second before the sharpness test, ${result.pageFpsAfter} after`);
+    await windowTests(result);
     result.ok = result.chunks > 0;
   } catch (e) { result.error = e.message; }
   finish();
