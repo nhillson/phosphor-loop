@@ -530,6 +530,7 @@
 
 
   .ctl { display: grid; gap: 2px; }
+  .ctl[hidden] { display: none; }
   /* Descriptions shown as hover tooltips instead (see hintsToTips) */
   .hint.as-tip { display: none !important; }
   [data-tip] { cursor: help; }

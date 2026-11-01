@@ -2095,6 +2095,7 @@ function neutral() {
   syncAdjUI();
   setGrade(GRADE_DEF);
   setRelief(RELIEF_DEF);
+  setType({ ...typeArt, tAmt: 0 });
   Object.values(LIVE_SRC).forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
@@ -7126,6 +7127,7 @@ function snapshot() {
     text: { str: txt.str, style: txt.style },
     grade: { ...grade },
     relief: { ...relief },
+    type: { ...typeArt },
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
@@ -7242,6 +7244,8 @@ function loadPreset(pr, quiet) {
   // Presets saved before Color grading existed load with it at normal
   setGrade(d.grade);
   setRelief(d.relief);
+  // Presets saved before Type art existed load with it off
+  setType(d.type);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
@@ -8369,6 +8373,117 @@ function setReliefUniforms(now) {
   set3f(dispProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
 }
 window.__plRelief = { relief, setRelief, adj };
+
+/* ================= type art ================= */
+// The picture typed out in characters (js/typeart.js): over the finished picture (Final Pass), or inside each loop,
+// so the loops feed on the typed picture (Within Loops). Autopilot leaves it alone, presets keep it, Neutral turns
+// it off (and keeps the rest of its settings).
+const TA = window.PhosphorTypeArt;
+const TYPE_KEY = 'phosphor-type-v1';
+const TYPE_DEF = { ...TA.DEFAULTS };
+const TYPE_NUM = ['tAmt', 'tSize', 'tLayers', 'tSpread', 'tInk', 'tContrast', 'tEdge', 'tShimmer', 'tHold', 'tBg'];
+const TYPE_PICK = { tSet: TA.SETS, tSet2: { same: { label: 'Same as the first layer' }, ...TA.SETS }, tFont: TA.FONTS, tColor: TA.COLORS };
+const typeArt = { ...TYPE_DEF };
+const typeEls = {};
+for (const k of TYPE_NUM) typeEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
+for (const [k, list] of Object.entries(TYPE_PICK)) {
+  const sel = $('#' + k);
+  for (const [v, o] of Object.entries(list)) { const op = document.createElement('option'); op.value = v; op.textContent = o.label; sel.append(op); }
+}
+function typeText(k, v) {
+  switch (k) {
+    case 'tAmt': return v === 0 ? 'OFF' : `${v}%`;
+    case 'tLayers': return String(v);
+    case 'tSpread': return v === 0 ? 'SAME' : String(v);
+    case 'tInk': return v === 0 ? 'BALANCED' : `${v < 0 ? 'SPARSE' : 'HEAVY'} ${Math.abs(v)}`;
+    case 'tContrast': return v === 100 ? 'NORMAL' : `${v}%`;
+    case 'tEdge': return v === 0 ? 'OFF' : String(v);
+    case 'tShimmer': return v === 0 ? 'EXACT' : String(v);
+    case 'tHold': return v === 0 ? 'FREE' : String(v);
+    case 'tBg': return v === 0 ? 'NONE' : String(v);
+    default: return String(v);
+  }
+}
+// Any saved or loaded Type art, made safe: missing or broken values are the defaults (off)
+function cleanType(t) {
+  const out = { ...TYPE_DEF };
+  if (!t || typeof t !== 'object') return out;
+  for (const k of TYPE_NUM) { const { el } = typeEls[k]; if (Number.isFinite(t[k])) out[k] = clamp(Math.round(t[k]), +el.min, +el.max); }
+  for (const [k, list] of Object.entries(TYPE_PICK)) if (typeof t[k] === 'string' && t[k] in list) out[k] = t[k];
+  if (typeof t.tCustom === 'string' && t.tCustom.trim()) out.tCustom = t.tCustom.slice(0, 80);
+  out.tInside = !!t.tInside;
+  out.tInvert = !!t.tInvert;
+  return out;
+}
+function syncTypeUI() {
+  for (const [k, { el, out }] of Object.entries(typeEls)) { el.value = typeArt[k]; fillTrack(el); out.textContent = typeText(k, typeArt[k]); }
+  for (const k of Object.keys(TYPE_PICK)) $('#' + k).value = typeArt[k];
+  $('#tCustom').value = typeArt.tCustom;
+  $('#tCustomRow').hidden = typeArt.tSet !== 'custom' && typeArt.tSet2 !== 'custom';
+  $('#tSet2').closest('.ctl').hidden = typeArt.tLayers < 2;
+  $('#tSpread').closest('.ctl').hidden = typeArt.tLayers < 2;
+  $$('#typeWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.tin === '1') === typeArt.tInside)));
+  $$('#typeInk button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.tinv === '1') === typeArt.tInvert)));
+}
+function saveType() { try { localStorage.setItem(TYPE_KEY, JSON.stringify(typeArt)); } catch (_) {} }
+function setType(t) { Object.assign(typeArt, cleanType(t)); syncTypeUI(); saveType(); }
+for (const [k, { el, out }] of Object.entries(typeEls)) {
+  el.addEventListener('input', () => {
+    typeArt[k] = +el.value; fillTrack(el); out.textContent = typeText(k, typeArt[k]); saveType();
+    if (k === 'tLayers') syncTypeUI();
+  });
+  el.addEventListener('dblclick', () => setType({ ...typeArt, [k]: TYPE_DEF[k] }));
+}
+for (const k of Object.keys(TYPE_PICK)) $('#' + k).addEventListener('change', (e) => setType({ ...typeArt, [k]: e.target.value }));
+$('#tCustom').addEventListener('input', (e) => { if (e.target.value.trim()) { typeArt.tCustom = e.target.value.slice(0, 80); saveType(); } });
+$('#typeReset').addEventListener('click', () => setType(TYPE_DEF));
+$$('#typeInk button').forEach((b) => b.addEventListener('click', () => setType({ ...typeArt, tInvert: b.dataset.tinv === '1' })));
+$$('#typeWhere button').forEach((b) => b.addEventListener('click', () => {
+  setType({ ...typeArt, tInside: b.dataset.tin === '1' });
+  showOSD('TYPE ART', typeArt.tInside ? 'WITHIN LOOPS' : 'FINAL PASS');
+}));
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(TYPE_KEY) || 'null'); } catch (_) {} setType(saved); }
+// The engine is made the first time Type art is turned up, so a graphics card that can't run it only loses Type art
+let typeEng = null, typeFailed = false;
+function typeEngine() {
+  if (typeEng || typeFailed) return typeEng;
+  try { typeEng = TA.create(gl); } catch (err) {
+    console.warn('Type art could not start:', err);
+    typeFailed = true;
+    toast('Type art can’t run on this graphics card.');
+  }
+  return typeEng;
+}
+const typeFinalSt = { st: null };
+const typeLoopSt = { A: null, B: null, C: null, D: null };
+let typeScratch = null;
+// Final Pass: the finished picture typed at the screen's own size. Gives back the picture to show.
+function typeFinal(tex) {
+  const on = typeArt.tAmt > 0 && !typeArt.tInside;
+  if (!on) { if (typeFinalSt.st && typeEng) { typeEng.release(typeFinalSt.st); typeFinalSt.st = null; } return tex; }
+  const eng = typeEngine();
+  if (!eng) return tex;
+  if (!typeFinalSt.st) typeFinalSt.st = eng.state();
+  return eng.run(typeFinalSt.st, tex, canvas.width, canvas.height, typeArt, typeArt.tAmt / 100, null).tex;
+}
+// Within Loops: loop k's newest picture typed and put back, so next frame the loop feeds on it. Higher Amount
+// types more of it each frame (all of it at the top), at the same pace at any frame rate (f: sixtieths this frame).
+function typeInLoop(k, f) {
+  const on = typeArt.tAmt > 0 && typeArt.tInside;
+  if (!on) { if (typeLoopSt[k] && typeEng) { typeEng.release(typeLoopSt[k]); typeLoopSt[k] = null; } return; }
+  const eng = typeEngine();
+  const L = loops[k];
+  if (!eng || !L.rt) return;
+  if (!typeScratch || typeScratch.w !== simW || typeScratch.h !== simH) {
+    if (typeScratch) dropTarget(typeScratch);
+    typeScratch = { ...makeTarget(), w: simW, h: simH };
+  }
+  if (!typeLoopSt[k]) typeLoopSt[k] = eng.state();
+  const a = Math.pow(typeArt.tAmt / 100, 1.5);
+  eng.run(typeLoopSt[k], L.rt[L.front].tex, simW, simH, typeArt, 1 - Math.pow(1 - a, f), typeScratch);
+  copyInto(L.rt[L.front], typeScratch.tex);
+}
+window.__plType = { typeArt, setType, ready: () => !!typeEng, failed: () => typeFailed };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
@@ -10716,7 +10831,7 @@ function frame() {
       if (loopOn(o) && (clamp(mix.cur[FEED_INTO[key]], 0, 100) > 0.1 || readsOther(key))) need[o] = true;
     }
     for (const key of act) mirrorStep(key, dt);
-    for (const key of act) if (need[key]) runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
+    for (const key of act) if (need[key]) { runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f); typeInLoop(key, f); }
   }
 
   for (const key of KEYS) finalPass(key);
@@ -10742,11 +10857,13 @@ function frame() {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   eyeTick(now, dt, wA, wB);
   const shown = drawShapes(now) || comp;
+  // Type art set to Final Pass types the finished picture, shapes and all
+  const finalTex = typeFinal(shown.tex);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.useProgram(dispProg.p);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shown.tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, finalTex);
   set2f(dispProg, 'uRes', canvas.width, canvas.height);
   set1f(dispProg, 'uTime', (now - t0) / 1000);
   set1f(dispProg, 'uStatic', staticAmt);

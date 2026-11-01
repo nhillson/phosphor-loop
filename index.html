@@ -987,6 +987,104 @@
         <div class="dev-actions"><button class="btn small" id="reliefReset">Back to normal</button></div>
       </section>
 
+      <section class="group" id="typeGroup" aria-labelledby="h-type">
+        <h2 id="h-type">Type art</h2>
+        <p class="hint">Types the picture out in characters, like typewriter art. Each spot tries every character and keeps the one whose shape fits best, so a slope gets a slash and a curve a bracket. Up to three layers of text are stacked, each shifted against the others, and each one fills in what the others missed. Autopilot leaves it where you put it, presets keep it, and Neutral turns it off.</p>
+        <div class="seg seg-2" id="typeWhere" role="group" aria-label="Where Type art works">
+          <button data-tin="0" aria-pressed="true">Final Pass</button>
+          <button data-tin="1" aria-pressed="false">Within Loops</button>
+        </div>
+        <p class="hint">Final Pass types the finished picture, like a lens over the screen. Within Loops, every loop feeds on the typed picture, so the characters themselves zoom, spin and leave trails, and get typed over again every frame.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tAmt">Amount</label><output id="tAmtOut" for="tAmt"></output></div>
+          <input type="range" id="tAmt" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>All typed</span></div>
+          <span class="hint">How much of the picture is typed. Off leaves it alone. All the way up shows only the characters.</span>
+        </div>
+        <div class="ctl">
+          <label for="tSet" class="lbl">Characters</label>
+          <select id="tSet"></select>
+        </div>
+        <div class="ctl" id="tCustomRow" hidden>
+          <label for="tCustom" class="lbl">Your characters</label>
+          <div class="preset-row"><input type="text" id="tCustom" maxlength="80" autocomplete="off" spellcheck="false" value="PHOSPHOR" placeholder="Type the characters to use"></div>
+        </div>
+        <div class="ctl">
+          <label for="tFont" class="lbl">Font</label>
+          <select id="tFont"></select>
+        </div>
+        <div class="ctl">
+          <label for="tColor" class="lbl">Colors</label>
+          <select id="tColor"></select>
+        </div>
+        <div class="ctl">
+          <span class="lbl">Ink goes on</span>
+          <div class="seg seg-2" id="typeInk" role="group" aria-label="Which parts of the picture get the characters">
+            <button data-tinv="0" aria-pressed="true" title="The bright parts are typed and the dark parts left empty">Bright parts</button>
+            <button data-tinv="1" aria-pressed="false" title="Swapped: the dark parts are typed and the bright parts left empty">Dark parts</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tSize">Character size</label><output id="tSizeOut" for="tSize"></output></div>
+          <input type="range" id="tSize" min="0" max="100" step="1" value="35">
+          <div class="ends"><span>Tiny</span><span>Huge</span></div>
+          <span class="hint">How big the characters are. Small ones show more detail; big ones read as letters.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tLayers">Layers</label><output id="tLayersOut" for="tLayers"></output></div>
+          <input type="range" id="tLayers" min="1" max="3" step="1" value="2">
+          <div class="ends"><span>1</span><span>3</span></div>
+          <span class="hint">How many layers of text are stacked. Each extra layer is shifted part of a character and types over the gaps the others left, for a richer, finer picture.</span>
+        </div>
+        <div class="ctl">
+          <label for="tSet2" class="lbl">Characters on the extra layers</label>
+          <select id="tSet2"></select>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tSpread">Layer sizes</label><output id="tSpreadOut" for="tSpread"></output></div>
+          <input type="range" id="tSpread" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>All the same</span><span>Very different</span></div>
+          <span class="hint">Left, every layer has the same size of character. Right, the second layer’s are smaller and the third’s bigger.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tInk">Ink</label><output id="tInkOut" for="tInk"></output></div>
+          <input type="range" id="tInk" class="bipolar" min="-100" max="100" step="1" value="0">
+          <div class="ends"><span>Sparse</span><span>Balanced</span><span>Heavy</span></div>
+          <span class="hint">Left, it would rather leave a gap than put a character where it doesn’t quite fit: airy, clean. Right, it fills every spot it can: bold and dense.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tContrast">Contrast</label><output id="tContrastOut" for="tContrast"></output></div>
+          <input type="range" id="tContrast" class="bipolar" min="0" max="200" step="1" value="100">
+          <div class="ends"><span>Flat</span><span>Normal</span><span>Bold</span></div>
+          <span class="hint">Higher pushes the picture to strong darks and lights before it’s typed, so shapes come out crisper.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tEdge">Outlines</label><output id="tEdgeOut" for="tEdge"></output></div>
+          <input type="range" id="tEdge" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Only outlines</span></div>
+          <span class="hint">Types the edges of shapes instead of their insides, like a line drawing. Characters love lines: slopes get slashes, corners get brackets.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tShimmer">Shimmer</label><output id="tShimmerOut" for="tShimmer"></output></div>
+          <input type="range" id="tShimmer" min="0" max="100" step="1" value="15">
+          <div class="ends"><span>Exact</span><span>Wild</span></div>
+          <span class="hint">Lets it pick characters that nearly fit, so they keep flickering between close choices. A little feels hand-typed and alive; a lot turns into a storm of characters.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tHold">Steady letters</label><output id="tHoldOut" for="tHold"></output></div>
+          <input type="range" id="tHold" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Change freely</span><span>Hold on</span></div>
+          <span class="hint">How much a character prefers to stay as it was. Higher keeps the text calm while the picture moves underneath.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="tBg">Picture behind</label><output id="tBgOut" for="tBg"></output></div>
+          <input type="range" id="tBg" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>None</span><span>Shows through</span></div>
+          <span class="hint">Shows the picture faintly behind the characters.</span>
+        </div>
+        <div class="dev-actions"><button class="btn small" id="typeReset">Back to normal</button></div>
+      </section>
+
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
         <h2 id="h-shared">Shared presets</h2>
         <p class="hint" id="sharedHint">Looks picked out for everyone. Tap one to load it.</p>
@@ -1219,6 +1317,7 @@
             <dt>Screen shape</dt><dd>Fill the space, or frame it as a 4:3 TV or 16:9.</dd>
             <dt>Picture sharpness</dt><dd>How many lines the picture is drawn with; the number shows at the top right. Standard is the 576 lines Phosphor Loop has always used and is the lightest on the computer. High goes up to 1080, like HD video. Full draws as many lines as the screen (or the Output window) shows. Auto, the usual setting, starts where it last settled on this computer, sharpens while the picture stays smooth and steps back if it slows down. Effects keep their size at every setting; only the detail gets finer. Each computer or phone keeps its own choice.</dd>
             <dt>Color grading</dt><dd>A filter over the finished picture, after every loop is mixed. Exposure, Contrast and Midtones set how bright and punchy it is; Saturation, Hue, Red, Green, Blue and Sepia change its colors. It never feeds back into the loops, Autopilot leaves it alone, presets keep it, and Neutral or Back to normal resets it.</dd>
+            <dt>Type art</dt><dd>Types the picture out in characters, like typewriter art: each spot keeps the character whose shape fits best, and up to three shifted layers fill each other’s gaps. Pick the characters (letters, slashes, blocks, braille, shapes, stars, Matrix code or your own), the font and the colors, including ink on paper. Final Pass types the finished picture; Within Loops makes the loops feed on the typed picture so the characters themselves zoom, spin and trail. Shimmer lets close choices flicker; Steady letters keeps them calm. Autopilot leaves it alone, presets keep it, and Neutral turns it off.</dd>
             <dt>Freeze and Clear</dt><dd>Hold the picture (the Space key), or wipe it to black (the C key).</dd>
             <dt>Sizing the picture and the controls</dt><dd>Drag the right edge, the bottom edge or the corner of the picture’s frame to give it a new shape; making it wider than there’s room for narrows the controls. When you let go, the picture keeps that shape and grows to fill all the room it has, and it keeps filling as the controls get wider or narrower. Picking a Screen shape replaces it. Drag the bar between the picture and the controls to make the controls wider or narrower. With Spread out controls on, the picture is as wide as its column. Your sizes are remembered in this browser; double-click a handle or the bar to go back to the automatic size.</dd>
             <dt>Sequencer</dt><dd>Opens the sequencer under the picture: four tracks, one for each loop (A to D), where you place looks by time along the song. A loop with no block at that moment goes blank. Blocks fade in and out, blocks that overlap on a track crossfade (right-click one to rename it or save its look to My presets), a block remembers which picture or video its loop was showing (your own files by where they are on disk, never a copy), and any loop, effect or color grading slider can change over a block. Scroll moves along the song and Shift + scroll zooms. Above the tracks, a spectrograph of the song builds up as it plays and is saved with it.</dd>
@@ -1423,6 +1522,7 @@
 
 <script src="js/fractal-math.js"></script>
 <script src="js/shapes.js"></script>
+<script src="js/typeart.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/helpers.js"></script>
 <script src="js/recording-formats.js"></script>
