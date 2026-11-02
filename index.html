@@ -147,13 +147,21 @@
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <button class="btn" id="wideBtn" aria-pressed="false" title="Shrink the picture here to a small preview and spread the controls across the screen, so you can see more of them at once"><span class="led"></span>Spread out controls</button>
         <span class="spacer" aria-hidden="true"></span>
-        <button class="btn" id="snipOpen" aria-pressed="false" aria-controls="snipPanel" hidden title="Trim the video playing and save that part to your clip library (Phosphor Clips), with the whole look on screen">✂ Save clip…</button>
+        <button class="btn" id="snipOpen" aria-pressed="false" aria-controls="snipPanel" hidden title="Save to your clip library (Phosphor Clips): record the inputs, effects and every change over time, to play back live later, or trim the video playing">✂ Save clip…</button>
         <button class="btn" id="recMic" aria-pressed="true" hidden title="Which sound goes into videos you record. Click to change it: Off, Mic, Computer or Both."><span class="led"></span><span id="recSoundLabel">Video sound: Both</span></button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden title="Record a video; press again to stop and save it (key V, works in full screen too)"><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
       <div class="clip-saver">
         <form class="snip-form" id="snipPanel" hidden aria-label="Save a clip">
           <div class="snip-head"><b>Save a clip</b><span class="snip-what" id="snipWhat"></span></div>
+          <div class="snip-choose" role="group" aria-label="What to save">
+            <button type="button" class="btn snip-pick" id="snipPickMoves"><b>● Record the settings</b><small>The inputs, effects and every change over time. Plays back live later.</small></button>
+            <button type="button" class="btn snip-pick" id="snipPickTrim"><b>✂ Trim the video</b><small>Cut out part of the video playing, with the look on screen.</small></button>
+          </div>
+          <div class="snip-rec">
+            <button type="button" class="btn rec" id="snipRecGo" aria-pressed="false"><span class="led"></span><span id="snipRecLabel">Start recording</span></button>
+            <span class="hint snip-rec-hint" id="snipRecHint"></span>
+          </div>
           <div class="trim">
             <div class="trim-over" id="trimOver" title="The whole video: the trimmed part, and (outlined) the stretch the strip below shows. Click to move through the video.">
               <div class="trim-over-sel" id="trimOverSel"></div>
@@ -185,14 +193,21 @@
             <input class="seq-in" id="snipTags" type="text" maxlength="400" list="cxTagSuggest" autocomplete="off" spellcheck="false" placeholder="Tags, e.g. fractal, industrial" aria-label="Tags, commas between">
           </div>
           <div class="snip-opts">
-            <label class="snip-sound"><input type="checkbox" id="snipFx" checked> Save the whole look with it</label>
-            <label class="snip-sound"><input type="checkbox" id="snipSound"> Keep sound</label>
+            <label class="snip-sound snip-trimonly"><input type="checkbox" id="snipFx" checked> Save the whole look with it</label>
+            <label class="snip-sound snip-trimonly"><input type="checkbox" id="snipSound"> Keep sound</label>
             <span class="spacer"></span>
+            <button class="btn small" type="button" id="snipRedo">Record again</button>
             <button class="btn small" type="submit" id="snipSave">Save</button>
             <button class="btn small" type="button" id="snipCancel">Cancel</button>
           </div>
         </form>
         <p class="hint snip-status" id="snipStatus" role="status" aria-live="polite"></p>
+      </div>
+      <div class="session-bar moves-bar" id="movesBar" hidden>
+        <div class="session-row">
+          <span class="live" aria-hidden="true"></span><span id="movesText"></span>
+          <button class="btn small" id="movesStop">Stop</button>
+        </div>
       </div>
       <div class="session-bar" id="sessionBar" hidden>
         <div class="session-row">
@@ -1572,6 +1587,7 @@
 <script src="js/audio/rhythm.js"></script>
 <script src="js/spotify.js"></script>
 <script src="js/timeline.js"></script>
+<script src="js/moves.js"></script>
 <script src="js/subject.js"></script>
 <script src="js/app.js"></script>
 

@@ -496,6 +496,21 @@
   .snip-sound { display: flex; align-items: center; gap: 6px; font-size: 14px; }
   .snip-status { margin: 0; }
   .snip-status:empty { display: none; }
+  /* What Save clip does (see snipStage in js/app.js): choose (a video is in: trim it or record the settings),
+     rec / recording / recorded (the settings), trim (the video) */
+  .snip-choose, .snip-rec, #snipRedo { display: none; }
+  .snip-form[data-stage="choose"] .snip-choose { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .snip-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; text-align: left; white-space: normal; height: auto; }
+  .snip-pick small { font-size: 13px; color: var(--dim); font-weight: 400; }
+  .snip-form:is([data-stage="rec"], [data-stage="recording"], [data-stage="recorded"]) .snip-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .snip-rec-hint { margin: 0; font-size: 13px; }
+  .snip-form[data-stage="recorded"] #snipRedo { display: inline-flex; }
+  .snip-form[data-stage="recorded"] #snipRecGo { display: none; }
+  .snip-form:not([data-stage="trim"]) :is(.trim, .snip-trimonly) { display: none; }
+  .snip-form:is([data-stage="choose"], [data-stage="rec"], [data-stage="recording"]) :is(.snip-fields, #snipSave) { display: none; }
+  .session-bar.moves-bar { border-color: rgba(255,75,62,.45); background: rgba(255,75,62,.07); }
+  .moves-bar .session-row .live { background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); }
+  @media (max-width: 700px) { .snip-form[data-stage="choose"] .snip-choose { grid-template-columns: minmax(0, 1fr); } }
   .trim { display: flex; flex-direction: column; gap: 8px; }
   .trim-bar { position: relative; height: 34px; border-radius: 6px; background: var(--well); border: 1px solid var(--line); cursor: pointer; touch-action: none; }
   .trim-sel { position: absolute; top: 0; bottom: 0; background: rgba(139,26,184,.28); border-top: 2px solid var(--amber); border-bottom: 2px solid var(--amber); pointer-events: none; }
@@ -917,6 +932,7 @@
   .cx-facts { font-size: 12.5px; }
   .clips-grid .nat-tile[aria-selected="true"] { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber); }
   .nat-tile .cx-fxb { position: absolute; left: 5px; top: 5px; padding: 1px 6px; border-radius: 4px; background: var(--amber); color: #fff; font: 600 11px/1.5 var(--f-body); letter-spacing: .04em; }
+  .nat-tile .cx-fxb.mv { background: var(--tally); }
   .nat-tile .cx-tl { position: absolute; left: 0; right: 0; bottom: 21px; padding: 0 7px; font-size: 11px; color: #e7d6f2; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; background: none; }
   @media (max-width: 900px) {
     .cx-body, .cx-body:has(.cx-side:not([hidden])) { grid-template-columns: minmax(0, 1fr); }

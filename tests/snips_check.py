@@ -151,6 +151,9 @@ def main():
         ok(J("!document.querySelector('#snipOpen').hidden && !!document.querySelector('.transport #snipOpen')"), '✂ Save clip shows under the picture while a video is in')
         ok(J("!document.querySelector('#row-video #snipOpen')"), 'and no longer under Video')
         click('#snipOpen')
+        # With a video shown, Save clip asks first: trim it, or record the settings (tests/moves_check.py)
+        if until("__plMoves.rec.stage === 'choose'", 'Save clip did not ask whether to trim or record'):
+            click('#snipPickTrim')
         if until("!document.querySelector('#snipPanel').hidden && document.querySelectorAll('#snipCat option').length >= 3", 'the save form did not open with the categories'):
             ok(J("document.querySelector('#snipName').value") == 'Swirl 1s–3s', 'the name is filled in: ' + J("document.querySelector('#snipName').value"))
             ok(J("document.querySelector('#snipCat').value") == 'abstract|', 'the folder starts as the clip’s own')
@@ -185,6 +188,8 @@ def main():
             click('#vidPlay')
             c.wait_frames(3, 'paused')
             click('#snipOpen')
+            if until("__plMoves.rec.stage === 'choose'", 'Save clip did not ask first for your own video'):
+                click('#snipPickTrim')
             until("!document.querySelector('#snipPanel').hidden", 'the save form did not open for your own video')
             ok(J("document.querySelector('#snipWhat').textContent").startswith('The whole video'), 'nothing marked: the trim starts as the whole video')
             ok(J("document.querySelector('#snipName').value") == 'mine 0s–4s', 'named for the whole video')

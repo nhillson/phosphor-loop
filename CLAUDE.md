@@ -58,6 +58,11 @@ file don't rebuild the app.
    type and pick from page scripts (`element.click()`, set value + input event), not Playwright's own click or fill: it can wait forever on this page in the workspace
    browser. `tests/clips_check.py`'s last check (the last clip coming back after a reload) fails here when run after the
    rest of that test, also on versions before the explorer; it passes on its own.
+4k. **Recorded moves** (✂ Save clip… › Record the settings: the settings over time, saved as a library clip's effects
+   `look.moves` with a preview video; Play the recording in the explorer, Add the recording in the sequencer; logic in
+   `js/moves.js`, glue under "recorded moves" in js/app.js): `CLIPS_APP=<clip-app folder> python3 tests/moves_check.py`
+   (about 4 minutes; the real sharing server, so ffmpeg must be installed). With a video shown, Save clip asks first
+   (trim or record); snips_check.py picks Trim. It reaches into the app through `window.__plMoves`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

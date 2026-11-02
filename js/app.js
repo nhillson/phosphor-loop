@@ -19,6 +19,8 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 // Not part of a Spread out column's copy of a loop's settings (see "a column per loop")
 const notCopy = (el) => !el.closest('.loop-col');
+// A recording of the settings playing back (see "recorded moves"); set early, since Autopilot and presets check it
+const MV = { play: null, applying: false };
 
 /* ================= hints as hover tooltips ================= */
 // The small grey descriptions under the controls are tucked away and shown as a tooltip when the mouse rests on the
@@ -1448,6 +1450,7 @@ function randomLoop() {
   };
 }
 function surprise() {
+  if (MV.play && !MV.applying) movesStop(true);
   takeOver();
   markPreset(null);
   const both = Math.random() < 0.5;
@@ -2115,6 +2118,7 @@ function writeSpec(dt) {
 // Back to a plain monitor: loop A shows its current input filling the screen, with every effect off
 const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
+  if (MV.play && !MV.applying) movesStop(true);
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
   for (const k of KEYS) { loopGrade[k] = null; seqRelief[k] = null; }
@@ -2715,6 +2719,7 @@ function whiteWatch(now, dt, wA, wB) {
 // which never folds away or hides, so it's always easy to find
 const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
 function setAutopilot(on, quiet) {
+  if (on && MV.play && !MV.applying) movesStop(false, 'Autopilot took over, so the recording stopped.');
   ap.on = on;
   ap.quick = 0;
   ap.beatWait = null;
@@ -5453,7 +5458,7 @@ function cxTile(c) {
   b.setAttribute('aria-selected', String(cx.sel.has(c.id)));
   b.setAttribute('aria-current', String(c.id === clips.cur));
   const thumb = c.thumb ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : '';
-  b.innerHTML = `${thumb}<em class="clip-dur">${fmtT(c.d || 0)}</em>${c.fx ? '<i class="cx-fxb" title="Effects saved with it">FX</i>' : ''}`
+  b.innerHTML = `${thumb}<em class="clip-dur">${fmtT(c.d || 0)}</em>${c.mv ? '<i class="cx-fxb mv" title="Recorded settings: plays back live">REC</i>' : c.fx ? '<i class="cx-fxb" title="Effects saved with it">FX</i>' : ''}`
     + `${c.tags && c.tags.length ? `<span class="cx-tl">${escapeHTML(c.tags.map((t) => '#' + t).join(' '))}</span>` : ''}<span>${escapeHTML(c.n)}</span>`;
   return b;
 }
@@ -5546,6 +5551,15 @@ function cxSide() {
   $('#cxUseAll').disabled = !c.fx;
   $('#cxUseFx').textContent = seqMode ? `Add to track ${seq.selTrack + 1} with its loop’s look` : 'Use with its effects';
   $('#cxUseFx').title = c.fx ? '' : 'This clip has no effects saved with it yet';
+  // A recording of the settings (look.moves): found out from its effects, which are asked for once
+  if (c.fx) cxLook(c).then((look) => {
+    if (cx.sel.size !== 1 || !cx.sel.has(c.id) || !isMoves(look)) return;
+    $('#cxFxState').innerHTML = `<b>Recorded settings, ${fmtT(look.moves.dur)} long.</b> They play back live: its inputs, effects and every change, rebuilt here. The video is just a preview.`;
+    $('#cxFxSave').textContent = 'Save the picture on screen instead (the recording goes)';
+    if (seqMode) { $('#cxUseAll').textContent = 'Add the recording'; $('#cxUseAll').title = 'Blocks on each loop’s track, with every change drawn as change lines'; }
+    else $('#cxUseFx').textContent = 'Play the recording';
+  }).catch(() => {});
+  $('#cxUseAll').textContent = 'Add with its whole look';
   $('#cxFacts').textContent = [`${fmtT(c.d || 0)} long`, c.w && c.h ? `${c.w}×${c.h}` : '', c.sound ? 'with sound' : '',
     c.by ? `by ${c.by}` : '', c.lic || '', c.page ? `from ${c.page}` : ''].filter(Boolean).join(' · ');
 }
@@ -5603,10 +5617,12 @@ async function cxUse(c, withFx) {
   }
   if (cx.mode === 'seq') {
     closeClips();
-    if (withFx === 'whole') seqPlaceWhole(c, look); else seqPlaceClip(c, look);
+    if (withFx === 'whole') { if (isMoves(look)) seqPlaceMoves(c, look); else seqPlaceWhole(c, look); } else seqPlaceClip(c, look);
     return;
   }
   closeClips();
+  // A recording of the settings plays back live (its video is only a preview)
+  if (isMoves(look)) { movesPlay(c, look); return; }
   if (look) {
     loadPreset({ id: '', name: c.n, data: look });
     await clipPick(c, lookUsesVideo(look));
@@ -5955,7 +5971,7 @@ const SNIP_CAT_KEY = 'phosphor-snip-cat';
 // a, b: the trimmed part (seconds); play: the video repeats just that part while the panel is open
 // autoName: the name follows the trim (video name, start–end) until you type one of your own
 // v0, v1: the stretch of the video the strip shows now (zoomed in on a short trim), easing towards view (its target)
-const snip = { busy: false, open: false, a: 0, b: 0, play: true, drag: null, autoName: true, base: '', v0: 0, v1: 0, view: null, px: 0, lastTick: 0 };
+const snip = { stage: '', busy: false, open: false, a: 0, b: 0, play: true, drag: null, autoName: true, base: '', v0: 0, v1: 0, view: null, px: 0, lastTick: 0 };
 const snipSay = (t) => { $('#snipStatus').textContent = t || ''; };
 const vidDur = () => { const v = vid.video; return v && isFinite(v.duration) && v.duration > 0 ? v.duration : 0; };
 const fmtT1 = (s) => { s = Math.max(0, s || 0); return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
@@ -5966,6 +5982,7 @@ function snipRange() {
   return { a, b, d, whole: a <= 0.05 && b >= d - 0.05 };
 }
 function snipWhatText() {
+  if (snip.stage !== 'trim') return;
   const r = snipRange();
   $('#snipWhat').textContent = r.whole ? `The whole video, ${r.d.toFixed(1)} seconds. Drag the handles to trim it.`
     : `${fmtT1(r.a)} to ${fmtT1(r.b)}: ${Math.max(0, r.b - r.a).toFixed(1)} seconds.`;
@@ -6018,7 +6035,7 @@ function trimSet(which, t) {
 // against an end), the playhead, and the video kept inside the trimmed part
 function snipTick() {
   const v = vid.video, d = vidDur();
-  if (!snip.open || !v || !d) return;
+  if (!snip.open || snip.stage !== 'trim' || !v || !d) return;
   const now = performance.now(), dt = snip.lastTick ? Math.min(0.1, (now - snip.lastTick) / 1000) : 0.016;
   snip.lastTick = now;
   if (snip.drag) {
@@ -6144,14 +6161,24 @@ $('#trimSetA').addEventListener('click', () => { if (vid.video) trimSet('a', vid
 $('#trimSetB').addEventListener('click', () => { if (vid.video) { trimSet('b', vid.video.currentTime); vid.video.currentTime = snip.a; } });
 $('#trimAll').addEventListener('click', () => { snip.a = 0; snip.b = vidDur(); trimDraw(); });
 $('#trimPlay').addEventListener('click', () => { snip.play = !snip.play; $('#trimPlay').setAttribute('aria-pressed', String(snip.play)); });
-// The ✂ Save clip button shows while there's a video in (on a computer: Phosphor Clips is a Windows program)
+// The ✂ Save clip button: on a computer (Phosphor Clips is a Windows program) that can record the picture (the
+// preview a recording of the settings is saved with), or with a video in to trim
 let snipBtnShown = null;
+const canMoves = () => typeof window.MediaRecorder !== 'undefined' && typeof canvas.captureStream === 'function';
+// A video is in and some loop shows it: then there's a video to trim
+const videoIn = () => !!vid.video && !!inMedia.vid && uses('video');
 function snipBtnSync() {
-  const show = !!vid.video && !!inMedia.vid && !APP && !inArtifact;
-  if (show === snipBtnShown) return;
-  snipBtnShown = show;
-  $('#snipOpen').hidden = !show;
-  if (!show && snip.open) snipCloseForm();
+  const show = !APP && !inArtifact && (canMoves() || (!!vid.video && !!inMedia.vid));
+  if (show !== snipBtnShown) {
+    snipBtnShown = show;
+    $('#snipOpen').hidden = !show;
+    if (!show && snip.open) snipCloseForm();
+  }
+  // Trimming a video that no loop shows any more would save something that isn't on screen
+  if (snip.open && snip.stage === 'trim' && !videoIn()) {
+    snipCloseForm();
+    snipSay('No loop shows the video now, so the trim closed. Press ✂ Save clip… again to record the settings instead.');
+  }
 }
 // Where the video playing came from: a library clip (its id), or a file of your own (the file)
 function snipSource() {
@@ -6170,8 +6197,7 @@ const nameT = (t) => {
   return m ? `${m}m${xs.padStart(Number.isInteger(x) ? 2 : 4, '0')}s` : `${xs}s`;
 };
 async function snipOpenForm() {
-  const src = snipSource(), form = $('#snipPanel');
-  if (!src) { snipSay('Put a video in first: Inputs › Video › Clip library… or Choose a video….'); return; }
+  const form = $('#snipPanel');
   if (APP || inArtifact) { snipSay('Saving to the clip library works on a computer with Phosphor Clips, in Chrome or Edge.'); return; }
   try { localStorage.setItem(CLIP_ON_KEY, '1'); } catch (_) { /* fine */ }
   snipSay('Looking for Phosphor Clips on this computer…');
@@ -6179,14 +6205,46 @@ async function snipOpenForm() {
     snipSay('Phosphor Clips isn’t answering. Start it on this computer (it sits by the clock), then try again. If the browser asks whether this site may reach apps on this device, press Allow.');
     return;
   }
-  // The folder: the last one saved to, or else the clip's own; any category or folder inside one
-  const from = src.from && cxClip(src.from);
+  // The folder: the last one saved to, or else (trimming a library clip) the clip's own
+  const src = videoIn() ? snipSource() : null, from = src && src.from && cxClip(src.from);
   let keep = lsGet(SNIP_CAT_KEY) || (from ? cxKey(from.c, from.p || '') : '');
   if (keep && !keep.includes('|')) keep = cxKey(keep, '');
   const sel = $('#snipCat');
   folderOptions(sel, null);
   if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
-  // The trim starts as the part Repeat a section marks, or the whole video
+  cxTagsBuild();
+  snipSay('');
+  form.hidden = false;
+  snip.open = true;
+  $('#snipOpen').setAttribute('aria-pressed', 'true');
+  // A video in: trim it, or record the settings (asked each time). Otherwise: record the settings.
+  if (videoIn() && src) snipStage('choose');
+  else if (!canMoves()) { snipCloseForm(); snipSay('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  else snipStage('rec');
+  form.scrollIntoView({ block: 'nearest' });
+}
+// What the panel shows: choose, trim, rec (ready to record), recording, recorded
+function snipStage(stage) {
+  snip.stage = stage;
+  $('#snipPanel').dataset.stage = stage;
+  const what = {
+    choose: 'A video is in. What would you like to save?',
+    rec: 'Records the settings, not a movie: each loop’s inputs, every effect and fader, mixing, Color grading and 3D lighting, and how they change as you (or Autopilot) go. It plays back live later.',
+    recording: '',
+    recorded: '',
+  }[stage];
+  if (what !== undefined) $('#snipWhat').textContent = what;
+  if (stage === 'rec') {
+    $('#snipRecLabel').textContent = 'Start recording';
+    $('#snipRecGo').setAttribute('aria-pressed', 'false');
+    $('#snipRecHint').textContent = 'A short preview video is saved with it, for the clip gallery.';
+  }
+}
+// Trim the video playing: the trim starts as the part Repeat a section marks, or the whole video
+function snipTrimStart() {
+  const src = snipSource();
+  if (!src) { snipCloseForm(); snipSay('Put a video in first: Inputs › Video › Clip library… or Choose a video….'); return; }
+  snipStage('trim');
   snip.base = baseName(src.name);
   snip.autoName = true;
   const d = vidDur();
@@ -6197,26 +6255,24 @@ async function snipOpenForm() {
   snip.v0 = 0; snip.v1 = 0; snip.drag = null;
   [snip.v0, snip.v1] = trimViewFor();
   trimDraw();
-
   // A snip of a tagged clip starts with its tags; the suggestions are every tag in the library
   $('#snipTags').value = ((src.from && cxClip(src.from)?.tags) || []).join(', ');
-  cxTagsBuild();
-  snipSay('');
-  form.hidden = false;
-  snip.open = true;
-  $('#snipOpen').setAttribute('aria-pressed', 'true');
   if (vid.video) { vid.video.currentTime = snip.a; vid.video.play().catch(() => {}); }
-  form.scrollIntoView({ block: 'nearest' });
 }
 function snipCloseForm() {
   peekStop();
+  if (mvRec.on) mvRecStop(true);
+  mvRecDrop();
   $('#snipPanel').hidden = true;
   $('#snipOpen').setAttribute('aria-pressed', 'false');
   snip.open = false;
+  snip.stage = '';
   snip.drag = null;
 }
 async function snipSave() {
   if (snip.busy) return;
+  if (snip.stage === 'recorded') return mvSave();
+  if (snip.stage !== 'trim') return;
   const src = snipSource(), r = snipRange();
   if (!src) { snipSay('The video has gone. Play it again, then save.'); return; }
   if (!(r.b - r.a >= 0.2)) { snipSay('The trimmed part is too short. Drag the end handle further on.'); return; }
@@ -6276,6 +6332,10 @@ async function snipSave() {
   }
 }
 $('#snipOpen').addEventListener('click', () => { if (snip.open) snipCloseForm(); else void snipOpenForm(); });
+$('#snipPickTrim').addEventListener('click', snipTrimStart);
+$('#snipPickMoves').addEventListener('click', () => snipStage('rec'));
+$('#snipRecGo').addEventListener('click', () => { if (mvRec.on) mvRecStop(); else mvRecStart(); });
+$('#snipRedo').addEventListener('click', () => { mvRecDrop(); snipStage('rec'); snipSay(''); });
 $('#snipName').addEventListener('input', () => { snip.autoName = false; });
 window.__plSnip = { time: () => (vid.video ? vid.video.currentTime : 0), get state() { return { ...snip }; }, get peek() { return { on: peek.on, which: peek.which }; } };   // for tests/snips_check.py
 $('#snipCancel').addEventListener('click', () => { snipCloseForm(); snipSay(''); });
@@ -6283,6 +6343,272 @@ $('#snipPanel').addEventListener('submit', (e) => { e.preventDefault(); void sni
 // Keys typed in the panel stay there (not Phosphor Loop's shortcuts)
 $('#snipPanel').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); snipCloseForm(); } e.stopPropagation(); });
 $('#snipName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); $('#snipCancel').click(); } });
+
+/* ================= recorded moves: the settings over time, saved to the clip library and played back live ================= */
+// ✂ Save clip… › Record the settings: while it records, the look (a preset's snapshot plus which loops play the
+// Video, how many loops, and which picture or library clip is in) is noted up to 30 times a second (js/moves.js
+// keeps only what changes, and thins smooth changes out), and the picture itself is recorded as a preview. Save sends
+// the preview to Phosphor Clips like a video of your own (its /snip), then the start look plus the recording as
+// the clip's effects (look.moves). In the clip library, Play the recording rebuilds the picture from them, live:
+// the inputs really run here, sound reacts to whatever plays now, and the recording starts over at its end.
+const MV_MAX = 600;   // a recording stops by itself after ten minutes
+const MV_RATE = 1000 / 30;
+const mvRec = { on: false, rec: null, start: null, t0: 0, last: 0, vr: null, chunks: [], blob: null, ext: 'webm', moves: null, drop: false, media: '' };
+// Which picture and video are in (when a loop shows them), as text, so a change is one event
+function mvMediaNow() {
+  const m = {};
+  if (uses('picture') && inMedia.pic) m.pic = { ...inMedia.pic };
+  if (uses('video') && inMedia.vid) { m.vid = { ...inMedia.vid }; delete m.vid.at; }
+  if (m.pic && m.pic.kind === 'own') seqKeepPointer(m.pic.name, inMedia.picHandle);
+  if (m.vid && m.vid.kind === 'own') seqKeepPointer(m.vid.name, inMedia.vidHandle);
+  return m.pic || m.vid ? JSON.stringify(m) : '';
+}
+const mvLookNow = () => ({ ...clipLookNow(), n: loopCount, media: mvMediaNow() });
+function mvRecStart() {
+  if (mvRec.on) return;
+  mvRecDrop();
+  let stream;
+  try { stream = canvas.captureStream(30); } catch (_) { snipSay('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  // The preview: H.264 where the browser makes it (on the graphics card, so the picture keeps its speed), else WebM.
+  // Phosphor Clips turns it into its usual MP4 either way.
+  const types = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4'];
+  const mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+  try { mvRec.vr = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8000000 } : undefined); }
+  catch (_) { stream.getTracks().forEach((t) => t.stop()); snipSay('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  const vr = mvRec.vr;
+  mvRec.chunks = [];
+  mvRec.drop = false;
+  vr.ondataavailable = (e) => { if (e.data && e.data.size) mvRec.chunks.push(e.data); };
+  vr.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    const type = vr.mimeType || mime || 'video/webm', chunks = mvRec.chunks;
+    mvRec.chunks = [];
+    if (mvRec.drop || mvRec.vr !== vr) return;
+    mvRec.vr = null;
+    const ms = mvRec.moves ? mvRec.moves.dur * 1000 : 0, raw = new Blob(chunks, { type });
+    mvRec.ext = type.includes('mp4') ? 'mp4' : 'webm';
+    if (!raw.size || !mvRec.moves) { snipStage('rec'); snipSay('Nothing was recorded. Try again.'); return; }
+    try { mvRec.blob = await (mvRec.ext === 'mp4' ? standardMp4(raw) : addWebmDuration(raw, ms)); } catch (_) { mvRec.blob = raw; }
+    mvRecDone();
+  };
+  mvRec.start = mvLookNow();
+  mvRec.media = mvRec.start.media;
+  mvRec.start.mediaAt = r1(vid.video && uses('video') ? vid.video.currentTime || 0 : 0);
+  mvRec.rec = new PhosphorMoves.Recorder(mvRec.start);
+  mvRec.moves = null;
+  mvRec.on = true;
+  mvRec.t0 = performance.now();
+  mvRec.last = mvRec.t0;
+  vr.start(500);
+  snipStage('recording');
+  $('#snipRecGo').setAttribute('aria-pressed', 'true');
+  $('#snipRecLabel').textContent = 'Stop 0:00';
+  $('#snipRecHint').textContent = 'Recording. Change inputs, move faders, or let Autopilot run. Press Stop when you’re done.';
+  $('#snipWhat').textContent = '';
+  snipSay('');
+}
+// Each frame while recording: the look, at most 30 times a second
+function mvRecTick(now) {
+  if (!mvRec.on) return;
+  if (now - mvRec.last < MV_RATE - 2) return;
+  mvRec.last = now;
+  const t = (now - mvRec.t0) / 1000;
+  const look = mvLookNow();
+  look.mediaAt = mvRec.start.mediaAt;
+  mvRec.rec.sample(look, t);
+  $('#snipRecLabel').textContent = `Stop ${fmt(t)}`;
+  if (t >= MV_MAX) { mvRecStop(); snipSay('Recordings stop at ten minutes. This one is ready to save.'); }
+}
+function mvRecStop(drop) {
+  if (!mvRec.on) return;
+  mvRec.on = false;
+  const t = (performance.now() - mvRec.t0) / 1000;
+  mvRec.moves = mvRec.rec.finish(t);
+  mvRec.rec = null;
+  mvRec.drop = !!drop;
+  $('#snipRecGo').setAttribute('aria-pressed', 'false');
+  if (drop) { try { mvRec.vr && mvRec.vr.stop(); } catch (_) { /* gone */ } mvRec.vr = null; mvRec.moves = null; return; }
+  if (t < 0.5) { mvRec.drop = true; try { mvRec.vr.stop(); } catch (_) {} mvRec.vr = null; mvRec.moves = null; snipStage('rec'); snipSay('That was too short. Record for a little longer.'); return; }
+  $('#snipRecLabel').textContent = 'Finishing…';
+  try { mvRec.vr.stop(); } catch (_) { mvRecDone(); }
+}
+// What's on show on screen at the start: the inputs' names (for the recording's own name)
+function mvBaseName() {
+  const shown = activeKeys().filter((k) => wOf(mix.tgt, k) > 0.05);
+  const names = [...new Set(shown.flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]).filter((x) => x && x !== 'none' && x !== 'loop').map((x) => SRC_LABEL[x] || x))];
+  return names.slice(0, 3).join(' + ') || 'Recording';
+}
+function mvRecDone() {
+  snipStage('recorded');
+  const m = mvRec.moves, nCh = Object.keys(m.tr).length + new Set(m.ev.map((e) => e[1])).size;
+  $('#snipWhat').textContent = `Recorded ${fmt(m.dur)}: ${nCh === 0 ? 'nothing changed (it plays back as a still look)' : `${nCh} setting${nCh === 1 ? '' : 's'} changed along the way`}.`;
+  $('#snipRecHint').textContent = '';
+  const when = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  $('#snipName').value = `${mvBaseName()} ${when}`.slice(0, 80);
+  $('#snipTags').value = '';
+  $('#snipName').focus();
+  $('#snipName').select();
+}
+function mvRecDrop() {
+  if (mvRec.vr) { mvRec.drop = true; try { mvRec.vr.stop(); } catch (_) {} mvRec.vr = null; }
+  mvRec.on = false; mvRec.rec = null; mvRec.blob = null; mvRec.moves = null; mvRec.chunks = [];
+}
+async function mvSave() {
+  if (!mvRec.blob || !mvRec.moves) { snipSay('Record something first.'); return; }
+  const name = $('#snipName').value.trim() || mvBaseName(), where = $('#snipCat').value, { c: cat, p: folder } = splitKey(where);
+  try { localStorage.setItem(SNIP_CAT_KEY, where); } catch (_) { /* fine */ }
+  const look = { ...mvRec.start, moves: mvRec.moves };
+  const size = JSON.stringify(look).length;
+  // Phosphor Clips takes effects up to 4 MB
+  if (size > 3.9e6) { snipSay('This recording is too long to save (too many changes). Record a shorter one.'); return; }
+  const fileName = `${name.replace(/[\\/:*?"<>|]/g, ' ')}.${mvRec.ext}`;
+  const q = new URLSearchParams({ start: '0', name, cat, folder, sound: '0', tags: splitTags($('#snipTags').value).join(','), src: fileName });
+  snip.busy = true;
+  $('#snipSave').disabled = true;
+  snipSay('Sending the recording to Phosphor Clips…');
+  try {
+    const res = await fetch(`${clips.base}/snip?${q}`, { method: 'POST', body: mvRec.blob, cache: 'no-store', targetAddressSpace: 'loopback',
+      headers: { 'Content-Type': mvRec.blob.type || 'application/octet-stream' } });
+    let j = null;
+    try { j = await res.json(); } catch (_) { /* answered without a reason */ }
+    if (!res.ok || !j || !j.ok) {
+      snipSay(j && j.message ? `Couldn’t save it: ${j.message}` : 'Couldn’t save it. Is Phosphor Clips still running (1.6 or later)?');
+      return;
+    }
+    let ok = false;
+    try {
+      const e = await fetch(`${clips.base}/clip/${encodeURIComponent(j.clip.id)}`, { method: 'POST', cache: 'no-store', targetAddressSpace: 'loopback',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ look }) });
+      const ej = await e.json().catch(() => null);
+      ok = e.ok && ej && ej.ok;
+    } catch (_) { ok = false; }
+    const where = [j.cat || clipCatName(j.clip.c), ...String(j.clip.p || '').split('/').filter(Boolean)].join(' › ');
+    mvRecDrop();
+    snipCloseForm();
+    if (ok) {
+      snipSay(`Saved the recording “${j.clip.n}” to ${where}. In Clip library…, pick it and press Play the recording.`);
+      toast(`Saved the recording “${j.clip.n}” to the clip library.`);
+    } else snipSay(`Saved the preview “${j.clip.n}” to ${where}, but not its settings: this Phosphor Clips is too old for them. Install 1.7 or later, then record again.`);
+    cxLooks.delete(j.clip.id);
+    await clipList(true).catch(() => {});
+    if (!clipsDlg.hidden) { clipsBuild(); clipsFilter(); }
+  } catch (_) {
+    snipSay('Couldn’t reach Phosphor Clips. Is it running on this computer?');
+  } finally {
+    snip.busy = false;
+    $('#snipSave').disabled = false;
+  }
+}
+
+// Playing a recording back
+const mvPlay = { p: null, t0: 0, dur: 0, name: '', ui: 0, dirty: new Set() };
+const isMoves = (look) => !!look && PhosphorMoves.clean(look.moves);
+function setPath(o, path, v) {
+  const parts = path.split('.');
+  for (let i = 0; i < parts.length - 1; i++) { if (!o[parts[i]] || typeof o[parts[i]] !== 'object') return false; o = o[parts[i]]; }
+  o[parts[parts.length - 1]] = v;
+  return true;
+}
+// Brings in the picture or library clip the recording had at that point (as the sequencer does for its blocks)
+function mvMedia(sig, at) {
+  let m = null;
+  try { m = sig ? JSON.parse(sig) : null; } catch (_) { m = null; }
+  if (!m) return;
+  if (m.pic && !sameMedia(m.pic, inMedia.pic)) seqLoadPic(m.pic);
+  if (m.vid && !sameMedia(m.vid, inMedia.vid)) seqLoadVid({ a: seq.t, media: { vid: { ...m.vid, at: at || 0 } } });
+}
+function movesPlay(c, look) {
+  movesStop(true);
+  const start = { ...look };
+  delete start.moves;
+  MV.applying = true;
+  try {
+    loadPreset({ id: '', name: c.n, data: start }, true);
+    mvMedia(start.media, start.mediaAt);
+  } finally { MV.applying = false; }
+  mvPlay.p = new PhosphorMoves.Player(start, look.moves);
+  mvPlay.dur = look.moves.dur;
+  mvPlay.name = c.n;
+  mvPlay.t0 = performance.now();
+  mvPlay.ui = 0;
+  MV.play = mvPlay;
+  $('#movesBar').hidden = false;
+  showOSD('RECORDING', c.n.toUpperCase().slice(0, 18));
+  toast(`Playing the recording “${c.n}”. It starts over at its end; Stop (or touching a control) ends it.`, 6000);
+}
+function movesStop(quiet, why) {
+  if (!MV.play) return;
+  MV.play = null;
+  mvPlay.p = null;
+  $('#movesBar').hidden = true;
+  // What's on screen now stays, and is kept as yours (as if you'd set it)
+  setGrade({ ...grade }); setRelief({ ...relief }); setType({ ...typeArt }); saveText();
+  syncUI();
+  if (!quiet) toast(why || 'Stopped the recording. The picture stays as it was.');
+}
+// Each frame while a recording plays: the settings that changed since the last frame
+function movesTick(now) {
+  if (!MV.play) return;
+  const p = mvPlay.p, t = ((now - mvPlay.t0) / 1000) % Math.max(0.05, mvPlay.dur);
+  const diff = p.step(t), d = mvPlay.dirty;
+  MV.applying = true;
+  try {
+    for (const [path, v] of diff) {
+      const dot = path.indexOf('.'), g = dot < 0 ? path : path.slice(0, dot), rest = dot < 0 ? '' : path.slice(dot + 1);
+      if (KEYS.includes(g)) {
+        if (!rest || v === null) continue;
+        setPath(loops[g].tgt, rest, v);
+        d.add('loops');
+        if (rest === 'in1' || rest === 'in2') d.add('devices');
+      } else if (g === 'mix' && rest && Number.isFinite(v)) { mix.tgt[rest] = v; d.add('loops'); }
+      else if (g === 'adj' && rest && v !== null) { if (setPath(adj, rest, v)) d.add('adj'); }
+      else if (g === 'snd' && rest && v !== null) { if (rest === 'amount' ? (snd.amount = v, true) : /^(map|react)\./.test(rest) && setPath(snd, rest, v)) d.add('snd'); }
+      else if (g === 'grade' && rest in GRADE_DEF && Number.isFinite(v)) { grade[rest] = v; d.add('grade'); }
+      else if (g === 'relief' && rest in RELIEF_DEF && v !== null) { relief[rest] = v; d.add('relief'); }
+      else if (g === 'type' && rest && v !== null && rest in typeArt) { typeArt[rest] = v; d.add('type'); }
+      else if (g === 'text') {
+        if (rest === 'str' && typeof v === 'string') txt.str = v.slice(0, 60);
+        else if (rest === 'style' && v in TEXT_FONTS) txt.style = v;
+        drawText();
+      } else if (g === 'n' && (v === 2 || v === 3 || v === 4) && v !== loopCount) { setLoopCount(v, 'load'); d.add('loops'); d.add('devices'); }
+      else if (g === 'media') mvMedia(v, 0);
+    }
+    if (d.has('devices')) {
+      const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
+      if (used.includes('camera') && !cam.on) startCamera();
+      if (used.includes('screen') && !scr.on) startScreen(true);
+      if (used.includes('phone')) startPhoneLink();
+      settleDevices();
+      d.delete('devices');
+    }
+  } finally { MV.applying = false; }
+  // The controls follow along a few times a second (not every frame)
+  if (now - mvPlay.ui > 250) {
+    mvPlay.ui = now;
+    if (d.has('loops')) syncUI();
+    if (d.has('adj')) syncAdjUI();
+    if (d.has('snd')) syncSoundUI();
+    if (d.has('grade')) syncGradeUI();
+    if (d.has('relief')) syncReliefUI();
+    if (d.has('type')) syncTypeUI();
+    d.clear();
+    $('#movesText').innerHTML = `<b>Playing “${escapeHTML(mvPlay.name)}”</b> · ${fmt(t)} of ${fmt(mvPlay.dur)} · starts over at the end`;
+  }
+}
+$('#movesStop').addEventListener('click', () => movesStop());
+// Touching a control while a recording plays: you take over, and the recording stops (it would undo you otherwise)
+const mvTakeOver = (e) => {
+  if (!MV.play || MV.applying || !e.isTrusted) return;
+  const el = e.target;
+  if (!el.closest || !el.closest('aside.panel, .loop-col') || el.closest('#clipsDlg, .preset-row, .seq')) return;
+  if (e.type === 'input' && !el.matches('input[type="range"], select, input[type="checkbox"]')) return;
+  if (e.type === 'click' && !el.closest('[data-src], .recipe, #inputs button')) return;
+  movesStop(false, 'You took over, so the recording stopped. The picture stays as it was.');
+};
+document.addEventListener('input', mvTakeOver, true);
+document.addEventListener('click', mvTakeOver, true);
+window.__plMoves = { get rec() { return { on: mvRec.on, moves: mvRec.moves, blob: !!mvRec.blob, stage: snip.stage }; }, get play() { return MV.play ? { t: mvPlay.p.lastCs / 100, name: mvPlay.name } : null; },
+  movesPlay, movesStop, tgt: (k) => ({ ...loops[k].tgt }), M: () => PhosphorMoves };   // for tests/moves_check.py
 function vcrTick() {
   snipBtnSync();
   snipTick();
@@ -7087,6 +7413,7 @@ RECIPES.forEach((r) => {
   recipeWrap.appendChild(a);
 });
 function applyRecipe(r) {
+  if (MV.play && !MV.applying) movesStop(true);
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
@@ -7268,6 +7595,7 @@ presetForm.addEventListener('submit', async (e) => {
 });
 
 function loadPreset(pr, quiet) {
+  if (MV.play && !MV.applying) movesStop(true);
   for (const k of KEYS) { loopGrade[k] = null; seqRelief[k] = null; }
   if (ap.on) setAutopilot(false, true);
   const d = pr.data || {};
@@ -10719,6 +11047,86 @@ function seqPlaceWhole(c, look) {
   seq.selId = made[0] ? made[0].id : null;
   seqNote(`Added “${c.n}” with its whole look: ${made.length} block${made.length === 1 ? '' : 's'}, on ${used.map((k) => `track ${KEYS.indexOf(k) + 1}`).join(', ')} at ${fmtSeq(a, true)}.`);
 }
+// Add the recording: a recording of the settings (look.moves), laid out on the tracks from the playhead. Each loop gets
+// blocks on its own track; a new block starts wherever the loop's inputs (or another switch) changed, and every
+// fader that moved inside a block becomes one of its change lines, as do Show, feed, Color grading and 3D lighting.
+// (A block holds up to 32 change lines of up to 64 points; past that the busiest ones are kept, smoothed.)
+function seqPlaceMoves(c, look) {
+  const M = PhosphorMoves, mv = look.moves, start = { ...look };
+  delete start.moves;
+  const P = new M.Player(start, mv);
+  const dur = seqDur(), a0 = r1(clamp(seq.t, 0, dur)), len = Math.min(mv.dur, dur - a0);
+  if (len < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
+  const at = (t) => P.lookAt(t), flat = new Map();
+  const num = (path, t, dflt) => { if (!flat.has(t)) flat.set(t, M.flatten(at(t))); const v = flat.get(t)[path]; return Number.isFinite(v) ? v : dflt; };
+  // The number a change line follows, for one loop: [path in the recording, change-line key]
+  const linesFor = (k) => {
+    const out = [[`mix.${SHOW[k]}`, 'show'], [`mix.${FEED_INTO[otherLoop(k)]}`, 'feed']];
+    for (const key of Object.keys(SEQ_NAME)) if (key !== 'show' && key !== 'feed' && !(key in GRADE_DEF) && !(key in RELIEF_DEF)) out.push([`${k}.${key}`, key]);
+    for (const key of Object.keys(GRADE_DEF)) out.push([`grade.${key}`, key]);
+    for (const key of Object.keys(RELIEF_DEF)) out.push([`relief.${key}`, key]);
+    return out;
+  };
+  const made = [];
+  for (const k of KEYS) {
+    // Where this loop's blocks start: the beginning, and each change to its switches (or the number of loops,
+    // or the picture or clip in), at least half a second apart
+    const cuts = [0];
+    for (const [cs, path] of mv.ev) {
+      const g = path.split('.')[0], t = cs / 100;
+      if ((g === k || g === 'n' || g === 'media') && t < len - TL.MIN_LEN && t - cuts[cuts.length - 1] >= TL.MIN_LEN) cuts.push(t);
+    }
+    for (let i = 0; i < cuts.length; i++) {
+      const s0 = cuts[i], e0 = i + 1 < cuts.length ? cuts[i + 1] : len;
+      const L0 = at(s0 + 0.001), lk = L0[k];
+      if (!lk || (L0.n || 2) < LOOP_NUM[k] + 1) continue;
+      // Shown (or feeding one that is, or read by another loop) somewhere in the stretch, or it isn't worth a block
+      const showAt = (t) => num(`mix.${SHOW[k]}`, t, k === 'B' ? 0 : 100);
+      const samples = [s0, (s0 + e0) / 2, e0 - 0.01];
+      const showMax = Math.max(...samples.map(showAt), ...(mv.tr[`mix.${SHOW[k]}`] || []).filter((_, j) => j % 2 === 1));
+      const feedMax = Math.max(...samples.map((t) => num(`mix.${FEED_INTO[otherLoop(k)]}`, t, 0)));
+      const readBy = KEYS.some((j) => j !== k && L0[j] && otherLoop(j) === k && usesIn(L0[j], 'loop'));
+      if (showMax <= 0.5 && feedMax <= 0.5 && !readBy) continue;
+      const autos = [];
+      for (const [path, key] of linesFor(k)) {
+        const [lo, hi] = seqRange(key), norm = (v) => clamp((v - lo) / ((hi - lo) || 1), 0, 1);
+        const tr = mv.tr[path] || [], base = num(path, s0 + 0.001, undefined);
+        if (base === undefined) continue;
+        // The line: its value at the block's start and end, and the recording's own points in between
+        const pts = [0, norm(base)];
+        for (let j = 0; j < tr.length; j += 2) { const t = tr[j] / 100; if (t > s0 && t < e0) pts.push((t - s0) / (e0 - s0), norm(tr[j + 1])); }
+        pts.push(1, norm(num(path, e0 - 0.001, base)));
+        let lo2 = Infinity, hi2 = -Infinity;
+        for (let j = 1; j < pts.length; j += 2) { lo2 = Math.min(lo2, pts[j]); hi2 = Math.max(hi2, pts[j]); }
+        const moves = hi2 - lo2 > 0.002;
+        // Steady lines only where the block needs them: its Show and feed, and grading or lighting away from normal
+        const steadyNeeded = key === 'show' || key === 'feed' || (key in GRADE_DEF && base !== GRADE_DEF[key]) || (key in RELIEF_DEF && num('relief.rDepth', s0 + 0.001, 0) > 0);
+        if (!moves && !steadyNeeded) continue;
+        let thin = moves ? M.simplify(pts) : [0, pts[1], 1, pts[1]];
+        // At most 64 points: evenly picked from the thinned line
+        if (thin.length > 128) { const n = thin.length / 2, out = []; for (let q = 0; q < 64; q++) { const j = Math.round(q * (n - 1) / 63); out.push(thin[j * 2], thin[j * 2 + 1]); } thin = out; }
+        const line = [];
+        for (let j = 0; j < thin.length; j += 2) line.push([thin[j], thin[j + 1]]);
+        autos.push({ key, pts: line, spread: hi2 - lo2, keep: key === 'show' || key === 'feed' });
+      }
+      autos.sort((x, y) => (y.keep - x.keep) || (y.spread - x.spread));
+      let media = null;
+      try {
+        const m = L0.media ? JSON.parse(L0.media) : null;
+        if (m && m.vid && usesIn(lk, 'video')) media = { vid: { ...m.vid, at: m.vid.id === JSON.parse(start.media || '{}').vid?.id ? r1((start.mediaAt || 0) + s0) : 0 } };
+        else if (m && m.pic && usesIn(lk, 'picture')) media = { pic: m.pic };
+      } catch (_) { media = null; }
+      const bl = TL.cleanBlock({ track: KEYS.indexOf(k), a: a0 + s0, b: a0 + e0, label: `${c.n} (${k})`.slice(0, 80), look: JSON.parse(JSON.stringify(lk)),
+        fin: 0, fout: 0, media, autos: autos.slice(0, 32).map(({ key, pts }) => ({ key, pts })) });
+      if (bl) made.push(bl);
+    }
+  }
+  if (!made.length) { seqNote('That recording shows nothing on screen, so there’s nothing to add.'); return; }
+  seqChange(() => seq.rec.blocks.push(...made));
+  seq.selId = made[0].id;
+  const tracks = [...new Set(made.map((b) => b.track + 1))];
+  seqNote(`Added the recording “${c.n}”: ${made.length} block${made.length === 1 ? '' : 's'} with their changes over time, on track${tracks.length === 1 ? '' : 's'} ${tracks.join(', ')} from ${fmtSeq(a0, true)}.`);
+}
 $('#seqAddClip').addEventListener('click', () => { seqCloseMenus(); openClips('seq'); });
 function seqAddMarker() {
   const m = { id: TL.id(), t: r1(clamp(seq.t, 0, seqDur())), name: `Marker ${seq.rec.markers.length + 1}` };
@@ -10906,6 +11314,8 @@ function frame() {
 
   for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update(subjectModes(name));
   syncSubjectStatus();
+  mvRecTick(now);
+  movesTick(now);
   vcrTick();
   packAdj();
   analyzeSound(dt, now);
