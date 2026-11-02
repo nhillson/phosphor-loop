@@ -666,7 +666,7 @@ function clipCard(c) {
   card.appendChild(pic);
   const meta = el('div', 'meta');
   meta.appendChild(el('b', '', c.n));
-  meta.appendChild(el('span', '', [c.w && c.h ? c.w + '×' + c.h : '', c.sound ? 'with sound' : '', c.fx ? 'with effects' : ''].filter(Boolean).join(' · ')));
+  meta.appendChild(el('span', '', [c.w && c.h ? c.w + '×' + c.h : '', c.sound ? 'with sound' : '', c.mv ? 'recorded settings' : c.fx ? 'with effects' : ''].filter(Boolean).join(' · ')));
   if (c.tags && c.tags.length) meta.appendChild(el('span', 'tags', c.tags.map((t) => '#' + t).join(' ')));
   card.appendChild(meta);
   card.addEventListener('mouseenter', () => {
@@ -757,7 +757,7 @@ function openClip(id) {
   fact('Length', fmtLen(c.d || 0));
   fact('Size', c.w && c.h ? c.w + ' × ' + c.h + (c.fps ? ', ' + Math.round(c.fps) + ' frames a second' : '') : '');
   fact('Sound', c.sound ? 'Yes' : 'No');
-  fact('Effects', c.fx ? 'Saved with it (Phosphor Loop uses them with “Use with its effects”)' : '');
+  fact('Effects', c.mv ? 'A recording of the settings over time (Phosphor Loop plays it back with “Play the recording”; the video is a preview)' : c.fx ? 'Saved with it (Phosphor Loop uses them with “Use with its effects”)' : '');
   fact('From', [c.page, c.site].filter(Boolean).join(' · '));
   fact('By', c.by);
   fact('Licence', c.lic);

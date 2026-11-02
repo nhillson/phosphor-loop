@@ -106,7 +106,7 @@ function clipJson(c) {
   return {
     id: c.id, n: c.n, c: c.c, d: c.d, w: c.w, h: c.h, fps: c.fps, sound: !!c.sound, thumb: !!c.t,
     by: c.by || '', lic: c.lic || '', src: c.src || '', page: c.page || '', added: c.added || '',
-    tags: c.tags || [], fx: !!c.fx, p: subOf(c.f),
+    tags: c.tags || [], fx: !!c.fx, mv: !!c.mv, p: subOf(c.f),
   };
 }
 

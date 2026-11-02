@@ -1,4 +1,6 @@
 'use strict';
+// Effects that are a recording of the settings over time (Phosphor Loop's look.moves)
+const isRecording = (look) => !!(look && typeof look === 'object' && look.moves && typeof look.moves === 'object' && look.moves.v === 1);
 // The clip library: a folder per category inside the library folder (Videos\Phosphor Clips by default), each clip
 // an MP4, plus library.json listing every clip with its name, category, size, length and where it came from (in the
 // same style as Phosphor Loop's nature/pictures.json, so Phosphor Loop can read it later). Thumbnails live in
@@ -6,7 +8,8 @@
 // Each clip can have a settings file beside it, <Name>.phosphor.json: its tags, the Phosphor Loop effects saved with
 // it (the whole picture, like a preset), its category and where it came from. It travels with the clip: copy both
 // files into a category folder of another library (on another computer, say) and that library picks up the tags and
-// effects too. library.json keeps the tags and whether there are effects (fx); the effects themselves stay in the
+// effects too. library.json keeps the tags and whether there are effects (fx), and whether those effects are a recording
+// of the settings over time (mv: Phosphor Loop's Record the settings, look.moves); the effects themselves stay in the
 // settings file, so library.json stays small with thousands of clips.
 // Inside a category folder there can be subfolders, as deep as you like (Abstract/Fractals/Blue): a clip's subfolder is
 // the part of its file path between the category folder and its name (subOf). Empty folders are kept in the list too
@@ -99,6 +102,7 @@ class Library {
     const file = this.sideAbs(clip);
     if (look === undefined) look = ((await this.readSide(clip)) || {}).look || null;
     clip.fx = !!look;
+    clip.mv = isRecording(look);
     if (!look && !(clip.tags && clip.tags.length)) { await fsp.rm(file, { force: true }).catch(() => {}); return; }
     const cat = this.cat(clip.c);
     const d = {
@@ -116,6 +120,7 @@ class Library {
     if (!d) return;
     clip.tags = cleanTags(d.tags);
     clip.fx = !!(d.look && typeof d.look === 'object');
+    clip.mv = isRecording(d.look);
     for (const k of ['src', 'page', 'by', 'lic']) if (typeof d[k] === 'string' && d[k] && !clip[k]) clip[k] = d[k].slice(0, 400);
     if (Array.isArray(d.part) && !clip.part) clip.part = d.part.slice(0, 2);
   }

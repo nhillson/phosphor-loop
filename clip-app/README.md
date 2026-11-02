@@ -55,6 +55,9 @@ trimmer (H.264 MP4, at the size picked in the trimmer last, sound only if *Keep 
   the clip window here (Library › a clip › Tags, commas between). The Library search finds clips by name or tag.
 - **Saved effects**: Phosphor Loop can save the whole picture (all loops, mixing, Color grading, 3D lighting, like a
   preset) with a clip; its explorer then offers *Use with its effects* or *Just the clip*.
+- **Recorded settings** (Phosphor Loop's ✂ Save clip… › Record the settings): the effects are a start look plus
+  `moves`, the settings over time (`js/moves.js` on Phosphor Loop's `main`); the clip's video is a preview. These
+  clips are marked `mv` in the listing (a red REC badge in Phosphor Loop's explorer).
 - Both live in a **settings file** beside the clip, `<Name>.phosphor.json` (tags, effects, category, credit);
   `library.json` keeps only the tags and whether there are effects (`fx`). Renaming, moving or deleting a clip here
   takes its settings file along.
