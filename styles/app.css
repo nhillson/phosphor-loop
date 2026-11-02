@@ -503,7 +503,11 @@
   .snip-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; text-align: left; white-space: normal; height: auto; }
   .snip-pick small { font-size: 13px; color: var(--dim); font-weight: 400; }
   .snip-form:is([data-stage="rec"], [data-stage="recording"], [data-stage="recorded"]) .snip-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-  .snip-rec-hint { margin: 0; font-size: 13px; }
+  .snip-rec-hint { margin: 0; font-size: 13px; flex-basis: 100%; }
+  .snip-size { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .snip-size select { margin: 0; }
+  .snip-form[data-stage="recording"] :is(.snip-size, .snip-recsound) { opacity: .5; pointer-events: none; }
+  .snip-form[data-stage="recorded"] .snip-size { display: none; }
   .snip-form[data-stage="recorded"] #snipRedo { display: inline-flex; }
   .snip-form[data-stage="recorded"] #snipRecGo { display: none; }
   .snip-form:not([data-stage="trim"]) :is(.trim, .snip-trimonly) { display: none; }

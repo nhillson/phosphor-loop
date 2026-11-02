@@ -147,7 +147,8 @@
         <button class="btn" id="outBtn" aria-pressed="false" title="Open the picture in its own window for a projector or second screen">Output window</button>
         <button class="btn" id="wideBtn" aria-pressed="false" title="Shrink the picture here to a small preview and spread the controls across the screen, so you can see more of them at once"><span class="led"></span>Spread out controls</button>
         <span class="spacer" aria-hidden="true"></span>
-        <button class="btn" id="snipOpen" aria-pressed="false" aria-controls="snipPanel" hidden title="Save to your clip library (Phosphor Clips): record the inputs, effects and every change over time, to play back live later, or trim the video playing">✂ Save clip…</button>
+        <button class="btn" id="looksOpen" hidden title="Your saved looks (what ✂ Save clip saves): play a recording back, or use a look">Look library</button>
+        <button class="btn" id="snipOpen" aria-pressed="false" aria-controls="snipPanel" hidden title="Save a look to your Look library: record the inputs, effects and every change over time, to play back live later, or trim the video playing">✂ Save clip…</button>
         <button class="btn" id="recMic" aria-pressed="true" hidden title="Which sound goes into videos you record. Click to change it: Off, Mic, Computer or Both."><span class="led"></span><span id="recSoundLabel">Video sound: Both</span></button>
         <button class="btn rec" id="rec" aria-pressed="false" hidden title="Record a video; press again to stop and save it (key V, works in full screen too)"><span class="led"></span><span id="recLabel">Record</span></button>
       </div>
@@ -160,6 +161,9 @@
           </div>
           <div class="snip-rec">
             <button type="button" class="btn rec" id="snipRecGo" aria-pressed="false"><span class="led"></span><span id="snipRecLabel">Start recording</span></button>
+            <label class="snip-size">Video <select id="snipRecSize" aria-label="Size of the saved video">
+              <option value="1080">1080p</option><option value="1440">1440p</option><option value="2160">4K</option></select></label>
+            <label class="snip-sound snip-recsound"><input type="checkbox" id="snipRecSound" checked> Sound</label>
             <span class="hint snip-rec-hint" id="snipRecHint"></span>
           </div>
           <div class="trim">

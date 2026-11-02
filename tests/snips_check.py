@@ -119,6 +119,13 @@ def main():
                 print('  note: no picture', os.path.basename(path), str(e).splitlines()[0])
         shown = lambda: J("[...document.querySelectorAll('#clipsGrid .nat-tile')].map(t => t.querySelector('span:last-of-type').textContent)")
         lib_clip = lambda name: next((x for x in library()['clips'] if x['n'] == name), None)
+        def move_to(name, cat):
+            got = lib_clip(name)
+            if not got:
+                return
+            J(f"fetch('http://127.0.0.1:{PORT}/clip/{got['id']}', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify({{ c: {json.dumps(cat)} }}) }}).then(r => r.json()).then(j => {{ window.__moved = j.ok; }})")
+            until("window.__moved === true", f'moving {name} to {cat} failed')
+            J("window.__moved = null")
 
         # 0. The buttons that went: Save picture, Clear, Freeze, Full screen, Next look (their keys stay)
         gone = J("['snap', 'clear', 'freeze', 'full', 'nextLookBar'].filter(id => document.getElementById(id))")
@@ -156,7 +163,8 @@ def main():
             click('#snipPickTrim')
         if until("!document.querySelector('#snipPanel').hidden && document.querySelectorAll('#snipCat option').length >= 3", 'the save form did not open with the categories'):
             ok(J("document.querySelector('#snipName').value") == 'Swirl 1s–3s', 'the name is filled in: ' + J("document.querySelector('#snipName').value"))
-            ok(J("document.querySelector('#snipCat').value") == 'abstract|', 'the folder starts as the clip’s own')
+            ok(J("document.querySelector('#snipCat').value") == 'looks|', 'the folder starts as the Look library’s top (Save clip saves only there)')
+            ok(J("[...document.querySelectorAll('#snipCat option')].every(o => o.value.startsWith('looks|'))"), 'and only Look library folders are offered')
             ok(J("document.querySelector('#snipFx').checked"), 'Save the whole look is on to start with')
             ok(J("document.querySelector('#trimAT').textContent") == '0:01.0' and J("document.querySelector('#trimBT').textContent") == '0:03.0', 'the trim starts as the marked part')
             tsel = J("(() => { const e = document.querySelector('#trimSel'); return [parseFloat(e.style.left), parseFloat(e.style.width)]; })()")
@@ -168,14 +176,16 @@ def main():
             # at the workspace's 2 frames a second; a sixtieth of a second on Nick's computers)
             ok(0.9 <= tnow <= 3.6, f'the video stays inside the trimmed part ({tnow:.2f} s)')
             fill('#snipName', 'Swirl middle')
-            select('#snipCat', 'water|')
+            select('#snipCat', 'looks|')
             fill('#snipTags', 'Fractal, neon')
             c.wait_frames(3, 'form')
             shot(os.path.join(out, 'snip-form.png'))
             click('#snipSave')
             if until("document.querySelector('#snipStatus').textContent.startsWith('Saved')", 'the snip was not saved', 60):
                 got = lib_clip('Swirl middle')
-                ok(got and got['c'] == 'water' and abs(got['d'] - 2) < 0.2, f'the snip is in the library under Water, 2 s long')
+                ok(got and got['c'] == 'looks' and abs(got['d'] - 2) < 0.2, f'the snip is in the Look library, 2 s long')
+                # (the rest of this test files it with the web clips, where the explorer checks below expect it)
+                move_to('Swirl middle', 'water')
                 ok(got and got['tags'] == ['fractal', 'neon'], f"its tags ({got and got['tags']})")
                 ok(got and got['fx'], 'its effects were saved')
                 look = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{PORT}/look/{got['id']}").read())['look']
@@ -258,11 +268,12 @@ def main():
             ok(st4['v0'] == 0 and abs(st4['v1'] - 4) < 0.05, f"a part half the video long shows the whole video ({st4['v0']:.2f}–{st4['v1']:.2f})")
             J("document.querySelector('#snipFx').checked = false")
             fill('#snipTags', 'industrial')
-            ok(J("document.querySelector('#snipCat').value") == 'water|', 'the last folder picked is remembered')
+            ok(J("document.querySelector('#snipCat').value") == 'looks|', 'the last folder picked is remembered')
             click('#snipSave')
             if until("document.querySelector('#snipStatus').textContent.startsWith('Saved')", 'your own video’s snip was not saved', 60):
                 got = lib_clip('mine 2s–4s')
-                ok(got and abs(got['d'] - 2) < 0.2 and got['tags'] == ['industrial'] and not got['fx'], f'your own video’s snip: 2 s, tagged, no effects ({got})')
+                ok(got and abs(got['d'] - 2) < 0.2 and got['tags'] == ['industrial'] and not got['fx'] and got['c'] == 'looks', f'your own video’s snip: 2 s, tagged, no effects, in the Look library ({got})')
+                move_to('mine 2s–4s', 'water')
 
         # 4. Searching and tags in the explorer
         click('#clipOpen')

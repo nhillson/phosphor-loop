@@ -113,6 +113,8 @@ def main():
         ok(J("!document.querySelector('#snipOpen').title.includes('Trim the video playing and save')"), 'its tooltip talks about recording')
         click('#snipOpen')
         until("__plMoves.rec.stage === 'rec'", 'with no video, Save clip did not go straight to recording')
+        ok(J("document.querySelector('#snipCat').value === 'looks|' && [...document.querySelectorAll('#snipCat option')].every(o => o.value.startsWith('looks|'))"),
+           'Save clip saves only into the Look library')
         ok(J("getComputedStyle(document.querySelector('.snip-rec')).display !== 'none' && getComputedStyle(document.querySelector('.trim')).display === 'none'"),
            'the record button shows, the trim strip doesn’t')
         shot('1-ready.png')
@@ -120,8 +122,10 @@ def main():
         new_in = 'patchwork' if start_in != 'patchwork' else 'bars'
 
         # 2. Record: Zoom moves, then loop A's input changes, then Zoom again
+        J("document.querySelector('#snipRecSize').value = '1080'")
         click('#snipRecGo')
         until("__plMoves.rec.stage === 'recording' && __plMoves.rec.on", 'recording did not start')
+        ok(J("__plMoves.drawn().h") == 1080, f"the picture is drawn 1080 lines tall while it records ({J('__plMoves.drawn()')})")
         for v in (0, 20, 40, 60, 80):
             slide('#zoom', v)
             c.wait_frames(3, 'zooming')
@@ -133,6 +137,7 @@ def main():
         shot('2-recording.png')
         click('#snipRecGo')
         until("__plMoves.rec.stage === 'recorded' && __plMoves.rec.blob", 'the recording did not finish')
+        ok(J("__plMoves.drawn().h") != 1080 or J("__plMoves.drawn().screen"), f"the picture went back to the preview's size ({J('__plMoves.drawn()')})")
         mv = J("__plMoves.rec.moves")
         zoom = (mv or {}).get('tr', {}).get('A.zoom', [])
         ok(len(zoom) >= 4 and max(zoom[1::2]) >= 79 and min(zoom[1::2]) <= -49, f'Zoom’s moves were recorded ({zoom[:12]}…)')
@@ -146,17 +151,22 @@ def main():
         click('#snipSave')
         until("document.querySelector('#snipStatus').textContent.includes('Saved the recording')", 'saving the recording failed: ' + J("document.querySelector('#snipStatus').textContent"), 90)
         clip = next((x for x in library()['clips'] if x['n'] == 'Test moves'), None)
-        ok(bool(clip), 'it is in the library')
+        ok(bool(clip) and clip['c'] == 'looks', f"it is in the Look library ({clip and clip['c']})")
+        ok(J("!__plMoves.web().some(c => c.n === 'Test moves')"), 'and not among the web clips Autopilot uses')
         if clip:
             look = json.loads(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/look/{clip["id"]}').read()).get('look') or {}
             ok(isinstance(look.get('moves'), dict) and 'A.zoom' in look['moves'].get('tr', {}), 'its effects hold the recording')
             ok(look.get('A', {}).get('in1') == start_in, 'and the look it started from')
+            ok(clip['h'] == 1080, f"its video is 1080 lines tall ({clip['w']}×{clip['h']})")
         ok(J("document.querySelector('#snipPanel').hidden"), 'the panel closed')
 
         # 4. The explorer: the REC badge, Play the recording brings the changes back
-        J("document.querySelector('#row-video').hidden = false")
-        click('#clipOpen')
-        until(f"!!{tile('Test moves')}", 'the recording is not in the explorer')
+        ok(J("!document.querySelector('#looksOpen').hidden"), 'the Look library button shows under the picture')
+        click('#looksOpen')
+        until(f"!!{tile('Test moves')}", 'the recording is not in the Look library')
+        ok(J("document.querySelector('#clipsTitle').textContent === 'Look library'"), 'it opens as the Look library')
+        ok(J("[...document.querySelectorAll('#clipsGrid .nat-tile')].every(t => t.dataset.c === 'looks')"), 'the Look library shows only looks')
+        ok(J("document.querySelector('#clipsAp').hidden && document.querySelector('#clipsFile').hidden"), 'no Autopilot categories or Choose a video file there')
         ok(J(f"!!{tile('Test moves')}.querySelector('.cx-fxb.mv')"), 'its tile has the REC badge')
         pick_tile('Test moves')
         until("document.querySelector('#cxUseFx').textContent === 'Play the recording'", 'the button did not become Play the recording')

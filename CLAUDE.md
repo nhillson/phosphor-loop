@@ -63,6 +63,11 @@ file don't rebuild the app.
    `js/moves.js`, glue under "recorded moves" in js/app.js): `CLIPS_APP=<clip-app folder> python3 tests/moves_check.py`
    (about 4 minutes; the real sharing server, so ffmpeg must be installed). With a video shown, Save clip asks first
    (trim or record); snips_check.py picks Trim. It reaches into the app through `window.__plMoves`.
+   Everything Save clip saves goes into the **Look library**: Phosphor Clips 1.9's `looks` category (folder Looks),
+   opened with the Look library button under the picture (`openClips('looks')`). The Clip library (Video) and
+   Autopilot see only the web clips (`clips.web`); the sequencer's + Add clip sees both (`clipsSetView`). While a
+   look records, the picture is drawn at the size picked (1080p/1440p/4K, `MV.size` through `capCfg`), not the
+   preview's.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

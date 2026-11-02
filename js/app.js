@@ -12,15 +12,19 @@ const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 const SIM_H = 576;
 // The stream app's capture mode: the size and speed it streams at. The app can switch it off ("Streaming?" Off),
 // and then the page draws like an ordinary browser window, at the size Picture sharpness picks.
-function capCfg() { const c = window.__phosphorCaptureConfig; return c && !c.off ? c : null; }
+// A recording of the settings playing back, or a look being recorded (see "recorded moves"); set first, since the
+// drawing size, Autopilot and presets check it
+const MV = { play: null, applying: false, size: null };
+// The size the picture is drawn at, when something other than the screen sets it: Phosphor Stream (its capture
+// config), or a look being recorded with Save clip (MV.size, so the saved video is sharp, not the size of the
+// preview on this page)
+function capCfg() { const c = window.__phosphorCaptureConfig; return c && !c.off ? c : MV.size || null; }
 let simW = 768, simH = capCfg()?.renderHeight || SIM_H, simAspect = simW / simH;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 // Not part of a Spread out column's copy of a loop's settings (see "a column per loop")
 const notCopy = (el) => !el.closest('.loop-col');
-// A recording of the settings playing back (see "recorded moves"); set early, since Autopilot and presets check it
-const MV = { play: null, applying: false };
 
 /* ================= hints as hover tooltips ================= */
 // The small grey descriptions under the controls are tucked away and shown as a tooltip when the mouse rests on the
@@ -5182,7 +5186,22 @@ natDlg.addEventListener('keydown', (e) => {
 const CLIP_PORTS = [47811, 47812, 47813];
 const CLIP_ON_KEY = 'phosphor-clips-on', CLIP_TAB_KEY = 'phosphor-clips-tab', CLIP_OFF_KEY = 'phosphor-clips-ap-off', CLIP_LAST_KEY = 'phosphor-clips-last';
 // list: the clips (null until Phosphor Clips answers); cur: the clip in use; own: a video file of your own is in
-const clips = { base: '', list: null, cats: [], at: 0, req: null, cur: '', own: false, ask: 0, cat: 'all', off: [] };
+// clips.all: everything Phosphor Clips shares; clips.web: the clips grabbed from the web (Autopilot and the Video
+// input's gallery use these); clips.list/cats/folders: what the explorer shows now (clipsSetView)
+const clips = { base: '', list: null, cats: [], at: 0, req: null, cur: '', own: false, ask: 0, cat: 'all', off: [], all: null, web: null, allCats: [], allFolders: [], view: 'clips' };
+// The Look library: Save clip's looks (recordings of the settings, and trims saved with their look), in Phosphor
+// Clips' Looks folder (1.9 and later), kept apart from the web clips: its own button and window, never Autopilot's
+const LOOKS = 'looks';
+const hasLooks = () => clips.allCats.some((c) => c.id === LOOKS);
+function clipsSetView(v) {
+  clips.view = v;
+  const inView = (cid) => v === 'all' || (v === 'looks' ? cid === LOOKS : cid !== LOOKS);
+  clips.list = clips.all ? clips.all.filter((c) => inView(c.c)) : null;
+  clips.cats = clips.allCats.filter((c) => inView(c.id));
+  clips.folders = clips.allFolders.filter((f) => inView(f.c));
+  if (clips.cat !== 'all' && !clips.cats.some((c) => c.id === clips.cat)) clips.cat = 'all';
+  return clips.list;
+}
 try {
   clips.cat = localStorage.getItem(CLIP_TAB_KEY) || 'all';
   clips.off = JSON.parse(localStorage.getItem(CLIP_OFF_KEY) || '[]');
@@ -5207,11 +5226,13 @@ function clipList(fresh) {
         const d = await r.json();
         if (!d || d.app !== 'Phosphor Clips') throw new Error('not Phosphor Clips');
         clips.base = base;
-        clips.list = Array.isArray(d.clips) ? d.clips : [];
-        clips.cats = Array.isArray(d.cats) ? d.cats : [];
+        clips.all = Array.isArray(d.clips) ? d.clips : [];
+        clips.web = clips.all.filter((c) => c.c !== LOOKS);
+        clips.allCats = Array.isArray(d.cats) ? d.cats : [];
         // Subfolders inside the categories (Phosphor Clips 1.7 and later), empty ones too
-        clips.folders = Array.isArray(d.folders) ? d.folders.filter((f) => f && typeof f.c === 'string' && typeof f.p === 'string') : [];
+        clips.allFolders = Array.isArray(d.folders) ? d.folders.filter((f) => f && typeof f.c === 'string' && typeof f.p === 'string') : [];
         clips.at = performance.now();
+        clipsSetView(clips.view);
         if (clips.cat !== 'all' && !clips.list.some((c) => c.c === clips.cat)) clips.cat = 'all';
         return clips.list;
       } catch (e) { why = e; } finally { clearTimeout(t); }
@@ -5226,10 +5247,10 @@ function clipList(fresh) {
 }
 const clipCatName = (id) => { const c = clips.cats.find((x) => x.id === id); return c ? c.n : id; };
 // The clips Autopilot may bring in: those in the ticked categories
-const clipsAp = () => (clips.list || []).filter((c) => !clips.off.includes(c.c));
-const clipsReady = () => !!clips.list && clipsAp().length > 0 && clipsWanted();
+const clipsAp = () => (clips.web || []).filter((c) => !clips.off.includes(c.c));
+const clipsReady = () => !!clips.web && clipsAp().length > 0 && clipsWanted();
 // The clips in the gallery's chosen category (or all of them)
-const clipsShown = () => (clips.list || []).filter((c) => clips.cat === 'all' || c.c === clips.cat);
+const clipsShown = () => (clips.web || []).filter((c) => clips.cat === 'all' || c.c === clips.cat);
 function clipNoCredit() {
   clips.cur = '';
   try { localStorage.removeItem(CLIP_LAST_KEY); } catch (_) { /* fine */ }
@@ -5272,7 +5293,7 @@ function clipShuffle() {
   clipList().then(() => {
     const shown = clipsShown().filter((c) => c.id !== clips.cur);
     if (shown.length) clipPick(pick(shown));
-    else toast(clips.list.length ? 'There’s no other clip in this category.' : 'The clip library is empty. Save some clips with Phosphor Clips.');
+    else toast((clips.web || []).length ? 'There’s no other clip in this category.' : 'The clip library is empty. Save some clips with Phosphor Clips.');
   }).catch(() => openClips('video'));
 }
 function clipsSay(html) {
@@ -5289,7 +5310,7 @@ function clipsSay(html) {
 const CX_PAGE = 120;
 const cx = { mode: 'video', q: '', sort: 'new', tags: [], sel: new Set(), anchor: '', shown: [], drawn: 0, obs: null,
   folder: lsGet('phosphor-clips-folder') || '', open: new Set() };
-const cxClip = (id) => (clips.list || []).find((c) => c.id === id) || null;
+const cxClip = (id) => (clips.all || []).find((c) => c.id === id) || null;
 const cxText = (c) => `${c.n} ${(c.tags || []).join(' ')} ${clipCatName(c.c)} ${c.p || ''} ${c.page || ''} ${c.by || ''}`.toLowerCase();
 // In the folder picked in the tree: its category, and that subfolder or any folder inside it
 const inFolder = (c, cat, sub) => (cat === 'all' || c.c === cat) && (!sub || c.p === sub || (c.p || '').startsWith(sub + '/'));
@@ -5382,7 +5403,7 @@ function cxTreeBuild() {
     box.appendChild(row);
     return open;
   };
-  node('all', '', 'All clips', list.length, 0, false);
+  node('all', '', clips.view === 'looks' ? 'All looks' : 'All clips', list.length, 0, false);
   for (const c of clips.cats) {
     const folders = cxFolders(c.id);
     const mine = list.filter((x) => x.c === c.id);
@@ -5575,8 +5596,7 @@ async function cxEdit(c, changes, quiet) {
         ? 'This Phosphor Clips is too old for tags and effects. Install the newest one (1.7 or later).' : 'Couldn’t change it. Is Phosphor Clips still running?');
       return null;
     }
-    const i = (clips.list || []).findIndex((x) => x.id === c.id);
-    if (i >= 0) clips.list[i] = j.clip;
+    for (const l of [clips.all, clips.web, clips.list]) { const i = (l || []).findIndex((x) => x.id === c.id); if (i >= 0) l[i] = j.clip; }
     if (changes.look !== undefined) cxLooks.delete(c.id);
     if (!quiet) {
       const tile = clipsGrid.querySelector(`.nat-tile[data-id="${CSS.escape(c.id)}"]`);
@@ -5764,9 +5784,12 @@ $('#cxCopy').addEventListener('click', async () => {
 let clipsReturn = null;
 // mode: 'video' (the Video input's Clip library…) or 'seq' (the sequencer's + Add clip…)
 function openClips(mode) {
-  cx.mode = mode === 'seq' ? 'seq' : 'video';
-  $('#clipsTitle').textContent = cx.mode === 'seq' ? `Add a clip to track ${seq.selTrack + 1}` : 'Clip library';
-  $('#clipsFile').hidden = cx.mode === 'seq';
+  // video: the web clips, for the Video input; looks: the Look library (Save clip's looks); seq: both, for a track
+  cx.mode = mode === 'seq' || mode === 'looks' ? mode : 'video';
+  if (clips.view !== { video: 'clips', looks: 'looks', seq: 'all' }[cx.mode]) { clipsSetView({ video: 'clips', looks: 'looks', seq: 'all' }[cx.mode]); cx.sel.clear(); cx.folder = ''; clips.cat = 'all'; }
+  $('#clipsTitle').textContent = cx.mode === 'seq' ? `Add a clip to track ${seq.selTrack + 1}` : cx.mode === 'looks' ? 'Look library' : 'Clip library';
+  $('#clipsFile').hidden = cx.mode !== 'video';
+  clipsDlg.classList.toggle('looks', cx.mode === 'looks');
   try { localStorage.setItem(CLIP_ON_KEY, '1'); } catch (_) { /* fine */ }
   if (clipsDlg.hidden) {
     clipsReturn = document.activeElement;
@@ -5781,11 +5804,17 @@ function openClips(mode) {
     clipsBuild();
     clipsFilter();
     clipMark();
-    $('#clipShuffle').hidden = !list.length;
-    $('#clipsShuffle').hidden = !list.length;
+    $('#clipShuffle').hidden = !(clips.web || []).length;
+    $('#clipsShuffle').hidden = !list.length || cx.mode !== 'video';
     $('#clipsFoot').hidden = false;
+    if (cx.mode === 'looks' && !hasLooks()) {
+      clipsSay('This Phosphor Clips is too old for the Look library. Install Phosphor Clips 1.9 or later, then press <b>Try again</b>.');
+      $('#clipsHint').hidden = true;
+      return;
+    }
     if (!list.length) {
-      clipsSay('Phosphor Clips is running, but its library is empty. Grab a video there and save it, then press <b>Try again</b>.');
+      clipsSay(cx.mode === 'looks' ? 'No looks saved yet. Press <b>✂ Save clip…</b> under the picture to record one.'
+        : 'Phosphor Clips is running, but its library is empty. Grab a video there and save it, then press <b>Try again</b>.');
       $('#clipsHint').hidden = true;
       return;
     }
@@ -5855,7 +5884,8 @@ function clipsKeepOneReady() {
 function clipsStart() {
   if (!clipsWanted()) return;
   const last = lsGet(CLIP_LAST_KEY);
-  clipList().then((list) => {
+  clipList().then(() => {
+    const list = clips.web || [];
     $('#clipShuffle').hidden = !list.length;
     if (vid.on) return true;
     const c = list.find((x) => x.id === last);
@@ -5863,7 +5893,7 @@ function clipsStart() {
   }).then((ok) => { if (!ok) clipsDropVideo(); }, () => clipsDropVideo());
   setInterval(() => {
     if (document.hidden || !clipsWanted()) return;
-    clipList(true).then(() => { $('#clipShuffle').hidden = !clips.list.length; clipsKeepOneReady(); }).catch(() => { /* not running right now */ });
+    clipList(true).then(() => { $('#clipShuffle').hidden = !(clips.web || []).length; clipsKeepOneReady(); }).catch(() => { /* not running right now */ });
   }, 60000);
 }
 
@@ -6172,6 +6202,7 @@ function snipBtnSync() {
   if (show !== snipBtnShown) {
     snipBtnShown = show;
     $('#snipOpen').hidden = !show;
+    $('#looksOpen').hidden = APP || inArtifact;
     if (!show && snip.open) snipCloseForm();
   }
   // Trimming a video that no loop shows any more would save something that isn't on screen
@@ -6205,13 +6236,21 @@ async function snipOpenForm() {
     snipSay('Phosphor Clips isn’t answering. Start it on this computer (it sits by the clock), then try again. If the browser asks whether this site may reach apps on this device, press Allow.');
     return;
   }
-  // The folder: the last one saved to, or else (trimming a library clip) the clip's own
-  const src = videoIn() ? snipSource() : null, from = src && src.from && cxClip(src.from);
-  let keep = lsGet(SNIP_CAT_KEY) || (from ? cxKey(from.c, from.p || '') : '');
-  if (keep && !keep.includes('|')) keep = cxKey(keep, '');
+  // Everything Save clip saves goes in the Look library (Phosphor Clips' Looks folder), apart from the web clips
+  if (!hasLooks()) {
+    snipSay('This Phosphor Clips is too old for the Look library, where Save clip saves. Install Phosphor Clips 1.9 or later, then try again.');
+    return;
+  }
+  const src = videoIn() ? snipSource() : null;
+  // The folder: the last one in the Look library saved to, or its top
+  let keep = lsGet(SNIP_CAT_KEY) || '';
+  if (!keep.startsWith(LOOKS + '|')) keep = cxKey(LOOKS, '');
   const sel = $('#snipCat');
+  const was = clips.view;
+  clipsSetView('looks');
   folderOptions(sel, null);
-  if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
+  clipsSetView(was);
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : cxKey(LOOKS, '');
   cxTagsBuild();
   snipSay('');
   form.hidden = false;
@@ -6229,15 +6268,18 @@ function snipStage(stage) {
   $('#snipPanel').dataset.stage = stage;
   const what = {
     choose: 'A video is in. What would you like to save?',
-    rec: 'Records the settings, not a movie: each loop’s inputs, every effect and fader, mixing, Color grading and 3D lighting, and how they change as you (or Autopilot) go. It plays back live later.',
+    rec: 'Records the settings, not a movie: each loop’s inputs, every effect and fader, mixing, Color grading and 3D lighting, and how they change as you (or Autopilot) go. It plays back live later, from the Look library.',
     recording: '',
     recorded: '',
   }[stage];
   if (what !== undefined) $('#snipWhat').textContent = what;
   if (stage === 'rec') {
+    $('.snip-recsound').style.display = '';
     $('#snipRecLabel').textContent = 'Start recording';
     $('#snipRecGo').setAttribute('aria-pressed', 'false');
-    $('#snipRecHint').textContent = 'A short preview video is saved with it, for the clip gallery.';
+    $('#snipRecHint').textContent = snd.track && snd.track.readyState === 'live'
+      ? 'A video is saved with it too, at the size picked here, with the sound React to sound hears.'
+      : 'A video is saved with it too, at the size picked here. For sound in it, first pick Computer sound or Microphone under React to sound.';
   }
 }
 // Trim the video playing: the trim starts as the part Repeat a section marks, or the whole video
@@ -6333,6 +6375,10 @@ async function snipSave() {
 }
 $('#snipOpen').addEventListener('click', () => { if (snip.open) snipCloseForm(); else void snipOpenForm(); });
 $('#snipPickTrim').addEventListener('click', snipTrimStart);
+$('#looksOpen').addEventListener('click', () => openClips('looks'));
+// The size a look's video is recorded at (remembered in this browser)
+try { const v = localStorage.getItem('phosphor-look-size'); if (['1080', '1440', '2160'].includes(v)) $('#snipRecSize').value = v; } catch (_) { /* fine */ }
+$('#snipRecSize').addEventListener('change', () => { try { localStorage.setItem('phosphor-look-size', $('#snipRecSize').value); } catch (_) { /* fine */ } });
 $('#snipPickMoves').addEventListener('click', () => snipStage('rec'));
 $('#snipRecGo').addEventListener('click', () => { if (mvRec.on) mvRecStop(); else mvRecStart(); });
 $('#snipRedo').addEventListener('click', () => { mvRecDrop(); snipStage('rec'); snipSay(''); });
@@ -6353,7 +6399,7 @@ $('#snipName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.
 // the inputs really run here, sound reacts to whatever plays now, and the recording starts over at its end.
 const MV_MAX = 600;   // a recording stops by itself after ten minutes
 const MV_RATE = 1000 / 30;
-const mvRec = { on: false, rec: null, start: null, t0: 0, last: 0, vr: null, chunks: [], blob: null, ext: 'webm', moves: null, drop: false, media: '' };
+const mvRec = { pending: null, sound: false, on: false, rec: null, start: null, t0: 0, last: 0, vr: null, chunks: [], blob: null, ext: 'webm', moves: null, drop: false, media: '' };
 // Which picture and video are in (when a loop shows them), as text, so a change is one event
 function mvMediaNow() {
   const m = {};
@@ -6365,16 +6411,45 @@ function mvMediaNow() {
 }
 const mvLookNow = () => ({ ...clipLookNow(), n: loopCount, media: mvMediaNow() });
 function mvRecStart() {
-  if (mvRec.on) return;
+  if (mvRec.on || mvRec.pending) return;
   mvRecDrop();
+  // The picture is drawn at the size picked (1080p, 1440p or 4K, in its own shape) while it records, not at the size
+  // of the preview on this page; it goes back when the recording stops
+  if (!window.__phosphorCaptureConfig || window.__phosphorCaptureConfig.off) {
+    const lines = +$('#snipRecSize').value || 1080, aspect = canvas.width / Math.max(1, canvas.height);
+    const h = lines, w = Math.min(4096, Math.round((h * aspect) / 2) * 2);
+    // (the loops drawn with as many lines; SIM_H / 576 is 1 here, smaller only in the tests' lowered page)
+    MV.size = { width: w, height: h, renderHeight: Math.round((h * SIM_H) / 576) };
+    fit();
+  }
+  mvRec.pending = { frames: 0 };
+  snipStage('recording');
+  $('#snipRecGo').setAttribute('aria-pressed', 'true');
+  $('#snipRecLabel').textContent = 'Getting ready…';
+  $('#snipWhat').textContent = '';
+  snipSay('');
+}
+// The recording really starts once the picture is drawing at its new size (or after 90 frames, whatever happens)
+function mvRecBegin() {
+  mvRec.pending = null;
   let stream;
-  try { stream = canvas.captureStream(30); } catch (_) { snipSay('This browser can’t record the picture. Use Chrome or Edge.'); return; }
-  // The preview: H.264 where the browser makes it (on the graphics card, so the picture keeps its speed), else WebM.
-  // Phosphor Clips turns it into its usual MP4 either way.
-  const types = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4'];
+  try { stream = canvas.captureStream(60); } catch (_) { mvRecFail('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  // Sound: what React to sound hears (a copy, so listening carries on), when Sound is ticked
+  const heard = $('#snipRecSound').checked && snd.track && snd.track.readyState === 'live' ? snd.track.clone() : null;
+  if (heard) stream.addTrack(heard);
+  mvRec.sound = !!heard;
+  // H.264 where the browser makes it (on the graphics card, so the picture keeps its speed), else WebM; Opus sound at
+  // 320 kbps where it can (AAC at 192, the most Windows' AAC encoder makes, otherwise). Phosphor Clips keeps looks at
+  // high quality, up to 4K, sound at 320 kbps.
+  const types = heard
+    ? ['video/mp4;codecs=avc1,opus', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4']
+    : ['video/mp4;codecs=avc1', 'video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4'];
   const mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-  try { mvRec.vr = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8000000 } : undefined); }
-  catch (_) { stream.getTracks().forEach((t) => t.stop()); snipSay('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  // Plenty of bits: fine feedback detail is the hardest thing there is for a video encoder
+  const px = canvas.width * canvas.height, vbps = Math.round(clamp(px * 60 * 0.3, 25e6, 160e6));
+  const abps = /mp4a/.test(mime) ? 192000 : 320000;
+  try { mvRec.vr = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: vbps, audioBitsPerSecond: abps } : undefined); }
+  catch (_) { stream.getTracks().forEach((t) => t.stop()); mvRecFail('This browser can’t record the picture. Use Chrome or Edge.'); return; }
   const vr = mvRec.vr;
   mvRec.chunks = [];
   mvRec.drop = false;
@@ -6400,15 +6475,27 @@ function mvRecStart() {
   mvRec.t0 = performance.now();
   mvRec.last = mvRec.t0;
   vr.start(500);
-  snipStage('recording');
-  $('#snipRecGo').setAttribute('aria-pressed', 'true');
   $('#snipRecLabel').textContent = 'Stop 0:00';
-  $('#snipRecHint').textContent = 'Recording. Change inputs, move faders, or let Autopilot run. Press Stop when you’re done.';
-  $('#snipWhat').textContent = '';
-  snipSay('');
+  $('#snipRecHint').textContent = `Recording at ${canvas.width}×${canvas.height}${mvRec.sound ? ', with sound' : $('#snipRecSound').checked ? ', no sound (React to sound isn’t listening)' : ''}. Change inputs, move faders, or let Autopilot run. Press Stop when you’re done.`;
+}
+function mvRecFail(why) {
+  mvSizeBack();
+  snipStage('rec');
+  snipSay(why);
+}
+// The picture goes back to the size of the preview here
+function mvSizeBack() {
+  if (!MV.size) return;
+  MV.size = null;
+  fit();
 }
 // Each frame while recording: the look, at most 30 times a second
 function mvRecTick(now) {
+  if (mvRec.pending) {
+    const want = MV.size;
+    if (!want || (canvas.width === want.width && canvas.height === want.height && simH === Math.min(want.renderHeight, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096)) || ++mvRec.pending.frames > 90) mvRecBegin();
+    return;
+  }
   if (!mvRec.on) return;
   if (now - mvRec.last < MV_RATE - 2) return;
   mvRec.last = now;
@@ -6420,8 +6507,10 @@ function mvRecTick(now) {
   if (t >= MV_MAX) { mvRecStop(); snipSay('Recordings stop at ten minutes. This one is ready to save.'); }
 }
 function mvRecStop(drop) {
+  if (mvRec.pending) { mvRec.pending = null; mvSizeBack(); if (!drop) snipStage('rec'); return; }
   if (!mvRec.on) return;
   mvRec.on = false;
+  mvSizeBack();
   const t = (performance.now() - mvRec.t0) / 1000;
   mvRec.moves = mvRec.rec.finish(t);
   mvRec.rec = null;
@@ -6440,6 +6529,8 @@ function mvBaseName() {
 }
 function mvRecDone() {
   snipStage('recorded');
+  // Sound: Keep it when saving (only offered when there was some)
+  $('.snip-recsound').style.display = mvRec.sound ? '' : 'none';
   const m = mvRec.moves, nCh = Object.keys(m.tr).length + new Set(m.ev.map((e) => e[1])).size;
   $('#snipWhat').textContent = `Recorded ${fmt(m.dur)}: ${nCh === 0 ? 'nothing changed (it plays back as a still look)' : `${nCh} setting${nCh === 1 ? '' : 's'} changed along the way`}.`;
   $('#snipRecHint').textContent = '';
@@ -6450,6 +6541,7 @@ function mvRecDone() {
   $('#snipName').select();
 }
 function mvRecDrop() {
+  if (mvRec.pending) { mvRec.pending = null; mvSizeBack(); }
   if (mvRec.vr) { mvRec.drop = true; try { mvRec.vr.stop(); } catch (_) {} mvRec.vr = null; }
   mvRec.on = false; mvRec.rec = null; mvRec.blob = null; mvRec.moves = null; mvRec.chunks = [];
 }
@@ -6462,7 +6554,7 @@ async function mvSave() {
   // Phosphor Clips takes effects up to 4 MB
   if (size > 3.9e6) { snipSay('This recording is too long to save (too many changes). Record a shorter one.'); return; }
   const fileName = `${name.replace(/[\\/:*?"<>|]/g, ' ')}.${mvRec.ext}`;
-  const q = new URLSearchParams({ start: '0', name, cat, folder, sound: '0', tags: splitTags($('#snipTags').value).join(','), src: fileName });
+  const q = new URLSearchParams({ start: '0', name, cat, folder, sound: mvRec.sound && $('#snipRecSound').checked ? '1' : '0', tags: splitTags($('#snipTags').value).join(','), src: fileName });
   snip.busy = true;
   $('#snipSave').disabled = true;
   snipSay('Sending the recording to Phosphor Clips…');
@@ -6486,8 +6578,8 @@ async function mvSave() {
     mvRecDrop();
     snipCloseForm();
     if (ok) {
-      snipSay(`Saved the recording “${j.clip.n}” to ${where}. In Clip library…, pick it and press Play the recording.`);
-      toast(`Saved the recording “${j.clip.n}” to the clip library.`);
+      snipSay(`Saved the recording “${j.clip.n}” to ${where}. To play it back, press Look library under the picture, pick it, then Play the recording.`);
+      toast(`Saved the recording “${j.clip.n}” to the Look library.`);
     } else snipSay(`Saved the preview “${j.clip.n}” to ${where}, but not its settings: this Phosphor Clips is too old for them. Install 1.7 or later, then record again.`);
     cxLooks.delete(j.clip.id);
     await clipList(true).catch(() => {});
@@ -6608,7 +6700,7 @@ const mvTakeOver = (e) => {
 document.addEventListener('input', mvTakeOver, true);
 document.addEventListener('click', mvTakeOver, true);
 window.__plMoves = { get rec() { return { on: mvRec.on, moves: mvRec.moves, blob: !!mvRec.blob, stage: snip.stage }; }, get play() { return MV.play ? { t: mvPlay.p.lastCs / 100, name: mvPlay.name } : null; },
-  movesPlay, movesStop, tgt: (k) => ({ ...loops[k].tgt }), M: () => PhosphorMoves };   // for tests/moves_check.py
+  movesPlay, movesStop, tgt: (k) => ({ ...loops[k].tgt }), web: () => clips.web || [], drawn: () => ({ w: canvas.width, h: canvas.height, screen: !MV.size }), M: () => PhosphorMoves };   // for tests/moves_check.py
 function vcrTick() {
   snipBtnSync();
   snipTick();
@@ -10430,7 +10522,7 @@ async function seqLoadVid(bl) {
   try {
     if (vm.kind === 'clip') {
       await clipList();
-      const c = (clips.list || []).find((x) => x.id === vm.id);
+      const c = (clips.all || []).find((x) => x.id === vm.id);
       if (!c || !(await clipPick(c, true))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
     } else {
       const { file, h } = await seqOwnFile(vm.name, 'video');
