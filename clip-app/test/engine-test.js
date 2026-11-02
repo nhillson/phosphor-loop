@@ -188,7 +188,11 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
       log,
     });
     await lib.open();
-    assert.equal(lib.data.cats.length, DEFAULT_CATEGORIES.length);
+    // The web categories, plus the Looks folder (Phosphor Loop's Look library), which can't be renamed or removed
+    assert.equal(lib.data.cats.length, DEFAULT_CATEGORIES.length + 1);
+    assert.ok(lib.cat('looks') && lib.cat('looks').sys && fs.existsSync(path.join(dir, 'Looks')), 'the Looks folder');
+    await assert.rejects(lib.removeCategory('looks'));
+    await assert.rejects(lib.renameCategory('looks', 'Other looks'));
     const tmp = path.join(job(), 'x.mp4');
     fs.copyFileSync(cut.file, tmp);
     const c = await lib.addClip(tmp, { n: 'Swirl: "best" bit?', c: 'abstract', d: cut.probe.duration, w: cut.probe.width, h: cut.probe.height, src: site.url, page: 'Swirling' });

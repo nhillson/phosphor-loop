@@ -186,7 +186,8 @@ class Library {
         if (!id) {
           if (!files.length) continue;
           id = this.uniqueCatId(slug(e.name));
-          this.data.cats.splice(this.data.cats.length - 1, 0, { id, n: e.name });
+          const at = this.data.cats.findIndex((c) => c.id === 'other' || c.sys);
+          this.data.cats.splice(at < 0 ? this.data.cats.length : at, 0, { id, n: e.name });
           folders.set(e.name.toLowerCase(), id);
           this.log('library: new category from folder ' + e.name);
         }
