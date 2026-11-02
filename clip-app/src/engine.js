@@ -387,6 +387,16 @@ const ENCODERS = {
   qsv: ['-c:v', 'h264_qsv', '-preset', 'slow', '-global_quality', '20', '-profile:v', 'high'],
   x264: ['-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-profile:v', 'high'],
 };
+// Looks (Phosphor Loop's Save clip): its picture is already one lossy step away from the screen, so it's kept closer
+// to what was sent: a lower quantiser and room for 4K
+const HIGH = { nvenc: ['-cq', '14', '-maxrate', '200M', '-bufsize', '400M'], amf: ['-qp_i', '14', '-qp_p', '16', '-qp_b', '18'], qsv: ['-global_quality', '15'], x264: ['-crf', '14'] };
+function encoderArgs(enc, high) {
+  const a = ENCODERS[enc].slice();
+  if (!high) return a;
+  const h = HIGH[enc];
+  for (let i = 0; i < h.length; i += 2) { const j = a.indexOf(h[i]); if (j >= 0) a[j + 1] = h[i + 1]; else a.push(h[i], h[i + 1]); }
+  return a;
+}
 let encoderPick = null;
 function pickEncoder(tools, log) {
   if (encoderPick) return encoderPick;
@@ -404,7 +414,7 @@ function pickEncoder(tools, log) {
   return encoderPick;
 }
 
-async function cutClip(tools, src, out, { start = 0, end, keepSound = false, maxHeight = 1080, crop = null, signal, log, onProgress } = {}) {
+async function cutClip(tools, src, out, { start = 0, end, keepSound = false, maxHeight = 1080, crop = null, high = false, signal, log, onProgress } = {}) {
   const p = await probe(tools, src, { signal });
   const stop = Math.min(end == null ? p.duration : end, p.duration || end || 0);
   const dur = Math.max(0.1, stop - start);
@@ -420,15 +430,17 @@ async function cutClip(tools, src, out, { start = 0, end, keepSound = false, max
   const args = ['-hide_banner', '-y', '-nostdin', '-ss', start.toFixed(3), '-i', src, '-t', dur.toFixed(3), '-map', '0:v:0'];
   const sound = keepSound && p.hasAudio;
   if (sound) args.push('-map', '0:a:0?');
-  args.push('-vf', vf.join(','), ...ENCODERS[enc], '-g', String(Math.max(1, Math.round(fps * 2))));
-  if (sound) args.push('-c:a', 'aac', '-b:a', '192k', '-ac', '2'); else args.push('-an');
+  const encArgs = encoderArgs(enc, high);
+  args.push('-vf', vf.join(','), ...encArgs, '-g', String(Math.max(1, Math.round(fps * 2))));
+  // Looks keep their sound at 320 kbps (near the top AAC gives), 48 kHz stereo
+  if (sound) args.push('-c:a', 'aac', '-b:a', high ? '320k' : '192k', '-ar', '48000', '-ac', '2'); else args.push('-an');
   args.push('-sn', '-dn', '-map_metadata', '-1', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', out);
   let r = await run(tools.ffmpeg, args, { signal, log, onLine: progressReader(dur, onProgress) });
   if (r.code !== 0 && enc !== 'x264') {
     // The card's encoder can refuse odd sizes; the processor never does
     if (log) log('encoder ' + enc + ' failed, using x264: ' + r.stderr.slice(-300));
-    const i = args.indexOf(ENCODERS[enc][0]);
-    args.splice(i, ENCODERS[enc].length, ...ENCODERS.x264);
+    const i = args.indexOf(encArgs[0]);
+    args.splice(i, encArgs.length, ...encoderArgs('x264', high));
     r = await run(tools.ffmpeg, args, { signal, log, onLine: progressReader(dur, onProgress) });
   }
   if (r.code !== 0 || !fs.existsSync(out)) throw new ClipError('The clip couldn’t be made.', 'failed', r.stderr.slice(-500));

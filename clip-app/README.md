@@ -55,6 +55,10 @@ trimmer (H.264 MP4, at the size picked in the trimmer last, sound only if *Keep 
   the clip window here (Library › a clip › Tags, commas between). The Library search finds clips by name or tag.
 - **Saved effects**: Phosphor Loop can save the whole picture (all loops, mixing, Color grading, 3D lighting, like a
   preset) with a clip; its explorer then offers *Use with its effects* or *Just the clip*.
+- **Looks** (Phosphor Loop's Look library): every library has a `looks` category (folder `Looks`, `sys: true`) that
+  can't be renamed or removed, isn't offered for web grabs or suggested by the recogniser, and holds what Phosphor
+  Loop's ✂ Save clip saves. Snips into it are kept up to 4K, at a lower quantiser (`HIGH` in engine.js), sound AAC
+  320 kbps 48 kHz; web clips stay as before (up to the trimmer's size, 192 kbps).
 - **Recorded settings** (Phosphor Loop's ✂ Save clip… › Record the settings): the effects are a start look plus
   `moves`, the settings over time (`js/moves.js` on Phosphor Loop's `main`); the clip's video is a preview. These
   clips are marked `mv` in the listing (a red REC badge in Phosphor Loop's explorer).

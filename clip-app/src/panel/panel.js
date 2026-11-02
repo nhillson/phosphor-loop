@@ -520,7 +520,8 @@ function renderEdCats() {
   const box = $('#edCats');
   box.textContent = '';
   const sug = S.ed.suggestion && S.ed.suggestion.id;
-  for (const c of S.lib.cats) {
+  // Grabs from the web go in the web categories (Looks is Phosphor Loop's Look library)
+  for (const c of S.lib.cats.filter((x) => !x.sys)) {
     const b = el('button', 'chip' + (S.ed.cat === c.id ? ' on' : '') + (sug === c.id ? ' guess' : ''), c.n);
     b.type = 'button';
     b.dataset.cat = c.id;
@@ -823,7 +824,7 @@ function renderCatList() {
     const inp = el('input');
     inp.value = c.n;
     inp.maxLength = 40;
-    inp.disabled = c.id === 'other';
+    inp.disabled = c.id === 'other' || !!c.sys;
     inp.addEventListener('change', async () => { const n = inp.value.trim(); if (!n || n === c.n) { inp.value = c.n; return; } const r = await call('cat:rename', { id: c.id, n }); if (!r || !r.ok) inp.value = c.n; });
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
     li.appendChild(inp);

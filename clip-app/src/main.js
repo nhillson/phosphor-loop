@@ -177,7 +177,7 @@ function libraryForPanel() {
   const d = library.data;
   return {
     dir: library.dir,
-    cats: d.cats.map((c) => ({ id: c.id, n: c.n, count: d.clips.filter((x) => x.c === c.id).length })),
+    cats: d.cats.map((c) => ({ id: c.id, n: c.n, sys: !!c.sys, count: d.clips.filter((x) => x.c === c.id).length })),
     clips: d.clips.slice().sort((a, b) => String(b.added || '').localeCompare(String(a.added || ''))).map(clipForPanel),
   };
 }
@@ -684,7 +684,8 @@ async function suggest(job, range, crop) {
   const r = job.result;
   if (!r) return;
   const info = { ...r.info, page: job.req.pageTitle, url: job.req.url };
-  const cats = library.data.cats;
+  // (never the Looks folder: that's Phosphor Loop's looks, not web clips)
+  const cats = library.data.cats.filter((c) => !c.sys);
   if (!job.suggestion) job.suggestion = combine(null, info, cats);
   if (process.env.CLIPS_NO_VISION === '1' || (vision.broken && !vision.proc)) { sendJobs(); return; }
   const seq = ++job.looks;

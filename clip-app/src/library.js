@@ -1,5 +1,8 @@
 'use strict';
 // Effects that are a recording of the settings over time (Phosphor Loop's look.moves)
+// Phosphor Loop's Look library: the looks its Save clip saves, in their own folder, apart from the web clips. Every
+// library has it; it can't be renamed or removed, and grabs from the web never go in it.
+const LOOKS_CAT = { id: 'looks', n: 'Looks', sys: true };
 const isRecording = (look) => !!(look && typeof look === 'object' && look.moves && typeof look.moves === 'object' && look.moves.v === 1);
 // The clip library: a folder per category inside the library folder (Videos\Phosphor Clips by default), each clip
 // an MP4, plus library.json listing every clip with its name, category, size, length and where it came from (in the
@@ -73,7 +76,7 @@ class Library {
     this.thumb = thumb;
     this.trash = trash || ((f) => fsp.rm(f, { force: true }));
     this.log = log || (() => {});
-    this.data = { app: 'Phosphor Clips', version: 1, cats: DEFAULT_CATEGORIES.map((c) => ({ ...c })), clips: [] };
+    this.data = { app: 'Phosphor Clips', version: 1, cats: [...DEFAULT_CATEGORIES.map((c) => ({ ...c })), { ...LOOKS_CAT }], clips: [] };
     this.chain = Promise.resolve();
   }
 
@@ -137,6 +140,8 @@ class Library {
       if (d && Array.isArray(d.cats) && Array.isArray(d.clips)) {
         this.data = { app: 'Phosphor Clips', version: 1, ...d };
         if (!this.cat('other')) this.data.cats.push({ ...DEFAULT_CATEGORIES.find((c) => c.id === 'other') });
+        if (!this.cat('looks')) this.data.cats.push({ ...LOOKS_CAT });
+        this.cat('looks').sys = true;
       }
     } catch (_) { /* a new library */ }
     // A folder for every category, so clips can be dragged between them in File Explorer
@@ -361,7 +366,9 @@ class Library {
       const same = this.data.cats.find((c) => c.n.toLowerCase() === n.toLowerCase());
       if (same) return same;
       const cat = { id: this.uniqueCatId(slug(n)), n };
-      this.data.cats.splice(this.data.cats.length - (this.data.cats[this.data.cats.length - 1].id === 'other' ? 1 : 0), 0, cat);
+      // New categories go before Other (and the Looks folder)
+      const at = this.data.cats.findIndex((c) => c.id === 'other' || c.sys);
+      this.data.cats.splice(at < 0 ? this.data.cats.length : at, 0, cat);
       await fsp.mkdir(this.catFolder(cat), { recursive: true });
       await this.write();
       return cat;
@@ -372,6 +379,7 @@ class Library {
     return this.serial(async () => {
       const cat = this.cat(id);
       if (!cat) throw new Error('That category doesn’t exist.');
+      if (cat.sys) throw new Error('Looks is Phosphor Loop’s Look library; it keeps its name.');
       const n = safeName(name, '').slice(0, 40);
       if (!n) throw new Error('Give the category a name.');
       if (this.data.cats.some((c) => c !== cat && c.n.toLowerCase() === n.toLowerCase())) throw new Error('There’s already a category called ' + n + '.');
@@ -407,6 +415,7 @@ class Library {
   removeCategory(id) {
     return this.serial(async () => {
       if (id === 'other') throw new Error('Other always stays.');
+      if (this.cat(id) && this.cat(id).sys) throw new Error('Looks is Phosphor Loop’s Look library; it always stays.');
       const cat = this.cat(id);
       if (!cat) return;
       const other = this.cat('other');

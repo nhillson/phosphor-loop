@@ -82,7 +82,9 @@ async function makeSnip({ tools, library, work, req, ask, settings = {}, log = (
     const end = Math.min(ask.end == null ? p.duration : ask.end, p.duration || ask.end);
     if (!(end - ask.start >= MIN_LEN)) throw new SnipError('The snip is too short (or starts after the video ends).');
     const out = path.join(dir, 'snip.mp4');
-    const made = await E.cutClip(tools, src, out, { start: ask.start, end, keepSound: ask.sound, maxHeight: +settings.maxHeight || 1080, log });
+    // A look (Phosphor Loop's Look library) is kept up to 4K, at higher quality, sound at 320 kbps
+    const look = cat.id === 'looks';
+    const made = await E.cutClip(tools, src, out, { start: ask.start, end, keepSound: ask.sound, maxHeight: look ? 2160 : +settings.maxHeight || 1080, high: look, log });
     // A snip of a snip still says which part of the original it is
     const off = from && Array.isArray(from.part) ? from.part[0] : 0;
     const name = ask.name || (from ? from.n + ' (snip)' : ask.src ? ask.src.replace(/\.[^.]+$/, '') + ' (snip)' : 'Snip');
