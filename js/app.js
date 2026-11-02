@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const { FR, makeDrone } = window.PhosphorFractals;
-const { VS, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
+const { VS, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
 const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.PhosphorHelpers;
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
@@ -153,15 +153,15 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false,
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0 };
@@ -542,6 +542,13 @@ gl.useProgram(finalProg.p);
 set1i(finalProg, 'uNow', 0); set1i(finalProg, 'uLast', 1);
 gl.useProgram(dispProg.p);
 set1i(dispProg, 'uTex', 0);
+// Life works its board out in its own small program; a graphics card that can't run it shows nothing for Life
+let lifeProg = null;
+try {
+  lifeProg = program(FS_LIFE);
+  gl.useProgram(lifeProg.p);
+  set1i(lifeProg, 'uLife', 0); set1i(lifeProg, 'uLoop', 1);
+} catch (_) { lifeProg = null; }
 // Time warp gets its own program, so a graphics card that can't draw it only loses Time warp
 let twProg = null;
 try {
@@ -954,7 +961,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1044,6 +1051,30 @@ function syncTopoUI(t) {
   $('#topoStatus').textContent = !t.topoPic ? 'Contour lines over land that slowly reshapes itself while the view drifts across it.'
     : tr === 'loop' ? `Tracing loop ${otherLoop(edit)}’s picture. Pick a Second input to trace that instead.`
     : `Tracing ${(SRC_LABEL[tr] || tr)}: bright parts are high ground. It isn’t shown as itself, only its contour lines.`;
+}
+// Life: how big its cells are, how fast the generations go, and where new life comes from
+const LIFE_UI = { lifeCells: ['#lifeCells', ['BIG CELLS', 'MEDIUM CELLS', 'SMALL CELLS']], lifeSpeed: ['#lifeSpeed', ['SLOW', 'MEDIUM SPEED', 'FAST']] };
+for (const [field, [sel, words]] of Object.entries(LIFE_UI)) $$(sel + ' button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt[field] = +b.dataset.v;
+  syncUI();
+  showOSD('LIFE', words[+b.dataset.v]);
+}));
+$$('#lifeFrom button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.lifeLoop = b.dataset.v === '1';
+  syncUI();
+  showOSD('LIFE', b.dataset.v === '1' ? 'NEW LIFE FROM THE PICTURE' : 'NEW LIFE FROM SPRINKLES');
+}));
+function syncLifeUI(t) {
+  $$('#lifeCells button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.lifeCells ?? 1))));
+  $$('#lifeSpeed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.lifeSpeed ?? 1))));
+  $$('#lifeFrom button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.lifeLoop)));
+}
+// A random Life look for Surprise and Autopilot: mostly medium, now and then big or small cells, slow or fast
+function lifeLook() {
+  const r = () => { const x = Math.random(); return x < 0.2 ? 0 : x < 0.75 ? 1 : 2; };
+  return { lifeCells: r(), lifeSpeed: r(), lifeLoop: Math.random() < 0.3 };
 }
 $$('#specShape button').forEach((b) => b.addEventListener('click', () => {
   takeOver('in1');
@@ -1279,8 +1310,9 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life']) $('#row-' + s).hidden = !usesHere(s);
   syncTopoUI(t);
+  syncLifeUI(t);
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
@@ -1350,7 +1382,8 @@ function patchLoop(k, p, force) {
   // The mirror's Transition and Spin are yours: they stay through every new look (loadPreset brings back a preset's)
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
-  if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic; }
+  if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
@@ -1383,10 +1416,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'picture', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'picture', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35,
+    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(),
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2081,7 +2114,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -2117,7 +2150,7 @@ $('#neutral').addEventListener('click', neutral);
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2218,7 +2251,7 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -2901,7 +2934,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'picture', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'picture', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3085,11 +3118,13 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
     if (sc.in1 === 'patchwork') sc.size = Math.round(rnd(55, 100));
     if (sc.in1 === 'topo') sc.size = Math.round(rnd(55, 100));
+    if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
     }
     if ((sc.in1 === 'topo' || sc.in2 === 'topo') && !isPinned('in1', k)) sc.topoPic = Math.random() < 0.35;
+    if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
       if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
@@ -3148,7 +3183,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -3579,6 +3614,7 @@ function tasteFeats(L) {
   if (b.zoom === 'out') f.push('edge:' + (L.edge ? 'fold' : 'dark'));
   if (L.in1 === 'spectro' || L.in2 === 'spectro') f.push('spec:' + (L.specRound ? 'round' : 'scroll'));
   if (L.in1 === 'topo' || L.in2 === 'topo') f.push('topo:' + (L.topoPic ? 'picture' : 'land'));
+  if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -7002,6 +7038,11 @@ const RECIPES = [
     how: 'TOPO MAP · TRAILS 80 · COLOR 4',
     sw: 'repeating-radial-gradient(circle at 40% 55%,#05070d 0 6px,#29b6ff 6px 7px,#05070d 7px 12px,#ffb840 12px 13px)',
     patch: { A: { in1: 'topo', topoPic: false, size: 100, zoom: 0, spin: 0, trails: 80, color: 4, blur: 0 } } },
+  { name: 'Game of Life', after: 'Under Life, try Small cells and Fast, or New life from: The picture to let it feed on its own trails.',
+    text: 'Conway’s Game of Life in glowing tiles: cells are born, live and die by a few simple rules, flashing white as they arrive and turning cyan, gold and purple as they age.',
+    how: 'LIFE · TRAILS 70 · COLOR 3',
+    sw: 'radial-gradient(circle at 30% 35%,#d9f3ff 0 9%,transparent 10%),radial-gradient(circle at 62% 58%,#ffb833 0 9%,transparent 10%),radial-gradient(circle at 45% 70%,#c238ff 0 8%,transparent 9%),#05040a',
+    patch: { A: { in1: 'life', lifeCells: 1, lifeSpeed: 1, lifeLoop: false, size: 100, zoom: 0, spin: 0, trails: 70, color: 3, blur: 0 } } },
   { name: 'Terrain flight', after: 'It wanders from canyon to ridges to plains about once a minute.',
     text: 'A flight over land made of triangles, every edge a glowing wire: teal valleys, gold peaks and a low sun under a starry nebula.',
     how: 'TERRAIN · EVERYTHING ELSE OFF',
@@ -9356,6 +9397,70 @@ function topoPre(L, dst, unit13, srcId) {
   gl.viewport(0, 0, simW, simH);
   gl.bindTexture(gl.TEXTURE_2D, T.tex);
 }
+// Life: Conway's Game of Life, a board for each loop worked out a generation at a time by FS_LIFE, with the
+// generations at the pace Speed sets. A board starts a third full; from then on small splashes of new cells land
+// now and then (and on the beat when the loop reacts to sound), so it never dies out. With New life from: The
+// picture, a dead cell where the loop's own picture is bright comes alive now and then, so the board feeds on
+// the trails it leaves. Returns the board for the loop's pass to read, or null when Life can't run here.
+const LIFE_ROWS = [32, 54, 90], LIFE_GPS = [4, 8, 16];
+function lifeTarget(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  for (const q of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, q, gl.NEAREST);
+  for (const q of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, q, gl.CLAMP_TO_EDGE);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fbo };
+}
+function lifeTick(k, dt) {
+  if (!lifeProg) return null;
+  const L = loops[k], t = L.tgt;
+  const h = LIFE_ROWS[t.lifeCells ?? 1] ?? LIFE_ROWS[1], w = Math.max(4, Math.round(h * simW / simH));
+  let S = L.life;
+  if (!S || S.w !== w || S.h !== h) {
+    if (S) for (const r of S.rt) { gl.deleteTexture(r.tex); gl.deleteFramebuffer(r.fbo); }
+    S = L.life = { rt: [lifeTarget(w, h), lifeTarget(w, h)], front: 0, w, h, acc: 0, wait: 0.5, beat: 0, drop: null, fresh: true };
+  }
+  gl.useProgram(lifeProg.p);
+  gl.viewport(0, 0, w, h);
+  gl.uniform2i(U(lifeProg, 'uGrid'), w, h);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, L.rt[L.front].tex);
+  const pass = (step, drop, clear) => {
+    const dst = S.rt[1 - S.front];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, S.rt[S.front].tex);
+    set1f(lifeProg, 'uStep', step);
+    set1f(lifeProg, 'uClear', clear ? 1 : 0);
+    set4f(lifeProg, 'uDrop', ...(drop || [0, 0, 0, 0]));
+    set1f(lifeProg, 'uFromLoop', step && t.lifeLoop ? 0.02 : 0);
+    set1f(lifeProg, 'uSeed', Math.random() * 100);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    S.front = 1 - S.front;
+  };
+  const splash = (r, full) => [Math.random() * w, Math.random() * h, r, full];
+  if (S.fresh) { pass(0, [w / 2, h / 2, w + h, 0.33], true); S.fresh = false; }
+  // A splash now and then: every second or two, less often while the picture also brings new life
+  S.wait -= dt;
+  if (S.wait <= 0) {
+    S.drop = splash(2.5 + Math.random() * 3.5 * (h / 54), 0.5);
+    S.wait = (t.lifeLoop ? 2.5 : 1) + Math.random() * 1.5;
+  }
+  // On the beat, when this loop reacts to sound
+  if (reacts(k) && snd.analyser) {
+    const b = snd.env.beat;
+    if (b > 0.6 && S.beat <= 0.6) S.drop = splash((2 + 4 * sndPower()) * (h / 54), 0.55);
+    S.beat = b;
+  }
+  S.acc += dt * LIFE_GPS[t.lifeSpeed ?? 1];
+  const steps = Math.min(2, Math.floor(S.acc));
+  S.acc = Math.min(S.acc - steps, 0.999);
+  for (let i = 0; i < steps; i++) { pass(1, S.drop); S.drop = null; }
+  return S.rt[S.front].tex;
+}
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const otherK = otherLoop(k);
@@ -9390,6 +9495,12 @@ function runLoop(k, xf, brush, f) {
   const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
   const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
   const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
+  // Life's board is read through the picture slot its input would use for a 3D world (it has no slot of its own:
+  // see UNITS). Traced by Topo map, it's read from the first, as a traced 3D world is.
+  const traced = topoTrace(t);
+  const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
+  const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
+  const srcOf = (n) => (n === 'life' && !lifeTex ? SRC_ID.none : resolveSrc(n, t.motion));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -9399,7 +9510,7 @@ function runLoop(k, xf, brush, f) {
   // The see-through surround only once every live input here has its outlines; until then the plain picture
   set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !LIVE_SRC[n] || LIVE_SRC[n].texFor(t.subject) !== LIVE_SRC[n]) ? 1 : 0);
   const texs = [src.tex, otherTex, picTex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
-                flyTex1 || src.tex, flyTex2 || src.tex, specTex, textTex];
+                (lifeIn1 && lifeTex) || flyTex1 || src.tex, (lifeIn2 && lifeTex) || flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
   if (t.in1 === 'spectro' || t.in2 === 'spectro') {
     set2f(fbProg, 'uSpecSize', SPEC_W, SPEC_H);
@@ -9473,18 +9584,18 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uXfeed', xf);
   // A world that can't be drawn feeds in nothing (never the loop's own last frame)
   // Topo map tracing another input draws only its lines: the input it traces isn't shown as itself
-  const traced = topoTrace(t);
+  set1f(fbProg, 'uLifeT', lifeTex ? L.life.acc : 0);
   if (traced) {
     const slot = t.in1 === 'topo' ? 2 : 1, fly = slot === 1 ? flyTex1 : flyTex2;
     set1i(fbProg, 'uIn1', SRC_ID.topo);
     set1i(fbProg, 'uIn2', SRC_ID.none);
-    set1i(fbProg, 'uTopoSrc', is3D(traced) && !fly ? SRC_ID.none : resolveSrc(traced, t.motion));
+    set1i(fbProg, 'uTopoSrc', is3D(traced) && !fly ? SRC_ID.none : srcOf(traced));
     // A traced 3D world is read from the first 3D picture's slot, whichever input it is
     if (fly) { gl.activeTexture(gl.TEXTURE0 + 12); gl.bindTexture(gl.TEXTURE_2D, fly); }
   } else {
     set1i(fbProg, 'uTopoSrc', -1);
-    set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : resolveSrc(t.in1, t.motion));
-    set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : resolveSrc(t.in2, t.motion));
+    set1i(fbProg, 'uIn1', is3D(t.in1) && !flyTex1 ? SRC_ID.none : srcOf(t.in1));
+    set1i(fbProg, 'uIn2', t.in2 === 'none' || (is3D(t.in2) && !flyTex2) ? SRC_ID.none : srcOf(t.in2));
   }
   set1f(fbProg, 'uBlend', clamp(c.blend, 0, 100) / 100);
   set1f(fbProg, 'uScale', scale);
@@ -9523,7 +9634,7 @@ function runLoop(k, xf, brush, f) {
   if (shapeSw.n) { const l = U(fbProg, 'uSw[0]'); if (l) gl.uniform4fv(l, shapeSw.S); }
   const bc = hsv(((simT * 0.15) + (0.5 * LOOP_OFF[k])) % 1, 0.65, 1);
   set3f(fbProg, 'uBrushCol', bc[0], bc[1], bc[2]);
-  if (traced) topoPre(L, dst, texs[13], is3D(traced) && !(t.in1 === 'topo' ? flyTex2 : flyTex1) ? SRC_ID.none : resolveSrc(traced, t.motion));
+  if (traced) topoPre(L, dst, texs[13], is3D(traced) && !(t.in1 === 'topo' ? flyTex2 : flyTex1) ? SRC_ID.none : srcOf(traced));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   L.front = 1 - L.front;
   twStep(k, f / 60);

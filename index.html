@@ -288,6 +288,7 @@
             <button data-src="ink" aria-pressed="false">Ink</button>
             <button data-src="patchwork" aria-pressed="false" title="Hand-inked tiles that turn, so their lines join into new paths, loops and weaves">Patchwork</button>
             <button data-src="topo" aria-pressed="false" title="Glowing contour lines, like a hiking map, over land that reshapes itself as the view drifts">Topo map</button>
+            <button data-src="life" aria-pressed="false" title="Conway’s Game of Life: glowing cells that are born, live and die by a few simple rules">Life</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -339,6 +340,33 @@
               </div>
             </div>
             <span class="hint" id="topoStatus"></span>
+          </div>
+
+          <div class="dev" id="row-life" hidden>
+            <div class="ctl">
+              <span class="lbl" id="lifeCellsLbl" title="How big each cell is: smaller cells make a bigger, busier board">Cells</span>
+              <div class="seg seg-3" id="lifeCells" role="group" aria-labelledby="lifeCellsLbl">
+                <button data-v="0" aria-pressed="false">Big</button>
+                <button data-v="1" aria-pressed="true">Medium</button>
+                <button data-v="2" aria-pressed="false">Small</button>
+              </div>
+            </div>
+            <div class="ctl">
+              <span class="lbl" id="lifeSpeedLbl" title="How many generations go by each second: 4, 8 or 16">Speed</span>
+              <div class="seg seg-3" id="lifeSpeed" role="group" aria-labelledby="lifeSpeedLbl">
+                <button data-v="0" aria-pressed="false">Slow</button>
+                <button data-v="1" aria-pressed="true">Medium</button>
+                <button data-v="2" aria-pressed="false">Fast</button>
+              </div>
+            </div>
+            <div class="ctl">
+              <span class="lbl" id="lifeFromLbl" title="Sprinkles: little splashes of new cells land every second or two, and on the beat. The picture: new cells are also born where the loop’s own picture is bright, so Life feeds on its own trails.">New life from</span>
+              <div class="seg seg-2" id="lifeFrom" role="group" aria-labelledby="lifeFromLbl">
+                <button data-v="0" aria-pressed="true">Sprinkles</button>
+                <button data-v="1" aria-pressed="false">The picture</button>
+              </div>
+            </div>
+            <span class="hint">Each cell lives on with 2 or 3 live neighbours and is born with exactly 3. New cells flash white, then turn cyan, gold and purple as they age.</span>
           </div>
 
           <div class="dev" id="row-text" hidden>

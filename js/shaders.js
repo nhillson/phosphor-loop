@@ -153,6 +153,7 @@ uniform int uTopoSrc;     // Topo map, Height from the picture: the input it tra
 uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, ahead of the loop's own pass
 // That small softened brightness is read from uScene2 (see topoPre): this program already reads 16 pictures, the
 // most Windows graphics (Chrome and Edge there) allow in one program, so it can't have a 17th of its own
+uniform float uLifeT;    // Life: how far it is from one generation to the next (0 to 1), so cells glide in and out
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
@@ -826,6 +827,36 @@ vec3 seedTopo(vec2 p, float t) {
   vec2 g = vec2(dFdx(h), dFdy(h)) * uSim.y;
   return contours(h, g, 16.0);
 }
+// Life: Conway's Game of Life. Its board is worked out a generation at a time by its own small program (FS_LIFE,
+// see lifeTick in js/app.js) and read here from the scene picture slot it was given. Each live cell is a glowing
+// rounded square that swells in when it's born and shrinks away when it dies. Newborn cells are ice white, turning
+// cyan, then gold, then purple the longer they live. Input size 100 fills the screen; smaller shows more of the board,
+// which wraps round, so it repeats seamlessly.
+vec3 lifeCol(float age) {
+  vec3 c = mix(vec3(0.6, 0.92, 1.0), vec3(0.05, 0.8, 1.0), smoothstep(0.0, 0.05, age));
+  c = mix(c, vec3(1.0, 0.68, 0.15), smoothstep(0.08, 0.2, age));
+  return mix(c, vec3(0.75, 0.2, 1.0), smoothstep(0.3, 0.55, age));
+}
+vec3 seedLife(vec2 p, sampler2D board) {
+  ivec2 G = textureSize(board, 0);
+  vec2 gs = vec2(G);
+  float fill = uScale / 2.5;
+  vec2 g = p / fill * gs.y + gs * 0.5;
+  vec2 cell = floor(g), u = fract(g) - 0.5;
+  vec4 s = texelFetch(board, ivec2(mod(cell, gs)), 0);
+  float e = smoothstep(0.0, 1.0, clamp(uLifeT * 2.5, 0.0, 1.0));
+  float on = mix(s.a, s.r, e);
+  float aa = gs.y / (fill * uSim.y);                 // one pixel, in cells
+  float r = 0.4 * (0.35 + 0.65 * on);                // half the square's width: it swells in and shrinks out
+  float d = length(max(abs(u) - (r - 0.12), 0.0)) - 0.12;
+  float box = 1.0 - smoothstep(-aa, aa, d);
+  float halo = 0.3 * exp(-max(d, 0.0) * 10.0);
+  // A cell born this generation flashes white as it arrives
+  vec3 c = mix(lifeCol(s.b), vec3(1.0), (1.0 - s.a) * s.r * (1.0 - e) * 0.45);
+  // The faint ghost of cells that just died
+  float ghost = s.g * (1.0 - s.r) * 0.22 * (1.0 - smoothstep(-aa, aa, length(u) - 0.22));
+  return c * (box + halo) * on + vec3(0.45, 0.15, 0.7) * ghost;
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -837,6 +868,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 22) return seedSpec(p);
   if (id == 24) return seedText(p, uTime);
   if (id == 33) return seedTopo(p, uTime);
+  if (id == 34) return seedLife(p, scene);
   // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this
   // pass (see draw3D) filling the screen
   if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
@@ -2810,6 +2842,46 @@ float map(vec3 p, out vec4 tr) {
 
 
 
+// Life: one generation of Conway's Game of Life. Each cell of the board is one pixel: r alive now, g a glow that fades
+// after it dies, b how long it has lived, a whether it was alive the generation before (so the picture can glide
+// between the two). The board wraps round at its edges. New cells can be splashed in, and with New life from: The
+// picture, a dead cell where the loop's own picture is bright now and then comes alive.
+const FS_LIFE = `#version 300 es
+precision highp float;
+uniform sampler2D uLife, uLoop;
+uniform ivec2 uGrid;
+uniform float uStep;       // 1: a new generation; 0: only the splash below
+uniform float uClear;      // 1: start from an empty board
+uniform vec4 uDrop;        // a splash of new cells: centre and radius (in cells), and how full it is (0: none)
+uniform float uFromLoop;   // the chance a dead cell where the loop is bright comes alive this generation
+uniform float uSeed;
+out vec4 o;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float alive(ivec2 c) { c = (c % uGrid + uGrid) % uGrid; return texelFetch(uLife, c, 0).r > 0.5 ? 1.0 : 0.0; }
+void main() {
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 me = uClear > 0.5 ? vec4(0.0) : texelFetch(uLife, c, 0);
+  float a = me.r > 0.5 ? 1.0 : 0.0;
+  float now = a, glow = me.g, age = me.b, before = me.a;
+  if (uStep > 0.5) {
+    float n = 0.0;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) if (x != 0 || y != 0) n += alive(c + ivec2(x, y));
+    now = (n > 2.5 && n < 3.5) || (a > 0.5 && n > 1.5 && n < 2.5) ? 1.0 : 0.0;
+    before = a;
+    age = now > 0.5 ? (a > 0.5 ? min(age + 1.0 / 24.0, 1.0) : 0.0) : age;
+    glow = now > 0.5 ? 1.0 : max(glow * 0.72 - 0.01, 0.0);
+    if (now < 0.5 && uFromLoop > 0.0) {
+      vec3 pic = texture(uLoop, (vec2(c) + 0.5) / vec2(uGrid)).rgb;
+      if (dot(pic, vec3(0.299, 0.587, 0.114)) > 0.55 && hash(vec2(c) * 0.71 + uSeed) < uFromLoop) { now = 1.0; age = 0.0; glow = 1.0; }
+    }
+  }
+  if (uDrop.w > 0.0) {
+    vec2 gs = vec2(uGrid), d = vec2(c) + 0.5 - uDrop.xy;
+    d -= floor(d / gs + 0.5) * gs;   // the shortest way round the wrapped board
+    if (length(d) < uDrop.z && hash(vec2(c) * 1.37 + uSeed) < uDrop.w) { now = 1.0; age = 0.0; glow = 1.0; }
+  }
+  o = vec4(now, glow, age, before);
+}`;
 const FS_COPY = `#version 300 es
 precision highp float;
 uniform sampler2D uSrc;
@@ -2842,5 +2914,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();
