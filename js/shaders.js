@@ -153,6 +153,7 @@ uniform int uTopoSrc;     // Topo map, Height from the picture: the input it tra
 uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, ahead of the loop's own pass
 // That small softened brightness is read from uScene2 (see topoPre): this program already reads 16 pictures, the
 // most Windows graphics (Chrome and Edge there) allow in one program, so it can't have a 17th of its own
+uniform float uRadarWind;   // Doppler radar: 1 shows the wind (towards and away from the radar), 0 the rain
 uniform float uLifeT;    // Life: how far it is from one generation to the next (0 to 1), so cells glide in and out
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
@@ -857,6 +858,86 @@ vec3 seedLife(vec2 p, sampler2D board) {
   float ghost = s.g * (1.0 - s.r) * 0.22 * (1.0 - smoothstep(-aa, aa, length(u) - 0.22));
   return c * (box + halo) * on + vec3(0.45, 0.15, 0.7) * ghost;
 }
+// Doppler radar: a weather radar screen. Made-up storms (patchy rain, a squall line that turns slowly, and one strong
+// storm with a spin in it) drift across a faint map of county lines and a winding state border. The beam goes round
+// every 4 seconds, and only where it has just passed is the picture new, so there's a seam where it updates, as on a
+// real radar. Rain is drawn in the weather service's colours, a step for every 5 dBZ; Wind shows how fast the air
+// moves towards the radar (greens) or away from it (reds), only where there's rain to bounce off, with the spinning
+// storm a bright red and green pair. The readings come in small blocks, 1 degree by 1/140 of the range, like the
+// real thing. Input size 100 fits the whole circle on screen.
+const vec3 RADAR_PAL[14] = vec3[14](vec3(0.02, 0.91, 0.91), vec3(0.0, 0.62, 0.96), vec3(0.12, 0.35, 0.95),
+  vec3(0.01, 0.99, 0.01), vec3(0.0, 0.77, 0.0), vec3(0.0, 0.56, 0.0), vec3(0.99, 0.97, 0.01), vec3(0.9, 0.74, 0.0),
+  vec3(0.99, 0.58, 0.0), vec3(0.99, 0.0, 0.0), vec3(0.83, 0.0, 0.0), vec3(0.74, 0.0, 0.0), vec3(0.97, 0.0, 0.99), vec3(0.6, 0.33, 0.78));
+float rdFbm(vec2 q) {
+  float s = 0.0, a = 0.5;
+  mat2 R = mat2(0.8, -0.6, 0.6, 0.8);
+  for (int i = 0; i < 4; i++) { s += a * tnoise(q); q = R * q * 2.03 + 11.7; a *= 0.5; }
+  return s / 0.9375;
+}
+vec2 radarStorm(float t) { return vec2(0.42 * sin(t * 0.031 + 1.0), 0.34 * cos(t * 0.023)); }
+// How strong the rain is at q (radar range 1 at the circle's edge) at time t, 0 to 1 (0 to 75 dBZ)
+float radarEcho(vec2 q, float t) {
+  vec2 w = q * 1.7 - vec2(0.035, 0.016) * t;
+  float f = rdFbm(w + vec2(0.0, t * 0.004));
+  float big = rdFbm(w * 0.45 + 3.3 + t * 0.006);
+  float ang = 0.7 + 0.25 * sin(t * 0.011);
+  float off = dot(q, vec2(cos(ang), sin(ang))) - 0.35 * sin(t * 0.017);
+  float line = exp(-off * off / 0.01) * smoothstep(0.35, 0.65, rdFbm(w * 1.3 + 7.1));
+  vec2 d = q - radarStorm(t);
+  float cell = exp(-dot(d, d) / 0.01);
+  float v = smoothstep(0.55, 1.0, 0.55 * f + 0.6 * big) + 0.65 * line + 0.75 * cell;
+  return clamp(v * (0.65 + 0.55 * f), 0.0, 1.0);
+}
+vec3 seedRadar(vec2 p, float t) {
+  float fill = uScale / 2.5, R = 0.47 * fill;
+  vec2 q = p / R;
+  float r = length(q), px = 1.0 / (R * uSim.y), lw = 0.75 * uPxK;   // px: one pixel, in radar ranges
+  // The map underneath: county lines, and a winding state border (worked out before any branching, for its slope)
+  float h = 0.62 * tnoise(q * 1.4 + vec2(4.0, 1.0)) + 0.38 * tnoise(q * 3.7 + 2.0);
+  float bd = abs(h - 0.5) / max(length(vec2(dFdx(h), dFdy(h))), 1e-5);
+  vec2 m = rot(0.06) * q * 3.2, gm = 0.5 - abs(fract(m) - 0.5);
+  float cd = min(gm.x, gm.y) / (3.2 * px);
+  float map = 0.2 * clamp(lw - cd + 0.5, 0.0, 1.0) + 0.4 * clamp(uPxK - bd + 0.5, 0.0, 1.0);
+  vec3 mapCol = vec3(0.4, 0.45, 0.55) * map;
+  // The map and the scope's lines are laid over the trails too (see below), so they keep their brightness
+  gSpecA = min(map * 2.0, 0.85);
+  if (r > 1.0) return mapCol * 0.45;
+  const float W = TAU / 4.0;
+  float beam = mod(t * W, TAU), az = mod(atan(q.x, q.y), TAU);
+  // The block this pixel's reading belongs to, and when the beam last passed it
+  float rb = (floor(r * 140.0) + 0.5) / 140.0, ab = (floor(az / TAU * 360.0) + 0.5) / 360.0 * TAU;
+  vec2 qb = rb * vec2(sin(ab), cos(ab));
+  float ts = t - mod(beam - ab, TAU) / W;
+  float dbz = pow(radarEcho(qb, ts), 1.35) * 75.0;
+  vec3 c = vec3(0.0);
+  bool echo = false;
+  if (uRadarWind < 0.5) {
+    if (dbz >= 15.0) { c = RADAR_PAL[int(clamp(floor(dbz / 5.0) - 1.0, 0.0, 13.0))]; echo = true; }
+  } else if (dbz >= 15.0) {
+    vec2 dd = qb - radarStorm(ts);
+    float dl = length(dd), sp = 1.5 * (dl < 0.07 ? dl / 0.07 : 0.07 / dl);
+    float th = 0.6 + 0.4 * sin(ts * 0.02);
+    vec2 wind = 0.55 * vec2(cos(th), sin(th)) + vec2(-dd.y, dd.x) / max(dl, 1e-4) * sp;
+    float k = clamp(dot(wind, qb / max(rb, 1e-4)) / 1.3, -1.0, 1.0), st = floor(abs(k) * 8.0 + 0.5) / 8.0;
+    if (st < 0.07) c = vec3(0.42);
+    else if (k < 0.0) c = st > 0.9 ? vec3(0.4, 1.0, 0.85) : mix(vec3(0.0, 0.3, 0.05), vec3(0.15, 1.0, 0.25), st);
+    else c = st > 0.9 ? vec3(1.0, 0.55, 0.8) : mix(vec3(0.35, 0.0, 0.02), vec3(1.0, 0.1, 0.15), st);
+    echo = true;
+  }
+  c *= 0.9;
+  c += mapCol * (echo ? 0.45 : 1.0);
+  // Range rings, a line every 30 degrees and the edge, in dim radar green
+  float rd = abs(fract(r * 4.0 + 0.5) - 0.5) / 4.0 / px;
+  float sd = abs(fract(az / TAU * 12.0 + 0.5) - 0.5) / 12.0 * TAU * r / px;
+  vec3 grid = vec3(0.1, 0.45, 0.22);
+  c += grid * (0.35 * clamp(lw - rd + 0.5, 0.0, 1.0) + 0.18 * clamp(lw - sd + 0.5, 0.0, 1.0) + 0.7 * clamp(1.5 * uPxK - (1.0 - r) / px + 0.5, 0.0, 1.0));
+  // The beam: a bright line with a fading wedge behind it
+  float behind = mod(beam - az, TAU);
+  c += vec3(0.25, 1.0, 0.45) * (0.9 * clamp(1.2 * uPxK - min(behind, TAU - behind) * r / px + 0.5, 0.0, 1.0) + 0.22 * exp(-behind * 2.5));
+  // Laid over the trails where there's rain, like the spectrograph, so the colours stay true and never pile up into white
+  gSpecA = echo ? 0.85 : min(dot(c, vec3(0.3, 0.6, 0.1)) * 2.5, 0.85);
+  return c;
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -869,6 +950,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 24) return seedText(p, uTime);
   if (id == 33) return seedTopo(p, uTime);
   if (id == 34) return seedLife(p, scene);
+  if (id == 35) return seedRadar(p, uTime);
   // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this
   // pass (see draw3D) filling the screen
   if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
