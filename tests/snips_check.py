@@ -161,7 +161,7 @@ def main():
         # With a video shown, Save clip asks first: trim it, or record the settings (tests/moves_check.py)
         if until("__plMoves.rec.stage === 'choose'", 'Save clip did not ask whether to trim or record'):
             click('#snipPickTrim')
-        if until("!document.querySelector('#snipPanel').hidden && document.querySelectorAll('#snipCat option').length >= 3", 'the save form did not open with the categories'):
+        if until("!document.querySelector('#snipPanel').hidden && document.querySelectorAll('#snipCat option').length >= 1", 'the save form did not open with the Look library’s folders'):
             ok(J("document.querySelector('#snipName').value") == 'Swirl 1s–3s', 'the name is filled in: ' + J("document.querySelector('#snipName').value"))
             ok(J("document.querySelector('#snipCat').value") == 'looks|', 'the folder starts as the Look library’s top (Save clip saves only there)')
             ok(J("[...document.querySelectorAll('#snipCat option')].every(o => o.value.startsWith('looks|'))"), 'and only Look library folders are offered')
