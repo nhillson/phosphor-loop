@@ -2271,7 +2271,7 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [],
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false,
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
 // Autopilot never changes them, and moving their controls neither pins anything nor stops it.
@@ -2319,6 +2319,7 @@ try {
   if (s && typeof s === 'object') {
     for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
+    apSet.type = s.type === true;
     apSet.check = s.check !== false;
     apSet.hints = s.hints !== false;
     apSet.fsKeep = s.fsKeep === true;
@@ -3405,6 +3406,7 @@ function apStep(now, onBeat) {
   if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
   apPicture(came);
   apClip(came);
+  apTypeArt(came, now);
   syncUI();
   apStatus();
 }
@@ -4378,6 +4380,7 @@ function showAp(k) {
 function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
+  $('#apType').setAttribute('aria-pressed', String(apSet.type));
   $('#apCheck').setAttribute('aria-pressed', String(apSet.check));
   $('#apHints').setAttribute('aria-pressed', String(apSet.hints));
   $('#apFsKeep').setAttribute('aria-pressed', String(apSet.fsKeep));
@@ -4411,6 +4414,12 @@ for (const [k, c] of Object.entries(apCtl)) {
   c.el.addEventListener('input', () => set(+c.el.value));
   c.el.addEventListener('dblclick', () => set(AP_DEFAULTS[k]));
 }
+$('#apType').addEventListener('click', () => {
+  apSet.type = !apSet.type;
+  saveAp();
+  syncApUI();
+  toast(apSet.type ? 'Autopilot will bring Type art in with some new looks, and take it out with others.' : 'Autopilot leaves Type art alone now.');
+});
 $('#apBeat').addEventListener('click', () => {
   apSet.beat = !apSet.beat;
   saveAp();
@@ -7609,7 +7618,7 @@ function snapshot() {
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
   return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, taste: apSet.taste, beat: apSet.beat, check: apSet.check,
-    hints: apSet.hints, touch: apSet.touch,
+    hints: apSet.hints, touch: apSet.touch, type: apSet.type,
     off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim), weights: cleanWeights(apSet.weights) };
 }
 function markPreset(id) {
@@ -7743,6 +7752,7 @@ function loadPreset(pr, quiet) {
   if (a && typeof a === 'object') {
     for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
     apSet.beat = a.beat === true;
+    apSet.type = a.type === true;
     // Presets saved before Check each look (or Learn from hints) existed have it on
     apSet.check = a.check !== false;
     apSet.hints = a.hints !== false;
@@ -8903,7 +8913,9 @@ function syncTypeUI() {
   $$('#typeInk button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.tinv === '1') === typeArt.tInvert)));
 }
 function saveType() { try { localStorage.setItem(TYPE_KEY, JSON.stringify(typeArt)); } catch (_) {} }
-function setType(t) { Object.assign(typeArt, cleanType(t)); syncTypeUI(); saveType(); }
+// Autopilot's Type art fade (see apTypeArt); anything that sets Type art outright stops it
+const typeGlide = { on: false, from: 0, to: 0, t0: 0, dur: 1, ui: 0 };
+function setType(t) { typeGlide.on = false; Object.assign(typeArt, cleanType(t)); syncTypeUI(); saveType(); }
 for (const [k, { el, out }] of Object.entries(typeEls)) {
   el.addEventListener('input', () => {
     typeArt[k] = +el.value; fillTrack(el); out.textContent = typeText(k, typeArt[k]); saveType();
@@ -8920,6 +8932,47 @@ $$('#typeWhere button').forEach((b) => b.addEventListener('click', () => {
   showOSD('TYPE ART', typeArt.tInside ? 'WITHIN LOOPS' : 'FINAL PASS');
 }));
 { let saved = null; try { saved = JSON.parse(localStorage.getItem(TYPE_KEY) || 'null'); } catch (_) {} setType(saved); }
+// Autopilot's Type art (Use Type art, under Autopilot; off at first). With it on, about a third of new looks bring
+// Type art in (more with How wild up, fewer with it down): a set of characters, a font, a color, a size and the rest
+// picked at random, its amount fading up over the Fade time (or fast, on a beat); about half the time a look that
+// keeps it on keeps its characters too and only changes how strong it is. The other new looks fade it back out.
+// Moving any Type art control yourself stops the fade where it is. Off, Autopilot never touches Type art.
+const typeRange = (k) => [Number(typeEls[k].el.min), Number(typeEls[k].el.max)];
+function apTypeArt(came, now) {
+  if (!apSet.type || !came || typeFailed) return;
+  const wild = apSet.wild / 100, odds = 0.2 + 0.3 * wild;
+  const isOn = typeArt.tAmt > 0;
+  if (Math.random() >= odds) { if (isOn) typeFadeTo(0, now); return; }
+  if (!isOn || Math.random() < 0.5) {
+    const sets = Object.keys(TA.SETS).filter((k) => k !== 'custom' || (typeArt.tCustom || '').trim());
+    const ri = (k, lo, hi) => { const [a, b] = typeRange(k); return Math.round(clamp(rnd(lo, hi), a, b)); };
+    const layers = Math.random() < 0.55 ? 1 : Math.random() < 0.75 ? 2 : 3;
+    Object.assign(typeArt, cleanType({
+      ...typeArt, tAmt: typeArt.tAmt,
+      tSet: pick(sets), tSet2: Math.random() < 0.6 ? 'same' : pick(sets), tFont: pick(Object.keys(TA.FONTS)), tColor: pick(Object.keys(TA.COLORS)),
+      tSize: ri('tSize', 10, 75), tLayers: layers, tSpread: layers > 1 ? ri('tSpread', 0, 70) : 0, tInk: ri('tInk', -40, 50),
+      tContrast: ri('tContrast', 80, 150), tEdge: Math.random() < 0.3 ? ri('tEdge', 10, 60) : 0, tShimmer: ri('tShimmer', 0, 45),
+      tHold: ri('tHold', 20, 80), tBg: Math.random() < 0.25 ? ri('tBg', 10, 60) : 0,
+      tInside: Math.random() < 0.2, tInvert: Math.random() < 0.15,
+    }));
+  }
+  typeFadeTo(Math.round(rnd(40 + 20 * wild, 100)), now);
+}
+function typeFadeTo(to, now) {
+  Object.assign(typeGlide, { on: true, from: typeArt.tAmt, to, t0: now, dur: (ap.quick ? 1.5 : apFadeSec()) * 1000 });
+  syncTypeUI();
+}
+// Each frame while it fades (the controls follow a few times a second)
+function typeTick(now) {
+  if (!typeGlide.on) return;
+  const u = clamp((now - typeGlide.t0) / typeGlide.dur, 0, 1), e = u * u * (3 - 2 * u);
+  typeArt.tAmt = Math.round(typeGlide.from + (typeGlide.to - typeGlide.from) * e);
+  if (u >= 1) { typeGlide.on = false; syncTypeUI(); saveType(); return; }
+  if (now - typeGlide.ui > 250) { typeGlide.ui = now; const c = typeEls.tAmt; c.el.value = typeArt.tAmt; fillTrack(c.el); c.out.textContent = typeText('tAmt', typeArt.tAmt); }
+}
+// Your hand on any Type art control: the fade stops where it is
+for (const ev of ['input', 'change']) $('#typeGroup').addEventListener(ev, (e) => { if (e.isTrusted) typeGlide.on = false; }, true);
+for (const { el } of Object.values(typeEls)) el.addEventListener('pointerdown', () => { typeGlide.on = false; });
 // The engine is made the first time Type art is turned up, so a graphics card that can't run it only loses Type art
 let typeEng = null, typeFailed = false;
 function typeEngine() {
@@ -11408,6 +11461,7 @@ function frame() {
   syncSubjectStatus();
   mvRecTick(now);
   movesTick(now);
+  typeTick(now);
   vcrTick();
   packAdj();
   analyzeSound(dt, now);

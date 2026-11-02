@@ -68,6 +68,8 @@ file don't rebuild the app.
    Autopilot see only the web clips (`clips.web`); the sequencer's + Add clip sees both (`clipsSetView`). While a
    look records, the picture is drawn at the size picked (1080p/1440p/4K, `MV.size` through `capCfg`), not the
    preview's.
+4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
+   `python3 tests/ap_type_check.py` (about a minute and a half).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
