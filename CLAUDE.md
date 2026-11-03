@@ -105,6 +105,8 @@ file don't rebuild the app.
    1080p through `MV.size` and recorded with this computer's sound, then offers an MP4; the song starts in Spotify from
    the top with `spotify.play(0, uri)` and is paused at the end, `spotify.pause()`; `EX`, `exGo`, `exTick` in js/app.js):
    `python3 tests/seq_export_check.py` (about 2 minutes; own clock, no sound) and `node --test tests/spotify.test.mjs`.
+   Recordings hold their sound back by **Sound timing** (export panel, `recSync`, `phosphor-rec-sync`, ½ s to start with;
+   `blendSounds(tracks, delay)`), because in a recording the picture comes after its sound; Record and Save clip use it too.
 4u. **A block's start, and its grading** (a block starting by itself has its settings and Show from its first frame, its mirror
    Cut unless its details pick a Transition, `bl.mxIn`; an Autopilot Type art glide stops; `startFresh` in seqApplyTrack):
    `python3 tests/seq_block_start_check.py`. A block keeps the Color grading it was added with (`bl.grade`, `seqGradeNow`,

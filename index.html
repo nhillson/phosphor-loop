@@ -111,6 +111,18 @@
             </span>
             <label class="seq-field"><input type="checkbox" id="seqExSound" checked> With the song’s sound</label>
           </div>
+          <div class="seq-ex-row">
+            <span class="seq-field" title="In a recording the picture comes a little after its sound. This holds the sound back by this much so the picture lines up with the music. Used by Export video, Record and Save clip.">Sound timing: hold the sound back
+              <span class="seg seg-5 seq-ex-size" id="seqExSync" role="group" aria-label="Hold the sound back by">
+                <button type="button" data-sync="0" aria-pressed="false">0</button>
+                <button type="button" data-sync="0.25" aria-pressed="false">¼ s</button>
+                <button type="button" data-sync="0.5" aria-pressed="true">½ s</button>
+                <button type="button" data-sync="0.75" aria-pressed="false">¾ s</button>
+                <button type="button" data-sync="1" aria-pressed="false">1 s</button>
+              </span>
+            </span>
+            <span class="hint">If looks and flashes come after the beat in your videos, hold the sound back more; if before it, less. Record and Save clip use it too.</span>
+          </div>
           <ol class="seq-ex-how" id="seqExHow"></ol>
           <div class="seq-ex-row">
             <button class="btn small primary" type="button" id="seqExGo">Start export</button>

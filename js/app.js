@@ -6561,7 +6561,9 @@ function mvRecBegin() {
   let stream;
   try { stream = canvas.captureStream(60); } catch (_) { mvRecFail('This browser can’t record the picture. Use Chrome or Edge.'); return; }
   // Sound: what React to sound hears (a copy, so listening carries on), when Sound is ticked
-  const heard = $('#snipRecSound').checked && snd.track && snd.track.readyState === 'live' ? snd.track.clone() : null;
+  const heardRaw = $('#snipRecSound').checked && snd.track && snd.track.readyState === 'live' ? snd.track.clone() : null;
+  mvRec.blend = heardRaw ? blendSounds([heardRaw], recSync) : null;
+  const heard = mvRec.blend ? mvRec.blend.track : null;
   if (heard) stream.addTrack(heard);
   mvRec.sound = !!heard;
   // H.264 where the browser makes it (on the graphics card, so the picture keeps its speed), else WebM; Opus sound at
@@ -6582,6 +6584,9 @@ function mvRecBegin() {
   vr.ondataavailable = (e) => { if (e.data && e.data.size) mvRec.chunks.push(e.data); };
   vr.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop());
+    if (heardRaw) heardRaw.stop();
+    if (mvRec.blend?.ctx) { try { mvRec.blend.ctx.close(); } catch (_) {} }
+    mvRec.blend = null;
     const type = vr.mimeType || mime || 'video/webm', chunks = mvRec.chunks;
     mvRec.chunks = [];
     if (mvRec.drop || mvRec.vr !== vr) return;
@@ -8411,14 +8416,24 @@ async function openRecMic() {
   }
   return stream.getAudioTracks()[0];
 }
-// Two sounds (music and mic) are blended into one, since a video holds a single sound track
-function blendSounds(tracks) {
-  if (tracks.length < 2) return { track: tracks[0] || null, ctx: null };
+// Sound timing: in a recording the picture comes a little after its sound (it takes the graphics card a moment to
+// draw and the recorder to take it), so the sound is held back by this much to match: what the music moves, and looks
+// on their cues, line up with the music in the video. Set under Export video; used by Record and Save clip too.
+const REC_SYNC_KEY = 'phosphor-rec-sync', REC_SYNCS = [0, 0.25, 0.5, 0.75, 1];
+let recSync = 0.5;
+{ const v = parseFloat(lsGet(REC_SYNC_KEY)); if (REC_SYNCS.includes(v)) recSync = v; }
+// Two sounds (music and mic) are blended into one, since a video holds a single sound track; and held back by delay
+// seconds (Sound timing)
+function blendSounds(tracks, delay = 0) {
+  if (!tracks.length) return { track: null, ctx: null };
+  if (tracks.length < 2 && !(delay > 0)) return { track: tracks[0], ctx: null };
   const AC = window.AudioContext || window.webkitAudioContext;
   let ctx;
   try { ctx = new AC({ sampleRate: 48000 }); } catch (_) { ctx = new AC(); }
   const out = ctx.createMediaStreamDestination();
-  tracks.forEach((t) => ctx.createMediaStreamSource(new MediaStream([t])).connect(out));
+  let into = out;
+  if (delay > 0) { const dl = ctx.createDelay(2); dl.delayTime.value = delay; dl.connect(out); into = dl; }
+  tracks.forEach((t) => ctx.createMediaStreamSource(new MediaStream([t])).connect(into));
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   return { track: out.stream.getAudioTracks()[0], ctx };
 }
@@ -8490,7 +8505,7 @@ async function startRec() {
   const stopSounds = () => sounds.forEach((t) => t.stop());
   let stream;
   try { stream = canvas.captureStream(30); } catch (e) { stopSounds(); recNote('Recording isn’t supported in this browser.'); return; }
-  const blend = blendSounds(sounds);
+  const blend = blendSounds(sounds, recSync);
   if (blend.track) stream.addTrack(blend.track);
   const withSound = !!blend.track;
   // MP4 with an H.264 picture and AAC sound plays almost anywhere (phones, Instagram, video editors), so it's
@@ -10906,7 +10921,7 @@ async function exGo() {
 function exBegin() {
   let stream;
   try { stream = canvas.captureStream(60); } catch (_) { exFail('This browser can’t record the picture. Use Chrome or Edge.'); return; }
-  EX.blend = blendSounds(EX.sound);
+  EX.blend = blendSounds(EX.sound, recSync);
   if (EX.blend.track) stream.addTrack(EX.blend.track);
   const withSound = !!EX.blend.track;
   // H.264 with AAC sound plays everywhere (YouTube, Instagram, phones, video editors); WebM where the browser can't
@@ -11003,7 +11018,11 @@ function exTick(now) {
     }
     return;
   }
-  if (EX.stage === 'tail' && EX.frames >= 15) exFinish('save');
+  if (EX.stage === 'tail') {
+    // (a little longer at the end, so the held-back sound's last part is in)
+    EX.tailAt ||= now;
+    if (EX.frames >= 15 && now - EX.tailAt > recSync * 1000 + 300) { EX.tailAt = 0; exFinish('save'); }
+  }
 }
 function exFinish(how) {
   if (!EX.stage) return;
@@ -11032,13 +11051,18 @@ $('#seqExport').addEventListener('click', exOpen);
 $('#seqExCancel').addEventListener('click', () => { $('#seqExportForm').hidden = true; });
 $('#seqExGo').addEventListener('click', () => { void exGo(); });
 $('#seqExSound').addEventListener('change', exHow);
+function syncRecSync() { $$('#seqExSync button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.sync === recSync))); }
+$$('#seqExSync button').forEach((b) => b.addEventListener('click', () => {
+  recSync = +b.dataset.sync; lsSet(REC_SYNC_KEY, String(recSync)); syncRecSync();
+}));
+syncRecSync();
 $$('#seqExSize button').forEach((b) => b.addEventListener('click', () => {
   $$('#seqExSize button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   exHow();
 }));
 $('#expStop').addEventListener('click', () => exFinish('save'));
 $('#expCancel').addEventListener('click', () => exFinish('cancel'));
-window.__plExport = { get stage() { return EX.stage; }, get from() { return EX.from; }, get end() { return EX.end; }, get size() { return { w: canvas.width, h: canvas.height }; }, get spotify() { return EX.spotify; } };   // for tests/seq_export_check.py
+window.__plExport = { get sync() { return recSync; }, blend: (d) => { const AC = window.AudioContext || window.webkitAudioContext, c = new AC(), o = c.createOscillator(), m = c.createMediaStreamDestination(); o.connect(m); o.start(); const b = blendSounds([m.stream.getAudioTracks()[0]], d); return { delayed: !!b.ctx, track: !!b.track }; }, get stage() { return EX.stage; }, get from() { return EX.from; }, get end() { return EX.end; }, get size() { return { w: canvas.width, h: canvas.height }; }, get spotify() { return EX.spotify; } };   // for tests/seq_export_check.py
 function seqSeek(t) {
   t = clamp(t, 0, seqDur());
   if (seq.song && spotify.snapshot?.track?.uri === seq.song.uri) {

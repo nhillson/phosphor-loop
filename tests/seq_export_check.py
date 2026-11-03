@@ -82,6 +82,12 @@ def main():
         how = J("document.querySelector('#seqExHow').textContent")
         ok('0:06' in how and '4K' in how and 'Also share system audio' in how, f'it explains the steps: “{how[:160]}…”')
         ok(J("document.querySelector('#seqExSize [aria-pressed=\"true\"]').dataset.h") == '2160', '4K is picked to start with')
+        # Sound timing: the sound is held back half a second to start with; picking another amount is kept
+        ok(J("__plExport.sync") == 0.5 and J("document.querySelector('#seqExSync [aria-pressed=\"true\"]').dataset.sync") == '0.5', 'Sound timing holds the sound back ½ s to start with')
+        click('#seqExSync [data-sync="0.25"]')
+        ok(J("__plExport.sync") == 0.25 and J("localStorage.getItem('phosphor-rec-sync')") == '0.25', 'picking ¼ s is kept')
+        ok(J("__plExport.blend(0.25)") == {'delayed': True, 'track': True}, 'a recording’s sound goes through the hold-back')
+        click('#seqExSync [data-sync="0.5"]')
 
         # With the sound ticked, and no computer sound to share here: it says what to do, and nothing starts
         click('#seqExGo')
