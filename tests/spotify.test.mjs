@@ -135,3 +135,18 @@ test('play from a spot starts the song there (exporting starts from the top); pa
   await client.pause();
   assert.equal(pauses, 1); assert.equal(client.snapshot.playing, false);
 });
+test('play, seek and pause that answer 200 with a body that isn’t JSON still count as done', async () => {
+  const odd = () => new Response('4fa1c2e9b7', {status: 200, headers: {'Content-Type': 'text/plain'}});
+  const {client} = fixture((url, o) => {
+    if (url.endsWith('/me')) return json({id: 'user'});
+    if (url.includes('/queue')) return json({currently_playing: item, queue: []});
+    if (o?.method === 'PUT') return odd();
+    return json({currently_playing_type: 'track', item, is_playing: false, progress_ms: 90000});
+  });
+  client.token.scope = 'user-modify-playback-state';
+  await client.poll();
+  assert.equal(await client.seek(0), 0, 'seek');
+  assert.equal(await client.play(), true, 'play');
+  assert.equal(client.snapshot.playing, true);
+  assert.equal(await client.pause(), true, 'pause');
+});

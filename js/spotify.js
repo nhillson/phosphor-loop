@@ -102,7 +102,12 @@
       if (response.status === 404 && path.startsWith('/me/player/play')) throw Object.assign(new Error('Spotify isn’t playing on any device right now.'), { noDevice: true });
       if (response.status === 403 && path.startsWith('/me/player/play')) throw new Error('Spotify only lets other apps start the music on a Premium account. Press play in Spotify instead.');
       if (!response.ok) throw new Error('Spotify playback is unavailable. Retrying…');
-      return response.status === 204 ? null : response.json();
+      if (response.status === 204) return null;
+      // Play, pause and seek can answer 200 with a body that isn't JSON (an id of some kind): they worked, nothing to read
+      const text = await response.text();
+      if (!text.trim()) return null;
+      try { return JSON.parse(text); }
+      catch (error) { if (options.method && options.method !== 'GET') return null; throw error; }
     }
     async poll() {
       const revision = this.revision, playbackVersion = this.playbackVersion;
