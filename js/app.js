@@ -5046,12 +5046,15 @@ function loadFile(file, handle = null) {
 }
 // Puts a video (an object URL) in as the Video input. quiet: in place without switching any loop to it (Autopilot,
 // or the page opening). Resolves true once its first frame is ready, false if it can't be played.
-function openVideo(url, name, { quiet = false, to = vid } = {}) {
+// spare: loaded into the loop's spare player instead, paused and out of sight, for vidUseSpare to swap in later
+function openVideo(url, name, { quiet = false, to = vid, spare = false } = {}) {
   return new Promise((resolve) => {
     const v = mkVideo();
     v.loop = true;
+    if (spare) { v.autoplay = false; v.preload = 'auto'; }
     v.src = url;
     v.addEventListener('loadeddata', () => {
+      if (spare) { vidDropSpare(to); to.spare = { v, url, name }; resolve(true); return; }
       if (to.url) URL.revokeObjectURL(to.url);
       to.url = url;
       to.attach(v, null);
@@ -5070,8 +5073,39 @@ function openVideo(url, name, { quiet = false, to = vid } = {}) {
       if (!quiet) toast('That video couldn’t be played here. Try an MP4 or WebM file.');
       resolve(false);
     }, { once: true });
-    v.play().catch(() => {});
+    if (!spare) v.play().catch(() => {});
   });
+}
+// A loop's spare player: in a sequence with two video blocks back to back on one track, the next block's video
+// waits in it, paused at its start point, while the first still plays; when its block comes in it takes over at
+// once (no black), and the player it replaces is let go. At most one spare per loop, and only while it's needed.
+function vidDropSpare(to) {
+  const sp = to.spare;
+  if (!sp) return;
+  to.spare = null;
+  URL.revokeObjectURL(sp.url);
+  sp.v.removeAttribute('src'); sp.v.load();
+}
+function vidUseSpare(to) {
+  const sp = to.spare;
+  if (!sp) return false;
+  to.spare = null;
+  const old = to.video;
+  if (to.url) URL.revokeObjectURL(to.url);
+  to.url = sp.url;
+  sp.v.autoplay = true;
+  to.attach(sp.v, null);
+  if (old && old !== sp.v) { old.removeAttribute('src'); old.load(); }
+  to.userPaused = false;
+  to.name = sp.name;
+  to.loopA = null; to.loopB = null;
+  sp.v.playbackRate = to.rate;
+  to.media = sp.media || null; to.handle = sp.handle || null;
+  to.clip = sp.clip || ''; to.own = !!sp.own; to.credit = sp.credit || '';
+  if (to === vid) snipCloseForm();
+  vidPanelSync();
+  settleDevices();
+  return true;
 }
 // The Video controls show the edited loop's own video, or say whose video it's showing when it has none of its own
 function vidPanelSync() {
@@ -5346,21 +5380,24 @@ function clipMark() {
 }
 // Feeds a library clip in as the Video input. quiet: in place, without switching a loop to Video (Autopilot, or
 // bringing back the last clip when the page opens). Resolves true once it's showing.
-function clipPick(c, quiet, to = vid) {
+function clipPick(c, quiet, to = vid, spare = false) {
   if (!c || !clips.base) return Promise.resolve(false);
-  const ask = ++to.ask;
+  // (a spare doesn't count as a new pick: a pick of yours meanwhile still wins over it)
+  const ask = spare ? to.ask : ++to.ask;
   return fetch(`${clips.base}/clip/${encodeURIComponent(c.id)}`, clipFetchOpts())
     .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
     .then((blob) => {
       if (ask !== to.ask) return false;   // a later pick (or a video of your own) overtook this one
-      return openVideo(URL.createObjectURL(blob), c.n, { quiet, to }).then((ok) => {
+      return openVideo(URL.createObjectURL(blob), c.n, { quiet, to, spare }).then((ok) => {
         if (!ok || ask !== to.ask) return ok;
+        const from = c.src && /^https?:/.test(c.src)
+          ? ` · <a href="${escapeHTML(c.src)}" target="_blank" rel="noopener">${escapeHTML(c.by || 'source')}</a>` : (c.by ? ` · ${escapeHTML(c.by)}` : '');
+        const credit = `Clip library: ${escapeHTML(clipCatName(c.c))}${from}${c.lic ? ' · ' + escapeHTML(c.lic) : ''}`;
+        if (spare) { if (to.spare) Object.assign(to.spare, { media: { kind: 'clip', id: c.id, name: c.n }, clip: c.id, own: false, credit }); return !!to.spare; }
         to.media = { kind: 'clip', id: c.id, name: c.n }; to.handle = null;
         to.clip = c.id;
         to.own = false;
-        const from = c.src && /^https?:/.test(c.src)
-          ? ` · <a href="${escapeHTML(c.src)}" target="_blank" rel="noopener">${escapeHTML(c.by || 'source')}</a>` : (c.by ? ` · ${escapeHTML(c.by)}` : '');
-        to.credit = `Clip library: ${escapeHTML(clipCatName(c.c))}${from}${c.lic ? ' · ' + escapeHTML(c.lic) : ''}`;
+        to.credit = credit;
         vidPanelSync();
         // The clip loop A had last time comes back with the page
         if (to.key === 'A') { try { localStorage.setItem(CLIP_LAST_KEY, c.id); } catch (_) { /* fine */ } }
@@ -5992,7 +6029,7 @@ window.__plClips = {
   wanted: () => clipsWanted(), ready: () => clipsReady(),
   input: (k, slot) => loops[k].tgt[slot], setInput: (k, slot, src) => { loops[k].tgt[slot] = src; settleDevices(); },
   detachVideo: () => { for (const o of Object.values(vids)) { o.detach(); o.clip = ''; o.media = null; o.credit = ''; } vidPanelSync(); },
-  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading }])),
+  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading, spare: vids[k].spare ? vids[k].spare.name : null }])),
   pickInto: (k, id) => clipPick((clips.all || []).find((c) => c.id === id), true, vids[k]),
   apClip: (k, gap) => { if (gap != null) ap.clipIn = gap; apClip(k); },
   videoUsable: () => apPool().includes('video') && apUsable('video'),
@@ -10589,7 +10626,7 @@ function seqRun(on, message) {
     if (seq.apMode) { seq.apMode = null; }
     seqStopRec();
     seq.ownsVideo = false;
-    for (const to of Object.values(vids)) seqVidRelease(to, true);
+    for (const to of Object.values(vids)) { seqVidRelease(to, true); vidDropSpare(to); }
     if (was) seqGiveBack();
   }
   if (message) seqNote(message);
@@ -10790,51 +10827,68 @@ function seqVidRelease(to, now) {
   setTimeout(go, 3000);
 }
 // Loads a block's video into a loop's own player (to)
-async function seqLoadVid(bl, to = vid) {
+// spare: into the loop's spare player (its own player is showing the block before; see vidUseSpare)
+async function seqLoadVid(bl, to = vid, spare = false) {
   const vm = bl.media.vid, ask = ++to.seqAsk;
   to.loading = vm;
-  to.forBl = bl;
-  // Blacked out only when it's on screen now; a video loaded ahead (seqPreloadVid) isn't seen yet
-  if (vidInUse(to)) seqVidWait(to);
+  if (!spare) {
+    to.forBl = bl;
+    // Blacked out only when it's on screen now; a video loaded ahead (seqPreloadVid) isn't seen yet
+    if (vidInUse(to)) seqVidWait(to);
+  }
   try {
     if (vm.kind === 'clip') {
       // The library is asked again only for a clip it hasn't listed yet (one less wait before the video comes in)
       const known = () => (clips.all || []).find((x) => x.id === vm.id);
       if (!known() || !clips.base) await clipList(true);
       const c = known();
-      if (!c || !(await clipPick(c, true, to))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
+      if (!c || !(await clipPick(c, true, to, spare))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
     } else {
       const { file, h } = await seqOwnFile(vm.name, 'video');
       if (ask !== to.seqAsk) return;
-      to.ask++;
-      if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true, to }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
-      to.own = true; clipNoCredit(to);
-      to.media = { ...vm }; delete to.media.at; to.handle = h;
-      vidPanelSync();
+      if (!spare) to.ask++;
+      if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true, to, spare }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
+      const media = { ...vm };
+      delete media.at;
+      if (spare) { if (to.spare) Object.assign(to.spare, { media, handle: h, own: true, clip: '', credit: '' }); }
+      else {
+        to.own = true; clipNoCredit(to);
+        to.media = media; to.handle = h;
+        vidPanelSync();
+      }
     }
-    if (ask === to.seqAsk) seqVidTime(to.forBl && sameMedia(to.forBl.media?.vid, vm) ? to.forBl : bl, to);
+    if (ask !== to.seqAsk) return;
+    if (spare) {
+      // Its block came in while it loaded (the loop is black, waiting for it): it takes over now
+      if (to.forBl && sameMedia(to.forBl.media?.vid, vm)) { vidUseSpare(to); seqVidTime(to.forBl, to); }
+      else if (to.spare) {
+        // Waits at its start point
+        const v = to.spare.v, at = vm.at || 0;
+        if (Number.isFinite(v.duration) && v.duration > 0) v.currentTime = at % v.duration;
+      }
+    } else seqVidTime(to.forBl && sameMedia(to.forBl.media?.vid, vm) ? to.forBl : bl, to);
   } catch (e) { if (ask === to.seqAsk) seqNote(e.message); }
   finally {
     if (ask === to.seqAsk) { to.loading = null; seqVidRelease(to, false); }
   }
 }
-// A track's next block with a different video than its loop's player holds is loaded a few seconds early, while
-// nothing on screen shows that player, so it's ready (at its start point) the moment its block comes in
-// (15 s ahead: a long clip in 4K can take a few seconds to come over from Phosphor Clips)
+// A track's next block with a different video than its loop's player holds is loaded early, so it's ready (at its
+// start point) the moment its block comes in: into the loop's own player while nothing on screen shows it, or else
+// into its spare player (15 s ahead: a long clip in 4K can take a few seconds to come over from Phosphor Clips)
 seq.preloadSecs = 15;
 function seqPreloadVid(t) {
   if (!seq.playing) return;
   for (let k = 0, used = seqTracksUsed(); k < TL.TRACKS; k++) {
     const K = KEYS[k], to = vids[K];
-    if (!used.has(k) || !loopOn(K) || to.loading || vidInUse(to)) continue;
+    if (!used.has(k) || !loopOn(K) || to.loading) continue;
     let next = null;
     for (const b of seq.rec.blocks) {
       if (b.track !== k || !b.media?.vid || b.a <= t || b.a - t > seq.preloadSecs) continue;
       if (!next || b.a < next.a) next = b;
     }
-    if (!next || sameMedia(next.media.vid, to.media)) continue;
+    if (!next || sameMedia(next.media.vid, to.media) || (to.spare && sameMedia(next.media.vid, to.spare.media))) continue;
     seq.ownsVideo = true;
-    seqLoadVid(next, to);
+    seqLoadVid(next, to, vidInUse(to));
   }
 }
 function seqShowMedia(bl, K) {
@@ -10846,6 +10900,8 @@ function seqShowMedia(bl, K) {
     seq.ownsVideo = true;
     to.forBl = bl;
     if (sameMedia(m.vid, to.media) && to.on) seqVidTime(bl, to);
+    // Waiting in the spare player: it takes over at once
+    else if (to.spare && sameMedia(m.vid, to.spare.media) && !to.loading) { vidUseSpare(to); seqVidTime(bl, to); }
     // Already on its way (loaded ahead): the picture stays black until it's in, at this block's spot
     else if (sameMedia(m.vid, to.loading)) seqVidWait(to);
     else seqLoadVid(bl, to);

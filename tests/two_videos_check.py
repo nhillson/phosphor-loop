@@ -1,12 +1,13 @@
 """Each loop's own video, and the sequencer's videos coming in without the one before flashing up.
 
-  python3 tests/two_videos_check.py       (about a minute; a stand-in clip library, like tests/clips_check.py)
+  python3 tests/two_videos_check.py       (about 4 minutes; a stand-in clip library, like tests/clips_check.py)
 
 Loop A plays one clip while loop B plays another; a loop with no video of its own shows another loop's; the Video
 controls follow the loop being edited. In the sequencer: a video block, then a block with no video, then a block with
 a different video on the same track: the next video is loaded ahead during the middle block, and at no frame does the
-loop show the first video once the third block has begun (a jump straight into it shows black until it's in). Every
-wait is a number of frames or a condition with a ceiling.
+loop show the first video once the third block has begun (a jump straight into it shows black until it's in). Then a
+fourth video block straight after the third, no gap: its video waits in the loop's spare player and takes over with no
+black frame. Every wait is a number of frames or a condition with a ceiling.
 """
 import functools
 import os
@@ -119,14 +120,15 @@ def main():
           r.blocks.push({{ id: 'v1', track: 0, a: 0, b: 3, label: '', look: {look % "'video'"}, fin: 0, fout: 0, autos: [], media: vidOf({{ id: '{swirl['id']}', n: '{swirl['n']}' }}) }});
           r.blocks.push({{ id: 'n2', track: 0, a: 3, b: 40, label: '', look: {look % "'wave'"}, fin: 0, fout: 0, autos: [] }});
           r.blocks.push({{ id: 'v3', track: 0, a: 40, b: 90, label: '', look: {look % "'video'"}, fin: 0, fout: 0, autos: [], media: vidOf({{ id: '{blue['id']}', n: '{blue['n']}' }}) }});
-          r.blocks.push({{ id: 'n4', track: 0, a: 90, b: 120, label: '', look: {look % "'wave'"}, fin: 0, fout: 0, autos: [] }});
+          r.blocks.push({{ id: 'v4', track: 0, a: 90, b: 150, label: '', look: {look % "'video'"}, fin: 0, fout: 0, autos: [], media: vidOf({{ id: '{swirl['id']}', n: '{swirl['n']}' }}) }});
+          r.blocks.push({{ id: 'n5', track: 0, a: 150, b: 180, label: '', look: {look % "'wave'"}, fin: 0, fout: 0, autos: [] }});
         }})()""")
         # Loop A's player back to swirl, as the first block wants
         J(f"__plClips.pickInto('A', '{swirl['id']}')")
         until(f"__plClips.vids().A.clip === '{swirl['id']}'", 'loop A’s clip did not go back to the first')
         # Every frame from now: the song's time, whether loop A shows Video, and which video its player holds
         J("""window.__rec = []; (function f() { const v = __plClips.vids().A;
-          __rec.push({ t: __plSeq.t, inVid: __plAp.loops.A.tgt.in1 === 'video', name: v.name, wait: v.wait, running: __plSeq.running, loading: v.loading });
+          __rec.push({ t: __plSeq.t, inVid: __plAp.loops.A.tgt.in1 === 'video', name: v.name, wait: v.wait, running: __plSeq.running, loading: v.loading, spare: v.spare });
           requestAnimationFrame(f); })()""")
         # The workspace's software graphics load a clip slowly (15 s or more), so the next video is loaded further ahead here
         J("__plSeq.preloadSecs = 36")
@@ -150,11 +152,26 @@ def main():
             print('    note:', J("document.querySelector('#seqNote').textContent"), J("__plClips.vids().A"))
         c.wait_frames(10, 'third block')
         rec = J("__rec")
-        bad = [r for r in rec if r['running'] and r['t'] >= 40.05 and r['inVid'] and r['name'] == swirl['n'] and not r['wait']]
+        bad = [r for r in rec if r['running'] and 40.05 <= r['t'] < 90 and r['inVid'] and r['name'] == swirl['n'] and not r['wait']]
         ok(not bad, f"no frame in the third block shows the first video ({len(bad)} did; {len([r for r in rec if r['t'] >= 40.05])} frames looked at)")
         v = V()
         ok(v['A']['name'] == blue['n'] and not v['A']['paused'] and not v['A']['wait'], f"the third block plays its own video ({v['A']['name']})")
         pg.screenshot(path=os.path.join(out, 'third-block.png'), timeout=30000)
+
+        # The fourth block, a different video straight after the third (no gap): it waits in loop A's spare player
+        # while the third plays, then takes over at once: no frame of black, none of the third's video
+        if until(f"__plClips.vids().A.spare === '{swirl['n']}' && __plSeq.t < 90", 'the fourth block’s video did not wait in the spare player before its block', 60):
+            ok(J("__plClips.vids().A.name") == blue['n'] and not J("__plClips.vids().A.paused"), 'meanwhile the third block’s video plays on')
+        until("__plSeq.t > 91", 'the sequence did not reach the fourth block', 60)
+        c.wait_frames(10, 'fourth block')
+        rec = J("__rec")
+        after = [r for r in rec if r['running'] and 90.05 <= r['t'] < 150]
+        bad = [r for r in after if r['inVid'] and r['name'] == blue['n']]
+        black = [r for r in after if r['wait']]
+        ok(after and not bad, f"from the fourth block on, no frame shows the third block’s video ({len(bad)} of {len(after)} did)")
+        ok(not black, f"and no frame of black between them ({len(black)} were)")
+        v = V()
+        ok(v['A']['name'] == swirl['n'] and not v['A']['paused'] and v['A']['spare'] is None, f"the fourth block plays its video and the spare is let go ({v['A']['name']}, spare {v['A']['spare']})")
 
         # A jump straight from the first block into the third (no time to load ahead): black until it's in, never the first
         J("__plSeq.preloadSecs = 0")   # nothing loaded ahead now: the jump has to wait for its video
@@ -165,13 +182,14 @@ def main():
         until(f"__plClips.vids().A.clip === '{blue['id']}' && !__plClips.vids().A.wait", 'after the jump, the third block’s video did not come in', 60)
         c.wait_frames(6, 'after the jump')
         rec = J("__rec")
-        bad = [r for r in rec if r['t'] >= 40.05 and r['inVid'] and r['name'] == swirl['n'] and not r['wait']]
-        waited = [r for r in rec if r['t'] >= 40.05 and r['wait']]
+        bad = [r for r in rec if 40.05 <= r['t'] < 90 and r['inVid'] and r['name'] == swirl['n'] and not r['wait']]
+        waited = [r for r in rec if 40.05 <= r['t'] < 90 and r['wait']]
         ok(not bad, f"after a jump into the third block no frame shows the first video ({len(bad)} did; black for {len(waited)} frames while it loaded)")
         ok(len(waited) > 0, 'while the jump’s video loaded, the loop showed black')
         J("document.querySelector('#seqPlay').click()")
         c.wait_frames(4, 'stopped')
         ok(not J("__plClips.vids().A.wait"), 'stopping leaves nothing blacked out')
+        ok(J("__plClips.vids().A.spare") is None, 'and no spare video kept')
         ok(not errors, 'no page errors: ' + '; '.join(errors[:3]))
         b.close()
     srv.shutdown()
