@@ -1047,6 +1047,11 @@
 .seq-save { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .seq-save[hidden] { display: none; }
 .seq-save input { width: min(260px, 60vw); }
+.btn.seq-handbtn[aria-pressed="true"] .led { background: #3ddc84; box-shadow: 0 0 8px rgba(61,220,132,.7); }
+.btn#seqLetGo.live { border-color: #3ddc84; color: var(--ink); box-shadow: 0 0 8px rgba(61,220,132,.45); }
+.seq-hand .seq-field select:disabled { opacity: .45; }
+.tabs .hand-live { font: 400 13px/1 var(--f-osd); letter-spacing: .04em; padding: 2px 4px; border-radius: 3px; border: 1px solid #3ddc84; color: #3ddc84; margin-left: 4px; }
+.tabs .hand-live[hidden] { display: none; }
 .btn.seq-recbtn[aria-pressed="true"] .led { background: var(--tally); box-shadow: 0 0 8px rgba(255,75,62,.7); }
 .seq .btn:disabled { opacity: .45; cursor: default; }
 

@@ -888,12 +888,15 @@ const sliderEls = {}, outputs = {};
     takeOver(k);
     // Raising a loop's Show while a sequence plays it: you take over
     if (/^show[A-D]$/.test(k)) seqTakeOver(k.slice(4));
-    (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
+    // Play over it: on a loop the sequence plays, the fader shifts the sequence's own value (see handSlider)
+    if (!handSlider(k, isMix, +el.value)) (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     showSlider(k);
     if (k in FEED_TO && +el.value > 0) showFedLoop(k);
     if (isMix || k === 'trails') syncVisibility();
   });
   el.addEventListener('dblclick', () => {
+    // Play over it: double-clicking a fader you moved gives just that one back to the sequence
+    if (handRelease(k, isMix)) { syncUI(); return; }
     markHand(k);
     takeOver(k);
     const v = (isMix ? mix.base : loops[edit].base)[k];
@@ -10634,6 +10637,8 @@ function seqRun(on, message) {
   seq.running = on;
   $('#seqPlay').setAttribute('aria-pressed', String(on));
   seq.applied = [null, null, null, null];
+  // What you played over the last run stays on screen as it is, but the sequence starts (or ends) with none of it held
+  handForget();
   if (on) {
     if (ap.on) setAutopilot(false, true);
     seq.apMode = null;
@@ -10720,10 +10725,190 @@ function seqGiveBack() {
 // Your hand on a loop the sequence is playing (picking its input, or its Show fader): you take over and the sequence
 // stops, rather than it hiding or replacing what you just did
 function seqTakeOver(k) {
+  if (handPlays()) return;   // Play over it: your hand rides on top instead (see handBefore / handAfter)
   if (!seq.running || seq.apMode || !seqTracksUsed().has(KEYS.indexOf(k))) return;
   seqRun(false, 'You took over, so the sequence stopped. Press Play to go back to it.');
   toast('You took over, so the sequence stopped. Press Play in the sequencer to go back to it.');
 }
+
+/* ---- Play over it: your hand on top of a playing sequence, like a knob on a DJ mixer ----
+   While it's on and the sequence plays, a fader you move on one of its loops keeps the sequence's own value (its
+   block's look and change lines) and adds your amount to it: hand.loop[K][key] (and hand.mix[key] for Show and the
+   feeds) hold { off: your amount, applied: what was really added this frame (after the fader's ends), rel: when you
+   let go, from: your amount then }. Other things you pick on that loop (an input, a mirror level, a switch) are held
+   as they are: hand.set[K][key], with the sequence's own value in hand.raw[K][key]. Each frame the sequence gets its
+   own values back (handBefore), plays (seqApplyTrack), and yours go on top again (handAfter). Nothing goes into the
+   sequence itself. Your changes stay until Let go (or a double-click on one fader), or, with "When I let go: Drifts
+   back", a fader eases back to the sequence over that many seconds after you let go of it. */
+const HAND_KEY = 'phosphor-seq-hand';
+const hand = {
+  on: true, secs: 0,
+  loop: { A: {}, B: {}, C: {}, D: {} }, mix: {},
+  set: { A: {}, B: {}, C: {}, D: {} }, raw: { A: {}, B: {}, C: {}, D: {} },
+  after: { A: null, B: null, C: null, D: null },
+  touchAt: -1e9, grab: null, ui: '',
+};
+try {
+  const h = JSON.parse(localStorage.getItem(HAND_KEY) || 'null');
+  if (h) { hand.on = h.on !== false; if ([0, 2, 4, 8].includes(h.secs)) hand.secs = h.secs; }
+} catch (_) {}
+function handKeep() { try { localStorage.setItem(HAND_KEY, JSON.stringify({ on: hand.on, secs: hand.secs })); } catch (_) {} }
+// Export video plays the sequence by itself, so your hand isn't laid over it
+const handPlays = () => hand.on && seq.running && !seq.apMode && !seq.editing && !EX.stage;
+const handOwns = (K) => loopOn(K) && seqTracksUsed().has(LOOP_NUM[K]) && !(seq.recording && LOOP_NUM[K] === seq.selTrack);
+// Show A-D belong to their loop; a feed belongs to the sequence when either loop of its pair is the sequence's
+const handMixOwned = (key) => /^show/.test(key) ? handOwns(key.slice(4)) : handOwns(FEED_TO[key]) || handOwns(otherLoop(FEED_TO[key]));
+const handHoldsInput = (K) => handPlays() && ('in1' in hand.set[K] || 'in2' in hand.set[K]);
+const handRange = (key) => { const el = sliderEls[key]; return el ? [+el.min, +el.max] : [-1e9, 1e9]; };
+// A fader moved while the sequence plays its loop: your amount on top of the sequence's (true), or not handled (false)
+function handSlider(key, isMix, v) {
+  if (!handPlays()) return false;
+  if (isMix ? !handMixOwned(key) : !handOwns(edit)) return false;
+  const store = isMix ? hand.mix : hand.loop[edit], T = isMix ? mix.tgt : loops[edit].tgt;
+  const e = store[key] || (store[key] = { off: 0, applied: 0, rel: null, from: 0 });
+  const raw = T[key] - e.applied;
+  e.off = e.from = v - raw; e.applied = e.off;
+  T[key] = v;
+  // Dragged: drifts back from when it's let go. A Shift+wheel or arrow-key step: from now.
+  const held = hand.grab && hand.grab.key === key;
+  e.rel = held ? null : performance.now();
+  handUI();
+  return true;
+}
+// One fader given back to the sequence (double-click)
+function handRelease(key, isMix) {
+  if (!handPlays()) return false;
+  const store = isMix ? hand.mix : hand.loop[edit], e = store[key];
+  if (!e) return false;
+  (isMix ? mix.tgt : loops[edit].tgt)[key] -= e.applied;
+  delete store[key];
+  handUI();
+  seqNote('That fader is back with the sequence.');
+  return true;
+}
+const handEase = (e, now) => {
+  if (!hand.secs || e.rel === null) return true;
+  const t = (now - e.rel) / (hand.secs * 1000);
+  if (t >= 1) return false;
+  const s = t * t * (3 - 2 * t);
+  e.off = e.from * (1 - s);
+  return true;
+};
+function handBefore(k, now) {
+  const K = KEYS[k], T = loops[K].tgt, after = hand.after[K], set = hand.set[K], raw = hand.raw[K];
+  if (!handPlays()) { hand.after[K] = null; return; }
+  // Something else you picked on this loop since the last frame (an input, a mirror level, a switch): held as it is
+  if (after && now - hand.touchAt < 1500) {
+    for (const key of Object.keys(T)) {
+      const v = T[key];
+      if (LOOP_SLIDERS.includes(key) || (v !== null && typeof v === 'object') || v === after[key]) continue;
+      if (!(key in set)) raw[key] = after[key];
+      set[key] = v;
+    }
+  }
+  // The sequence's own values back, so it plays as it would
+  for (const [key, e] of Object.entries(hand.loop[K])) { T[key] -= e.applied; e.applied = 0; }
+  for (const key of Object.keys(set)) T[key] = raw[key];
+}
+function handAfter(k, now, fresh) {
+  const K = KEYS[k], L = loops[K], T = L.tgt, set = hand.set[K], raw = hand.raw[K];
+  if (!handPlays()) return;
+  for (const key of Object.keys(set)) { raw[key] = T[key]; T[key] = set[key]; }
+  for (const [key, e] of Object.entries(hand.loop[K])) {
+    if (!handEase(e, now)) { delete hand.loop[K][key]; continue; }
+    const [lo, hi] = handRange(key), v = clamp(T[key] + e.off, lo, hi);
+    e.applied = v - T[key];
+    T[key] = v;
+    // A block starting by itself is there from its first frame: with your amount in it, too
+    if (fresh) L.cur[key] = v;
+  }
+  hand.after[K] = { ...T };
+}
+function handMixBefore() {
+  for (const [key, e] of Object.entries(hand.mix)) { mix.tgt[key] -= e.applied; e.applied = 0; }
+}
+function handMixAfter(now) {
+  if (!handPlays()) return;
+  for (const [key, e] of Object.entries(hand.mix)) {
+    if (!handEase(e, now)) { delete hand.mix[key]; continue; }
+    const [lo, hi] = handRange(key), v = clamp(mix.tgt[key] + e.off, lo, hi);
+    e.applied = v - mix.tgt[key];
+    mix.tgt[key] = v;
+  }
+  handUI();
+}
+const handLoops = () => KEYS.filter((K) => Object.keys(hand.loop[K]).length || Object.keys(hand.set[K]).length || hand.mix[SHOW[K]]);
+// Let go: everything you changed goes back to the sequence. Faders glide back; an input you picked comes back as the
+// block's (with its picture or video)
+function handLetGo() {
+  for (const [i, K] of KEYS.entries()) {
+    const T = loops[K].tgt;
+    for (const e of Object.entries(hand.loop[K])) T[e[0]] -= e[1].applied;
+    const set = hand.set[K];
+    if ('in1' in set || 'in2' in set) seq.applied[i] = null;
+    for (const key of Object.keys(set)) T[key] = hand.raw[K][key];
+    hand.loop[K] = {}; hand.set[K] = {}; hand.raw[K] = {};
+  }
+  for (const [key, e] of Object.entries(hand.mix)) mix.tgt[key] -= e.applied;
+  hand.mix = {};
+  syncUI();
+  handUI();
+}
+// The sequence starting or stopping: nothing held any more (what's on screen stays as it is)
+function handForget() {
+  for (const K of KEYS) { hand.loop[K] = {}; hand.set[K] = {}; hand.raw[K] = {}; hand.after[K] = null; }
+  hand.mix = {};
+  handUI();
+}
+function handUI() {
+  const live = handPlays() ? handLoops() : [];
+  const sig = `${hand.on}|${hand.secs}|${live.join('')}`;
+  if (sig === hand.ui) return;
+  hand.ui = sig;
+  for (const K of KEYS) { const el = $('#hand' + K); if (el) el.hidden = !live.includes(K); }
+  const go = $('#seqLetGo');
+  go.disabled = !live.length;
+  go.classList.toggle('live', !!live.length);
+  go.textContent = live.length ? `Let go (loop${live.length > 1 ? 's' : ''} ${live.join(', ')})` : 'Let go';
+  $('#seqHandOn').setAttribute('aria-pressed', String(hand.on));
+  $('#seqHandDrift').value = String(hand.secs);
+  $('#seqHandDrift').disabled = !hand.on;
+}
+// When you last touched a control (outside the sequencer): a change to a loop then is yours, not something else's
+for (const type of ['pointerdown', 'click', 'keydown', 'wheel', 'input', 'change']) {
+  document.addEventListener(type, (e) => { if (!(e.target && e.target.closest && e.target.closest('#seq'))) hand.touchAt = performance.now(); }, { capture: true, passive: true });
+}
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target;
+  if (!el.matches || !el.matches('input[type="range"]')) return;
+  const m = el.closest('.mirror'), key = m ? el.dataset.mid : el.id, K = m ? m.dataset.loop : edit;
+  hand.grab = { key, K };
+  // Grabbing a fader that's drifting back holds it where it is
+  const e2 = MIX_SLIDERS.includes(key) ? hand.mix[key] : hand.loop[K] && hand.loop[K][key];
+  if (e2) { e2.rel = null; e2.from = e2.off; }
+}, true);
+for (const type of ['pointerup', 'pointercancel']) window.addEventListener(type, () => {
+  const g = hand.grab;
+  hand.grab = null;
+  if (!g) return;
+  const e = MIX_SLIDERS.includes(g.key) ? hand.mix[g.key] : hand.loop[g.K] && hand.loop[g.K][g.key];
+  if (e) { e.rel = performance.now(); e.from = e.off; }
+}, true);
+$('#seqHandOn').addEventListener('click', () => {
+  if (hand.on) handLetGo();
+  hand.on = !hand.on; handKeep(); handUI();
+  seqNote(hand.on ? 'Play over it is on: move anything while the sequence plays and it rides on top. Let go gives it all back.'
+    : 'Play over it is off: changing a loop’s input or Show while the sequence plays it stops the sequence.');
+});
+$('#seqHandDrift').addEventListener('change', (e) => {
+  hand.secs = +e.target.value || 0; handKeep(); handUI();
+  // Changes held now start drifting from here
+  const now = performance.now();
+  const g = hand.grab, grabbed = g && (MIX_SLIDERS.includes(g.key) ? hand.mix[g.key] : hand.loop[g.K]?.[g.key]);
+  for (const e2 of [...Object.values(hand.mix), ...KEYS.flatMap((K) => Object.values(hand.loop[K]))]) if (e2 !== grabbed) { e2.rel = now; e2.from = e2.off; }
+});
+$('#seqLetGo').addEventListener('click', () => { handLetGo(); seqNote('Everything is back with the sequence.'); });
+setTimeout(handUI, 0);   // (once everything it looks at is set up)
 async function seqPlay() {
   if (seq.editing) { seqNote('Save to block or Cancel the look you’re editing first (the bar under the picture).'); return; }
   seqAskFiles();
@@ -11286,7 +11471,8 @@ function seqApplyTrack(k, x, now) {
     // A block starting by itself (not out of a crossfade): see the end of this
     startFresh = !x.other && !wasCross;
     // The outgoing block's picture or video first, then the incoming one's, which wins where they share an input
-    seqShowMedia(x.other, K); seqShowMedia(x.main, K);
+    // (not while you hold this loop's input: Play over it)
+    if (!handHoldsInput(K)) { seqShowMedia(x.other, K); seqShowMedia(x.main, K); }
     const used = [T.in1, T.in2];
     if (used.includes('camera') && !cam.on) startCamera();
     if (used.includes('screen') && !scr.on) startScreen(true);
@@ -11400,10 +11586,17 @@ function seqTick(now) {
         if (seq.apMode !== 'end') { seq.apMode = 'end'; seq.apBefore = seqApSnap(); setAutopilot(true, true); seqNote('The sequence has ended, so Autopilot is running.'); }
       } else {
         if (seq.apMode === 'end') { seq.apMode = null; setAutopilot(false, true); seqApBack(); }
-        if (!seq.apMode) for (let k = 0, used = seqTracksUsed(); k < TL.TRACKS; k++) {
-          if (!loopOn(KEYS[k]) || !used.has(k)) continue;   // no blocks on this track: the loop is yours
-          if (seq.recording && k === seq.selTrack) continue;   // you're playing this loop by hand
-          seqApplyTrack(k, r.tracks[k], now);
+        if (!seq.apMode) {
+          handMixBefore();
+          for (let k = 0, used = seqTracksUsed(); k < TL.TRACKS; k++) {
+            if (!loopOn(KEYS[k]) || !used.has(k)) continue;   // no blocks on this track: the loop is yours
+            if (seq.recording && k === seq.selTrack) continue;   // you're playing this loop by hand
+            const was = seq.applied[k];
+            handBefore(k, now);
+            seqApplyTrack(k, r.tracks[k], now);
+            handAfter(k, now, seq.applied[k] !== was);
+          }
+          handMixAfter(now);
         }
         seq.jumped = false;
         seqGradeRest();
@@ -12266,7 +12459,7 @@ function seqSetOpen(open, save) {
   window.dispatchEvent(new Event('resize'));
 }
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
-window.__plSeq = { get rec() { return seq.rec; }, get editing() { return seq.editing ? seq.editing.id : null; }, edit: (id) => seqEditStart(seq.rec.blocks.find((b) => b.id === id)), set preloadSecs(v) { seq.preloadSecs = v; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
+window.__plSeq = { hand, handLetGo: () => handLetGo(), get rec() { return seq.rec; }, get editing() { return seq.editing ? seq.editing.id : null; }, edit: (id) => seqEditStart(seq.rec.blocks.find((b) => b.id === id)), set preloadSecs(v) { seq.preloadSecs = v; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
   spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; }, seek: (t) => seqSeek(t),
   select: (id) => { seq.selId = id; seq.dirty = true; seqInspector(); }, redraw: () => seqDrawStatic() };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });

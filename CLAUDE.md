@@ -78,7 +78,13 @@ file don't rebuild the app.
    node --test tests/hits.test.mjs` (made-up music with known kicks, as Chrome's analyser hears it).
 4o. **A sequence and your hand** (a loop whose track has no blocks is yours; picking an input or raising Show on a loop
    the sequence plays stops it; stopping gives back the loops it hid; `seqRun`, `seqTakeOver`, `seqGiveBack`):
-   `python3 tests/seq_takeover_check.py` (about a minute).
+   `python3 tests/seq_takeover_check.py` (about a minute; with Play over it switched off).
+4o2. **Play over it** (sequencer switch, on by default, `hand` in js/app.js, kept in `phosphor-seq-hand`): while a sequence plays,
+   a fader moved on one of its loops adds your amount on top of the sequence's own value (`hand.loop` / `hand.mix`,
+   `handSlider`); other things picked on that loop (input, mirror, switches) are held as they are (`hand.set`, caught by
+   `handBefore` within 1.5 s of a touch). Each frame `handBefore` gives the sequence its values back, `seqApplyTrack`
+   plays, `handAfter` lays yours on top. Let go / double-click a fader / "When I let go: Drifts back" (`handEase`).
+   Off during Export video. `python3 tests/seq_hand_check.py` (about a minute and a half).
 4p. **Mirror as a change over time** (sequencer key `mirror`, range 0-8 snapped to Off/2/4/6/8 by `mirrorSnap`). Each point
    is one change with its own Transition and time (`[u, v, fx, secs]`, kept by `cleanPts` in js/timeline.js); the
    line holds each mirror until its next point and changes straight to that point's mirror there, its way (`lineValue`,

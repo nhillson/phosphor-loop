@@ -142,6 +142,19 @@
           <button class="btn small" id="seqMarker" title="Add a section marker at the playhead (key M, works while playing)">+ Marker</button>
           <button class="btn small seq-recbtn" id="seqRec" aria-pressed="false" title="While the sequence plays, the look you have on the chosen loop is written into its track"><span class="led"></span>Record look changes</button>
           <span class="seq-vsep" aria-hidden="true"></span>
+          <div class="seq-grp seq-hand" id="seqHand">
+            <button class="btn small seq-handbtn" id="seqHandOn" aria-pressed="true" title="While the sequence plays, any control you move rides on top of it, like a knob on a DJ mixer: faders shift the sequence’s own values up or down, and picking an input or moving Show never stops it. Nothing you do is saved into the sequence. Off: moving a loop’s input or Show stops the sequence, as before."><span class="led"></span>Play over it</button>
+            <label class="seq-field" title="What happens to a fader’s change when you let go of it">When I let go
+              <select class="seq-in" id="seqHandDrift">
+                <option value="0">It stays</option>
+                <option value="2">Drifts back, 2 s</option>
+                <option value="4">Drifts back, 4 s</option>
+                <option value="8">Drifts back, 8 s</option>
+              </select>
+            </label>
+            <button class="btn small" id="seqLetGo" disabled title="Everything you changed goes back to the sequence. Double-click one fader to let go of just that one.">Let go</button>
+          </div>
+          <span class="seq-vsep" aria-hidden="true"></span>
           <div class="seq-grp">
             <button class="btn small" id="seqUndo" disabled title="Undo (Ctrl+Z)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5 3L2 6l3 3M2.5 6H9a3 3 0 010 6H6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Undo</button>
             <button class="btn small" id="seqRedo" disabled title="Redo (Ctrl+Shift+Z)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M9 3l3 3-3 3M11.5 6H5a3 3 0 000 6h3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Redo</button>
@@ -337,10 +350,10 @@
 
       <section class="editor" id="editor" data-loop="A" aria-label="Loop settings">
         <div class="tabs" id="tabs" data-n="2" role="tablist" aria-label="Which loop to edit">
-          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span><span class="tab-name">Loop A</span> <span class="who" id="whoA" hidden></span><span class="vis" id="visA" role="img"></span></button>
-          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span><span class="tab-name">Loop B</span> <span class="who" id="whoB" hidden></span><span class="vis" id="visB" role="img"></span></button>
-          <button role="tab" id="tabC" aria-selected="false" aria-controls="editor" hidden><span class="tag">C</span><span class="tab-name">Loop C</span> <span class="who" id="whoC" hidden></span><span class="vis" id="visC" role="img"></span></button>
-          <button role="tab" id="tabD" aria-selected="false" aria-controls="editor" hidden><span class="tag">D</span><span class="tab-name">Loop D</span> <span class="who" id="whoD" hidden></span><span class="vis" id="visD" role="img"></span></button>
+          <button role="tab" id="tabA" aria-selected="true" aria-controls="editor"><span class="tag">A</span><span class="tab-name">Loop A</span> <span class="who" id="whoA" hidden></span><span class="hand-live" id="handA" hidden title="You’re playing over the sequence on loop A">LIVE</span><span class="vis" id="visA" role="img"></span></button>
+          <button role="tab" id="tabB" aria-selected="false" aria-controls="editor"><span class="tag">B</span><span class="tab-name">Loop B</span> <span class="who" id="whoB" hidden></span><span class="hand-live" id="handB" hidden title="You’re playing over the sequence on loop B">LIVE</span><span class="vis" id="visB" role="img"></span></button>
+          <button role="tab" id="tabC" aria-selected="false" aria-controls="editor" hidden><span class="tag">C</span><span class="tab-name">Loop C</span> <span class="who" id="whoC" hidden></span><span class="hand-live" id="handC" hidden title="You’re playing over the sequence on loop C">LIVE</span><span class="vis" id="visC" role="img"></span></button>
+          <button role="tab" id="tabD" aria-selected="false" aria-controls="editor" hidden><span class="tag">D</span><span class="tab-name">Loop D</span> <span class="who" id="whoD" hidden></span><span class="hand-live" id="handD" hidden title="You’re playing over the sequence on loop D">LIVE</span><span class="vis" id="visD" role="img"></span></button>
         </div>
         <p class="hint" id="hiddenHint" hidden><span id="hiddenText">Loop B isn’t on screen right now.</span> <button class="linkish" id="showLoop">Show this loop</button></p>
 

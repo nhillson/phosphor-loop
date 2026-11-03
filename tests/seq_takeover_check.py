@@ -4,7 +4,7 @@
 
 A sequence with blocks only on track 1 leaves loop B alone (it used to hide it the whole time); picking an input on
 loop A while the sequence plays it stops the sequence (you took over); stopping gives back the loops the sequence
-hid. Every wait is a number of frames.
+hid. Every wait is a number of frames. (This is with Play over it off; seq_hand_check.py tests it on.)
 """
 import functools
 import os
@@ -72,6 +72,9 @@ def main():
         ok(not J("__plSeq.running"), 'Stop stops it')
         ok(J("+document.querySelector('#showA').value") >= 99, f"stopping gives loop A back ({J('document.querySelector(\"#showA\").value')})")
         # Playing again, then picking an input on loop A: you take over
+        # (with Play over it off: on, your hand rides on top instead, see seq_hand_check.py)
+        click('#seqHandOn')
+        ok(J("document.querySelector('#seqHandOn').getAttribute('aria-pressed')") == 'false', 'Play over it switched off')
         J("__plSeq.rec.blocks[0].b = 60; __plSeq.rec.blocks.length = 1")
         click('#seqPlay')
         c.wait_frames(6, 'playing again')
