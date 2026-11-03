@@ -250,6 +250,10 @@ function createWindow() {
       try { tray.displayBalloon({ title: 'Phosphor Clips is still running', content: 'It keeps sharing your clips with Phosphor Loop. Right-click its icon by the clock to quit.', iconType: 'info' }); } catch (_) { /* no balloons here */ }
     }
   });
+  win.on('hide', pauseWebMedia);
+  win.on('minimize', pauseWebMedia);
+  win.on('show', webSound);
+  win.on('restore', webSound);
   win.on('closed', () => { win = null; web = null; });
 }
 
@@ -303,10 +307,24 @@ function placeWeb() {
   // doesn't play over the clip being trimmed
   if (webWasShown && !webShown) pauseWebMedia();
   webWasShown = webShown;
+  webSound();
 }
+// The page is silent whenever it can't be seen (the trimmer or library showing, or the window closed to the
+// clock), even when a player starts itself again or plays its next video
+function webSound() {
+  if (!web || web.webContents.isDestroyed()) return;
+  web.webContents.setAudioMuted(!(webShown && win && !win.isDestroyed() && win.isVisible() && !win.isMinimized()));
+}
+// Pauses every video and sound on the page, in every frame, including ones tucked inside players' own
+// hidden parts (shadow roots: Reddit's and others' players keep their video there)
+const PAUSE_ALL = `(() => { const walk = (root) => { for (const el of root.querySelectorAll('*')) {
+  if (el instanceof HTMLMediaElement && !el.paused) el.pause(); if (el.shadowRoot) walk(el.shadowRoot); } };
+  walk(document); })()`;
 function pauseWebMedia() {
+  if (!web) return;
+  webSound();
   try {
-    for (const f of web.webContents.mainFrame.framesInSubtree) f.executeJavaScript('document.querySelectorAll("video, audio").forEach((m) => m.pause())').catch(() => {});
+    for (const f of web.webContents.mainFrame.framesInSubtree) f.executeJavaScript(PAUSE_ALL).catch(() => {});
   } catch (_) { /* page gone */ }
 }
 

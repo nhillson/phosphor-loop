@@ -78,6 +78,21 @@ module.exports = async function selftest(h) {
     check('the trimmer opens on the marked part', Math.abs(ed.start - markedStart) < 0.35 && Math.abs(ed.end - markedEnd) < 0.35,
       `${ed.start.toFixed(2)}-${ed.end.toFixed(2)} of ${ed.d.toFixed(1)} s`);
     check('only the marked part came down (plus a little either side)', ed.d < 19 && ed.d > markedEnd - markedStart, ed.d.toFixed(2) + ' s of 20 s');
+    // The web page is silent and still behind the trimmer (its sound used to carry on)
+    const behind = await page().executeJavaScript(`(() => { const v = document.querySelector('video'); return { paused: v.paused }; })()`);
+    check('the web page is paused and silent behind the trimmer', behind.paused && page().isAudioMuted(), JSON.stringify({ ...behind, muted: page().isAudioMuted() }));
+    // Closing the window to the clock stops a player's video too, even one inside its own hidden parts (a shadow root)
+    await page().executeJavaScript(`(() => { const host = document.createElement('div'); document.body.appendChild(host);
+      const v = document.createElement('video'); v.src = 'swirl.mp4'; v.loop = true; v.id = 'inShadow';
+      host.attachShadow({ mode: 'open' }).appendChild(v); window.__shadowV = v; return v.play().then(() => true); })()`);
+    h.win().hide();
+    // The window is hidden, so there are no frames to count: ask the page until it's paused, 5 s at most
+    let shadowPaused = false;
+    for (const until = Date.now() + 5000; !shadowPaused && Date.now() < until;) shadowPaused = await page().executeJavaScript(`window.__shadowV.paused`);
+    check('closing to the clock pauses every video on the page, even inside a player', shadowPaused && page().isAudioMuted(), 'paused ' + shadowPaused + ', muted ' + page().isAudioMuted());
+    await page().executeJavaScript(`window.__shadowV.parentNode.host.remove()`);
+    h.win().show();
+    await panelFrames(5);
     // The whole picture shows in the trimmer: the video is never bigger than its box (it used to be cut off)
     const fit = await pjs(`(() => { const p = document.querySelector('#edPlayer').getBoundingClientRect(), v = document.querySelector('#edVideo').getBoundingClientRect();
       return { pw: p.width, ph: p.height, vw: v.width, vh: v.height, fit: getComputedStyle(document.querySelector('#edVideo')).objectFit }; })()`);
