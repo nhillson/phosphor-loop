@@ -804,7 +804,7 @@
             <div class="mbar"><i id="mHigh"></i><span>HIGH</span></div>
             <div class="mbeat" id="mBeat">● BEAT</div>
           </div>
-          <p class="hint" id="rhythmStatus" role="status" aria-live="polite">Share audio to find BPM.</p>
+          <p class="hint" id="rhythmStatus" role="status" aria-live="polite">Share audio and the BEAT light follows its hits.</p>
           <div class="dev-actions">
             <button class="btn small" id="sndRetry" hidden>Try again</button>
             <button class="btn small" id="sndUseMic" hidden>Use Microphone or Stereo Mix</button>
@@ -832,7 +832,7 @@
             </div>
           </div>
         </div>
-        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else. After about 12 seconds, the picture pulses to its BPM. Low, mid and high sounds react immediately. Record keeps the sound too.</p>
+        <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else. The picture reacts straight away: low, mid and high sounds, and a pulse on every hit (a kick, a snare, a strum) as it’s heard. Record keeps the sound too.</p>
       </section>
 
       <section class="group" id="apGroup" aria-labelledby="h-ap">
@@ -1371,8 +1371,8 @@
             <dt>Microphone</dt><dd>Listens to the room, so music from a speaker or a clap works. Listen to picks which input when there’s more than one.</dd>
             <dt>Loopback adapter</dt><dd>Hears the computer through BlackHole, Soundflower, Stereo Mix or another installed loopback input, without screen sharing. Pick the adapter under Listen to. On a Mac, route your output to a multi-output device that includes BlackHole and your speakers or headphones. Allow “microphone” access when the browser asks; that permission also covers loopback adapters. Video sound set to Computer keeps this same sound in recordings.</dd>
             <dt>Stereo Mix (Windows)</dt><dd>Hears the computer’s sound with no screen sharing at all: choose Microphone, then Stereo Mix under Listen to. If it isn’t listed, turn it on once in Windows Settings → System → Sound → More sound settings (Sound Control Panel on Windows 10) → Recording tab → right-click an empty spot → Show Disabled Devices → right-click Stereo Mix → Enable, then reload this page. Some computers don’t have it.</dd>
-            <dt>BPM and the meter</dt><dd>Low, Mid and High bars respond immediately. After about 12 seconds of music, the BPM readout and BEAT light follow a steady tempo grid. This pulse drives beat effects and Autopilot’s Change on the beat. Pulses stop during silence or when tempo tracking is unavailable. Run from localhost or HTTPS for BPM tracking.</dd>
-            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on the BPM pulse and bass, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>
+            <dt>Beats and the meter</dt><dd>Low, Mid and High bars respond immediately. The BEAT light flashes on every hit heard in the sound itself: the sound jumping up all at once, mostly in the bass (a kick), but snares and strums count too. Nothing guesses a tempo, so it can’t drift off the beat: no hit, no pulse. Each hit drives the beat effects and Autopilot’s Change on the beat. Louder hits pulse harder.</dd>
+            <dt>Amount and What the music moves</dt><dd>How hard the picture reacts (the middle is already strong; Wild is very strong), and which settings follow the music: Zoom kick punches the picture in on each hit and the bass, Input size swells on the bass, Spin follows the mids, Color jumps with the highs and beats, Warp jolts the picture on beats and Flash brightens on beats.</dd>
             <dt>Which browser</dt><dd>Computer sound works in Chrome and Edge. Firefox and Safari don’t pass sound through screen sharing, so use Microphone there (Stereo Mix on Windows hears the computer itself).</dd>
             <dt>Record</dt><dd>Video sound, next to Record, picks what goes into the video: the microphone, this computer’s sound, or both mixed together. Whatever React to sound is already hearing goes straight in, with nothing more to allow.</dd>
           </dl></div>
@@ -1591,6 +1591,7 @@
 <script src="js/recording-formats.js"></script>
 <script src="js/output-template.js"></script>
 <script src="js/ribbit.js"></script>
+<script src="js/audio/hits.js"></script>
 <script src="js/audio/beat-clock.js"></script>
 <script src="js/audio/rhythm.js"></script>
 <script src="js/spotify.js"></script>

@@ -32,6 +32,7 @@ FILES = {
     'js/shapes.js': 'application/javascript',
     'js/typeart.js': 'application/javascript',
     'js/app.js': 'application/javascript',
+    'js/audio/hits.js': 'application/javascript',
     'js/audio/beat-clock.js': 'application/javascript',
     'js/audio/rhythm.js': 'application/javascript',
     'js/audio/rhythm-worklet.js': 'application/javascript',

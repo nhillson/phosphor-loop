@@ -73,6 +73,12 @@ file don't rebuild the app.
 4m. **The sequencer's playhead with Spotify** (`seqPos` in js/app.js: small differences caught up by speed, skips over
    1.5 s jump; js/spotify.js polls every second while playing and moves the position at once on a seek):
    `python3 tests/seq_playhead_check.py` (about half a minute) and `node --test tests/spotify.test.mjs`.
+4n. **The beat, straight from the sound** (`js/audio/hits.js`; the old tempo finder in js/audio/rhythm.js no longer
+   starts, `USE_TEMPO_GRID` in js/app.js): `python3 tests/hits_music.py 60 && python3 tests/hits_music.py 30 &&
+   node --test tests/hits.test.mjs` (made-up music with known kicks, as Chrome's analyser hears it).
+4o. **A sequence and your hand** (a loop whose track has no blocks is yours; picking an input or raising Show on a loop
+   the sequence plays stops it; stopping gives back the loops it hid; `seqRun`, `seqTakeOver`, `seqGiveBack`):
+   `python3 tests/seq_takeover_check.py` (about a minute).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

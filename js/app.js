@@ -860,6 +860,8 @@ const sliderEls = {}, outputs = {};
   el.addEventListener('input', () => {
     markHand(k);
     takeOver(k);
+    // Raising a loop's Show while a sequence plays it: you take over
+    if (/^show[A-D]$/.test(k)) seqTakeOver(k.slice(4));
     (isMix ? mix.tgt : loops[edit].tgt)[k] = +el.value;
     showSlider(k);
     if (k in FEED_TO && +el.value > 0) showFedLoop(k);
@@ -1169,6 +1171,7 @@ function uses(src) { return activeKeys().some((k) => loops[k].tgt.in1 === src ||
 // browser treats the camera or screen request as something the person asked for.
 function chooseSource(slot, src) {
   takeOver(slot);
+  seqTakeOver(edit);
   loops[edit].tgt[slot] = src;
   if (is3D(src)) lastWorld[sceneGroup(src)] = src;
   if (src === 'camera' && !cam.on) startCamera();
@@ -1478,6 +1481,9 @@ $('#surprise').addEventListener('click', surprise);
 const snd = {
   src: 'off', ctx: null, analyser: null, source: null, stream: null, track: null, bins: null,
   rate: 48000, tap: null, appFeed: null, rhythm: null, rhythmSample: null, rhythmGrid: null, analysisError: '',
+  // Hits, heard straight from the sound: how much the spectrum rose since last frame (low and everything), its
+  // recent typical level and spread, the time of the last hit, and the hits a second lately (for the readout)
+  hit: { finder: null },
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
   beats: 0, shakeDir: [1, 0], amount: 60,
@@ -1737,8 +1743,11 @@ function dropTap() {
   try { t.reader.cancel().catch(() => {}); } catch (_) {}
   try { t.copy.stop(); } catch (_) {}
 }
-// Tempo runs on the audio clock, independently of the raw-track spectrum and graphics.
+// The tempo finder (js/audio/rhythm.js) guessed a BPM and pulsed on a grid, which drifted off the beat or settled on
+// the wrong tempo. The beat now comes straight from the sound (see analyzeSound), so the finder no longer starts.
+const USE_TEMPO_GRID = false;
 function startRhythm(ctx, source) {
+  if (!USE_TEMPO_GRID) return;
   if (location.protocol === 'file:') {
     snd.analysisError = 'BPM tracking needs localhost or HTTPS. Open the local preview.';
     return;
@@ -1815,7 +1824,8 @@ function useTap(track) {
 function stopSound() {
   snd.rhythm?.stop();
   snd.rhythm = null; snd.rhythmSample = null; snd.rhythmGrid = null; snd.analysisError = '';
-  $('#rhythmStatus').textContent = 'Share audio to find BPM.';
+  $('#rhythmStatus').textContent = 'Share audio and the BEAT light follows its hits.';
+  snd.hit.finder = null;
   $('#mBeat').classList.remove('on');
   if (APP) appSoundClose();
   dropTap();
@@ -2003,16 +2013,16 @@ function analyzeSound(dt, now) {
     const e = snd.env[k];
     snd.env[k] = e + (x - e) * (1 - Math.exp(-dt * (x > e ? 60 : k === 'mid' ? 7 : 10)));
   }
-  const music = snd.rhythmSample = snd.rhythm?.read() || null;
-  const grid = music?.gridBeat ?? null;
-  // Reacquiring after silence starts a new baseline, rather than inventing missed beats.
-  if (grid !== null && snd.rhythmGrid !== null && grid > snd.rhythmGrid) {
+  // The beat, straight from the sound (js/audio/hits.js): a pulse on each hit as it's heard, no tempo guessed
+  const H = snd.hit;
+  if (!H.finder) H.finder = new window.PhosphorHits();
+  H.finder.step(bins, hz, dt, now / 1000, raw.low + raw.mid + raw.high);
+  if (H.finder.strong) {
     snd.beats++;
     const a = Math.random() * Math.PI * 2;
     snd.shakeDir = [Math.cos(a), Math.sin(a)];
   }
-  snd.rhythmGrid = grid;
-  snd.env.beat = music?.bpmBeat || 0;
+  snd.env.beat = H.finder.beat;
 }
 const mLow = $('#mLow'), mMid = $('#mMid'), mHigh = $('#mHigh'), mBeat = $('#mBeat');
 let meterTick = 0;
@@ -2022,11 +2032,10 @@ function drawMeter() {
   mMid.style.transform = `scaleY(${snd.env.mid.toFixed(3)})`;
   mHigh.style.transform = `scaleY(${snd.env.high.toFixed(3)})`;
   mBeat.classList.toggle('on', snd.env.beat > 0.45);
-  const music = snd.rhythmSample;
-  const status = snd.analysisError || (music
-    ? (music.bpm ? Math.round(music.bpm) + ' BPM · ' : '') + music.state
-    : snd.rhythm?.error ? 'BPM tracking unavailable. Reconnect audio to try again.'
-    : 'Finding BPM · allow about 12 seconds of music.');
+  // How many hits a second lately, from the sound itself (not a tempo guess)
+  const F = snd.hit.finder, times = F ? F.times : [], recent = times.length, rate = recent >= 2 ? (recent - 1) / Math.max(0.5, times[recent - 1] - times[0]) : 0;
+  const quiet = snd.env.low + snd.env.mid + snd.env.high < 0.02 && (!F || performance.now() / 1000 - F.last > 2);
+  const status = quiet ? 'Listening for hits. Play some music.' : recent ? `Hits straight from the sound · about ${rate.toFixed(1)} a second` : 'Listening for hits…';
   const label = $('#rhythmStatus');
   if (label.textContent !== status) label.textContent = status;
 }
@@ -10443,20 +10452,46 @@ function seqLoadSong(key, song) {
   seq.dirty = seq.specDirty = true;
 }
 function seqUsedLoops() { return seq.rec.blocks.reduce((m, b) => Math.max(m, b.track + 1), 2); }
+// While a sequence plays, each loop whose track has blocks is the sequence's: between its blocks it's hidden. A loop
+// whose track has none is left to you. When it stops, every loop it hid comes back as it was before it started,
+// and the color grading and 3D lighting it gave each loop go back to the ones you set.
 function seqRun(on, message) {
+  const was = seq.running;
   seq.running = on;
   $('#seqPlay').setAttribute('aria-pressed', String(on));
   seq.applied = [null, null, null, null];
   if (on) {
     if (ap.on) setAutopilot(false, true);
     seq.apMode = null;
+    if (!was) seq.showsBefore = Object.fromEntries(KEYS.map((k) => [k, mix.tgt[SHOW[k]]]));
     if (loopCount < seqUsedLoops()) { setLoopCount(seqUsedLoops(), 'load'); syncUI(); }
   } else {
     if (seq.apMode) { seq.apMode = null; }
     seqStopRec();
     seq.ownsVideo = false;
+    if (was) seqGiveBack();
   }
   if (message) seqNote(message);
+}
+// The tracks this song's sequence has blocks on
+const seqTracksUsed = () => new Set(seq.rec.blocks.map((b) => b.track));
+function seqGiveBack() {
+  const before = seq.showsBefore || {};
+  for (const [i, k] of KEYS.entries()) {
+    loopGrade[k] = null; seqRelief[k] = null;
+    // A loop the sequence hid (and you hadn't) comes back
+    if (mix.tgt[SHOW[k]] < 1 && (before[k] ?? 0) >= 1) mix.tgt[SHOW[k]] = before[k];
+    else if (mix.tgt[SHOW[k]] < 1 && seq.rec.blocks.some((b) => b.track === i) && k !== 'B') mix.tgt[SHOW[k]] = 100;
+  }
+  seq.showsBefore = null;
+  syncUI();
+}
+// Your hand on a loop the sequence is playing (picking its input, or its Show fader): you take over and the sequence
+// stops, rather than it hiding or replacing what you just did
+function seqTakeOver(k) {
+  if (!seq.running || seq.apMode || !seqTracksUsed().has(KEYS.indexOf(k))) return;
+  seqRun(false, 'You took over, so the sequence stopped. Press Play to go back to it.');
+  toast('You took over, so the sequence stopped. Press Play in the sequencer to go back to it.');
 }
 async function seqPlay() {
   seqAskFiles();
@@ -10688,8 +10723,8 @@ function seqTick(now) {
         if (seq.apMode !== 'end') { seq.apMode = 'end'; setAutopilot(true, true); seqNote('The sequence has ended, so Autopilot is running.'); }
       } else {
         if (seq.apMode === 'end') { seq.apMode = null; setAutopilot(false, true); }
-        if (!seq.apMode) for (let k = 0; k < TL.TRACKS; k++) {
-          if (!loopOn(KEYS[k])) continue;
+        if (!seq.apMode) for (let k = 0, used = seqTracksUsed(); k < TL.TRACKS; k++) {
+          if (!loopOn(KEYS[k]) || !used.has(k)) continue;   // no blocks on this track: the loop is yours
           if (seq.recording && k === seq.selTrack) continue;   // you're playing this loop by hand
           seqApplyTrack(k, r.tracks[k], now);
         }
