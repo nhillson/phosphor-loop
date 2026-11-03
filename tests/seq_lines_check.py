@@ -98,6 +98,23 @@ def main():
         pg.mouse.dblclick(pt2[0], pt2[1])
         c.wait_frames(3, 'added')
         n1 = J("__plSeq.rec.blocks.find(b => b.id === 'c1').autos.map(a => a.pts.length)")
+        # As on a fast computer: the block is redrawn between the two clicks (the browser then counts no
+        # double-click); the app counts it itself
+        pt3 = J("""(() => { const l = document.querySelector('.seq-blk[data-id="c1"] .lines').getBoundingClientRect(); return [l.x + l.width * 0.2, l.y + l.height * 0.8]; })()""")
+        J("window.__sawDbl = 0; document.addEventListener('dblclick', (e) => { if (e.target.closest && e.target.closest('.seq-blk')) window.__sawDbl++; }, true);"
+          "document.addEventListener('pointerup', () => __plSeq.redraw(), { once: true, capture: true })")   # the block is rebuilt right after the first click
+        pg.mouse.dblclick(pt3[0], pt3[1])
+        c.wait_frames(3, 'added again')
+        n2 = J("__plSeq.rec.blocks.find(b => b.id === 'c1').autos.map(a => a.pts.length)")
+        ok(n2[2] == n1[2] + 1, f'a double-click still adds a point when the block is redrawn between the clicks ({n1[2]} → {n2[2]})')
+        # Right-click › Add a point here
+        J("""(() => { const l = document.querySelector('.seq-blk[data-id="c1"] .lines').getBoundingClientRect();
+          document.querySelector('.seq-blk[data-id="c1"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: l.x + l.width * 0.8, clientY: l.y + l.height * 0.8 })); })()""")
+        c.wait_frames(2, 'menu')
+        J("[...document.querySelectorAll('.seq-menu.fixed button')].find(b => b.textContent.startsWith('Add a point here')).click()")
+        c.wait_frames(2, 'added by menu')
+        n3 = J("__plSeq.rec.blocks.find(b => b.id === 'c1').autos.map(a => a.pts.length)")
+        ok(n3[2] == n2[2] + 1, f'right-click › Add a point here adds one ({n2[2]} → {n3[2]})')
         ok(n1[2] == n0[2] + 1 and [x for i, x in enumerate(n1) if i != 2] == [x for i, x in enumerate(n0) if i != 2], f'double-clicking adds a point to Trails only ({n0} → {n1})')
         try:
             pg.screenshot(path=os.path.join(tempfile.gettempdir(), 'seq-lines.png'), timeout=30000)

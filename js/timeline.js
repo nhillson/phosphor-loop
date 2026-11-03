@@ -127,7 +127,7 @@
         cut++;
         // Its change lines keep their shape up to the new end
         const keep = (dur - nb.a) / (nb.b - nb.a);
-        nb.autos = nb.autos.map((x) => ({ ...x, pts: cleanPts([...x.pts.filter((p) => p[0] < keep).map(([u, v, ...rest]) => [u / keep, v, ...rest]), [1, autoValue(x.pts, keep)]]) }));
+        nb.autos = nb.autos.map((x) => ({ ...x, pts: cleanPts([...x.pts.filter((p) => p[0] < keep).map(([u, v, ...rest]) => [u / keep, v, ...rest]), [1, x.key === 'mirror' ? [...x.pts].reverse().find((p) => p[0] <= keep)?.[1] ?? x.pts[0][1] : autoValue(x.pts, keep)]]) }));
         nb.b = r2(dur); nb.fin = Math.min(nb.fin, nb.b - nb.a); nb.fout = Math.min(nb.fout, nb.b - nb.a - nb.fin);
       }
       blocks.push(nb);

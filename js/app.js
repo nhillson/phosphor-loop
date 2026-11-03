@@ -10288,11 +10288,19 @@ function seqSetLineAct(bl, ai) {
 const MIRROR_STEPS = [0, 2, 4, 6, 8];
 const mirrorSnap = (v) => MIRROR_STEPS.reduce((p, q) => (Math.abs(q - v) < Math.abs(p - v) ? q : p), 0);
 const snapLine = (key, val) => (key === 'mirror' ? mirrorSnap(val * 8) / 8 : val);
-// The point a Mirror line is heading for at u (the change on the way up or down to it is that point's)
+// A Mirror line holds each mirror until its next point, then changes straight to that point's mirror (0 to 6 is one
+// change, not three steps of two): each point is a change, at its own time. The value of a line at u, either way:
+function lineValue(au, u) {
+  if (au.key !== 'mirror') return TL.autoValue(au.pts, u);
+  const p = mirrorPoint(au, u);
+  return p ? p[1] : au.pts[0][1];
+}
+// The Mirror change in effect at u: the last point at or before it (null before the first change)
 function mirrorPoint(au, u) {
   const pts = au.pts;
-  for (let i = 1; i < pts.length; i++) if (u <= pts[i][0] + 1e-6) return pts[i];
-  return pts[pts.length - 1];
+  let at = null;
+  for (let i = 0; i < pts.length; i++) if (pts[i][0] <= u + 1e-6) at = pts[i];
+  return at;
 }
 // A Mirror point's own transition and time, or the line's, or the usual
 const ptFx = (au, p) => (p && p[2]) || au.fx || 'melt';
@@ -10452,7 +10460,7 @@ function seqPos(now) {
     const off = want - seqPh.t;
     if (!seqPh.live || Math.abs(off) > 1.5) {
       // A skip (or just started following): straight there, and every block is put on afresh
-      if (seqPh.live) seq.applied = [null, null, null, null];
+      if (seqPh.live) { seq.applied = [null, null, null, null]; seq.jumped = true; }
       seqPh.t = want;
     } else if (!s.playing) seqPh.t += off * (1 - Math.exp(-dt * 12));   // paused: settles on the spot it stopped at
     else seqPh.t += dt * (1 + clamp(off / 0.6, -0.6, 0.6));
@@ -10551,7 +10559,7 @@ function seqSeek(t) {
     if (!spotify.canSeek) { seqNote('Reconnect Spotify (Song sequencer › Connect Spotify) to move the song from here.'); return; }
     spotify.seek(t * 1000).catch((err) => seqNote(err.message));
   } else { seq.local.pos = t; seq.local.at = performance.now(); }
-  seq.applied = [null, null, null, null]; seq.dirty = true;
+  seq.applied = [null, null, null, null]; seq.dirty = true; seq.jumped = true;
 }
 $('#seqEnd').addEventListener('change', (e) => { seq.rec.end = e.target.value; seqSave(); });
 
@@ -10680,7 +10688,9 @@ function seqApplyTrack(k, x, now) {
   const K = KEYS[k], L = loops[K], T = L.tgt;
   if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); seqRelief[K] = null; return; }
   const sig = x.other ? `${x.other.id}>${x.main.id}` : x.main.id;
+  let fresh = false;
   if (seq.applied[k] !== sig) {
+    fresh = true;
     const wasCross = (seq.applied[k] || '').includes('>');
     patchLoop(K, x.other ? x.other.look : x.main.look, true);
     seq.xin[k] = false;
@@ -10713,7 +10723,7 @@ function seqApplyTrack(k, x, now) {
   const take = (blk, u, wt) => {
     for (const au of blk.autos) {
       if (au.key === 'mirror' && (!mirrorLine || wt > mirrorLine.wt)) mirrorLine = { au, wt, u };
-      const [lo, hi] = seqRange(au.key), v = lo + (hi - lo) * TL.autoValue(au.pts, u);
+      const [lo, hi] = seqRange(au.key), v = lo + (hi - lo) * lineValue(au, u);
       if (!(au.key in vals)) vals[au.key] = { sum: 0, wt: 0 };
       vals[au.key].sum += v * wt; vals[au.key].wt += wt;
     }
@@ -10731,7 +10741,9 @@ function seqApplyTrack(k, x, now) {
     else if (key === 'mirror') {
       // A new step comes in through the line's own Transition, over its own time (see mirrorStep)
       const step = mirrorSnap(v);
-      if (step !== T.mirror) {
+      // After a jump in the song the mirror is simply what the line says there (no change played out)
+      if (fresh && seq.jumped) { T.mirror = step; mirrorCut(K); }
+      else if (step !== T.mirror) {
         // Each change comes in the way its own point says (the point the line is heading for), or else the line's way
         if (mirrorLine) {
           const pt = mirrorPoint(mirrorLine.au, mirrorLine.u);
@@ -10772,6 +10784,7 @@ function seqTick(now) {
           if (seq.recording && k === seq.selTrack) continue;   // you're playing this loop by hand
           seqApplyTrack(k, r.tracks[k], now);
         }
+        seq.jumped = false;
       }
     }
   }
@@ -10908,8 +10921,9 @@ function seqDrawStatic() {
       // (a Mirror line is drawn as the steps it really takes)
       const linePts = (au) => {
         if (au.key !== 'mirror') return au.pts.map(([u, val]) => `${u * 100},${100 - val * 100}`).join(' ');
-        const out = [];
-        for (let x = 0; x <= 100; x += 0.5) out.push(`${x},${100 - snapLine('mirror', TL.autoValue(au.pts, x / 100)) * 100}`);
+        // held flat, then straight up or down at each point
+        const out = [], y = (v) => 100 - snapLine('mirror', v) * 100;
+        au.pts.forEach(([u, v], i) => { if (i) out.push(`${u * 100},${y(au.pts[i - 1][1])}`); out.push(`${u * 100},${y(v)}`); });
         return out.join(' ');
       };
       // Many lines in one block: only one is in front (the one being edited: its points, clickable), the rest drawn
@@ -11081,6 +11095,14 @@ seqView.addEventListener('pointerdown', (e) => {
   const blkEl = e.target.closest('.seq-blk'), mkEl = e.target.closest('.seq-mk');
   if (mkEl && e.target.tagName === 'INPUT') return;
   const d = { x: e.clientX, y: e.clientY, start: seq.view.start, moved: false, before: seqSnap() };
+  // A second press within half a second and a few pixels of the first, on the same block (not on a point): a double-click
+  const now = performance.now(), last = seq.lastPress;
+  seq.lastPress = { t: now, x: e.clientX, y: e.clientY, id: blkEl ? blkEl.dataset.id : '' };
+  if (blkEl && last && last.id === blkEl.dataset.id && now - last.t < 500 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 8 && e.target.dataset.h !== 'pt') {
+    const bl = seqBlock(blkEl.dataset.id);
+    seq.lastPress = null;
+    if (bl && !bl.rec) { seqAddPointAt(bl, e.clientX, e.clientY); return; }
+  }
   if (blkEl) {
     const bl = seqBlock(blkEl.dataset.id); if (!bl || bl.rec) return;
     d.kind = e.target.dataset.h || 'move'; d.bl = bl; d.orig = JSON.parse(JSON.stringify(bl));
@@ -11090,7 +11112,11 @@ seqView.addEventListener('pointerdown', (e) => {
     else if (d.kind === 'line') {
       // A click on a line: on a Mirror line it picks the change there (the point the line is heading for)
       const ai = +e.target.dataset.a, au = bl.autos[ai], u = clamp((e.clientX - lr.left) / lr.width, 0, 1);
-      if (au && au.key === 'mirror') { const pt = mirrorPoint(au, u); seq.selPt = { id: bl.id, ai, pi: Math.max(1, au.pts.indexOf(pt)) }; }
+      if (au && au.key === 'mirror' && au.pts.length > 1) {
+        let best = 1;
+        for (let i = 1; i < au.pts.length; i++) if (Math.abs(au.pts[i][0] - u) < Math.abs(au.pts[best][0] - u)) best = i;
+        seq.selPt = { id: bl.id, ai, pi: best };
+      }
       d.kind = 'sel';
     }
     else if (!seq.selPt || seq.selPt.id !== bl.id) seq.selPt = null;
@@ -11137,25 +11163,30 @@ seqView.addEventListener('pointerup', (e) => {
 });
 seqView.addEventListener('pointercancel', () => { const d = seq.drag; if (d && d.kind !== 'pan') { seqRestore(d.before); seq.dirty = true; } seq.drag = null; });
 // Double-click a block to add a point to its newest change line; a marker to rename it
+// Double-clicking a marker renames it. Double-clicking a block adds a point there: that one is counted here, from two
+// presses close together in time and place on the same block (see seqView's pointerdown), not left to the browser,
+// which doesn't count a double-click when the block was redrawn between the two clicks, as it is on a fast computer.
 seqView.addEventListener('dblclick', (e) => {
   const mkEl = (document.elementFromPoint(e.clientX, e.clientY) || e.target).closest('.seq-mk');
-  if (mkEl) { seqRenameMarker(mkEl); return; }
-  // (the timeline holds on to the mouse while a button is down, so the double-click itself arrives at the timeline:
-  // what's really under the pointer is asked for)
-  const tgt = document.elementFromPoint(e.clientX, e.clientY) || e.target;
-  const h = tgt.dataset ? tgt.dataset.h : '';
-  const el = tgt.closest('.seq-blk'); if (!el || (h && h !== 'line' && h !== 'lineact')) return;
-  const bl = seqBlock(el.dataset.id); if (!bl) return;
+  if (mkEl) seqRenameMarker(mkEl);
+});
+// A point added on the line in front of block bl, where the pointer is (x, y on screen)
+function seqAddPointAt(bl, x, y) {
+  const el = seqLanes.querySelector(`.seq-blk[data-id="${CSS.escape(bl.id)}"]`);
+  if (!el) return;
   if (!bl.autos.length) { seqNote('Right-click the block and pick Change over time first.'); return; }
-  const r = (el.querySelector('.lines') || el).getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
-  // Double-clicking adds a point to the line in front (the one being edited)
-  const au = bl.autos[seqLineAct(bl)];
+  const r = (el.querySelector('.lines') || el).getBoundingClientRect(), u = clamp((x - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (y - r.top) / r.height, 0, 1);
+  const ai = seqLineAct(bl), au = bl.autos[ai];
   const np = [u, snapLine(au.key, val)];
+  // A new Mirror change comes in the way the change before it did (or the line's way)
   if (au.key === 'mirror') { const was = mirrorPoint(au, u); np.push(ptFx(au, was), ptSecs(au, was)); }
   seqChange(() => { au.pts.push(np); au.pts.sort((p, q) => p[0] - q[0]); });
-  if (au.key === 'mirror') { seq.selPt = { id: bl.id, ai: bl.autos.indexOf(au), pi: au.pts.indexOf(np) }; seqInspector(); }
-  seqNote(`Added a point to ${SEQ_NAME[au.key] || au.key}. Drag it to set the value.`);
-});
+  seq.selPt = { id: bl.id, ai, pi: au.pts.indexOf(np) };
+  seq.dirty = true;
+  seqInspector();
+  seqNote(au.key === 'mirror' ? `Added a Mirror change at ${fmtSeq(bl.a + u * (bl.b - bl.a), true)}. Drag it up or down for the mirror, left or right for when.`
+    : `Added a point to ${SEQ_NAME[au.key] || au.key}. Drag it to set the value.`);
+}
 function seqRenameMarker(el) {
   const m = seq.rec.markers.find((x) => x.id === el.dataset.id); if (!m) return;
   const before = seqSnap(), inp = document.createElement('input');
@@ -11274,6 +11305,7 @@ seqView.addEventListener('contextmenu', (e) => {
       { label: 'Save to My presets…', run: () => seqAsk(e.clientX, e.clientY, 'Save this look as', bl.label || '', nextPresetName(), (name) => seqSaveLook(bl, name || nextPresetName())) },
       '-',
       { label: `Change over time…${bl.autos.length ? ` (${bl.autos.length})` : ''}`, run: () => seqPickSlider(bl, e.clientX, e.clientY) },
+      ...(bl.autos.length ? [{ label: `Add a point here (${SEQ_NAME[bl.autos[seqLineAct(bl)].key] || bl.autos[seqLineAct(bl)].key})`, key: 'Double-click', run: () => seqAddPointAt(bl, e.clientX, e.clientY) }] : []),
       '-',
       { label: 'Delete', key: 'Del', run: () => seqDelete(bl) },
     ]);
@@ -11532,7 +11564,7 @@ function seqSetOpen(open, save) {
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
 window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
   spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; }, seek: (t) => seqSeek(t),
-  select: (id) => { seq.selId = id; seq.dirty = true; seqInspector(); } };   // for tests/snips_check.py
+  select: (id) => { seq.selId = id; seq.dirty = true; seqInspector(); }, redraw: () => seqDrawStatic() };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });
 
 /* ---------- Spotify: which song is playing ---------- */
@@ -11550,7 +11582,7 @@ function spotifySongChanged(snapshot) {
     if (seq.rec.blocks.length) seqRun(true, 'This song has a sequence; it’s playing.');
     else if (wasRunning || ap.on || !previous) { seqRun(false); seq.apMode = 'empty'; setAutopilot(true, true); seqNote('No sequence for this song yet, so Autopilot is running. Add looks to start one.'); }
   } else if (previous?.track && Math.abs(snapshot.progressMs - (previous.progressMs + (previous.playing ? snapshot.receivedAt - previous.receivedAt : 0))) > 1200) {
-    seq.applied = [null, null, null, null];
+    seq.applied = [null, null, null, null]; seq.jumped = true;
   }
 }
 $('#spotifyClientId').value = spotify.clientId;
