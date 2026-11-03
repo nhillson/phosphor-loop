@@ -10268,7 +10268,20 @@ const SEQ_SLIDERS = [
   ['3D lighting', [['rDepth', '3D depth'], ['rSmooth', '3D smoothness'], ['rShine', 'Shine'], ['rLight', 'Light direction'], ['rSpin', 'Light spin']]],
 ];
 const SEQ_NAME = Object.fromEntries(SEQ_SLIDERS.flatMap(([, list]) => list));
-const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1'];
+const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1', '#b8f28a', '#c9a8ff', '#ff9e7a', '#7ab8ff'];
+const seqLineColor = (ai) => SEQ_LINES[ai % SEQ_LINES.length];
+// The change line being edited in a block (the one in front): the one picked last, else its newest
+function seqLineAct(bl) {
+  if (!bl || !bl.autos.length) return -1;
+  const a = seq.lineAct && seq.lineAct.id === bl.id ? seq.lineAct.ai : -1;
+  return a >= 0 && a < bl.autos.length ? a : bl.autos.length - 1;
+}
+function seqSetLineAct(bl, ai) {
+  seq.lineAct = { id: bl.id, ai };
+  if (seq.selPt && (seq.selPt.id !== bl.id || seq.selPt.ai !== ai)) seq.selPt = null;
+  seq.dirty = true;
+  seqInspector();
+}
 // A slider's range, from the control itself
 // Mirror steps: Off, 2, 4, 6 and 8 sides. Its change line goes from Off (bottom) to 8 (top), in steps, and each
 // step comes in through the Transition picked for the line (Cut, Melt, Iris or Ripple) over the time picked.
@@ -10855,6 +10868,9 @@ function seqFixView() {
 const seqX = (t) => (t - seq.view.start) * seq.view.pps;
 function seqDrawStatic() {
   seqFixView();
+  // The selected block's track grows taller while it has change lines, so they have room to edit
+  const selBl = seq.rec.blocks.find((b) => b.id === seq.selId), tall = selBl && selBl.autos.length ? selBl.track : -1;
+  seqLaneEls.forEach((l, i) => { l.classList.toggle('tall', i === tall); seqCards[i].classList.toggle('tall', i === tall); });
   const v = seq.view, pps = v.pps, end = v.start + v.vw / pps, dur = seqDur();
   const steps = [0.5, 1, 2, 5, 10, 15, 30, 60], step = steps.find((s) => s * pps >= 64) || 60;
   const minor = step / (step >= 10 && step % 5 === 0 ? 5 : 2);
@@ -10896,13 +10912,23 @@ function seqDrawStatic() {
         for (let x = 0; x <= 100; x += 0.5) out.push(`${x},${100 - snapLine('mirror', TL.autoValue(au.pts, x / 100)) * 100}`);
         return out.join(' ');
       };
-      html += '<svg class="auto" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + bl.autos.map((au, ai) =>
-        `<polyline points="${linePts(au)}" fill="none" stroke="${SEQ_LINES[ai % 4]}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`).join('') + '</svg>';
-      if (bl.id === seq.selId || w > 120) bl.autos.forEach((au, ai) => {
-        const sp = seq.selPt && seq.selPt.id === bl.id && seq.selPt.ai === ai ? seq.selPt.pi : -1;
-        html += au.pts.map(([u, val, fx, secs], pi) => `<span class="dot${pi === sp ? ' sel' : ''}" data-h="pt" data-a="${ai}" data-p="${pi}" title="${au.key === 'mirror' && pi > 0 ? `Mirror ${mirrorSnap(val * 8) || 'Off'} · ${ptFx(au, au.pts[pi])}${ptFx(au, au.pts[pi]) === 'cut' ? '' : ` over ${ptSecs(au, au.pts[pi])} s`} (click to change)` : SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
-      });
-      if (w > 90) html += `<span class="atag">${bl.autos.map((au) => SEQ_NAME[au.key] || au.key).join(' · ')}</span>`;
+      // Many lines in one block: only one is in front (the one being edited: its points, clickable), the rest drawn
+      // faintly behind it; in the selected block a faint line can be clicked to bring it to the front. The lines sit
+      // a little inside the block, clear of its edges and handles, each with a wide invisible band along it to click.
+      const sel = bl.id === seq.selId, act = seqLineAct(bl);
+      const order = bl.autos.map((_, ai) => ai).sort((x, y) => (x === act) - (y === act));
+      html += '<div class="lines"><svg class="auto" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + order.map((ai) => {
+        const au = bl.autos[ai], front = sel && ai === act, pts = linePts(au);
+        return `<polyline points="${pts}" fill="none" stroke="${seqLineColor(ai)}" stroke-width="${front ? 2 : 1.25}" stroke-opacity="${front ? 1 : sel ? 0.3 : 0.75}" vector-effect="non-scaling-stroke"/>` +
+          (sel ? `<polyline class="hit" data-h="${front ? 'line' : 'lineact'}" data-a="${ai}" points="${pts}" fill="none" stroke="transparent" stroke-width="${front ? 14 : 8}" vector-effect="non-scaling-stroke"><title>${front ? '' : `Edit ${SEQ_NAME[au.key] || au.key}`}</title></polyline>` : '');
+      }).join('') + '</svg>';
+      if (sel && act >= 0) {
+        const au = bl.autos[act], sp = seq.selPt && seq.selPt.id === bl.id && seq.selPt.ai === act ? seq.selPt.pi : -1;
+        html += au.pts.map(([u, val], pi) => `<span class="dot${pi === sp ? ' sel' : ''}" data-h="pt" data-a="${act}" data-p="${pi}" title="${au.key === 'mirror' && pi > 0 ? `Mirror ${mirrorSnap(val * 8) || 'Off'} · ${ptFx(au, au.pts[pi])}${ptFx(au, au.pts[pi]) === 'cut' ? '' : ` over ${ptSecs(au, au.pts[pi])} s`} (click to change)` : SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${seqLineColor(act)}"></span>`).join('');
+      }
+      html += '</div>';
+      if (w > 90 && !sel) html += `<span class="atag">${bl.autos.map((au) => SEQ_NAME[au.key] || au.key).join(' · ')}</span>`;
+      if (w > 90 && sel && act >= 0) html += `<span class="atag">Editing <b style="color:${seqLineColor(act)}">${SEQ_NAME[bl.autos[act].key] || bl.autos[act].key}</b>${bl.autos.length > 1 ? ` · ${bl.autos.length - 1} more` : ''}</span>`;
     }
     if (w > 34) html += `<span class="t">${escapeHTML(seqName(bl))}<small>${fmtSeq(bl.a)}–${fmtSeq(bl.b)}</small></span>`;
     html += '<div class="eg l" data-h="l"></div><div class="eg r" data-h="r"></div>';
@@ -10970,10 +10996,10 @@ function seqInspector() {
   if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
-    (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
-  // A Mirror line: the change leading to the picked point, its own Transition and time
-  const mi = bl.autos.findIndex((au) => au.key === 'mirror');
-  if (mi >= 0) {
+    (bl.autos.length ? `<span class="seq-lines">Editing ${bl.autos.map((au, i) => `<button type="button" class="chip" data-line="${i}" aria-pressed="${i === seqLineAct(bl)}" title="Bring ${SEQ_NAME[au.key] || au.key}’s line to the front to edit it"><span class="led" style="background:${seqLineColor(i)}"></span>${SEQ_NAME[au.key] || au.key}</button>`).join('')}</span>` : '<span>No changes over time · right-click to add one</span>');
+  // The Mirror line in front: the change leading to the picked point, its own Transition and time
+  const mi = seqLineAct(bl);
+  if (mi >= 0 && bl.autos[mi].key === 'mirror') {
     const mau = bl.autos[mi], sp = seq.selPt && seq.selPt.id === bl.id && seq.selPt.ai === mi && seq.selPt.pi > 0 && seq.selPt.pi < mau.pts.length ? mau.pts[seq.selPt.pi] : null;
     if (!sp) el.innerHTML += '<span class="seq-mfx">Click a point on the Mirror line to pick how the change up to it comes in.</span>';
     else {
@@ -10984,6 +11010,13 @@ function seqInspector() {
     }
   }
 }
+// Which change line is in front (being edited), picked in the block's details
+$('#seqInsp').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-line]'), bl = b && seq.rec.blocks.find((x) => x.id === seq.selId);
+  if (!bl) return;
+  seqSetLineAct(bl, +b.dataset.line);
+  seqNote(`Editing ${SEQ_NAME[bl.autos[+b.dataset.line].key] || bl.autos[+b.dataset.line].key}: drag its points, double-click to add one.`);
+});
 // The picked Mirror point's Transition and time, picked in the block's details
 $('#seqInsp').addEventListener('click', (e) => {
   const b = e.target.closest('[data-mfx], [data-msecs]'), P = seq.selPt;
@@ -11037,7 +11070,10 @@ $('#seqFit').addEventListener('click', () => { seq.view.pps = seq.view.minPps; s
 }
 
 /* ---------- dragging: blocks (move, ends, fades, change-line points), markers, or the view itself ---------- */
-const seqTrackAtY = (y) => clamp(Math.floor((y - seqLanes.getBoundingClientRect().top) / (seqLaneEls[0].offsetHeight + 4)), 0, TL.TRACKS - 1);
+const seqTrackAtY = (y) => {
+  for (let i = 0; i < seqLaneEls.length; i++) if (y < seqLaneEls[i].getBoundingClientRect().bottom + 2) return i;
+  return TL.TRACKS - 1;
+};
 const seqBlock = (id) => seq.rec.blocks.find((b) => b.id === id);
 seqView.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
@@ -11048,7 +11084,15 @@ seqView.addEventListener('pointerdown', (e) => {
   if (blkEl) {
     const bl = seqBlock(blkEl.dataset.id); if (!bl || bl.rec) return;
     d.kind = e.target.dataset.h || 'move'; d.bl = bl; d.orig = JSON.parse(JSON.stringify(bl));
-    if (d.kind === 'pt') { const r = blkEl.getBoundingClientRect(); d.w = r.width; d.h = r.height; d.ai = +e.target.dataset.a; d.pi = +e.target.dataset.p; seq.selPt = { id: bl.id, ai: d.ai, pi: d.pi }; }
+    const lr = (blkEl.querySelector('.lines') || blkEl).getBoundingClientRect();
+    if (d.kind === 'pt') { d.w = lr.width; d.h = lr.height; d.ai = +e.target.dataset.a; d.pi = +e.target.dataset.p; seq.selPt = { id: bl.id, ai: d.ai, pi: d.pi }; }
+    else if (d.kind === 'lineact') { seqSetLineAct(bl, +e.target.dataset.a); d.kind = 'sel'; }
+    else if (d.kind === 'line') {
+      // A click on a line: on a Mirror line it picks the change there (the point the line is heading for)
+      const ai = +e.target.dataset.a, au = bl.autos[ai], u = clamp((e.clientX - lr.left) / lr.width, 0, 1);
+      if (au && au.key === 'mirror') { const pt = mirrorPoint(au, u); seq.selPt = { id: bl.id, ai, pi: Math.max(1, au.pts.indexOf(pt)) }; }
+      d.kind = 'sel';
+    }
     else if (!seq.selPt || seq.selPt.id !== bl.id) seq.selPt = null;
     seq.selId = bl.id; seqSelectTrack(bl.track); seq.dirty = true;
   } else if (mkEl) {
@@ -11094,13 +11138,18 @@ seqView.addEventListener('pointerup', (e) => {
 seqView.addEventListener('pointercancel', () => { const d = seq.drag; if (d && d.kind !== 'pan') { seqRestore(d.before); seq.dirty = true; } seq.drag = null; });
 // Double-click a block to add a point to its newest change line; a marker to rename it
 seqView.addEventListener('dblclick', (e) => {
-  const mkEl = e.target.closest('.seq-mk');
+  const mkEl = (document.elementFromPoint(e.clientX, e.clientY) || e.target).closest('.seq-mk');
   if (mkEl) { seqRenameMarker(mkEl); return; }
-  const el = e.target.closest('.seq-blk'); if (!el || e.target.dataset.h) return;
+  // (the timeline holds on to the mouse while a button is down, so the double-click itself arrives at the timeline:
+  // what's really under the pointer is asked for)
+  const tgt = document.elementFromPoint(e.clientX, e.clientY) || e.target;
+  const h = tgt.dataset ? tgt.dataset.h : '';
+  const el = tgt.closest('.seq-blk'); if (!el || (h && h !== 'line' && h !== 'lineact')) return;
   const bl = seqBlock(el.dataset.id); if (!bl) return;
   if (!bl.autos.length) { seqNote('Right-click the block and pick Change over time first.'); return; }
-  const r = el.getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
-  const au = bl.autos[bl.autos.length - 1];
+  const r = (el.querySelector('.lines') || el).getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
+  // Double-clicking adds a point to the line in front (the one being edited)
+  const au = bl.autos[seqLineAct(bl)];
   const np = [u, snapLine(au.key, val)];
   if (au.key === 'mirror') { const was = mirrorPoint(au, u); np.push(ptFx(au, was), ptSecs(au, was)); }
   seqChange(() => { au.pts.push(np); au.pts.sort((p, q) => p[0] - q[0]); });
@@ -11192,6 +11241,7 @@ function seqPickSlider(bl, x, y) {
             const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : key in RELIEF_DEF ? relief[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
             const v = clamp((cur - lo) / ((hi - lo) || 1), 0, 1);
             bl.autos.push({ key, pts: [[0, v], [1, v]], ...(key === 'mirror' ? { fx: bl.look.mirrorFx in MIRROR_FX && bl.look.mirrorFx !== 'cut' ? bl.look.mirrorFx : 'melt', secs: MIRROR_SECS } : {}) });
+            seq.lineAct = { id: bl.id, ai: bl.autos.length - 1 };
           }
         });
         seqNote(has ? `${name} no longer changes in “${seqName(bl)}”.` : `${name} now changes over “${seqName(bl)}”. Drag the dots to shape it, double-click the block to add a point.`);

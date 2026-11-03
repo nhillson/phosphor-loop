@@ -83,6 +83,10 @@ file don't rebuild the app.
    has its own Transition and time: a Mirror point is `[u, v, fx, secs]` (kept by `cleanPts` in js/timeline.js), and the
    change on the way to a point comes in its way (`mirrorPoint`); click a point to pick it in the block's details
    (`seq.selPt`). `python3 tests/seq_mirror_check.py`.
+4q. **Many change lines in a block**: one line is in front (`seqLineAct`: its points, clickable; picked with the buttons in
+   the block's details or by clicking its faint line), the others drawn faintly behind; the selected block's track
+   grows taller (`.seq-h-lane.tall`). The timeline holds the pointer while a button is down, so the double-click
+   handler asks `elementFromPoint` for what's under it. `python3 tests/seq_lines_check.py` (real mouse clicks).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

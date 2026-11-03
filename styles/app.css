@@ -1070,6 +1070,12 @@
 .seq-heads { flex: none; width: var(--seq-head); }
 .seq-view-col { flex: 1 1 auto; min-width: 0; }
 .seq-h-ruler { height: 18px; } .seq-h-marks { height: 18px; } .seq-h-spec { height: 48px; } .seq-h-lane { height: 40px; } .seq-h-ov { height: 10px; }
+/* The selected block's track, taller while it has change lines (see seqDrawStatic) */
+.seq-h-lane.tall { height: 128px; transition: height .15s; }
+.seq-h-lane { transition: height .15s; }
+#seqInsp .seq-lines, #seqInsp .seq-mfx { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+#seqInsp .seq-lines .led { box-shadow: none; }
+.seq-blk .atag b { font-weight: 600; }
 .seq-card { display: flex; align-items: center; gap: 10px; box-sizing: border-box; padding: 0 10px; border-radius: 5px; border: 1px solid var(--line); background: var(--raise); text-align: left; font: 14px/1.2 var(--f-body); color: var(--ink); min-width: 0; }
 .seq-card b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .seq-card small { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
@@ -1114,8 +1120,13 @@ button.seq-card { cursor: pointer; }
 .seq-blk .eg.l { left: -2px; } .seq-blk .eg.r { right: -2px; }
 .seq-blk .fh { display: none; position: absolute; top: -6px; width: 11px; height: 11px; margin-left: -6px; border-radius: 50%; background: var(--press-ink); border: 2px solid var(--well); box-sizing: border-box; cursor: ew-resize; z-index: 2; }
 .seq-blk:hover .fh, .seq-blk.sel .fh { display: block; }
+.seq-blk .lines { position: absolute; inset: 8px 11px; pointer-events: none; z-index: 3; }
+.seq-blk.sel .lines { top: 22px; bottom: 16px; }
 .seq-blk svg.auto { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-.seq-blk .dot { position: absolute; width: 9px; height: 9px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid var(--well); box-sizing: border-box; cursor: grab; z-index: 1; }
+.seq-blk svg.auto .hit { pointer-events: stroke; cursor: pointer; }
+.seq-blk .dot { pointer-events: auto; }
+.seq-blk .dot::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
+.seq-blk .dot { position: absolute; width: 11px; height: 11px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--well); box-sizing: border-box; cursor: grab; z-index: 1; }
 .seq-blk .dot.sel { width: 13px; height: 13px; margin: -7px 0 0 -7px; border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.6); z-index: 2; }
 .seq-blk .atag { position: absolute; right: 6px; bottom: 2px; font-size: 11px; color: var(--osd); pointer-events: none; white-space: nowrap; overflow: hidden; max-width: 90%; }
 .seq-xf { position: absolute; top: 3px; bottom: 3px; z-index: 3; pointer-events: none; border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(242,217,252,.28) 0 4px, transparent 4px 8px); border: 1px dashed var(--press-ink); box-sizing: border-box; display: flex; align-items: flex-end; justify-content: flex-end; font-size: 11px; color: var(--press-ink); overflow: hidden; white-space: nowrap; padding-right: 2px; }
