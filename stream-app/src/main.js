@@ -1,7 +1,7 @@
 'use strict';
 // Phosphor Stream: one window with Phosphor Loop on the left and the streaming controls on the right.
 const { app, BrowserWindow, WebContentsView, ipcMain, session, desktopCapturer, safeStorage, shell, dialog,
-  powerSaveBlocker, globalShortcut } = require('electron');
+  powerSaveBlocker, globalShortcut, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFile } = require('node:child_process');
@@ -47,7 +47,10 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // Share another window…: film a window even while it sits behind Phosphor Loop (Windows' own window capture)
 app.commandLine.appendSwitch('enable-features', 'WebRtcAllowWgcWindowCapturer');
 
-if (!TEST && !app.requestSingleInstanceLock()) app.quit();
+// Only one Phosphor Stream at a time. A second one started (from the desktop icon, say) hands over to the one already
+// open, which comes to the front, and closes at once without opening a window of its own (it used to flash one up).
+const firstCopy = TEST || app.requestSingleInstanceLock();
+if (!firstCopy) app.exit(0);
 
 /* ---------- settings (stream keys are locked with Windows' own protection) ---------- */
 const dataDir = () => app.getPath('userData');
@@ -478,6 +481,8 @@ function createWindow() {
       title: 'You’re live', message: 'You’re live right now. Stop the stream and close?' });
     if (r === 1) e.preventDefault();
   });
+  // The main window gone means Phosphor Stream is closing, even if another of its windows is still open
+  win.on('closed', () => { if (!TEST) closeAll('the main window closed'); });
   win.on('closed', () => { win = null; });
 }
 
@@ -944,15 +949,51 @@ ipcMain.handle('open-log', () => { if (logPath) shell.showItemInFolder(logPath);
 ipcMain.on('capture-config', (e) => { e.returnValue = captureConfig(); });
 
 /* ---------- start-up ---------- */
+// Opened again while open: this window comes to the front, wherever it had got to (back from a screen that's
+// switched off or unplugged, out of Click through), and a window that had gone is made afresh
+function bringBack() {
+  if (!win || win.isDestroyed()) { log('Opened again with no window: making a new one'); createWindow(); return; }
+  if (clickThrough) setClickThrough(false);
+  if (win.isFullScreen() && siteFull) setSiteFull(false);
+  if (win.isMinimized()) win.restore();
+  const b = win.getBounds(), on = screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    return b.x + 80 < a.x + a.width && b.x + b.width - 80 > a.x && b.y + 40 < a.y + a.height && b.y + 40 > a.y - 10;
+  });
+  if (!on) {
+    const a = screen.getPrimaryDisplay().workArea, w = Math.min(b.width, a.width), h = Math.min(b.height, a.height);
+    win.setBounds({ x: a.x + Math.round((a.width - w) / 2), y: a.y + Math.round((a.height - h) / 2), width: w, height: h });
+    log('Opened again: the window was off every screen, so it was brought onto the main one');
+  }
+  win.show();
+  win.focus();
+  win.moveTop();
+}
 app.on('second-instance', (_e, argv) => {
-  if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+  log('Opened again while already open: bringing the window to the front');
+  bringBack();
   // "Phosphor Stream.exe --sharpness-test" while the app is open runs the test in the open app
   if (argv.includes('--sharpness-test')) sharpnessTest();
 });
-app.on('window-all-closed', async () => { await stopLive(); setTimeout(() => app.quit(), 4000); });
+// Closing the main window closes Phosphor Stream: Phosphor Loop's Output window and anything else it opened go too
+// (one left open, maybe on a projector, used to keep the app running out of sight, and then it wouldn't open again).
+// The stream is stopped first, but never for more than a few seconds.
+let quitting = false;
+async function closeAll(why) {
+  if (quitting) return;
+  quitting = true;
+  log('Closing: ' + why);
+  await Promise.race([stopLive().catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+  for (const w of BrowserWindow.getAllWindows()) { try { if (!w.isDestroyed()) w.destroy(); } catch (_) {} }
+  setTimeout(() => app.exit(0), 3000);
+  app.quit();
+}
+app.on('window-all-closed', () => closeAll('every window closed'));
+process.on('uncaughtException', (e) => { try { log('Problem: ' + (e && e.stack || e)); } catch (_) {} });
+process.on('unhandledRejection', (e) => { try { log('Problem (async): ' + (e && e.stack || e)); } catch (_) {} });
 app.on('before-quit', () => { if (streamer.live) streamer.stop(); });
 
-app.whenReady().then(async () => {
+if (firstCopy) app.whenReady().then(async () => {
   loadSettings();
   log(`Phosphor Stream ${app.getVersion()} starting; FFmpeg at ${ffmpegPath()}`);
   permissions();
