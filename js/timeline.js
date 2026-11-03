@@ -3,6 +3,7 @@
 (() => {
   const TRACKS = 4, MIN_LEN = 0.5, MAX_BLOCKS = 400, MAX_MARKERS = 200, MAX_VERSIONS = 40;
   const END = ['hold', 'loop', 'auto'];
+  const FX = ['cut', 'melt', 'iris', 'ripple'];
   const num = (v, d = 0) => (Number.isFinite(+v) ? +v : d);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const r2 = (v) => Math.round(v * 100) / 100;
@@ -12,7 +13,9 @@
 
   function cleanPts(pts) {
     const out = (Array.isArray(pts) ? pts : []).filter((p) => Array.isArray(p) && p.length >= 2)
-      .map(([u, v]) => [clamp(num(u), 0, 1), clamp(num(v), 0, 1)]).sort((p, q) => p[0] - q[0]).slice(0, 64);
+      // (a Mirror line's point can also say how the change up to it comes in: [u, v, transition, seconds])
+      .map(([u, v, fx, secs]) => (FX.includes(fx) ? [clamp(num(u), 0, 1), clamp(num(v), 0, 1), fx, clamp(num(secs, 3), 0.5, 12)] : [clamp(num(u), 0, 1), clamp(num(v), 0, 1)]))
+      .sort((p, q) => p[0] - q[0]).slice(0, 64);
     if (out.length < 2) return [[0, 0.5], [1, 0.5]];
     out[0][0] = 0; out[out.length - 1][0] = 1;
     return out;
@@ -124,7 +127,7 @@
         cut++;
         // Its change lines keep their shape up to the new end
         const keep = (dur - nb.a) / (nb.b - nb.a);
-        nb.autos = nb.autos.map((x) => ({ ...x, pts: cleanPts([...x.pts.filter((p) => p[0] < keep).map(([u, v]) => [u / keep, v]), [1, autoValue(x.pts, keep)]]) }));
+        nb.autos = nb.autos.map((x) => ({ ...x, pts: cleanPts([...x.pts.filter((p) => p[0] < keep).map(([u, v, ...rest]) => [u / keep, v, ...rest]), [1, autoValue(x.pts, keep)]]) }));
         nb.b = r2(dur); nb.fin = Math.min(nb.fin, nb.b - nb.a); nb.fout = Math.min(nb.fout, nb.b - nb.a - nb.fin);
       }
       blocks.push(nb);

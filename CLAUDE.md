@@ -79,8 +79,10 @@ file don't rebuild the app.
 4o. **A sequence and your hand** (a loop whose track has no blocks is yours; picking an input or raising Show on a loop
    the sequence plays stops it; stopping gives back the loops it hid; `seqRun`, `seqTakeOver`, `seqGiveBack`):
    `python3 tests/seq_takeover_check.py` (about a minute).
-4p. **Mirror as a change over time** (sequencer key `mirror`, range 0-8 snapped to Off/2/4/6/8 by `mirrorSnap`; each line has its
-   own `fx` and `secs`, kept by `cleanBlock` in js/timeline.js, picked in the block's details): `python3 tests/seq_mirror_check.py`.
+4p. **Mirror as a change over time** (sequencer key `mirror`, range 0-8 snapped to Off/2/4/6/8 by `mirrorSnap`). Each change
+   has its own Transition and time: a Mirror point is `[u, v, fx, secs]` (kept by `cleanPts` in js/timeline.js), and the
+   change on the way to a point comes in its way (`mirrorPoint`); click a point to pick it in the block's details
+   (`seq.selPt`). `python3 tests/seq_mirror_check.py`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

@@ -10275,6 +10275,15 @@ const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1'];
 const MIRROR_STEPS = [0, 2, 4, 6, 8];
 const mirrorSnap = (v) => MIRROR_STEPS.reduce((p, q) => (Math.abs(q - v) < Math.abs(p - v) ? q : p), 0);
 const snapLine = (key, val) => (key === 'mirror' ? mirrorSnap(val * 8) / 8 : val);
+// The point a Mirror line is heading for at u (the change on the way up or down to it is that point's)
+function mirrorPoint(au, u) {
+  const pts = au.pts;
+  for (let i = 1; i < pts.length; i++) if (u <= pts[i][0] + 1e-6) return pts[i];
+  return pts[pts.length - 1];
+}
+// A Mirror point's own transition and time, or the line's, or the usual
+const ptFx = (au, p) => (p && p[2]) || au.fx || 'melt';
+const ptSecs = (au, p) => (p && p[3]) || au.secs || MIRROR_SECS;
 function seqRange(key) {
   if (key === 'mirror') return [0, 8];
   const el = key === 'show' ? $('#showA') : key === 'feed' ? $('#xab') : $('#' + key);
@@ -10690,7 +10699,7 @@ function seqApplyTrack(k, x, now) {
   let mirrorLine = null;
   const take = (blk, u, wt) => {
     for (const au of blk.autos) {
-      if (au.key === 'mirror' && (!mirrorLine || wt > mirrorLine.wt)) mirrorLine = { au, wt };
+      if (au.key === 'mirror' && (!mirrorLine || wt > mirrorLine.wt)) mirrorLine = { au, wt, u };
       const [lo, hi] = seqRange(au.key), v = lo + (hi - lo) * TL.autoValue(au.pts, u);
       if (!(au.key in vals)) vals[au.key] = { sum: 0, wt: 0 };
       vals[au.key].sum += v * wt; vals[au.key].wt += wt;
@@ -10710,7 +10719,12 @@ function seqApplyTrack(k, x, now) {
       // A new step comes in through the line's own Transition, over its own time (see mirrorStep)
       const step = mirrorSnap(v);
       if (step !== T.mirror) {
-        if (mirrorLine) { T.mirrorFx = mirrorLine.au.fx || 'melt'; L.mxSecs = mirrorLine.au.secs || MIRROR_SECS; }
+        // Each change comes in the way its own point says (the point the line is heading for), or else the line's way
+        if (mirrorLine) {
+          const pt = mirrorPoint(mirrorLine.au, mirrorLine.u);
+          T.mirrorFx = (pt && pt[2]) || mirrorLine.au.fx || 'melt';
+          L.mxSecs = (pt && pt[3]) || mirrorLine.au.secs || MIRROR_SECS;
+        }
         T.mirror = step;
         if (K === edit) syncUI();
       }
@@ -10885,7 +10899,8 @@ function seqDrawStatic() {
       html += '<svg class="auto" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + bl.autos.map((au, ai) =>
         `<polyline points="${linePts(au)}" fill="none" stroke="${SEQ_LINES[ai % 4]}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`).join('') + '</svg>';
       if (bl.id === seq.selId || w > 120) bl.autos.forEach((au, ai) => {
-        html += au.pts.map(([u, val], pi) => `<span class="dot" data-h="pt" data-a="${ai}" data-p="${pi}" title="${SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
+        const sp = seq.selPt && seq.selPt.id === bl.id && seq.selPt.ai === ai ? seq.selPt.pi : -1;
+        html += au.pts.map(([u, val, fx, secs], pi) => `<span class="dot${pi === sp ? ' sel' : ''}" data-h="pt" data-a="${ai}" data-p="${pi}" title="${au.key === 'mirror' && pi > 0 ? `Mirror ${mirrorSnap(val * 8) || 'Off'} · ${ptFx(au, au.pts[pi])}${ptFx(au, au.pts[pi]) === 'cut' ? '' : ` over ${ptSecs(au, au.pts[pi])} s`} (click to change)` : SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
       });
       if (w > 90) html += `<span class="atag">${bl.autos.map((au) => SEQ_NAME[au.key] || au.key).join(' · ')}</span>`;
     }
@@ -10956,19 +10971,31 @@ function seqInspector() {
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
     (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
-  const mau = bl.autos.find((au) => au.key === 'mirror');
-  if (mau) el.innerHTML += `<span class="seq-mfx">Mirror changes come in with ` +
-    ['cut', 'melt', 'iris', 'ripple'].map((f) => `<button type="button" class="chip" data-mfx="${f}" aria-pressed="${mau.fx === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('') +
-    (mau.fx === 'cut' ? '' : ` over ` + [1, 3, 6, 10].map((n) => `<button type="button" class="chip" data-msecs="${n}" aria-pressed="${Math.abs((mau.secs || 3) - n) < 0.01}">${n} s</button>`).join('')) + '</span>';
+  // A Mirror line: the change leading to the picked point, its own Transition and time
+  const mi = bl.autos.findIndex((au) => au.key === 'mirror');
+  if (mi >= 0) {
+    const mau = bl.autos[mi], sp = seq.selPt && seq.selPt.id === bl.id && seq.selPt.ai === mi && seq.selPt.pi > 0 && seq.selPt.pi < mau.pts.length ? mau.pts[seq.selPt.pi] : null;
+    if (!sp) el.innerHTML += '<span class="seq-mfx">Click a point on the Mirror line to pick how the change up to it comes in.</span>';
+    else {
+      const fx = ptFx(mau, sp), secs = ptSecs(mau, sp), at = fmtSeq(bl.a + sp[0] * (bl.b - bl.a), true);
+      el.innerHTML += `<span class="seq-mfx">The change to Mirror ${mirrorSnap(sp[1] * 8) || 'Off'} (at ${at}) comes in with ` +
+        ['cut', 'melt', 'iris', 'ripple'].map((f) => `<button type="button" class="chip" data-mfx="${f}" aria-pressed="${fx === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('') +
+        (fx === 'cut' ? '' : ' over ' + [1, 3, 6, 10].map((n) => `<button type="button" class="chip" data-msecs="${n}" aria-pressed="${Math.abs(secs - n) < 0.01}">${n} s</button>`).join('')) + '</span>';
+    }
+  }
 }
-// The Mirror line's Transition and time, picked in the block's details
+// The picked Mirror point's Transition and time, picked in the block's details
 $('#seqInsp').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-mfx], [data-msecs]');
-  const bl = b && seq.rec.blocks.find((x) => x.id === seq.selId), au = bl && bl.autos.find((x) => x.key === 'mirror');
-  if (!au) return;
-  seqChange(() => { if (b.dataset.mfx) au.fx = b.dataset.mfx; else au.secs = +b.dataset.msecs; });
+  const b = e.target.closest('[data-mfx], [data-msecs]'), P = seq.selPt;
+  const bl = b && P && seq.rec.blocks.find((x) => x.id === P.id), au = bl && bl.autos[P.ai], pt = au && au.key === 'mirror' && au.pts[P.pi];
+  if (!pt) return;
+  seqChange(() => {
+    const fx = b.dataset.mfx || ptFx(au, pt), secs = b.dataset.msecs ? +b.dataset.msecs : ptSecs(au, pt);
+    au.pts[P.pi] = [pt[0], pt[1], fx, secs];
+  });
   seqInspector();
-  seqNote(au.fx === 'cut' ? 'Mirror changes in this block cut straight in.' : `Mirror changes in this block come in with ${au.fx[0].toUpperCase() + au.fx.slice(1)} over ${au.secs} s.`);
+  const np = au.pts[P.pi];
+  seqNote(np[2] === 'cut' ? 'That mirror change cuts straight in.' : `That mirror change comes in with ${np[2][0].toUpperCase() + np[2].slice(1)} over ${np[3]} s.`);
 });
 function seqMeasure() {
   const v = seq.view, zoom = v.pps / (v.minPps || 1);
@@ -11021,7 +11048,8 @@ seqView.addEventListener('pointerdown', (e) => {
   if (blkEl) {
     const bl = seqBlock(blkEl.dataset.id); if (!bl || bl.rec) return;
     d.kind = e.target.dataset.h || 'move'; d.bl = bl; d.orig = JSON.parse(JSON.stringify(bl));
-    if (d.kind === 'pt') { const r = blkEl.getBoundingClientRect(); d.w = r.width; d.h = r.height; d.ai = +e.target.dataset.a; d.pi = +e.target.dataset.p; }
+    if (d.kind === 'pt') { const r = blkEl.getBoundingClientRect(); d.w = r.width; d.h = r.height; d.ai = +e.target.dataset.a; d.pi = +e.target.dataset.p; seq.selPt = { id: bl.id, ai: d.ai, pi: d.pi }; }
+    else if (!seq.selPt || seq.selPt.id !== bl.id) seq.selPt = null;
     seq.selId = bl.id; seqSelectTrack(bl.track); seq.dirty = true;
   } else if (mkEl) {
     d.kind = 'marker'; d.m = seq.rec.markers.find((m) => m.id === mkEl.dataset.id); d.orig = { t: d.m.t };
@@ -11047,7 +11075,7 @@ seqView.addEventListener('pointermove', (e) => {
     const pts = bl.autos[d.ai].pts, [u0, v0] = o.autos[d.ai].pts[d.pi], i = d.pi;
     const lo = i === 0 ? 0 : pts[i - 1][0], hi = i === pts.length - 1 ? 1 : pts[i + 1][0];
     const u = i === 0 ? 0 : i === pts.length - 1 ? 1 : clamp(u0 + dx / d.w, lo, hi);
-    pts[i] = [u, snapLine(bl.autos[d.ai].key, clamp(v0 - (e.clientY - d.y) / d.h, 0, 1))];
+    pts[i] = [u, snapLine(bl.autos[d.ai].key, clamp(v0 - (e.clientY - d.y) / d.h, 0, 1)), ...pts[i].slice(2)];
   }
   if (bl) { const len = bl.b - bl.a; bl.fin = Math.min(bl.fin, len); bl.fout = Math.min(bl.fout, len - bl.fin); }
   seq.dirty = true;
@@ -11073,7 +11101,10 @@ seqView.addEventListener('dblclick', (e) => {
   if (!bl.autos.length) { seqNote('Right-click the block and pick Change over time first.'); return; }
   const r = el.getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
   const au = bl.autos[bl.autos.length - 1];
-  seqChange(() => { au.pts.push([u, snapLine(au.key, val)]); au.pts.sort((p, q) => p[0] - q[0]); });
+  const np = [u, snapLine(au.key, val)];
+  if (au.key === 'mirror') { const was = mirrorPoint(au, u); np.push(ptFx(au, was), ptSecs(au, was)); }
+  seqChange(() => { au.pts.push(np); au.pts.sort((p, q) => p[0] - q[0]); });
+  if (au.key === 'mirror') { seq.selPt = { id: bl.id, ai: bl.autos.indexOf(au), pi: au.pts.indexOf(np) }; seqInspector(); }
   seqNote(`Added a point to ${SEQ_NAME[au.key] || au.key}. Drag it to set the value.`);
 });
 function seqRenameMarker(el) {
