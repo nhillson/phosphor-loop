@@ -2605,11 +2605,11 @@ function prepRestore(look, now, favMix) {
 function prepJudge(now) {
   const P = ap.prep;
   if (P.ok) {
-    // Passed and waiting its turn. If it starts going white after all, it's thrown away and another tried.
+    // Passed and waiting its turn. If it starts going white (or fades to black) after all, it's thrown away and another tried.
     const S = eyeRecent(P.k, 1500, now);
     if (S.length < 3 || P.tries >= CHECK.tries) return;
     const v = lookVerdict(S);
-    if (v.why !== 'white') return;
+    if (v.why !== 'white' && v.why !== 'dark') return;
     if (P.best && P.best.look === P.look) P.best = { v, look: P.look };
     P.ok = false;
     prepTry(now);
@@ -2767,6 +2767,86 @@ function whiteWatch(now, dt, wA, wB) {
   }
 }
 
+/* ================= black-out watch ================= */
+// The other way round: while Autopilot runs, the picture on screen is kept from fading away to black. When most of
+// the screen has gone nearly black (or it's heading there fast), Autopilot turns its own sliders up a notch on the
+// loop that's doing it, the way a person would: Trails first (so the picture is held instead of draining away),
+// then the input's size and brightness, then a little of the other loop poured in if that one still has light.
+// If one loop is dark and the other isn't, it shows the lit one. Still black after 4 seconds: on to the next look.
+// It never turns anything up while the white-out watch is busy, nor past AP_TRAILS_MAX when the other loop's
+// Trails are long already, so the two watches can't fight. Pinned sliders, fader limits and 3D build-ups are
+// left alone, and when you steer by hand (Autopilot off) it does nothing at all.
+const DARK = { lit: 0.1, mean: 0.045, fall: 0.18, clear: 0.16, step: 1.2, next: 4, trailsTop: 84 };
+const dark = { hot: 0, cool: 0, stepT: 0, lifting: '', liftT: 0, skipped: false };
+// Turns loop k's own settings up a notch. Says whether there was anything left to turn up.
+function liftLoop(k, otherLit) {
+  const t = loops[k].tgt;
+  let did = false;
+  const raise = (obj, key, v, pin) => {
+    if (pin || ramping(key, k)) return;
+    const r = limSpan(key);
+    v = Math.round(r ? Math.min(v, r[1]) : v);
+    if (v > obj[key]) { obj[key] = v; did = true; }
+  };
+  const other = otherLoop(k);
+  const top = loops[other].tgt.trails > AP_TRAILS_MAX ? AP_TRAILS_MAX : DARK.trailsTop;
+  if (t.trails < top) raise(t, 'trails', Math.min(top, t.trails + 6), isPinned('trails', k));
+  if (t.size < 85) raise(t, 'size', Math.min(100, t.size + 10), isPinned('size', k));
+  if ((t.gain ?? 1) < 1.4 && !ramping('gain', k)) { t.gain = Math.min(1.4, (t.gain ?? 1) * 1.15); did = true; }
+  const feed = FEED_INTO[k];
+  if (otherLit && mix.tgt[feed] < 30 && apOwnsMix(feed) && !rampingMix(feed)) raise(mix.tgt, feed, Math.max(12, mix.tgt[feed] + 8), ap.pins.has(feed));
+  return did;
+}
+function darkWatch(now, dt, wA, wB) {
+  // Never at the same time as the white-out watch
+  if (watch.hot > 0) { dark.hot = 0; return; }
+  let S = eyeRecent('comp', 1500, now);
+  if (!S.length) S = eyeRecent('comp', 3000, now).slice(-1);
+  if (!S.length) return;
+  const lit = eyeAvg(S, 'lit'), mean = eyeAvg(S, 'mean');
+  const first = S[0], last = S[S.length - 1], span = (last.t - first.t) / 1000;
+  const fall = span > 0.3 ? (first.lit - last.lit) / span : 0;
+  const lighter = span > 0.3 && last.lit > first.lit + 0.01;
+  const hot = (lit < DARK.lit && mean < DARK.mean) || (last.lit < DARK.clear && fall > DARK.fall);
+  if (dark.lifting && now - dark.liftT > 2500) dark.lifting = '';
+  if (!hot) {
+    if (last.lit > DARK.clear) dark.cool += dt;
+    if (dark.cool > 1.5) { dark.hot = 0; dark.skipped = false; }
+    return;
+  }
+  dark.cool = 0;
+  dark.hot += dt;
+  const shown = ['A', 'B'].filter((k) => (k === 'A' ? wA : wB) > 0.05 && apRuns(k));
+  const own = (k) => { const R = eyeRecent(k, 3000, now); return R.length ? Math.min(eyeAvg(R, 'lit'), R[R.length - 1].lit) : null; };
+  // A notch at a time, and none while it's already coming back (sliders glide, so a change takes a moment to show)
+  if (now - dark.stepT >= DARK.step * 1000 && !lighter) {
+    dark.stepT = now;
+    const culprits = shown.filter((k) => { const l = own(k); return l == null || l < DARK.clear; });
+    let did = false;
+    // One loop dark, the other still lit: show the lit one
+    if (shown.length === 2 && culprits.length === 1 && !ap.pins.has('view') && apPair()) {
+      const keep = culprits[0] === 'A' ? 'B' : 'A';
+      const to = limSpan('view') ? nearLim('view', keep === 'A' ? 0 : 100) : (keep === 'A' ? 0 : 100);
+      if (to !== mix.tgt.view) { mix.tgt.view = to; did = true; }
+    }
+    const fix = culprits.length ? culprits : shown;
+    for (const k of fix) { const o = own(otherLoop(k)); did = liftLoop(k, o != null && o > 0.3) || did; }
+    if (did) {
+      dark.lifting = fix.join(' and ');
+      dark.liftT = now;
+      syncUI();
+      apStatus();
+    }
+  }
+  // Still black: on to the next look, as soon as one is ready
+  if (dark.hot > DARK.next && !dark.skipped) {
+    dark.skipped = true;
+    ap.rush = true;
+    ap.next = Math.min(ap.next, now);
+    ap.due = Math.min(ap.due, now);
+  }
+}
+
 // Two Autopilot buttons: one at the top of Autopilot, and one in the row under the picture,
 // which never folds away or hides, so it's always easy to find
 const apBtns = [$('#autopilot'), $('#autopilotBar')].filter(Boolean);
@@ -2781,6 +2861,7 @@ function setAutopilot(on, quiet) {
   ap.rush = false;
   eyeReset();
   Object.assign(watch, { hot: 0, cool: 0, easing: '', skipped: false });
+  Object.assign(dark, { hot: 0, cool: 0, lifting: '', skipped: false });
   document.documentElement.classList.toggle('ap-on', on);
   apBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
   ap.turnN = 0;
@@ -3531,7 +3612,7 @@ function nextLook(how) {
 }
 $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
 // For tests/ap_loops_check.py: a way in to Autopilot's loops
-window.__plAp = { loops, ap, apSet, apTurn, step() { ap.quick = 0; apStep(performance.now(), false); } };
+window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 0; apStep(performance.now(), false); } };
 
 /* ================= learn my taste ================= */
 // More like this and Not this (under the picture, keys Y and X) teach Autopilot what you like. A rating is for the
@@ -4484,7 +4565,7 @@ $('#apCheck').addEventListener('click', () => {
   saveAp();
   syncApUI();
   toast(apSet.check ? 'Check each look is on. Autopilot tries each new look out of sight first and skips the poor ones.'
-    : 'Check each look is off. You’ll see every look Autopilot makes. It still keeps the picture from turning white.');
+    : 'Check each look is off. You’ll see every look Autopilot makes. It still keeps the picture from turning white or going black.');
 });
 // One toggle per kind of input. Lit means Autopilot may use it.
 for (const [k, label] of AP_INPUTS) {
@@ -4702,6 +4783,7 @@ function apStatus() {
       (holding ? 'New look as soon as one passes its check.'
         : ap.beatWait ? 'New look on the next beat.' : s <= 1 ? 'New look coming now.' : `Next new look in about ${s < 60 ? s + ' seconds' : fmtDur(s).toLowerCase()}.`);
     if (watch.easing) html += ` Easing off loop ${watch.easing} so it doesn’t turn white.`;
+    else if (dark.lifting) html += ` Bringing loop ${dark.lifting} back up so it doesn’t go black.`;
     else if (P && !P.ok) html += ` Trying out looks out of sight (${P.tries} of up to ${CHECK.tries}).`;
     else if (P && P.ok) html += ' The next one is checked and ready.';
     if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
@@ -10362,6 +10444,7 @@ function eyeTick(now, dt, wA, wB) {
     } else if (ap.prep) ap.prep = null;
     if (ap.glide && now >= ap.glide.at) glideJudge(now);
     whiteWatch(now, dt, wA, wB);
+    darkWatch(now, dt, wA, wB);
   }
   if (looking && !eye.sync && now - eye.askT > 55) {
     const P = ap.prep, keys = P ? [P.k, 'comp', P.k] : ['comp'];

@@ -68,6 +68,9 @@ file don't rebuild the app.
    Autopilot see only the web clips (`clips.web`); the sequencer's + Add clip sees both (`clipsSetView`). While a
    look records, the picture is drawn at the size picked (1080p/1440p/4K, `MV.size` through `capCfg`), not the
    preview's.
+4h2. **Autopilot's black-out watch** (`darkWatch` / `liftLoop` in js/app.js, next to the white-out watch: Trails, Input size and
+   brightness up a notch on a loop going black, show the lit loop, next look after 4 s; never while the white-out watch is busy):
+   `python3 tests/ap_dark_check.py` (about 2 minutes; it hands the eye copies of a black screen, since this workspace's graphics are too slow).
 4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
    `python3 tests/ap_type_check.py` (about a minute and a half).
 4m. **The sequencer's playhead with Spotify** (`seqPos` in js/app.js: small differences caught up by speed, skips over
