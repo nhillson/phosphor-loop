@@ -91,3 +91,29 @@ test('the position counts from halfway through the request',async()=>{
  const {client,advance}=fixture(async url=>{ if(!url.endsWith('/me')&&!url.endsWith('/queue')) advance(400); return url.endsWith('/me')?json({id:'user'}):url.endsWith('/queue')?json({currently_playing:item,queue:[]}):json({currently_playing_type:'track',item,is_playing:true,progress_ms:4000}); });
  await client.poll();assert.equal(client.position(),4200);
 });
+test('play starts the paused song, or wakes the last device when Spotify has gone idle', async () => {
+  let active = true, plays = [];
+  const {client} = fixture((url, o) => {
+    if (url.endsWith('/me')) return json({id: 'user'});
+    if (url.includes('/queue')) return json({currently_playing: item, queue: []});
+    if (url.includes('/me/player/play')) { plays.push({url, body: o.body}); return active || url.includes('device_id=') ? new Response(null, {status: 204}) : json({}, 404); }
+    if (url.endsWith('/me/player/devices')) return json({devices: [{id: 'pc', is_active: false, is_restricted: false}]});
+    return json({currently_playing_type: 'track', item, is_playing: false, progress_ms: 30000});
+  });
+  client.token.scope = 'user-modify-playback-state';
+  await client.poll();
+  await client.play();
+  assert.equal(plays.length, 1); assert.equal(client.snapshot.playing, true, 'playing from here at once');
+  client.snapshot.playing = false; active = false; plays = [];
+  await client.play();
+  assert.equal(plays.length, 2); assert.ok(plays[1].url.includes('device_id=pc'), 'woke the device it was last on');
+  assert.equal(JSON.parse(plays[1].body).position_ms, 30000, 'from the same spot');
+});
+test('play explains what to do without permission or a device', async () => {
+  const {client} = fixture((url) => url.endsWith('/me') ? json({id: 'user'}) : url.includes('/queue') ? json({currently_playing: item, queue: []})
+    : url.includes('/me/player/play') ? json({}, 404) : url.endsWith('/devices') ? json({devices: []}) : json({currently_playing_type: 'track', item, is_playing: false, progress_ms: 0}));
+  await client.poll();
+  await assert.rejects(client.play(), /Reconnect Spotify/);
+  client.token.scope = 'user-modify-playback-state';
+  await assert.rejects(client.play(), /isn’t open on any device/);
+});

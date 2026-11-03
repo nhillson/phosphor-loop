@@ -99,6 +99,8 @@
       if (response.status === 401) { this.clearSession(); throw new Error('Spotify session expired. Connect again.'); }
       if (response.status === 403) throw new Error('Spotify access denied. Check the app’s user allowlist and permissions.');
       if (response.status === 404 && path.startsWith('/me/player/seek')) throw new Error('No active Spotify player. Start playback in Spotify, then try seeking again.');
+      if (response.status === 404 && path.startsWith('/me/player/play')) throw Object.assign(new Error('Spotify isn’t playing on any device right now.'), { noDevice: true });
+      if (response.status === 403 && path.startsWith('/me/player/play')) throw new Error('Spotify only lets other apps start the music on a Premium account. Press play in Spotify instead.');
       if (!response.ok) throw new Error('Spotify playback is unavailable. Retrying…');
       return response.status === 204 ? null : response.json();
     }
@@ -158,6 +160,30 @@
       this.emit('status', { connected: false, stale: false, message: 'Spotify disconnected.' });
     }
     get canSeek() { return (this.token?.scope || '').split(' ').includes('user-modify-playback-state'); }
+    // Starts the song in Spotify where it's paused: on the device it was playing on, or, when Spotify has gone idle
+    // (no device active), on the one it was last on or the first one it has open, from the same spot
+    async play() {
+      if (!this.token) throw new Error('Connect Spotify first (Song sequencer › Connect Spotify).');
+      if (!this.canSeek) throw new Error('Reconnect Spotify (Song sequencer › Connect Spotify) so Play can start the music.');
+      const snap = this.snapshot, at = this.position();
+      this.playbackVersion++;
+      try { await this.api('/me/player/play', true, { method: 'PUT' }); }
+      catch (error) {
+        if (!error.noDevice) throw error;
+        const list = (await this.api('/me/player/devices'))?.devices || [];
+        const dev = list.find((d) => d.is_active) || list.find((d) => !d.is_restricted);
+        if (!dev) throw new Error('Spotify isn’t open on any device. Open Spotify on this computer or your phone, then press Play again.');
+        const body = snap?.track ? { uris: [snap.track.uri], position_ms: Math.max(0, Math.round(at || 0)) } : {};
+        await this.api('/me/player/play?device_id=' + encodeURIComponent(dev.id), true,
+          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      // Playing from here (the next look at Spotify confirms it)
+      if (this.snapshot?.track) {
+        this.snapshot = { ...this.snapshot, playing: true, progressMs: at ?? this.snapshot.progressMs, receivedAt: this.now() };
+        this.emit('playback', this.snapshot);
+      }
+      return true;
+    }
     async seek(positionMs) {
       if (!this.canSeek) throw new Error('Reconnect Spotify to enable seeking from the timeline.');
       const snapshot = this.snapshot, revision = this.revision;

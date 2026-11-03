@@ -10266,7 +10266,11 @@ const SEQ_SLIDERS = [
   // 3D lighting is one for the whole picture: when blocks on several tracks set it, it's a mix of them, each counted
   // as much as its loop shows (see reliefNow)
   ['3D lighting', [['rDepth', '3D depth'], ['rSmooth', '3D smoothness'], ['rShine', 'Shine'], ['rLight', 'Light direction'], ['rSpin', 'Light spin']]],
+  // Type art is one for the whole picture too: blocks on several tracks mix, each counted as much as its loop shows
+  // (see seqTypeApply); its characters, font and color stay as set under Type art
+  ['Type art', [['tAmt', 'Type art amount'], ['tSize', 'Character size'], ['tShimmer', 'Shimmer']]],
 ];
+const SEQ_TYPE = ['tAmt', 'tSize', 'tShimmer'];
 const SEQ_NAME = Object.fromEntries(SEQ_SLIDERS.flatMap(([, list]) => list));
 const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1', '#b8f28a', '#c9a8ff', '#ff9e7a', '#7ab8ff'];
 const seqLineColor = (ai) => SEQ_LINES[ai % SEQ_LINES.length];
@@ -10328,6 +10332,7 @@ const seqName = (bl) => {
 };
 
 const seq = {
+  typeL: { A: null, B: null, C: null, D: null }, typeBase: null, typeUi: 0,
   records: new Map(), key: 'standalone', rec: TL.newRecord(), song: null, accountId: null, lastPlayback: null,
   running: false, apMode: null, applied: [null, null, null, null], xin: [false, false, false, false],
   local: { pos: 0, at: 0, playing: false }, t: 0, playing: false, live: false,
@@ -10511,7 +10516,31 @@ function seqRun(on, message) {
 }
 // The tracks this song's sequence has blocks on
 const seqTracksUsed = () => new Set(seq.rec.blocks.map((b) => b.track));
+// Type art from the sequence: each of Amount, Character size and Shimmer that some block's line sets is the mix of
+// them (each counted as much as its loop shows); the rest stay as you set them. What you'd set is kept (typeBase) and
+// comes back when no block sets them any more, or the sequence stops.
+function seqTypeApply(now) {
+  let any = false;
+  for (const key of SEQ_TYPE) {
+    let sum = 0, wt = 0;
+    for (const K of KEYS) {
+      const t = seq.typeL[K];
+      if (!t || !(key in t) || !loopOn(K)) continue;
+      const w = Math.max(0.001, clamp(mix.tgt[SHOW[K]], 0, 100) / 100);
+      sum += t[key] * w; wt += w;
+    }
+    if (!wt) continue;
+    if (!seq.typeBase) seq.typeBase = Object.fromEntries(SEQ_TYPE.map((q) => [q, typeArt[q]]));
+    typeArt[key] = Math.round(sum / wt);
+    any = true;
+  }
+  if (seq.typeBase) for (const key of SEQ_TYPE) if (!KEYS.some((K) => seq.typeL[K] && key in seq.typeL[K] && loopOn(K))) typeArt[key] = seq.typeBase[key];
+  if (!any && seq.typeBase) { seq.typeBase = null; syncTypeUI(); return; }
+  if (any && now - seq.typeUi > 250) { seq.typeUi = now; for (const key of SEQ_TYPE) { const c = typeEls[key]; c.el.value = typeArt[key]; fillTrack(c.el); c.out.textContent = typeText(key, typeArt[key]); } }
+}
 function seqGiveBack() {
+  for (const K of KEYS) seq.typeL[K] = null;
+  seqTypeApply(performance.now());
   const before = seq.showsBefore || {};
   for (const [i, k] of KEYS.entries()) {
     loopGrade[k] = null; seqRelief[k] = null;
@@ -10531,11 +10560,13 @@ function seqTakeOver(k) {
 }
 async function seqPlay() {
   seqAskFiles();
+  // Following a Spotify song: Play starts the song in Spotify too (on the device it was last playing on, or the
+  // first one Spotify has open), and the looks run with it
   if (seq.song && spotify.snapshot?.track?.uri === seq.song.uri) {
-    seqRun(true, spotify.snapshot.playing ? 'Following the song in Spotify.' : 'Following the song. Press play in Spotify to start it.');
-    if (!spotify.snapshot.playing && spotify.canSeek) {
-      try { await spotify.api('/me/player/play', true, { method: 'PUT' }); } catch (_) { /* Spotify's own play button still works */ }
-    }
+    if (spotify.snapshot.playing) { seqRun(true, 'Following the song in Spotify.'); return; }
+    seqRun(true, 'Starting the song in Spotify…');
+    try { await spotify.play(); seqNote('Following the song in Spotify.'); }
+    catch (err) { seqNote(`${err.message} The looks follow as soon as the song plays.`); toast(err.message, 8000); }
     return;
   }
   const L = seq.local;
@@ -10686,7 +10717,7 @@ function seqShowMedia(bl) {
 }
 function seqApplyTrack(k, x, now) {
   const K = KEYS[k], L = loops[K], T = L.tgt;
-  if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); seqRelief[K] = null; return; }
+  if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); seqRelief[K] = null; seq.typeL[K] = null; return; }
   const sig = x.other ? `${x.other.id}>${x.main.id}` : x.main.id;
   let fresh = false;
   if (seq.applied[k] !== sig) {
@@ -10730,7 +10761,7 @@ function seqApplyTrack(k, x, now) {
   };
   take(x.main, x.u, x.other ? x.w : 1);
   if (x.other) take(x.other, x.uOther, 1 - x.w);
-  const grade = {}, rel = {};
+  const grade = {}, rel = {}, typ = {};
   for (const [key, { sum, wt }] of Object.entries(vals)) {
     if (wt <= 0) continue;
     const v = sum / wt;
@@ -10738,6 +10769,7 @@ function seqApplyTrack(k, x, now) {
     else if (key === 'feed') feed = v;
     else if (key in GRADE_DEF) grade[key] = v;
     else if (key in RELIEF_DEF) rel[key] = v;
+    else if (SEQ_TYPE.includes(key)) typ[key] = v;
     else if (key === 'mirror') {
       // A new step comes in through the line's own Transition, over its own time (see mirrorStep)
       const step = mirrorSnap(v);
@@ -10759,6 +10791,7 @@ function seqApplyTrack(k, x, now) {
   mix.tgt[SHOW[K]] = clamp(show, 0, 100) * x.show;
   if (feed !== null) mix.tgt[FEED_INTO[otherLoop(K)]] = feed;
   seqGrade(K, Object.keys(grade).length ? grade : null);
+  seq.typeL[K] = Object.keys(typ).length ? typ : null;
   seqRelief[K] = Object.keys(rel).length ? rel : null;
 }
 // Color grading inside the sequencer is each loop's own (see loopGrade); null puts that loop back to normal
@@ -10785,6 +10818,7 @@ function seqTick(now) {
           seqApplyTrack(k, r.tracks[k], now);
         }
         seq.jumped = false;
+        seqTypeApply(now);
       }
     }
   }
@@ -11269,7 +11303,7 @@ function seqPickSlider(bl, x, y) {
           if (has) bl.autos = bl.autos.filter((au) => au !== has);
           else {
             // The line starts at the block's own value for that slider
-            const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : key in RELIEF_DEF ? relief[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
+            const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : key in RELIEF_DEF ? relief[key] : SEQ_TYPE.includes(key) ? (seq.typeBase ? seq.typeBase[key] : typeArt[key]) : bl.look[key] ?? loopDefaults()[key] ?? lo;
             const v = clamp((cur - lo) / ((hi - lo) || 1), 0, 1);
             bl.autos.push({ key, pts: [[0, v], [1, v]], ...(key === 'mirror' ? { fx: bl.look.mirrorFx in MIRROR_FX && bl.look.mirrorFx !== 'cut' ? bl.look.mirrorFx : 'melt', secs: MIRROR_SECS } : {}) });
             seq.lineAct = { id: bl.id, ai: bl.autos.length - 1 };
@@ -11411,6 +11445,7 @@ function seqPlaceMoves(c, look) {
     for (const key of Object.keys(SEQ_NAME)) if (key !== 'show' && key !== 'feed' && !(key in GRADE_DEF) && !(key in RELIEF_DEF)) out.push([`${k}.${key}`, key]);
     for (const key of Object.keys(GRADE_DEF)) out.push([`grade.${key}`, key]);
     for (const key of Object.keys(RELIEF_DEF)) out.push([`relief.${key}`, key]);
+    for (const key of SEQ_TYPE) out.push([`type.${key}`, key]);
     return out;
   };
   const made = [];
@@ -11446,7 +11481,7 @@ function seqPlaceMoves(c, look) {
         for (let j = 1; j < pts.length; j += 2) { lo2 = Math.min(lo2, pts[j]); hi2 = Math.max(hi2, pts[j]); }
         const moves = hi2 - lo2 > 0.002;
         // Steady lines only where the block needs them: its Show and feed, and grading or lighting away from normal
-        const steadyNeeded = key === 'show' || key === 'feed' || (key in GRADE_DEF && base !== GRADE_DEF[key]) || (key in RELIEF_DEF && num('relief.rDepth', s0 + 0.001, 0) > 0);
+        const steadyNeeded = key === 'show' || key === 'feed' || (key in GRADE_DEF && base !== GRADE_DEF[key]) || (key in RELIEF_DEF && num('relief.rDepth', s0 + 0.001, 0) > 0) || (SEQ_TYPE.includes(key) && num('type.tAmt', s0 + 0.001, 0) > 0);
         if (!moves && !steadyNeeded) continue;
         let thin = moves ? M.simplify(pts) : [0, pts[1], 1, pts[1]];
         // At most 64 points: evenly picked from the thinned line

@@ -89,6 +89,11 @@ file don't rebuild the app.
    grows taller (`.seq-h-lane.tall`). Double-clicking a block is counted by the app (two presses within 0.5 s and 8 px,
    `seq.lastPress`), not the browser's dblclick, which doesn't come when the block is redrawn between the clicks;
    right-click › Add a point here too (`seqAddPointAt`). `python3 tests/seq_lines_check.py` (real mouse clicks).
+4r. **Type art over time** (sequencer keys `tAmt`, `tSize`, `tShimmer`, `SEQ_TYPE`; whole-picture, so blocks on several tracks
+   mix by Show, `seqTypeApply`; what Nick set is kept in `seq.typeBase` and comes back when no block sets it):
+   `python3 tests/seq_type_check.py`. **Play when following a paused Spotify song** starts it (`spotify.play()`: on its
+   device, or the one it was last on / first open when Spotify has gone idle, from the same spot; Premium only):
+   `node --test tests/spotify.test.mjs`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
