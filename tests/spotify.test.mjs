@@ -79,3 +79,15 @@ test('failed seeking leaves playback unchanged and a pre-seek poll cannot roll i
  fail=false;delay=true;const oldPoll=client.poll();await new Promise(r=>setTimeout(r,0));
  await client.seek(10000);release();await oldPoll;assert.equal(client.position(),10000);
 });
+test('a seek moves the position at once, and back if Spotify refuses',async()=>{
+ let refuse=false;
+ const {client,advance}=fixture((url,o)=>url.endsWith('/me')?json({id:'user'}):url.includes('/seek')?(refuse?json({},404):new Response(null,{status:204})):url.endsWith('/queue')?json({currently_playing:item,queue:[]}):json({currently_playing_type:'track',item,is_playing:true,progress_ms:4000}));
+ client.token.scope='user-modify-playback-state';
+ await client.poll();
+ const p=client.seek(90000);assert.equal(client.position(),90000,'moved before Spotify answered');await p;
+ refuse=true;await assert.rejects(client.seek(150000));assert.equal(client.position(),90000,'back where it was');
+});
+test('the position counts from halfway through the request',async()=>{
+ const {client,advance}=fixture(async url=>{ if(!url.endsWith('/me')&&!url.endsWith('/queue')) advance(400); return url.endsWith('/me')?json({id:'user'}):url.endsWith('/queue')?json({currently_playing:item,queue:[]}):json({currently_playing_type:'track',item,is_playing:true,progress_ms:4000}); });
+ await client.poll();assert.equal(client.position(),4200);
+});

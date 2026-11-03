@@ -112,13 +112,16 @@
           if (!profile?.id) throw new Error('Spotify account could not be identified.');
           this.accountId = profile.id;
         }
+        // The position Spotify gives is from about halfway through the request, not from when the answer arrives
+        const asked = this.now();
         const playback = await this.api('/me/player');
+        const heard = this.now(), at = heard - Math.min(1500, (heard - asked) / 2);
         if (revision !== this.revision || this.seeking || playbackVersion !== this.playbackVersion) return;
         const previous = this.snapshot;
         const item = playback?.currently_playing_type === 'track' && !playback.item?.is_local ? playback.item : null;
         const track = item?.uri ? { uri: item.uri, name: item.name, artists: (item.artists || []).map(a => a.name), durationMs: item.duration_ms } : null;
         this.snapshot = { accountId: this.accountId, track, playing: playback?.is_playing === true,
-          progressMs: Number(playback?.progress_ms) || 0, receivedAt: this.now() };
+          progressMs: Number(playback?.progress_ms) || 0, receivedAt: at };
         const changed = previous?.track?.uri !== track?.uri;
         if (changed) { this.queue = []; this.emit('queue', []); }
         this.emit('playback', this.snapshot);
@@ -141,7 +144,9 @@
       this.stop(); const revision = this.revision;
       const run = async () => {
         await this.poll();
-        if (revision === this.revision && this.token) this.timer = setTimeout(run, Math.max(3000, this.retryUntil - this.now()));
+        // Every second while music plays, so a skip in Spotify shows up within about a second; every 3 when it's not
+        const every = this.snapshot?.track && this.snapshot.playing ? 1000 : 3000;
+        if (revision === this.revision && this.token) this.timer = setTimeout(run, Math.max(every, this.retryUntil - this.now()));
       };
       if (this.token) run();
     }
@@ -161,7 +166,12 @@
       // Seeking past the duration can skip tracks. Keep the handle within this track.
       const target = Math.round(Math.min(Math.max(0, snapshot.track.durationMs - 1), Math.max(0, positionMs)));
       this.playbackVersion++; this.seeking = true;
+      // The playhead goes there at once, rather than when Spotify answers; back where it was if Spotify refuses
+      const before = this.snapshot;
+      this.snapshot = { ...snapshot, progressMs: target, receivedAt: this.now() };
+      this.emit('playback', this.snapshot);
       try { await this.api('/me/player/seek?position_ms=' + target, true, { method: 'PUT' }); }
+      catch (error) { if (this.snapshot?.track?.uri === snapshot.track.uri) { this.snapshot = before; this.emit('playback', before); } throw error; }
       finally { this.seeking = false; }
       if (revision !== this.revision || this.snapshot?.track?.uri !== snapshot.track.uri) return;
       this.snapshot = { ...this.snapshot, progressMs: target, receivedAt: this.now() };

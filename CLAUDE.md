@@ -70,6 +70,9 @@ file don't rebuild the app.
    preview's.
 4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
    `python3 tests/ap_type_check.py` (about a minute and a half).
+4m. **The sequencer's playhead with Spotify** (`seqPos` in js/app.js: small differences caught up by speed, skips over
+   1.5 s jump; js/spotify.js polls every second while playing and moves the position at once on a seek):
+   `python3 tests/seq_playhead_check.py` (about half a minute) and `node --test tests/spotify.test.mjs`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

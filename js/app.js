@@ -10403,10 +10403,26 @@ function seqSpecCapture(t) {
 }
 
 /* ---------- which song, and where in it ---------- */
+// Following a Spotify song, the playhead runs smoothly: Spotify is asked where it is about once a second, and each
+// answer is a little early or late, so small differences (under a second and a half) are caught up by running the
+// playhead a little faster or slower for a moment, never by stepping back; a bigger one is a skip (in Spotify, or a
+// click on the timeline), and the playhead goes straight there.
+const seqPh = { t: 0, at: 0, live: false };
 function seqPos(now) {
   const s = spotify.snapshot;
-  if (seq.song && s?.track && s.track.uri === seq.song.uri && now - s.receivedAt < 10000)
-    return { t: spotify.position(now) / 1000, playing: !!s.playing, live: true };
+  if (seq.song && s?.track && s.track.uri === seq.song.uri && now - s.receivedAt < 10000) {
+    const want = spotify.position(now) / 1000, dt = seqPh.at ? Math.min(0.25, (now - seqPh.at) / 1000) : 0;
+    const off = want - seqPh.t;
+    if (!seqPh.live || Math.abs(off) > 1.5) {
+      // A skip (or just started following): straight there, and every block is put on afresh
+      if (seqPh.live) seq.applied = [null, null, null, null];
+      seqPh.t = want;
+    } else if (!s.playing) seqPh.t += off * (1 - Math.exp(-dt * 12));   // paused: settles on the spot it stopped at
+    else seqPh.t += dt * (1 + clamp(off / 0.6, -0.6, 0.6));
+    seqPh.at = now; seqPh.live = true;
+    return { t: Math.max(0, seqPh.t), playing: !!s.playing, live: true };
+  }
+  seqPh.live = false; seqPh.at = 0;
   const L = seq.local;
   return { t: L.playing ? L.pos + (now - L.at) / 1000 : L.pos, playing: L.playing, live: false };
 }
@@ -11361,7 +11377,8 @@ function seqSetOpen(open, save) {
   window.dispatchEvent(new Event('resize'));
 }
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
-window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; } };   // for tests/snips_check.py
+window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
+  spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; } };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });
 
 /* ---------- Spotify: which song is playing ---------- */
