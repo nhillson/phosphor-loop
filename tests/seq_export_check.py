@@ -129,11 +129,12 @@ def main():
         J("""(() => { const S = __plSeq.spotify; S.stop(); S.token = { access: 'x', scope: 'user-modify-playback-state' };
           const track = { uri: 'spotify:track:T', name: 'Test song', artists: ['Me'], durationMs: 7000 };
           S.snapshot = { track, playing: false, progressMs: 3000, receivedAt: S.now() };
-          window.__sp = { plays: [], pauses: 0 };
-          S.play = async (ms, uri) => { __sp.plays.push([ms, uri]); S.snapshot = { ...S.snapshot, playing: true, progressMs: ms || 0, receivedAt: S.now() }; return true; };
+          window.__sp = { plays: [], seeks: [], pauses: 0 };
+          S.play = async (ms, uri) => { __sp.plays.push([ms ?? null, uri ?? null]); S.snapshot = { ...S.snapshot, playing: true, progressMs: ms ?? S.position(), receivedAt: S.now() }; return true; };
+          S.seek = async (ms) => { __sp.seeks.push(ms); S.snapshot = { ...S.snapshot, progressMs: ms, receivedAt: S.now() }; return ms; };
           S.pause = async () => { __sp.pauses++; S.snapshot = { ...S.snapshot, playing: false, progressMs: S.position(), receivedAt: S.now() }; return true; };
           // as Spotify's own answers would, every second
-          setInterval(() => { S.snapshot = { ...S.snapshot, progressMs: S.position(), receivedAt: S.now() }; }, 1000);
+          setInterval(() => { S.snapshot = { ...S.snapshot, progressMs: S.position(), receivedAt: S.now() }; S.polledAt = S.now(); }, 1000);
           __plSeq.follow(track); })()""")
         c.wait_frames(3, 'following the song')
         click('#seqExport')
@@ -145,7 +146,7 @@ def main():
         click('#seqExGo')
         until("__plExport.stage === 'play'", 'the export did not get going with the song', 120)
         plays = J("__sp.plays")
-        ok(plays and plays[0] == [0, 'spotify:track:T'], f'the song was started from the top in Spotify ({plays})')
+        ok(J("__sp.seeks")[:1] == [0] and plays and plays[0] == [None, None], f"the song was moved to its top and played, as Stop and Play would ({J('__sp.seeks')}, {plays})")
         ok(J("__plExport.from") < 1.5, f"the sequence follows it from the start (under way at {J('__plExport.from'):.2f} s)")
         until("!document.querySelector('#nameBox').hidden", 'the export with the song did not finish by itself', 120)
         ok(J("__sp.pauses") >= 1, 'the song is paused at the end')

@@ -10956,8 +10956,19 @@ function exTick(now) {
     if (EX.frames < 12) return;
     EX.stage = 'start'; EX.frames = 0;
     if (EX.spotify) {
-      // Spotify starts the song from the top; if it can't, the export waits for you to press Play there
-      if (spotify.canSeek) spotify.play(0, seq.song.uri).then(() => { EX.asked = true; }, (err) => { EX.why = err.message; });
+      // The song goes back to its top and plays, the way Stop and Play would (asking Spotify for "this song from 0:00"
+      // instead can leave the Spotify app blank, showing an error); if that can't be done, the export waits for you to
+      // press Play in Spotify
+      EX.askedAt = performance.now();
+      if (spotify.canSeek) void (async () => {
+        try {
+          if (spotify.snapshot?.track?.uri === seq.song.uri) { await spotify.seek(0); await spotify.play(); }
+          // Spotify's on another song, or none: it's started by hand (double-click it in Spotify); the export waits for it
+          // and moves it back to 0:00 once it plays
+          else EX.why = `Spotify isn’t on ${seq.song.name} right now.`;
+        } catch (err) { EX.why = err.message; }
+        EX.askedAt = performance.now();
+      })();
       else EX.why = 'Spotify isn’t connected with permission to start the song.';
     } else {
       seq.local.pos = 0; seq.local.at = performance.now(); seq.local.playing = true;
@@ -10968,11 +10979,12 @@ function exTick(now) {
   if (EX.stage === 'start') {
     // Under way once the song (or the sequence's own clock) plays from the top. Playing from further in (Spotify
     // started where it was), it's moved back to the top once.
-    const following = !EX.spotify || seqPh.live;
-    if (following && seq.playing && t > 3 && !EX.seekAsked && spotify.canSeek) { EX.seekAsked = true; spotify.seek(0).catch(() => {}); }
-    if (following && seq.playing && (t < 3 || EX.seekAsked && EX.frames > 240)) { EX.stage = 'play'; EX.frames = 0; EX.started = true; EX.from = t; return; }
+    // With Spotify, only once Spotify itself says the song is playing (not just that it was asked to)
+    const confirmed = !EX.spotify || (seqPh.live && spotify.snapshot?.playing && (spotify.polledAt || 0) > EX.askedAt);
+    if (confirmed && seq.playing && t > 3 && !EX.seekAsked && spotify.canSeek) { EX.seekAsked = true; EX.seekAt = performance.now(); spotify.seek(0).catch(() => {}); }
+    if (confirmed && seq.playing && (t < 3 || EX.seekAsked && performance.now() - EX.seekAt > 5000)) { EX.stage = 'play'; EX.frames = 0; EX.started = true; EX.from = t; return; }
     // Still waiting: what to do, plainly (it waits as long as it takes; Cancel stops it)
-    const slow = EX.frames > 240;
+    const slow = performance.now() - EX.askedAt > 5000;
     $('#expText').innerHTML = !EX.spotify ? '<b>Exporting</b> · starting…'
       : EX.why ? `<b>Waiting for the song</b> · ${escapeHTML(EX.why)} Press Play on <b>${escapeHTML(seq.song.name)}</b> in Spotify, from the start, and the export goes on by itself.`
       : slow ? `<b>Waiting for the song</b> · Spotify hasn’t started it yet. Press Play on <b>${escapeHTML(seq.song.name)}</b> in Spotify on this computer and the export goes on by itself.`
@@ -10980,7 +10992,9 @@ function exTick(now) {
     return;
   }
   if (EX.stage === 'play') {
-    $('#expText').innerHTML = `<b>Exporting</b> · ${fmtT(t)} of ${fmtT(EX.end)} · ${canvas.width}×${canvas.height}${EX.blend?.track ? ', with sound' : ''}`;
+    const paused = EX.spotify && spotify.snapshot && !spotify.snapshot.playing;
+    $('#expText').innerHTML = paused ? `<b>Exporting</b> · ${fmtT(t)} of ${fmtT(EX.end)} · <b>the song is paused in Spotify</b>: press Play there to go on`
+      : `<b>Exporting</b> · ${fmtT(t)} of ${fmtT(EX.end)} · ${canvas.width}×${canvas.height}${EX.blend?.track ? ', with sound' : ''}`;
     const songGone = EX.spotify && spotify.snapshot?.track && spotify.snapshot.track.uri !== seq.song?.uri;
     if (t >= EX.end - 0.25 || songGone || !seq.running) {
       // At the end the song is stopped before Spotify moves on to the next one

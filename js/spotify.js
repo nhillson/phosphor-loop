@@ -124,6 +124,8 @@
         const track = item?.uri ? { uri: item.uri, name: item.name, artists: (item.artists || []).map(a => a.name), durationMs: item.duration_ms } : null;
         this.snapshot = { accountId: this.accountId, track, playing: playback?.is_playing === true,
           progressMs: Number(playback?.progress_ms) || 0, receivedAt: at };
+        // When Spotify last answered for itself (not the guess made straight after Play or a seek)
+        this.polledAt = heard;
         const changed = previous?.track?.uri !== track?.uri;
         if (changed) { this.queue = []; this.emit('queue', []); }
         this.emit('playback', this.snapshot);
