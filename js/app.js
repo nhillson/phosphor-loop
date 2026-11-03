@@ -8908,7 +8908,7 @@ $$('#gradeWhere button').forEach((b) => b.addEventListener('click', () => {
 { let saved = null; try { saved = JSON.parse(localStorage.getItem(GRADE_KEY) || 'null'); } catch (_) {} setGrade(saved); }
 const gradeOn = () => Object.keys(GRADE_DEF).some((k) => grade[k] !== GRADE_DEF[k]);
 function setGradeUniforms() {
-  set1f(dispProg, 'uGradeOn', gradeOn() && !grade.gInside ? 1 : 0);
+  set1f(dispProg, 'uGradeOn', gradeOn() && !grade.gInside && !seq.gradeOwned ? 1 : 0);
   set4f(dispProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, grade.gGamma / 100, grade.gSat / 100);
   set2f(dispProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(dispProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
@@ -9137,14 +9137,14 @@ function typeInLoop(k, f) {
   eng.run(typeLoopSt[k], L.rt[L.front].tex, simW, simH, typeArt, 1 - Math.pow(1 - a, f), typeScratch);
   copyInto(L.rt[L.front], typeScratch.tex);
 }
-window.__plType = { typeArt, setType, ready: () => !!typeEng, failed: () => typeFailed };
+window.__plType = { typeArt, setType, ready: () => !!typeEng, failed: () => typeFailed, fadeTo: (v, secs) => { typeFadeTo(v, performance.now()); typeGlide.dur = secs * 1000; }, get gliding() { return typeGlide.on; } };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
 // tenth of the way each sixtieth of a second (f: how many sixtieths this frame is), so it builds up at the same
 // pace at any frame rate instead of piling up at once.
 function setLoopGradeUniforms(f) {
-  const on = grade.gInside && gradeOn();
+  const on = grade.gInside && gradeOn() && !seq.gradeOwned;
   set1f(fbProg, 'uGradeK', on ? 1 - Math.pow(0.9, f) : 0);
   if (!on) return;
   set4f(fbProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, Math.max(0.05, grade.gGamma / 100), grade.gSat / 100);
@@ -9153,7 +9153,7 @@ function setLoopGradeUniforms(f) {
 }
 // For tests/: the mirror change under way on a loop (see "mirror transitions")
 window.__plMirror = { state: (k) => loops[k].mx };
-window.__plGrade = { grade, setGrade, snapshot: () => snapshot(), loadPreset: (data) => loadPreset({ id: '', name: '', data }, true) };
+window.__plGrade = { grade, setGrade, loop: () => JSON.parse(JSON.stringify(loopGrade)), owned: () => !!seq.gradeOwned, snapshot: () => snapshot(), loadPreset: (data) => loadPreset({ id: '', name: '', data }, true) };
 
 const wideBtn = $('#wideBtn'), WIDE_KEY = 'phosphor-wide-controls';
 let wideCtl = (() => { try { return localStorage.getItem(WIDE_KEY) === '1'; } catch (_) { return false; } })();
@@ -10597,6 +10597,7 @@ function seqLoadSong(key, song) {
   seqSpecStore(true);
   if (seq.key !== key) seq.records.set(seq.key, seq.rec);
   seq.key = key; seq.song = song || null;
+  seq.apBefore = null;
   seq.rec = seq.records.get(key) || TL.newRecord();
   seq.undo.length = 0; seq.redo.length = 0; seqUndoUI();
   seq.selId = null; seq.applied = [null, null, null, null];
@@ -10620,6 +10621,11 @@ function seqRun(on, message) {
   if (on) {
     if (ap.on) setAutopilot(false, true);
     seq.apMode = null;
+    typeGlide.on = false;
+    // Type art gets ready now (its first start takes a moment), not when the first block with it comes in
+    if (seq.rec.blocks.some((b) => b.autos.some((au) => SEQ_TYPE.includes(au.key)))) typeEngine();
+    // Back from Autopilot at the sequence's end (even after Stop): as it was when the sequence ended
+    if (seq.apBefore) seqApBack();
     if (!was) seq.showsBefore = Object.fromEntries(KEYS.map((k) => [k, mix.tgt[SHOW[k]]]));
     if (loopCount < seqUsedLoops()) { setLoopCount(seqUsedLoops(), 'load'); syncUI(); }
   } else {
@@ -10648,6 +10654,8 @@ function seqTypeApply(now) {
     }
     if (!wt) continue;
     if (!seq.typeBase) seq.typeBase = Object.fromEntries(SEQ_TYPE.map((q) => [q, typeArt[q]]));
+    // (an Amount glide Autopilot started would otherwise keep pulling it its way for its whole Fade time)
+    typeGlide.on = false;
     typeArt[key] = Math.round(sum / wt);
     any = true;
   }
@@ -10655,7 +10663,32 @@ function seqTypeApply(now) {
   if (!any && seq.typeBase) { seq.typeBase = null; syncTypeUI(); return; }
   if (any && now - seq.typeUi > 250) { seq.typeUi = now; for (const key of SEQ_TYPE) { const c = typeEls[key]; c.el.value = typeArt[key]; fillTrack(c.el); c.out.textContent = typeText(key, typeArt[key]); } }
 }
+// Autopilot at the end of a sequence: everything as it was when the sequence ended is kept, and comes back when the
+// sequence plays again (a jump back, or Play), so nothing Autopilot brought in (another loop's input, a fader, a feed)
+// stays behind the sequence's looks
+function seqApSnap() {
+  return { mix: { ...mix.tgt }, count: loopCount, loops: Object.fromEntries(KEYS.map((k) => [k, JSON.parse(JSON.stringify(loops[k].tgt))])) };
+}
+function seqApBack() {
+  const b = seq.apBefore;
+  seq.apBefore = null;
+  if (!b) return;
+  if (loopCount !== b.count) setLoopCount(b.count, 'load');
+  Object.assign(mix.tgt, b.mix);
+  const used = seqTracksUsed();
+  KEYS.forEach((k, i) => {
+    if (used.has(i)) return;   // the sequence's own loops take its looks again straight away
+    const L = loops[k];
+    L.ramp = null;
+    Object.assign(L.tgt, b.loops[k]);
+    L.base = { ...L.tgt };
+  });
+  seq.applied = [null, null, null, null];
+  settleDevices();
+  syncUI();
+}
 function seqGiveBack() {
+  seq.gradeOwned = false;
   for (const K of KEYS) seq.typeL[K] = null;
   seqTypeApply(performance.now());
   const before = seq.showsBefore || {};
@@ -10700,6 +10733,21 @@ async function seqStop() {
   }
 }
 $('#seqPlay').addEventListener('click', () => { if (seq.running) void seqStop(); else void seqPlay(); });
+// From the start: the sequence from its very beginning, and its song from the top in Spotify
+async function seqFromStart() {
+  seqAskFiles();
+  if (seq.song && spotify.token) {
+    seqRun(true, 'Starting the song from the top in Spotify…');
+    try { await spotify.play(0, seq.song.uri); seqNote('Playing from the start, following the song in Spotify.'); }
+    catch (err) { seqNote(`${err.message} The looks follow as soon as the song plays.`); toast(err.message, 8000); }
+    return;
+  }
+  const L = seq.local;
+  L.pos = 0; L.at = performance.now(); L.playing = true;
+  seqRun(true, 'Playing the sequence from the start.');
+  seq.jumped = true;
+}
+$('#seqTop').addEventListener('click', () => { void seqFromStart(); });
 $('#seqStop').addEventListener('click', () => { void seqStop(); if (!seq.song) { seq.local.pos = 0; seq.dirty = true; } });
 /* ---------- export a sequence as a video ---------- */
 // Export video… plays the sequence once from the top, by itself, while the picture is drawn at 4K (or 1440p / 1080p)
@@ -10710,7 +10758,9 @@ $('#seqStop').addEventListener('click', () => { void seqStop(); if (!seq.song) {
 const EX = { stage: '', vr: null, chunks: [], sound: [], blend: null, end: 0, frames: 0, t0: 0, spotify: false, name: '',
   started: false, stop: '', mime: '', lock: null, hidden: false, h: 2160 };
 const exOn = () => !!EX.stage;
-const exSpotify = () => !!(seq.song && spotify.token && spotify.canSeek);
+// A sequence made for a Spotify song follows that song while it exports (with or without its sound in the video)
+const exFollows = () => !!(seq.song && spotify.token);
+const exSpotify = () => exFollows() && spotify.canSeek;
 const exEnd = () => (seq.song ? seq.song.durationMs / 1000 : Math.max(TL.MIN_LEN, TL.lastEnd(seq.rec)));
 const exSay = (t) => { $('#seqExSay').textContent = t || ''; };
 function exOpen() {
@@ -10763,7 +10813,8 @@ async function exGo() {
     }
   }
   EX.h = +($('#seqExSize [aria-pressed="true"]')?.dataset.h || 2160);
-  EX.spotify = wantSound && exSpotify();
+  EX.spotify = exFollows();
+  EX.asked = false; EX.seekAsked = false;
   EX.end = exEnd();
   EX.name = `${(seq.song ? seq.song.name : seq.rec.title || 'Phosphor Loop sequence').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80)} ${EX.h === 2160 ? '4K' : EX.h + 'p'}`;
   EX.started = false; EX.stop = ''; EX.hidden = false;
@@ -10838,7 +10889,9 @@ function exTick(now) {
     if (EX.frames < 12) return;
     EX.stage = 'start'; EX.frames = 0;
     if (EX.spotify) {
-      spotify.play(0, seq.song.uri).catch((err) => exFail(`${err.message} The export stopped.`));
+      // Spotify starts the song from the top; if it can't, the export waits for you to press Play there
+      if (spotify.canSeek) spotify.play(0, seq.song.uri).then(() => { EX.asked = true; }, (err) => { EX.why = err.message; });
+      else EX.why = 'Spotify isn’t connected with permission to start the song.';
     } else {
       seq.local.pos = 0; seq.local.at = performance.now(); seq.local.playing = true;
     }
@@ -10846,10 +10899,17 @@ function exTick(now) {
   }
   const t = seq.t;
   if (EX.stage === 'start') {
-    // Under way once the song (or the sequence's own clock) has started from the top
-    if (seq.playing && t < 5) { EX.stage = 'play'; EX.frames = 0; EX.started = true; EX.from = t; }
-    else if (EX.frames > 60 * 20) exFail('The song didn’t start in Spotify. Is Spotify open on this computer?');
-    $('#expText').innerHTML = '<b>Exporting</b> · starting the song…';
+    // Under way once the song (or the sequence's own clock) plays from the top. Playing from further in (Spotify
+    // started where it was), it's moved back to the top once.
+    const following = !EX.spotify || seqPh.live;
+    if (following && seq.playing && t > 3 && !EX.seekAsked && spotify.canSeek) { EX.seekAsked = true; spotify.seek(0).catch(() => {}); }
+    if (following && seq.playing && (t < 3 || EX.seekAsked && EX.frames > 240)) { EX.stage = 'play'; EX.frames = 0; EX.started = true; EX.from = t; return; }
+    // Still waiting: what to do, plainly (it waits as long as it takes; Cancel stops it)
+    const slow = EX.frames > 240;
+    $('#expText').innerHTML = !EX.spotify ? '<b>Exporting</b> · starting…'
+      : EX.why ? `<b>Waiting for the song</b> · ${escapeHTML(EX.why)} Press Play on <b>${escapeHTML(seq.song.name)}</b> in Spotify, from the start, and the export goes on by itself.`
+      : slow ? `<b>Waiting for the song</b> · Spotify hasn’t started it yet. Press Play on <b>${escapeHTML(seq.song.name)}</b> in Spotify on this computer and the export goes on by itself.`
+      : '<b>Exporting</b> · starting the song in Spotify…';
     return;
   }
   if (EX.stage === 'play') {
@@ -11108,7 +11168,7 @@ function seqApplyTrack(k, x, now) {
   const K = KEYS[k], L = loops[K], T = L.tgt;
   if (!x) { mix.tgt[SHOW[K]] = 0; seq.applied[k] = null; seqGrade(K, null); seqRelief[K] = null; seq.typeL[K] = null; return; }
   const sig = x.other ? `${x.other.id}>${x.main.id}` : x.main.id;
-  let fresh = false;
+  let fresh = false, startFresh = false;
   if (seq.applied[k] !== sig) {
     fresh = true;
     const wasCross = (seq.applied[k] || '').includes('>');
@@ -11118,6 +11178,8 @@ function seqApplyTrack(k, x, now) {
     if (x.other && x.main.look.in1 !== T.in1 && T.in2 === 'none') { T.in2 = x.main.look.in1; seq.xin[k] = true; }
     if (wasCross && !x.other) L.cur.blend = T.blend;
     seq.applied[k] = sig;
+    // A block starting by itself (not out of a crossfade): see the end of this
+    startFresh = !x.other && !wasCross;
     // The outgoing block's picture or video first, then the incoming one's, which wins where they share an input
     seqShowMedia(x.other, K); seqShowMedia(x.main, K);
     const used = [T.in1, T.in2];
@@ -11177,14 +11239,46 @@ function seqApplyTrack(k, x, now) {
     }
     else if (key in T) T[key] = v;
   }
+  // How the block's mirror comes in as it starts: Cut (unless picked otherwise in its details), or its Transition from
+  // the mirror before, over its time
+  // (after a jump in the song it's simply there)
+  if (startFresh) {
+    const [fx, secs] = x.main.mxIn || ['cut', 0];
+    if (fx === 'cut' || seq.jumped) mirrorCut(K);
+    else if (L.mx && L.mx.to !== T.mirror) { T.mirrorFx = fx; L.mxSecs = secs; }
+    // Its settings (change lines included) are there from its first frame, not gliding in from what was before; its
+    // fade in, when it has one, brings the look in as itself
+    for (const q of LOOP_SMOOTH) L.cur[q] = T[q];
+  }
   mix.tgt[SHOW[K]] = clamp(show, 0, 100) * x.show;
+  // A block with no fade in is on screen from its first frame
+  if (startFresh && !(x.main.fin > 0.05) && show * x.show > 1) mix.cur[SHOW[K]] = mix.tgt[SHOW[K]];
   if (feed !== null) mix.tgt[FEED_INTO[otherLoop(K)]] = feed;
-  seqGrade(K, Object.keys(grade).length ? grade : null);
+  // The block's own grading (blended through a crossfade), with its Color grading lines over it
+  const own = seqBlockGrade(x);
+  seqGrade(K, own || Object.keys(grade).length ? { ...(own || {}), ...grade } : null);
   seq.typeL[K] = Object.keys(typ).length ? typ : null;
   seqRelief[K] = Object.keys(rel).length ? rel : null;
 }
 // Color grading inside the sequencer is each loop's own (see loopGrade); null puts that loop back to normal
 function seqGrade(K, g) { loopGrade[K] = g; }
+function seqBlockGrade(x) {
+  const a = x.other && x.other.grade, b = x.main.grade;
+  if (!x.other) return b || null;
+  if (!a && !b) return null;
+  const out = {}, w = x.w;
+  for (const k of Object.keys(GRADE_DEF)) out[k] = (a?.[k] ?? GRADE_DEF[k]) + ((b?.[k] ?? GRADE_DEF[k]) - (a?.[k] ?? GRADE_DEF[k])) * w;
+  return out;
+}
+// While a sequence with graded blocks plays, each loop is graded on its own: by its block's grading, or else by yours,
+// and yours isn't laid over the whole picture as well (it would grade the blocks' grading twice)
+const seqGradeOwns = () => seq.running && !seq.apMode && seq.rec.blocks.some((b) => b.grade);
+function seqGradeRest() {
+  const owns = seqGradeOwns();
+  if (owns) for (const K of activeKeys()) { if (!loopGrade[K] && gradeOn()) loopGrade[K] = { ...grade }; }
+  else if (seq.gradeOwned) for (const K of KEYS) loopGrade[K] = null;
+  seq.gradeOwned = owns;
+}
 
 
 function seqTick(now) {
@@ -11198,15 +11292,16 @@ function seqTick(now) {
     else {
       const r = TL.resolve(seq.rec, p.t);
       if (r.autopilot) {
-        if (seq.apMode !== 'end') { seq.apMode = 'end'; setAutopilot(true, true); seqNote('The sequence has ended, so Autopilot is running.'); }
+        if (seq.apMode !== 'end') { seq.apMode = 'end'; seq.apBefore = seqApSnap(); setAutopilot(true, true); seqNote('The sequence has ended, so Autopilot is running.'); }
       } else {
-        if (seq.apMode === 'end') { seq.apMode = null; setAutopilot(false, true); }
+        if (seq.apMode === 'end') { seq.apMode = null; setAutopilot(false, true); seqApBack(); }
         if (!seq.apMode) for (let k = 0, used = seqTracksUsed(); k < TL.TRACKS; k++) {
           if (!loopOn(KEYS[k]) || !used.has(k)) continue;   // no blocks on this track: the loop is yours
           if (seq.recording && k === seq.selTrack) continue;   // you're playing this loop by hand
           seqApplyTrack(k, r.tracks[k], now);
         }
         seq.jumped = false;
+        seqGradeRest();
         seqTypeApply(now);
         seqPreloadVid(r.at ?? p.t);
       }
@@ -11231,13 +11326,13 @@ function seqRecTick(p) {
   if (!seq.recBlock) {
     seq.recBefore ||= seqSnap();
     seq.recGen = L.gen; seq.recMedia = seqMediaSig(L.tgt, K);
-    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0, media: seqCaptureMedia(L.tgt, K) });
+    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0, media: seqCaptureMedia(L.tgt, K), grade: seqGradeNow() });
     seq.recBlock.rec = true;
     seq.rec.blocks.push(seq.recBlock);
   }
   seq.recBlock.b = Math.max(seq.recBlock.a + TL.MIN_LEN, r1(t));
   // Slider moves during a look are kept: the block holds the look as it is when it ends
-  if (L.gen === seq.recGen) seq.recBlock.look = { ...L.tgt };
+  if (L.gen === seq.recGen) { seq.recBlock.look = { ...L.tgt }; const g = seqGradeNow(); if (g) seq.recBlock.grade = g; else delete seq.recBlock.grade; }
   seq.dirty = true;
 }
 // Closes the block being recorded; keepGoing leaves recording on, ready for the next look
@@ -11436,6 +11531,20 @@ function seqInspector() {
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
     (bl.autos.length ? `<span class="seq-lines">Editing ${bl.autos.map((au, i) => `<button type="button" class="chip" data-line="${i}" aria-pressed="${i === seqLineAct(bl)}" title="Bring ${SEQ_NAME[au.key] || au.key}’s line to the front to edit it"><span class="led" style="background:${seqLineColor(i)}"></span>${SEQ_NAME[au.key] || au.key}</button>`).join('')}</span>` : '<span>No changes over time · right-click to add one</span>');
+  // Its Color grading
+  {
+    const g = bl.grade, parts = g ? Object.keys(GRADE_DEF).filter((k) => Number.isFinite(g[k]) && g[k] !== GRADE_DEF[k]).map((k) => `${SEQ_NAME[k]} ${gradeText(k, g[k])}`) : [];
+    el.innerHTML += `<span class="seq-mfx">Color grading: ${parts.length ? escapeHTML(parts.join(' · ')) : 'none of its own (yours)'} ` +
+      `<button type="button" class="chip" data-grade="now" title="This block keeps the Color grading you have on screen now">Use the grading on screen</button>` +
+      (parts.length ? `<button type="button" class="chip" data-grade="none" title="This block has no grading of its own: it shows yours">None</button>` : '') + '</span>';
+  }
+  // How the block's mirror comes in when the block starts
+  if ((+bl.look.mirror || 0) > 0 || bl.autos.some((au) => au.key === 'mirror')) {
+    const [fx, secs] = bl.mxIn || ['cut', 3];
+    el.innerHTML += `<span class="seq-mfx">At the start its mirror comes in with ` +
+      ['cut', 'melt', 'iris', 'ripple'].map((f) => `<button type="button" class="chip" data-sfx="${f}" aria-pressed="${fx === f}" title="${f === 'cut' ? 'There straight away' : `A ${f} from the mirror before`}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('') +
+      (fx === 'cut' ? '' : ' over ' + [1, 3, 6, 10].map((n) => `<button type="button" class="chip" data-ssecs="${n}" aria-pressed="${Math.abs(secs - n) < 0.01}">${n} s</button>`).join('')) + '</span>';
+  }
   // The Mirror line in front: the change leading to the picked point, its own Transition and time
   const mi = seqLineAct(bl);
   if (mi >= 0 && bl.autos[mi].key === 'mirror') {
@@ -11455,6 +11564,28 @@ $('#seqInsp').addEventListener('click', (e) => {
   if (!bl) return;
   seqSetLineAct(bl, +b.dataset.line);
   seqNote(`Editing ${SEQ_NAME[bl.autos[+b.dataset.line].key] || bl.autos[+b.dataset.line].key}: drag its points, double-click to add one.`);
+});
+// The block's Color grading, from its details
+$('#seqInsp').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-grade]'), bl = b && seq.rec.blocks.find((x) => x.id === seq.selId);
+  if (!bl) return;
+  const g = b.dataset.grade === 'now' ? seqGradeNow() : undefined;
+  seqChange(() => { if (g) bl.grade = g; else delete bl.grade; });
+  seq.applied = [null, null, null, null];
+  seqInspector();
+  seqNote(g ? 'This block keeps the Color grading on screen now.' : b.dataset.grade === 'now' ? 'There’s no Color grading on screen, so this block has none of its own.' : 'This block has no Color grading of its own now: it shows yours.');
+});
+// How the block's mirror comes in at its start, picked in its details
+$('#seqInsp').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sfx], [data-ssecs]'), bl = b && seq.rec.blocks.find((x) => x.id === seq.selId);
+  if (!bl) return;
+  seqChange(() => {
+    const [fx0, secs0] = bl.mxIn || ['cut', 3];
+    const fx = b.dataset.sfx || fx0, secs = b.dataset.ssecs ? +b.dataset.ssecs : secs0;
+    if (fx === 'cut') delete bl.mxIn; else bl.mxIn = [fx, secs];
+  });
+  seqInspector();
+  seqNote(bl.mxIn ? `At its start, this block’s mirror comes in with ${bl.mxIn[0][0].toUpperCase() + bl.mxIn[0].slice(1)} over ${bl.mxIn[1]} s.` : 'At its start, this block’s mirror is there straight away.');
 });
 // The picked Mirror point's Transition and time, picked in the block's details
 $('#seqInsp').addEventListener('click', (e) => {
@@ -11756,16 +11887,24 @@ document.addEventListener('keydown', (e) => {
   else if (mod && k === 'v' && seq.clip) { e.preventDefault(); seqPaste(seq.selTrack, seq.t); }
   else if ((k === 'delete' || k === 'backspace') && bl) { e.preventDefault(); seqDelete(bl); }
   else if (!mod && !e.altKey && k === 'm') { e.preventDefault(); seqAddMarker(); }
+  else if (!mod && !e.altKey && k === 'home') { e.preventDefault(); void seqFromStart(); }
 });
 
 /* ---------- adding looks, markers ---------- */
 // withMedia: true keeps the picture or video the inputs hold now; an object is the block's own media. len: how long
 // the block plays (16 seconds unless said)
-function seqPlace(label, look, withMedia, len = 16) {
+// The Color grading a block keeps: the grading on screen (or a saved look's), when there is any
+function seqGradeNow(g = grade) {
+  const out = {};
+  for (const k of Object.keys(GRADE_DEF)) if (Number.isFinite(g?.[k])) out[k] = g[k];
+  return Object.keys(GRADE_DEF).some((k) => out[k] !== undefined && out[k] !== GRADE_DEF[k]) ? out : undefined;
+}
+// gradeFrom: whose Color grading the block keeps (a saved look's); the grading on screen unless said
+function seqPlace(label, look, withMedia, len = 16, gradeFrom) {
   const dur = seqDur(), a = r1(clamp(seq.t, 0, dur)), b = r1(Math.min(dur, a + Math.max(TL.MIN_LEN, len)));
   if (b - a < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
   const media = withMedia && typeof withMedia === 'object' ? withMedia : withMedia ? seqCaptureMedia(look, KEYS[seq.selTrack]) : null;
-  const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)), media });
+  const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)), media, grade: seqGradeNow(gradeFrom || grade) });
   seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
   seqNote(`Added “${seqName(nb)}” to track ${seq.selTrack + 1} at ${fmtSeq(a, true)}. Drag its ends to change how long it plays.`);
 }
@@ -11924,7 +12063,7 @@ function seqBuildSaved(menu) {
     const h = document.createElement('div'); h.className = 'mh'; h.textContent = title; menu.appendChild(h);
     for (const p of list) {
       const look = p.data?.[K] || p.data?.A; if (!look) continue;
-      any = true; seqMenuItem(menu, p.name, () => seqPlace(p.name, look));
+      any = true; seqMenuItem(menu, p.name, () => seqPlace(p.name, look, false, 16, p.data?.grade || GRADE_DEF));
     }
   }
   if (!any) { const h = document.createElement('div'); h.className = 'mh'; h.textContent = 'No saved looks yet. Save one under My presets.'; menu.appendChild(h); }

@@ -72,7 +72,9 @@ def main():
         got = {}
         for at in (40, 200, 360):
             J(f"__plSeq.seek({at})")
-            c.wait_frames(4, f'at {at} s')
+            # (with the block's loop on screen from its first frame, each frame of Type art takes several seconds in this
+            # workspace's software drawing)
+            c.wait_frames(4, f'at {at} s', ceiling=120)
             got[at] = (ty()['tAmt'], ty()['tSize'])
         print('   ', got)
         ok(got[40][0] < got[200][0] < got[360][0] and abs(got[200][0] - 50) <= 3, f'Type art’s amount follows its line ({[v[0] for v in got.values()]})')

@@ -105,6 +105,13 @@ file don't rebuild the app.
    1080p through `MV.size` and recorded with this computer's sound, then offers an MP4; the song starts in Spotify from
    the top with `spotify.play(0, uri)` and is paused at the end, `spotify.pause()`; `EX`, `exGo`, `exTick` in js/app.js):
    `python3 tests/seq_export_check.py` (about 2 minutes; own clock, no sound) and `node --test tests/spotify.test.mjs`.
+4u. **A block's start, and its grading** (a block starting by itself has its settings and Show from its first frame, its mirror
+   Cut unless its details pick a Transition, `bl.mxIn`; an Autopilot Type art glide stops; `startFresh` in seqApplyTrack):
+   `python3 tests/seq_block_start_check.py`. A block keeps the Color grading it was added with (`bl.grade`, `seqGradeNow`,
+   `seqBlockGrade`); while graded blocks play each loop is graded on its own and yours isn't laid over the whole picture
+   (`seqGradeRest`, `seq.gradeOwned`). **From the start** (`seqFromStart`, Home key): `python3 tests/seq_grade_check.py`.
+   After the end's Autopilot, going back into the sequence puts things back as they were at the end (`seqApSnap`,
+   `seqApBack`): `python3 tests/seq_ap_end_check.py`. Type art in this workspace takes seconds a frame: long ceilings.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

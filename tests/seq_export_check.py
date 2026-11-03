@@ -123,6 +123,50 @@ def main():
         # workspace's software drawing, a frame or two a second at 1080p)
         ok(dur >= 6, f'it holds the whole sequence ({dur:.1f} s for a 6 s sequence, plus a moment either side)')
         print('  video: ' + f)
+
+        # Following a Spotify song (a stand-in Spotify here: it plays when asked, paused 3 s in to start with), with the
+        # sound unticked: the song is started from the top, the export runs with it, and the song is paused at the end
+        J("""(() => { const S = __plSeq.spotify; S.stop(); S.token = { access: 'x', scope: 'user-modify-playback-state' };
+          const track = { uri: 'spotify:track:T', name: 'Test song', artists: ['Me'], durationMs: 7000 };
+          S.snapshot = { track, playing: false, progressMs: 3000, receivedAt: S.now() };
+          window.__sp = { plays: [], pauses: 0 };
+          S.play = async (ms, uri) => { __sp.plays.push([ms, uri]); S.snapshot = { ...S.snapshot, playing: true, progressMs: ms || 0, receivedAt: S.now() }; return true; };
+          S.pause = async () => { __sp.pauses++; S.snapshot = { ...S.snapshot, playing: false, progressMs: S.position(), receivedAt: S.now() }; return true; };
+          // as Spotify's own answers would, every second
+          setInterval(() => { S.snapshot = { ...S.snapshot, progressMs: S.position(), receivedAt: S.now() }; }, 1000);
+          __plSeq.follow(track); })()""")
+        c.wait_frames(3, 'following the song')
+        click('#seqExport')
+        c.wait_frames(2, 'export panel')
+        how = J("document.querySelector('#seqExHow').textContent")
+        ok('Test song' in how and 'from the top' in how, f'it says the song starts in Spotify from the top: “{how[:200]}…”')
+        J("document.querySelector('#seqExSound').checked = false")
+        click('#seqExSize [data-h="1080"]')
+        click('#seqExGo')
+        until("__plExport.stage === 'play'", 'the export did not get going with the song', 120)
+        plays = J("__sp.plays")
+        ok(plays and plays[0] == [0, 'spotify:track:T'], f'the song was started from the top in Spotify ({plays})')
+        ok(J("__plExport.from") < 1.5, f"the sequence follows it from the start (under way at {J('__plExport.from'):.2f} s)")
+        until("!document.querySelector('#nameBox').hidden", 'the export with the song did not finish by itself', 120)
+        ok(J("__sp.pauses") >= 1, 'the song is paused at the end')
+        J("document.querySelector('#nameDrop').click(); document.querySelector('#nameDrop').click()")   # Don't save, then Throw the video away?
+
+        # Spotify won't start it (no permission): the export waits and says to press Play in Spotify, then goes on
+        J("""(() => { const S = __plSeq.spotify; S.token = { access: 'x', scope: '' };
+          S.snapshot = { ...S.snapshot, playing: false, progressMs: 0, receivedAt: S.now() }; __sp.plays = []; })()""")
+        c.wait_frames(3, 'no permission')
+        click('#seqExport')
+        c.wait_frames(2, 'export panel')
+        click('#seqExGo')
+        until("document.querySelector('#expText').textContent.includes('Press Play')", 'waiting for the song, it did not say to press Play in Spotify', 120)
+        ok(J("__plExport.stage") == 'start', 'it waits for the song')
+        J("(() => { const S = __plSeq.spotify; S.snapshot = { ...S.snapshot, playing: true, progressMs: 0, receivedAt: S.now() }; })()")
+        until("__plExport.stage === 'play'", 'pressing Play in Spotify did not get the export going', 60)
+        ok(True, 'pressing Play in Spotify gets it going')
+        J("document.querySelector('#expCancel').click()")
+        until("__plExport.stage === ''", 'Cancel did not stop the export', 60)
+        c.wait_frames(3, 'cancelled')
+        ok(J("__plExport.stage") == '' and J("document.querySelector('#nameBox').hidden"), 'Cancel stops it without offering a video')
         ok(not errors, 'no page errors: ' + '; '.join(errors[:3]))
         b.close()
     srv.shutdown()

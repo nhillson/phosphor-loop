@@ -33,6 +33,12 @@
     const pic = one(m.pic, ['nature', 'own', 'card']), vid = one(m.vid, ['own', 'clip']);
     return pic || vid ? { ...(pic ? { pic } : {}), ...(vid ? { vid } : {}) } : null;
   }
+  function cleanGrade(g) {
+    if (!g || typeof g !== 'object') return null;
+    const out = {};
+    for (const [k, v] of Object.entries(g)) if (/^g[A-Z]\w{1,12}$/.test(k) && Number.isFinite(+v) && typeof v !== 'boolean') out[k] = +v;
+    return Object.keys(out).length ? out : null;
+  }
   function cleanBlock(b) {
     if (!b || typeof b !== 'object' || !b.look || typeof b.look !== 'object') return null;
     const a = Math.max(0, num(b.a)), end = Math.max(a + MIN_LEN, num(b.b, a + 16));
@@ -43,7 +49,11 @@
         ...(x.key === 'mirror' ? { fx: ['cut', 'melt', 'iris', 'ripple'].includes(x.fx) ? x.fx : 'melt', secs: clamp(num(x.secs, 3), 0.5, 12) } : {}) }));
     return { id: typeof b.id === 'string' ? b.id.slice(0, 24) : id(), track: clamp(Math.round(num(b.track)), 0, TRACKS - 1),
       a: r2(a), b: r2(end), label: typeof b.label === 'string' ? b.label.slice(0, 80) : '', look: b.look, fin: r2(fin), fout: r2(fout), autos,
-      ...(cleanMedia(b.media) ? { media: cleanMedia(b.media) } : {}) };
+      ...(cleanMedia(b.media) ? { media: cleanMedia(b.media) } : {}),
+      // The block's own Color grading (the grading on screen when its look was added), numbers only
+      ...(cleanGrade(b.grade) ? { grade: cleanGrade(b.grade) } : {}),
+      // How the block's mirror comes in when it starts: [Transition, seconds]; none kept means Cut
+      ...(Array.isArray(b.mxIn) && ['melt', 'iris', 'ripple'].includes(b.mxIn[0]) ? { mxIn: [b.mxIn[0], clamp(num(b.mxIn[1], 3), 0.5, 12)] } : {}) };
   }
   function cleanData(d) {
     return {
