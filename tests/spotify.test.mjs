@@ -117,3 +117,21 @@ test('play explains what to do without permission or a device', async () => {
   client.token.scope = 'user-modify-playback-state';
   await assert.rejects(client.play(), /isn’t open on any device/);
 });
+test('play from a spot starts the song there (exporting starts from the top); pause stops it', async () => {
+  let plays = [], pauses = 0;
+  const {client} = fixture((url, o) => {
+    if (url.endsWith('/me')) return json({id: 'user'});
+    if (url.includes('/queue')) return json({currently_playing: item, queue: []});
+    if (url.includes('/me/player/play')) { plays.push({url, body: o.body}); return new Response(null, {status: 204}); }
+    if (url.includes('/me/player/pause')) { pauses++; return new Response(null, {status: 204}); }
+    return json({currently_playing_type: 'track', item, is_playing: true, progress_ms: 90000});
+  });
+  client.token.scope = 'user-modify-playback-state';
+  await client.poll();
+  await client.play(0);
+  assert.equal(plays.length, 1);
+  assert.deepEqual(JSON.parse(plays[0].body), {uris: ['spotify:track:A'], position_ms: 0}, 'the same song, from the top');
+  assert.equal(client.position(), 0, 'the playhead is at the top at once');
+  await client.pause();
+  assert.equal(pauses, 1); assert.equal(client.snapshot.playing, false);
+});

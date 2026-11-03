@@ -101,6 +101,10 @@ file don't rebuild the app.
    into its spare player (`to.spare`, `vidUseSpare` swaps it in, `vidDropSpare` lets it go). A loop waiting for its
    video shows black (`seqVidWait`), never the one before: `python3 tests/two_videos_check.py` (about 4 minutes; the
    stand-in clip library).
+4t. **Export video…** (sequencer: plays the sequence once from the top by itself while the picture is drawn at 4K / 1440p /
+   1080p through `MV.size` and recorded with this computer's sound, then offers an MP4; the song starts in Spotify from
+   the top with `spotify.play(0, uri)` and is paused at the end, `spotify.pause()`; `EX`, `exGo`, `exTick` in js/app.js):
+   `python3 tests/seq_export_check.py` (about 2 minutes; own clock, no sound) and `node --test tests/spotify.test.mjs`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

@@ -162,24 +162,38 @@
     get canSeek() { return (this.token?.scope || '').split(' ').includes('user-modify-playback-state'); }
     // Starts the song in Spotify where it's paused: on the device it was playing on, or, when Spotify has gone idle
     // (no device active), on the one it was last on or the first one it has open, from the same spot
-    async play() {
+    // fromMs: from that spot in the song instead (exporting a sequence starts it from the top)
+    // (and uri: that song, when Spotify is on another)
+    async play(fromMs, uri) {
       if (!this.token) throw new Error('Connect Spotify first (Song sequencer › Connect Spotify).');
       if (!this.canSeek) throw new Error('Reconnect Spotify (Song sequencer › Connect Spotify) so Play can start the music.');
-      const snap = this.snapshot, at = this.position();
+      const snap = this.snapshot, song = uri || snap?.track?.uri;
+      const from = Number.isFinite(fromMs) && !!song, at = from ? Math.max(0, Math.round(fromMs)) : this.position();
       this.playbackVersion++;
-      try { await this.api('/me/player/play', true, { method: 'PUT' }); }
+      const here = from ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [song], position_ms: at }) } : { method: 'PUT' };
+      try { await this.api('/me/player/play', true, here); }
       catch (error) {
         if (!error.noDevice) throw error;
         const list = (await this.api('/me/player/devices'))?.devices || [];
         const dev = list.find((d) => d.is_active) || list.find((d) => !d.is_restricted);
         if (!dev) throw new Error('Spotify isn’t open on any device. Open Spotify on this computer or your phone, then press Play again.');
-        const body = snap?.track ? { uris: [snap.track.uri], position_ms: Math.max(0, Math.round(at || 0)) } : {};
+        const body = song ? { uris: [song], position_ms: Math.max(0, Math.round(at || 0)) } : {};
         await this.api('/me/player/play?device_id=' + encodeURIComponent(dev.id), true,
           { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       }
       // Playing from here (the next look at Spotify confirms it)
       if (this.snapshot?.track) {
         this.snapshot = { ...this.snapshot, playing: true, progressMs: at ?? this.snapshot.progressMs, receivedAt: this.now() };
+        this.emit('playback', this.snapshot);
+      }
+      return true;
+    }
+    async pause() {
+      if (!this.token || !this.canSeek) return false;
+      this.playbackVersion++;
+      try { await this.api('/me/player/pause', true, { method: 'PUT' }); } catch (_) { return false; }
+      if (this.snapshot?.track) {
+        this.snapshot = { ...this.snapshot, playing: false, progressMs: this.position() ?? this.snapshot.progressMs, receivedAt: this.now() };
         this.emit('playback', this.snapshot);
       }
       return true;

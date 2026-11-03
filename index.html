@@ -78,6 +78,7 @@
             <button class="btn small" id="seqPlay" aria-pressed="false" title="Run the sequence: each track plays its blocks on its loop"><span class="led"></span><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>Play</button>
             <button class="btn small" id="seqStop" title="Stop the sequence and hold the picture"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="1" fill="currentColor"/></svg>Stop</button>
           </div>
+          <button class="btn small" id="seqExport" title="Make a video of the whole sequence with its song, in 4K, by itself: it plays once from the top while it records">Export video…</button>
           <div class="seq-song" id="seqSong"><b>No song</b> <span>· its own clock</span></div>
           <output class="seq-clock" id="seqClock">0:00.0 / 4:00</output>
           <label class="seq-field">At end <select class="seq-in" id="seqEnd"><option value="hold">Hold last look</option><option value="loop">Loop sequence</option><option value="auto">Start Autopilot</option></select></label>
@@ -97,6 +98,25 @@
           <button class="btn small" type="submit">Save</button>
           <button class="btn small" type="button" id="seqSaveCancel">Cancel</button>
         </form>
+        <div class="seq-export" id="seqExportForm" hidden>
+          <div class="seq-ex-row">
+            <b>Export this sequence as a video</b>
+            <span class="seq-field">Size
+              <span class="seg seg-3 seq-ex-size" id="seqExSize" role="group" aria-label="Video size">
+                <button type="button" data-h="2160" aria-pressed="true">4K</button>
+                <button type="button" data-h="1440" aria-pressed="false">1440p</button>
+                <button type="button" data-h="1080" aria-pressed="false">1080p</button>
+              </span>
+            </span>
+            <label class="seq-field"><input type="checkbox" id="seqExSound" checked> With the song’s sound</label>
+          </div>
+          <ol class="seq-ex-how" id="seqExHow"></ol>
+          <div class="seq-ex-row">
+            <button class="btn small primary" type="button" id="seqExGo">Start export</button>
+            <button class="btn small" type="button" id="seqExCancel">Cancel</button>
+            <span class="seq-ex-say" id="seqExSay" role="status" aria-live="polite"></span>
+          </div>
+        </div>
         <div class="seq-tools">
           <span>Add to <b id="seqSelName">track 1 · loop A</b> at the playhead:</span>
           <button class="btn small" id="seqAddCurrent" title="This loop’s look as it is now">+ Add current look</button>
@@ -206,6 +226,13 @@
           </div>
         </form>
         <p class="hint snip-status" id="snipStatus" role="status" aria-live="polite"></p>
+      </div>
+      <div class="session-bar moves-bar" id="expBar" hidden>
+        <div class="session-row">
+          <span class="live" aria-hidden="true"></span><span id="expText"></span>
+          <button class="btn small" id="expStop" title="Stop now and save what's been recorded so far">Stop and save</button>
+          <button class="btn small" id="expCancel" title="Stop now and throw the video away">Cancel</button>
+        </div>
       </div>
       <div class="session-bar moves-bar" id="movesBar" hidden>
         <div class="session-row">

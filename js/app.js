@@ -10701,6 +10701,203 @@ async function seqStop() {
 }
 $('#seqPlay').addEventListener('click', () => { if (seq.running) void seqStop(); else void seqPlay(); });
 $('#seqStop').addEventListener('click', () => { void seqStop(); if (!seq.song) { seq.local.pos = 0; seq.dirty = true; } });
+/* ---------- export a sequence as a video ---------- */
+// Export video… plays the sequence once from the top, by itself, while the picture is drawn at 4K (or 1440p / 1080p)
+// and recorded with this computer's sound (the song, playing in Spotify on this computer), then saves an MP4. It
+// runs in real time: the song can't be recorded any faster than it plays. Stages: 'size' (waiting for the picture to
+// be drawn at its new size), 'lead' (recording the first look for a moment), 'start' (the song starting), 'play',
+// 'tail' (a moment more after the end), then the file.
+const EX = { stage: '', vr: null, chunks: [], sound: [], blend: null, end: 0, frames: 0, t0: 0, spotify: false, name: '',
+  started: false, stop: '', mime: '', lock: null, hidden: false, h: 2160 };
+const exOn = () => !!EX.stage;
+const exSpotify = () => !!(seq.song && spotify.token && spotify.canSeek);
+const exEnd = () => (seq.song ? seq.song.durationMs / 1000 : Math.max(TL.MIN_LEN, TL.lastEnd(seq.rec)));
+const exSay = (t) => { $('#seqExSay').textContent = t || ''; };
+function exOpen() {
+  if (exOn()) return;
+  const f = $('#seqExportForm');
+  if (!f.hidden) { f.hidden = true; return; }
+  if (!seq.rec.blocks.length) { seqNote('Add some looks to the tracks first: there’s nothing to export yet.'); return; }
+  if (mvRec.on || mvRec.pending || recorder) { seqNote('Finish the recording that’s going first.'); return; }
+  f.hidden = false;
+  exSay('');
+  exHow();
+}
+function exHow() {
+  const h = +($('#seqExSize [aria-pressed="true"]')?.dataset.h || 2160), wide = Math.round(h * 16 / 9);
+  const sound = $('#seqExSound').checked, heard = exHeard();
+  const steps = [`It plays the whole sequence once, from the start, in real time (${fmtT(exEnd())}), and saves it as an MP4 video, ${h === 2160 ? '4K' : h + 'p'} (${wide}×${h} for a wide picture).`];
+  if (seq.song && !exSpotify()) steps.push('Spotify isn’t connected with permission to play, so the song won’t start by itself: reconnect it under Song sequencer, or untick the sound.');
+  else if (seq.song) steps.push(`The song, ${escapeHTML(seq.song.name)}, starts in Spotify from the top by itself. Its sound is recorded from this computer, so play Spotify on this computer, not your phone, and keep its volume up.`);
+  else if (sound) steps.push('This sequence has no song, so the video gets whatever sound this computer plays meanwhile.');
+  if (sound) steps.push(heard ? 'The sound is what React to sound already hears from this computer.'
+    : 'When you press Start export, Chrome asks what to share: pick <b>Entire screen</b>, switch on <b>Also share system audio</b>, then press <b>Share</b>. Only the sound is used.');
+  steps.push(`Leave this window open and in front until it’s done; you can watch it. If the picture stutters at ${h === 2160 ? '4K' : h + 'p'}, Cancel and pick a smaller size.`);
+  $('#seqExHow').innerHTML = steps.map((t) => `<li>${t}</li>`).join('');
+}
+// The computer's sound React to sound already hears (not a microphone), if it does
+function exHeard() {
+  const t = snd.track && snd.track.readyState === 'live' ? snd.track : null;
+  return t && (snd.src === 'system' || snd.src === 'loopback') ? t : null;
+}
+async function exGo() {
+  if (exOn()) return;
+  if (mvRec.on || mvRec.pending || recorder) { exSay('Finish the recording that’s going first.'); return; }
+  if (!window.MediaRecorder || !canvas.captureStream) { exSay('This browser can’t record video. Use Chrome or Edge.'); return; }
+  const wantSound = $('#seqExSound').checked;
+  EX.sound = [];
+  if (wantSound) {
+    const heard = exHeard();
+    if (heard) EX.sound.push(heard.clone());
+    else {
+      exSay('Waiting for you to share this computer’s sound…');
+      try { EX.sound.push(await openRecComputer()); }
+      catch (err) {
+        const n = err && err.name;
+        exSay(n === 'NoSoundShared' ? 'No sound came with the share. Press Start export again and switch on Also share system audio under the screen you pick.'
+          : n === 'NoLoopback' ? `${browserName} can’t record this computer’s sound. Use Chrome or Edge, or untick the sound.`
+          : n === 'NotAllowedError' ? 'Sharing was cancelled, so nothing started. Press Start export to try again, or untick the sound.'
+          : 'This computer’s sound couldn’t start. Try again, or untick the sound.');
+        return;
+      }
+    }
+  }
+  EX.h = +($('#seqExSize [aria-pressed="true"]')?.dataset.h || 2160);
+  EX.spotify = wantSound && exSpotify();
+  EX.end = exEnd();
+  EX.name = `${(seq.song ? seq.song.name : seq.rec.title || 'Phosphor Loop sequence').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80)} ${EX.h === 2160 ? '4K' : EX.h + 'p'}`;
+  EX.started = false; EX.stop = ''; EX.hidden = false;
+  $('#seqExportForm').hidden = true;
+  exSay('');
+  // The sequence waits at its first look; the song is paused until the recording runs
+  if (seq.running) { const L = seq.local; L.playing = false; seqRun(false); }
+  if (EX.spotify && spotify.snapshot?.playing) await spotify.pause();
+  seq.local.pos = 0; seq.local.playing = false;
+  seq.applied = [null, null, null, null]; seq.jumped = true;
+  // The picture is drawn at the export's size while it runs, in its own shape (as Save clip's recordings are)
+  // (a video's shape: wide, 16:9, unless the picture is set to the old TV shape)
+  const aspect = shape === 'tv' ? 4 / 3 : 16 / 9, h = EX.h;
+  MV.size = { width: Math.min(4096, Math.round((h * aspect) / 2) * 2), height: h, renderHeight: Math.round((h * SIM_H) / 576) };
+  fit();
+  EX.stage = 'size'; EX.frames = 0;
+  // Keeps the screen awake (a sleeping screen would stop the picture)
+  try { EX.lock = await navigator.wakeLock?.request('screen'); } catch (_) { EX.lock = null; }
+  $('#expBar').hidden = false;
+  $('#expText').innerHTML = '<b>Exporting</b> · getting ready…';
+}
+function exBegin() {
+  let stream;
+  try { stream = canvas.captureStream(60); } catch (_) { exFail('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  EX.blend = blendSounds(EX.sound);
+  if (EX.blend.track) stream.addTrack(EX.blend.track);
+  const withSound = !!EX.blend.track;
+  // H.264 with AAC sound plays everywhere (YouTube, Instagram, phones, video editors); WebM where the browser can't
+  const types = withSound
+    ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1,opus', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+    : ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  EX.mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+  // Plenty of bits for fine feedback detail, but a song's length at 4K still fits in memory (about 65 Mbps at 4K)
+  const vbps = Math.round(clamp(canvas.width * canvas.height * 8, 16e6, 70e6));
+  const abps = /mp4a/.test(EX.mime) ? 192000 : 320000;
+  let vr;
+  try { vr = new MediaRecorder(stream, EX.mime ? { mimeType: EX.mime, videoBitsPerSecond: vbps, audioBitsPerSecond: abps } : undefined); }
+  catch (_) { stream.getTracks().forEach((t) => t.stop()); exFail('This browser can’t record the picture. Use Chrome or Edge.'); return; }
+  EX.vr = vr; EX.chunks = [];
+  vr.ondataavailable = (e) => { if (e.data && e.data.size) EX.chunks.push(e.data); };
+  vr.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    const type = vr.mimeType || EX.mime || 'video/webm', chunks = EX.chunks, ms = (performance.now() - EX.t0);
+    EX.chunks = [];
+    const keep = EX.stop !== 'cancel';
+    exCleanUp();
+    if (!keep) { seqNote('Export cancelled.'); return; }
+    const ext = type.includes('mp4') ? 'mp4' : 'webm', raw = new Blob(chunks, { type });
+    if (!raw.size) { seqNote('Nothing was recorded. Try again.'); return; }
+    seqNote('Export finished: name the video to save it.');
+    let file = raw;
+    try { file = await (ext === 'mp4' ? standardMp4(raw) : addWebmDuration(raw, ms)); } catch (_) { file = raw; }
+    offerFile(`${EX.name}.${ext}`, file);
+  };
+  vr.start(1000);
+  EX.t0 = performance.now();
+  EX.stage = 'lead'; EX.frames = 0;
+}
+// Each frame while exporting (from the drawing loop)
+function exTick(now) {
+  if (!EX.stage) return;
+  EX.frames++;
+  if (document.hidden && !EX.hidden) { EX.hidden = true; toast('Keep Phosphor Loop in front while it exports: hidden, it stops drawing.', 8000); }
+  if (EX.stage === 'size') {
+    const want = MV.size;
+    if (!want || (canvas.width === want.width && canvas.height === want.height) || EX.frames > 90) exBegin();
+    return;
+  }
+  if (EX.stage === 'lead') {
+    // The sequence's first look settles in for a moment (and the recording with it) before the song starts
+    if (EX.frames === 1) { seqRun(true, 'Exporting: the sequence plays from the start.'); }
+    if (EX.frames < 12) return;
+    EX.stage = 'start'; EX.frames = 0;
+    if (EX.spotify) {
+      spotify.play(0, seq.song.uri).catch((err) => exFail(`${err.message} The export stopped.`));
+    } else {
+      seq.local.pos = 0; seq.local.at = performance.now(); seq.local.playing = true;
+    }
+    return;
+  }
+  const t = seq.t;
+  if (EX.stage === 'start') {
+    // Under way once the song (or the sequence's own clock) has started from the top
+    if (seq.playing && t < 5) { EX.stage = 'play'; EX.frames = 0; EX.started = true; EX.from = t; }
+    else if (EX.frames > 60 * 20) exFail('The song didn’t start in Spotify. Is Spotify open on this computer?');
+    $('#expText').innerHTML = '<b>Exporting</b> · starting the song…';
+    return;
+  }
+  if (EX.stage === 'play') {
+    $('#expText').innerHTML = `<b>Exporting</b> · ${fmtT(t)} of ${fmtT(EX.end)} · ${canvas.width}×${canvas.height}${EX.blend?.track ? ', with sound' : ''}`;
+    const songGone = EX.spotify && spotify.snapshot?.track && spotify.snapshot.track.uri !== seq.song?.uri;
+    if (t >= EX.end - 0.25 || songGone || !seq.running) {
+      // At the end the song is stopped before Spotify moves on to the next one
+      if (EX.spotify) void spotify.pause();
+      EX.stage = 'tail'; EX.frames = 0;
+    }
+    return;
+  }
+  if (EX.stage === 'tail' && EX.frames >= 15) exFinish('save');
+}
+function exFinish(how) {
+  if (!EX.stage) return;
+  EX.stop = how;
+  if (EX.vr && EX.vr.state !== 'inactive') { EX.stage = 'saving'; $('#expText').innerHTML = '<b>Exporting</b> · finishing the file…'; EX.vr.stop(); }
+  else { exCleanUp(); if (how === 'cancel') seqNote('Export cancelled.'); }
+  if (EX.spotify && spotify.snapshot?.playing) void spotify.pause();
+}
+function exFail(why) {
+  EX.stop = 'cancel';
+  if (EX.vr && EX.vr.state !== 'inactive') EX.vr.stop(); else exCleanUp();
+  seqNote(why);
+  toast(why, 9000);
+}
+function exCleanUp() {
+  EX.sound.forEach((t) => t.stop()); EX.sound = [];
+  if (EX.blend?.ctx) { try { EX.blend.ctx.close(); } catch (_) {} }
+  EX.blend = null; EX.vr = null; EX.stage = '';
+  try { EX.lock?.release(); } catch (_) {}
+  EX.lock = null;
+  $('#expBar').hidden = true;
+  if (seq.running) { const L = seq.local; if (L.playing) { L.pos += (performance.now() - L.at) / 1000; L.playing = false; } seqRun(false); }
+  mvSizeBack();
+}
+$('#seqExport').addEventListener('click', exOpen);
+$('#seqExCancel').addEventListener('click', () => { $('#seqExportForm').hidden = true; });
+$('#seqExGo').addEventListener('click', () => { void exGo(); });
+$('#seqExSound').addEventListener('change', exHow);
+$$('#seqExSize button').forEach((b) => b.addEventListener('click', () => {
+  $$('#seqExSize button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  exHow();
+}));
+$('#expStop').addEventListener('click', () => exFinish('save'));
+$('#expCancel').addEventListener('click', () => exFinish('cancel'));
+window.__plExport = { get stage() { return EX.stage; }, get from() { return EX.from; }, get end() { return EX.end; }, get size() { return { w: canvas.width, h: canvas.height }; }, get spotify() { return EX.spotify; } };   // for tests/seq_export_check.py
 function seqSeek(t) {
   t = clamp(t, 0, seqDur());
   if (seq.song && spotify.snapshot?.track?.uri === seq.song.uri) {
@@ -11904,6 +12101,7 @@ function frame() {
   }
   syncSubjectStatus();
   mvRecTick(now);
+  exTick(now);
   movesTick(now);
   typeTick(now);
   vcrTick();

@@ -1150,3 +1150,12 @@ button.seq-card { cursor: pointer; }
 
 /* Video controls: whose video it is, when other loops have their own */
 .vid-whose { opacity: 0.7; font-weight: 400; }
+
+/* Export video (sequencer) */
+.seq-export { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--well); }
+.seq-export[hidden] { display: none; }
+.seq-ex-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.seq-ex-row b { color: var(--ink); }
+.seq-ex-size { display: inline-flex; }
+.seq-ex-how { margin: 0; padding-left: 20px; color: var(--dim); font-size: 13px; line-height: 1.45; }
+.seq-ex-say { color: var(--loop-a-ink); font-size: 13px; flex: 1 1 220px; }
