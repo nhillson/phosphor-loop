@@ -94,6 +94,11 @@ file don't rebuild the app.
    `python3 tests/seq_type_check.py`. **Play when following a paused Spotify song** starts it (`spotify.play()`: on its
    device, or the one it was last on / first open when Spotify has gone idle, from the same spot; Premium only):
    `node --test tests/spotify.test.mjs`.
+4s. **Each loop's own video** (`vids` in js/app.js: a player per loop; `vid` is the edited loop's, which the Video
+   controls, Save clip and `inMedia.vid` / `clips.cur` work on; `vidFor(k)` is what loop k shows: its own, or else the
+   first loop's that has one). The sequencer loads a track's next video into its loop's player ahead
+   (`seqPreloadVid`, `seq.preloadSecs`), and a loop waiting for its video shows black (`seqVidWait`), never the one
+   before: `python3 tests/two_videos_check.py` (about 3 minutes; the stand-in clip library).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

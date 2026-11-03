@@ -674,7 +674,7 @@ class LiveSource {
   get on() { return !!this.video; }
   update(modes) {
     const v = this.video;
-    if (this.hold || !v || v.readyState < 2 || !v.videoWidth) return;
+    if (this.hold || this.wait || !v || v.readyState < 2 || !v.videoWidth) return;
     const fresh = this.rvfc ? this.fresh : v.currentTime !== this.lastTime;
     if (!fresh) return;
     this.fresh = false;
@@ -698,11 +698,37 @@ class LiveSource {
     return s && s.frames >= 2 ? { cur: s.tex[this.idx], prev: s.tex[1 - this.idx] } : this;
   }
 }
-const vid = new LiveSource(false);
+// Each loop has a video player of its own, so loop A can play one video while loop B plays another. A loop whose
+// own player is empty shows another loop's video (the first one in A, B, C, D order that has one), the way the one
+// shared video always worked, so looks and Autopilot that pick Video always have a picture.
+const vids = Object.fromEntries(KEYS.map((k) => [k, Object.assign(new LiveSource(false), {
+  key: k, url: null, userPaused: false, loopA: null, loopB: null, rate: 1, media: null, handle: null,
+  clip: '', own: false, ask: 0, credit: '', name: '', wait: false, loading: null, forBl: null, seqAsk: 0,
+})]));
+let vid = vids.A;   // the video player of the loop being edited: the Video controls work on this one
+const anyVid = () => KEYS.some((k) => vids[k].on);
+// The video loop k shows: its own, or else the first loop's that has one
+function vidFor(k) {
+  const own = vids[k];
+  if (own && own.on) return own;
+  for (const j of KEYS) if (vids[j].on) return vids[j];
+  return own || vid;
+}
+const loopUsesVid = (k) => { const t = loops[k].tgt; return t.in1 === 'video' || t.in2 === 'video'; };
+// Whether any loop on screen shows this player's video (its own loop, or one borrowing it)
+const vidInUse = (s) => activeKeys().some((k) => loopUsesVid(k) && vidFor(k) === s);
+// The video a recording or Save clip means: the edited loop's when it shows, or else the first one shown
+function vidShown() {
+  if (vidInUse(vid)) return vid;
+  for (const k of activeKeys()) if (loopUsesVid(k)) return vidFor(k);
+  return vid;
+}
 const cam = new LiveSource(true);
 const scr = new LiveSource(false);
 const pho = new LiveSource(false);
-const LIVE_SRC = { video: vid, camera: cam, screen: scr, phone: pho };
+const LIVE_SRC = { get video() { return vid; }, camera: cam, screen: scr, phone: pho };
+// The live source loop k reads for an input
+const liveFor = (k, src) => (src === 'video' ? vidFor(k) : LIVE_SRC[src]);
 
 function mkVideo() {
   const v = document.createElement('video');
@@ -1041,7 +1067,7 @@ function subjectModes(src) {
   for (const k of activeKeys()) { const t = loops[k].tgt; if ((t.in1 === src || t.in2 === src) && subjectOn(t)) modes.add(t.subject); }
   return modes;
 }
-window.__plSubject = { vid, loops };   // for tests/subject_check.py
+window.__plSubject = { get vid() { return vid; }, loops };   // for tests/subject_check.py
 function syncSubjectStatus() {
   const el = $('#subjectStatus'), t = loops[edit].tgt;
   const msg = subjectOn(t) ? PhosphorSubject.status() : 'Off: the picture comes in as it is.';
@@ -1179,7 +1205,7 @@ function chooseSource(slot, src) {
   if (src === 'phone') startPhoneLink();
   // No video in yet: the clip library once it's been set up in this browser (its gallery also offers a file),
   // otherwise straight to choosing a file
-  if (src === 'video' && !vid.on) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
+  if (src === 'video' && !anyVid()) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
@@ -1192,9 +1218,15 @@ function chooseSource(slot, src) {
 function settleDevices() {
   if (!uses('camera') && cam.on) stopCamera();
   if (!uses('screen') && scr.on) stopScreen();
-  if (vid.video) {
-    if (uses('video') && vid.video.paused && !vidUserPaused) vid.video.play().catch(() => {});
-    if (!uses('video') && !vid.video.paused) vid.video.pause();
+  vidsPlay();
+}
+// Each video plays while a loop on screen shows it, and is paused otherwise
+function vidsPlay() {
+  for (const s of Object.values(vids)) {
+    if (!s.video) continue;
+    const used = vidInUse(s);
+    if (used && s.video.paused && !s.userPaused) s.video.play().catch(() => {});
+    if (!used && !s.video.paused) s.video.pause();
   }
 }
 
@@ -1204,6 +1236,8 @@ for (const k of KEYS) $('#tab' + k).addEventListener('click', () => setEdit(k));
 function setEdit(k) {
   if (!loopOn(k)) k = 'A';
   edit = k;
+  vid = vids[k];
+  vidPanelSync();
   editor.dataset.loop = k;
   for (const j of KEYS) $('#tab' + j).setAttribute('aria-selected', String(k === j));
   syncUI();
@@ -1371,6 +1405,7 @@ function syncUI() {
 function liveActive(src) {
   if (src === 'phone') return pho.on;
   if (src === 'spectro') return !!snd.analyser;   // a spectrograph that's hearing something stays, like a running camera
+  if (src === 'video') return anyVid();
   const s = LIVE_SRC[src];
   return !!(s && s.on);
 }
@@ -2154,7 +2189,7 @@ function neutral() {
   setGrade(GRADE_DEF);
   setRelief(RELIEF_DEF);
   setType({ ...typeArt, tAmt: 0 });
-  Object.values(LIVE_SRC).forEach((x) => { x.hold = false; });
+  [cam, scr, pho, ...Object.values(vids)].forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
   setEdit('A');
@@ -2965,7 +3000,7 @@ function apPool() {
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
-  if (vid.on || clipsReady()) pool.push('video');   // a clip from the clip library comes in when a look picks Video
+  if (anyVid() || clipsReady()) pool.push('video');   // a clip from the clip library comes in when a look picks Video
   for (const src of ['camera', 'screen', 'phone']) if (liveActive(src)) pool.push(src);
   if (snd.analyser) pool.push('spectro');
   // Leave out the inputs switched off under Autopilot settings. If that leaves nothing it can use right now
@@ -3412,7 +3447,7 @@ function apStep(now, onBeat) {
     ap.span = Math.max(1, ap.next - now);
     if (mixSet && !ap.pins.has('view')) mix.tgt.view = came === 'B' ? 100 : 0;
   }
-  if (vid.video && vid.video.paused && !vidUserPaused && uses('video')) vid.video.play().catch(() => {});
+  vidsPlay();
   apPicture(came);
   apClip(came);
   apTypeArt(came, now);
@@ -3452,17 +3487,20 @@ function apPicture(k) {
 // different one, the way it does with nature pictures. A video file of your own stays put, and nothing changes
 // when Video is switched off under Inputs Autopilot can use.
 function apClip(k) {
-  if (!clipsReady() || clips.own || !apAllowed('video')) return;
-  if (!vid.on) {
-    if (uses('video')) { ap.clipIn = apPicGap(); clipPick(pick(clipsAp()), true); }
+  if (!clipsReady() || !apAllowed('video')) return;
+  if (!anyVid()) {
+    if (uses('video')) { ap.clipIn = apPicGap(); clipPick(pick(clipsAp()), true, vids.A); }
     return;
   }
   const came = k && loops[k];
-  if (!came || (came.tgt.in1 !== 'video' && came.tgt.in2 !== 'video')) return;
+  if (!came || !loopUsesVid(k)) return;
+  // The new clip goes into the player that loop shows; a video of your own there stays put
+  const to = vidFor(k);
+  if (to.own) return;
   if (ap.clipIn > 1) { ap.clipIn--; return; }
   ap.clipIn = apPicGap();
-  const others = clipsAp().filter((c) => c.id !== clips.cur);
-  if (others.length) clipPick(pick(others), true);
+  const others = clipsAp().filter((c) => c.id !== to.clip);
+  if (others.length) clipPick(pick(others), true, to);
 }
 // Next look (beside the Autopilot buttons, or the L key): Autopilot's next new look straight away, cutting in
 // fast the way a look does on a beat, and the countdown to the one after starts again. If Autopilot is off it
@@ -3911,7 +3949,7 @@ function apScene(k) {
 function apUsable(src) {
   if (!src || src === 'none' || !(src in SRC_ID) || !apAllowed(src)) return false;
   if (is3D(src)) return worldOK(src);
-  if (src === 'video') return vid.on || clipsReady();
+  if (src === 'video') return anyVid() || clipsReady();
   if (DEVICE.includes(src)) return liveActive(src);
   if (src === 'spectro') return !!snd.analyser;
   if (src === 'loop') return apSet.mix > 10;
@@ -4915,7 +4953,10 @@ fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
 // a nature picture by its file, the test card, a library clip by its id, or a picture or video of your own by its
 // file name. No copy of your own file is ever kept: where the browser offers it (Chrome, Edge), a pointer to the file
 // on disk is kept instead (picHandle, vidHandle; see filePointerDB), and the file is opened from there each time.
-const inMedia = { pic: { kind: 'card', name: 'the test card' }, vid: null, picHandle: null, vidHandle: null };
+const inMedia = { pic: { kind: 'card', name: 'the test card' }, picHandle: null };
+// The video side is the edited loop's own player's (each loop has its own: see vids)
+Object.defineProperty(inMedia, 'vid', { get: () => vid.media, set: (m) => { vid.media = m; }, enumerable: true });
+Object.defineProperty(inMedia, 'vidHandle', { get: () => vid.handle, set: (h) => { vid.handle = h; }, enumerable: true });
 // Files of your own picked this visit, by name, so a block can find its file again where there's no pointer to it
 const ownFiles = new Map();
 const picFile = $('#picFile'), vidFile = $('#vidFile');
@@ -4951,12 +4992,11 @@ function downscale(img) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return c;
 }
-let vidURL = null, vidUserPaused = false;
 const vidPlay = $('#vidPlay');
 vidPlay.addEventListener('click', () => {
   if (!vid.video) return;
-  if (vid.video.paused) { vidUserPaused = false; vid.video.play().catch(() => {}); }
-  else { vidUserPaused = true; vid.video.pause(); }
+  if (vid.video.paused) { vid.userPaused = false; vid.video.play().catch(() => {}); }
+  else { vid.userPaused = true; vid.video.pause(); }
   vidPlay.textContent = vid.video.paused ? 'Play' : 'Pause';
 });
 function feedInto(src) {
@@ -4991,13 +5031,14 @@ function loadFile(file, handle = null) {
     img.onerror = () => { URL.revokeObjectURL(url); toast('That picture couldn’t be opened. Try a JPG or PNG.'); };
     img.src = url;
   } else if (type.startsWith('video/')) {
-    clips.ask++;   // a library clip still on its way doesn't replace this one
-    openVideo(URL.createObjectURL(file), file.name).then((ok) => {
+    const to = vid;
+    to.ask++;   // a library clip still on its way doesn't replace this one
+    openVideo(URL.createObjectURL(file), file.name, { to }).then((ok) => {
       if (!ok) return;
-      inMedia.vid = { kind: 'own', name: file.name }; inMedia.vidHandle = handle; ownFiles.set(file.name, file);
+      to.media = { kind: 'own', name: file.name }; to.handle = handle; ownFiles.set(file.name, file);
       // A video of your own: Autopilot leaves it in place instead of bringing in library clips
-      clips.own = true;
-      clipNoCredit();
+      to.own = true;
+      clipNoCredit(to);
     });
   } else {
     toast('That file isn’t a picture or video.');
@@ -5005,24 +5046,23 @@ function loadFile(file, handle = null) {
 }
 // Puts a video (an object URL) in as the Video input. quiet: in place without switching any loop to it (Autopilot,
 // or the page opening). Resolves true once its first frame is ready, false if it can't be played.
-function openVideo(url, name, { quiet = false } = {}) {
+function openVideo(url, name, { quiet = false, to = vid } = {}) {
   return new Promise((resolve) => {
     const v = mkVideo();
     v.loop = true;
     v.src = url;
     v.addEventListener('loadeddata', () => {
-      if (vidURL) URL.revokeObjectURL(vidURL);
-      vidURL = url;
-      vid.attach(v, null);
-      vidUserPaused = false;
-      say($('#vidStatus'), `<span class="live"></span><b>${escapeHTML(name)}</b>`);
-      $('#vcr').hidden = false;
-      vidPlay.textContent = 'Pause';
-      vidLoopA = null; vidLoopB = null; loopText(); snipCloseForm();
-      v.playbackRate = vidRate;
-      $('#vidDur').textContent = fmtT(v.duration);
+      if (to.url) URL.revokeObjectURL(to.url);
+      to.url = url;
+      to.attach(v, null);
+      to.userPaused = false;
+      to.name = name;
+      to.loopA = null; to.loopB = null;
+      v.playbackRate = to.rate;
+      if (to === vid) snipCloseForm();
+      vidPanelSync();
       if (quiet) settleDevices();   // plays only while a loop uses it
-      else { feedInto('video'); toast(`Feeding ${name} into loop ${edit}.`); }
+      else { feedInto('video'); toast(`Feeding ${name} into loop ${to.key}.`); }
       resolve(true);
     }, { once: true });
     v.addEventListener('error', () => {
@@ -5032,6 +5072,28 @@ function openVideo(url, name, { quiet = false } = {}) {
     }, { once: true });
     v.play().catch(() => {});
   });
+}
+// The Video controls show the edited loop's own video, or say whose video it's showing when it has none of its own
+function vidPanelSync() {
+  const st = $('#vidStatus');
+  if (!st) return;
+  if (vid.on) {
+    const others = KEYS.some((k) => k !== vid.key && vids[k].on);
+    say(st, `<span class="live"></span><b>${escapeHTML(vid.name)}</b>${others ? ` <span class="vid-whose">· loop ${vid.key}’s own video</span>` : ''}`);
+    $('#vcr').hidden = false;
+    vidPlay.textContent = vid.video.paused ? 'Play' : 'Pause';
+    $('#vidDur').textContent = fmtT(vid.video.duration);
+  } else {
+    const other = vidFor(vid.key);
+    say(st, other.on ? `Loop ${vid.key} is showing loop ${other.key}’s video, <b>${escapeHTML(other.name)}</b>. Pick a video here to give loop ${vid.key} its own.`
+      : 'No video chosen yet.');
+    $('#vcr').hidden = true;
+  }
+  $$('#vidSpeed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.rate === vid.rate)));
+  const credit = $('#clipCredit');
+  credit.innerHTML = vid.credit; credit.hidden = !vid.credit;
+  loopText();
+  clipMark();
 }
 function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
@@ -5206,7 +5268,11 @@ const CLIP_ON_KEY = 'phosphor-clips-on', CLIP_TAB_KEY = 'phosphor-clips-tab', CL
 // list: the clips (null until Phosphor Clips answers); cur: the clip in use; own: a video file of your own is in
 // clips.all: everything Phosphor Clips shares; clips.web: the clips grabbed from the web (Autopilot and the Video
 // input's gallery use these); clips.list/cats/folders: what the explorer shows now (clipsSetView)
-const clips = { base: '', list: null, cats: [], at: 0, req: null, cur: '', own: false, ask: 0, cat: 'all', off: [], all: null, web: null, allCats: [], allFolders: [], view: 'clips' };
+const clips = { base: '', list: null, cats: [], at: 0, req: null, cat: 'all', off: [], all: null, web: null, allCats: [], allFolders: [], view: 'clips' };
+// Which clip is in, whether it's a video of your own, and the latest ask are each loop's own (the edited loop's here)
+for (const [key, field] of [['cur', 'clip'], ['own', 'own'], ['ask', 'ask']]) {
+  Object.defineProperty(clips, key, { get: () => vid[field], set: (v) => { vid[field] = v; }, enumerable: true });
+}
 // The Look library: Save clip's looks (recordings of the settings, and trims saved with their look), in Phosphor
 // Clips' Looks folder (1.9 and later), kept apart from the web clips: its own button and window, never Autopilot's
 const LOOKS = 'looks';
@@ -5269,10 +5335,10 @@ const clipsAp = () => (clips.web || []).filter((c) => !clips.off.includes(c.c));
 const clipsReady = () => !!clips.web && clipsAp().length > 0 && clipsWanted();
 // The clips in the gallery's chosen category (or all of them)
 const clipsShown = () => (clips.web || []).filter((c) => clips.cat === 'all' || c.c === clips.cat);
-function clipNoCredit() {
-  clips.cur = '';
-  try { localStorage.removeItem(CLIP_LAST_KEY); } catch (_) { /* fine */ }
-  $('#clipCredit').hidden = true;
+function clipNoCredit(to = vid) {
+  to.clip = ''; to.credit = '';
+  if (to.key === 'A') { try { localStorage.removeItem(CLIP_LAST_KEY); } catch (_) { /* fine */ } }
+  if (to === vid) $('#clipCredit').hidden = true;
   clipMark();
 }
 function clipMark() {
@@ -5280,30 +5346,29 @@ function clipMark() {
 }
 // Feeds a library clip in as the Video input. quiet: in place, without switching a loop to Video (Autopilot, or
 // bringing back the last clip when the page opens). Resolves true once it's showing.
-function clipPick(c, quiet) {
+function clipPick(c, quiet, to = vid) {
   if (!c || !clips.base) return Promise.resolve(false);
-  const ask = ++clips.ask;
+  const ask = ++to.ask;
   return fetch(`${clips.base}/clip/${encodeURIComponent(c.id)}`, clipFetchOpts())
     .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
     .then((blob) => {
-      if (ask !== clips.ask) return false;   // a later pick (or a video of your own) overtook this one
-      return openVideo(URL.createObjectURL(blob), c.n, { quiet }).then((ok) => {
-        if (!ok || ask !== clips.ask) return ok;
-        inMedia.vid = { kind: 'clip', id: c.id, name: c.n }; inMedia.vidHandle = null;
-        clips.cur = c.id;
-        clips.own = false;
+      if (ask !== to.ask) return false;   // a later pick (or a video of your own) overtook this one
+      return openVideo(URL.createObjectURL(blob), c.n, { quiet, to }).then((ok) => {
+        if (!ok || ask !== to.ask) return ok;
+        to.media = { kind: 'clip', id: c.id, name: c.n }; to.handle = null;
+        to.clip = c.id;
+        to.own = false;
         const from = c.src && /^https?:/.test(c.src)
           ? ` · <a href="${escapeHTML(c.src)}" target="_blank" rel="noopener">${escapeHTML(c.by || 'source')}</a>` : (c.by ? ` · ${escapeHTML(c.by)}` : '');
-        const credit = $('#clipCredit');
-        credit.innerHTML = `Clip library: ${escapeHTML(clipCatName(c.c))}${from}${c.lic ? ' · ' + escapeHTML(c.lic) : ''}`;
-        credit.hidden = false;
-        clipMark();
-        try { localStorage.setItem(CLIP_LAST_KEY, c.id); } catch (_) { /* fine */ }
+        to.credit = `Clip library: ${escapeHTML(clipCatName(c.c))}${from}${c.lic ? ' · ' + escapeHTML(c.lic) : ''}`;
+        vidPanelSync();
+        // The clip loop A had last time comes back with the page
+        if (to.key === 'A') { try { localStorage.setItem(CLIP_LAST_KEY, c.id); } catch (_) { /* fine */ } }
         return true;
       });
     })
     .catch(() => {
-      if (ask === clips.ask && !quiet) toast('That clip couldn’t be loaded. Is Phosphor Clips still running?');
+      if (ask === to.ask && !quiet) toast('That clip couldn’t be loaded. Is Phosphor Clips still running?');
       return false;
     });
 }
@@ -5663,7 +5728,10 @@ async function cxUse(c, withFx) {
   if (isMoves(look)) { movesPlay(c, look); return; }
   if (look) {
     loadPreset({ id: '', name: c.n, data: look });
-    await clipPick(c, lookUsesVideo(look));
+    // The clip goes into each loop the saved picture showed it in (each loop has its own video player)
+    const ks = KEYS.filter((k) => loopOn(k) && usesIn(look[k], 'video'));
+    if (!ks.length) await clipPick(c, false);
+    else await Promise.all(ks.map((k) => clipPick(c, true, vids[k])));
   } else await clipPick(c);
 }
 function cxPick(id, e) {
@@ -5882,7 +5950,7 @@ clipsDlg.addEventListener('keydown', (e) => {
 });
 // Video loops that came back with the page but whose clip can't (Phosphor Clips isn't running): back to a pattern
 function clipsDropVideo() {
-  if (vid.on) return;
+  if (anyVid()) return;
   let dropped = false;
   for (const k of KEYS) {
     const t = loops[k].tgt;
@@ -5894,8 +5962,8 @@ function clipsDropVideo() {
 // A clip is kept ready (paused until a loop uses it) whenever the library has clips for Autopilot, so a look that
 // picks Video has a picture straight away, and Check each look sees the clip rather than an empty input
 function clipsKeepOneReady() {
-  if (!vid.on && !clips.own && clipsReady()) return clipPick(pick(clipsAp()), true);
-  return Promise.resolve(vid.on);
+  if (!anyVid() && !vids.A.own && clipsReady()) return clipPick(pick(clipsAp()), true, vids.A);
+  return Promise.resolve(anyVid());
 }
 // When the page opens (after the last session is back): the clip in use last time comes back, and the library is
 // asked again every minute so Autopilot knows about new clips
@@ -5905,9 +5973,9 @@ function clipsStart() {
   clipList().then(() => {
     const list = clips.web || [];
     $('#clipShuffle').hidden = !list.length;
-    if (vid.on) return true;
+    if (anyVid()) return true;
     const c = list.find((x) => x.id === last);
-    return c ? clipPick(c, true) : clipsKeepOneReady();
+    return c ? clipPick(c, true, vids.A) : clipsKeepOneReady();
   }).then((ok) => { if (!ok) clipsDropVideo(); }, () => clipsDropVideo());
   setInterval(() => {
     if (document.hidden || !clipsWanted()) return;
@@ -5920,10 +5988,12 @@ function clipsStart() {
 window.__plClips = {
   get list() { return clips.list; }, get cur() { return clips.cur; }, get own() { return clips.own; },
   get off() { return clips.off.slice(); }, set off(v) { clips.off = v.slice(); },
-  get vidOn() { return vid.on; }, get vidFrames() { return vid.frames; }, get edit() { return edit; },
+  get vidOn() { return anyVid(); }, get vidFrames() { return vidFor(edit).frames; }, get edit() { return edit; },
   wanted: () => clipsWanted(), ready: () => clipsReady(),
-  input: (k, slot) => loops[k].tgt[slot], setInput: (k, slot, src) => { loops[k].tgt[slot] = src; },
-  detachVideo: () => { vid.detach(); clips.cur = ''; },
+  input: (k, slot) => loops[k].tgt[slot], setInput: (k, slot, src) => { loops[k].tgt[slot] = src; settleDevices(); },
+  detachVideo: () => { for (const o of Object.values(vids)) { o.detach(); o.clip = ''; o.media = null; o.credit = ''; } vidPanelSync(); },
+  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading }])),
+  pickInto: (k, id) => clipPick((clips.all || []).find((c) => c.id === id), true, vids[k]),
   apClip: (k, gap) => { if (gap != null) ap.clipIn = gap; apClip(k); },
   videoUsable: () => apPool().includes('video') && apUsable('video'),
   loadFile: (f) => loadFile(f), close: () => closeClips(),
@@ -5944,7 +6014,7 @@ stage.addEventListener('drop', (e) => {
 
 /* ================= video deck ================= */
 const vidPos = $('#vidPos'), vidTime = $('#vidTime');
-let scrubbing = false, vidLoopA = null, vidLoopB = null, vidRate = 1, vidTxt = '';
+let scrubbing = false, vidTxt = '';
 function fmtT(s) {
   if (!isFinite(s)) s = 0;
   s = Math.max(0, s);
@@ -5961,34 +6031,34 @@ vidPos.addEventListener('input', () => {
   vidTime.textContent = fmtT(v.currentTime);
 });
 vidPos.addEventListener('change', () => { scrubbing = false; });
-$('#vidStart').addEventListener('click', () => seekTo(vidLoopA ?? 0));
+$('#vidStart').addEventListener('click', () => seekTo(vid.loopA ?? 0));
 $('#vidBack').addEventListener('click', () => seekBy(-5));
 $('#vidFwd').addEventListener('click', () => seekBy(5));
 $$('#vidSpeed button').forEach((b) => b.addEventListener('click', () => {
-  vidRate = +b.dataset.rate;
-  if (vid.video) vid.video.playbackRate = vidRate;
+  vid.rate = +b.dataset.rate;
+  if (vid.video) vid.video.playbackRate = vid.rate;
   $$('#vidSpeed button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
 }));
 $('#vidIn').addEventListener('click', () => {
   if (!vid.video) return;
-  vidLoopA = vid.video.currentTime;
-  if (vidLoopB != null && vidLoopB <= vidLoopA + 0.1) vidLoopB = null;
+  vid.loopA = vid.video.currentTime;
+  if (vid.loopB != null && vid.loopB <= vid.loopA + 0.1) vid.loopB = null;
   loopText();
 });
 $('#vidOut').addEventListener('click', () => {
   if (!vid.video) return;
   const t = vid.video.currentTime;
-  if (vidLoopA != null && t <= vidLoopA + 0.1) { toast('Mark the end somewhere after the start.'); return; }
-  vidLoopB = t;
-  seekTo(vidLoopA ?? 0);
+  if (vid.loopA != null && t <= vid.loopA + 0.1) { toast('Mark the end somewhere after the start.'); return; }
+  vid.loopB = t;
+  seekTo(vid.loopA ?? 0);
   loopText();
 });
-$('#vidAll').addEventListener('click', () => { vidLoopA = null; vidLoopB = null; loopText(); });
+$('#vidAll').addEventListener('click', () => { vid.loopA = null; vid.loopB = null; loopText(); });
 function loopText() {
-  const has = vidLoopA != null || vidLoopB != null;
+  const has = vid.loopA != null || vid.loopB != null;
   $('#vidAll').hidden = !has;
   $('#vidLoopText').textContent = has
-    ? `Repeating ${fmtT(vidLoopA ?? 0)} to ${vidLoopB != null ? fmtT(vidLoopB) : 'the end'}.`
+    ? `Repeating ${fmtT(vid.loopA ?? 0)} to ${vid.loopB != null ? fmtT(vid.loopB) : 'the end'}.`
     : 'The whole video plays on repeat.';
   markBar();
   snipWhatText();
@@ -5997,13 +6067,13 @@ function loopText() {
 let markSig = '';
 function markBar() {
   const v = vid.video, el = $('#vidMark'), d = v && isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
-  const has = d && (vidLoopA != null || vidLoopB != null);
-  const sig = has ? `${vidLoopA}|${vidLoopB}|${d}` : '';
+  const has = d && (vid.loopA != null || vid.loopB != null);
+  const sig = has ? `${vid.loopA}|${vid.loopB}|${d}` : '';
   if (sig === markSig) return;
   markSig = sig;
   el.hidden = !has;
   if (!has) return;
-  const a = clamp((vidLoopA ?? 0) / d, 0, 1), b = clamp((vidLoopB ?? d) / d, 0, 1);
+  const a = clamp((vid.loopA ?? 0) / d, 0, 1), b = clamp((vid.loopB ?? d) / d, 0, 1);
   el.style.left = (a * 100) + '%';
   el.style.width = (Math.max(0.005, b - a) * 100) + '%';
 }
@@ -6214,7 +6284,7 @@ $('#trimPlay').addEventListener('click', () => { snip.play = !snip.play; $('#tri
 let snipBtnShown = null;
 const canMoves = () => typeof window.MediaRecorder !== 'undefined' && typeof canvas.captureStream === 'function';
 // A video is in and some loop shows it: then there's a video to trim
-const videoIn = () => !!vid.video && !!inMedia.vid && uses('video');
+const videoIn = () => !!vid.video && !!vid.media && vidInUse(vid);
 function snipBtnSync() {
   const show = !APP && !inArtifact && (canMoves() || (!!vid.video && !!inMedia.vid));
   if (show !== snipBtnShown) {
@@ -6308,8 +6378,8 @@ function snipTrimStart() {
   snip.base = baseName(src.name);
   snip.autoName = true;
   const d = vidDur();
-  snip.a = vidLoopA ?? 0;
-  snip.b = vidLoopB ?? d;
+  snip.a = vid.loopA ?? 0;
+  snip.b = vid.loopB ?? d;
   snip.play = true;
   $('#trimPlay').setAttribute('aria-pressed', 'true');
   snip.v0 = 0; snip.v1 = 0; snip.drag = null;
@@ -6422,9 +6492,10 @@ const mvRec = { pending: null, sound: false, on: false, rec: null, start: null, 
 function mvMediaNow() {
   const m = {};
   if (uses('picture') && inMedia.pic) m.pic = { ...inMedia.pic };
-  if (uses('video') && inMedia.vid) { m.vid = { ...inMedia.vid }; delete m.vid.at; }
+  const sv = vidShown();
+  if (vidInUse(sv) && sv.media) { m.vid = { ...sv.media }; delete m.vid.at; }
   if (m.pic && m.pic.kind === 'own') seqKeepPointer(m.pic.name, inMedia.picHandle);
-  if (m.vid && m.vid.kind === 'own') seqKeepPointer(m.vid.name, inMedia.vidHandle);
+  if (m.vid && m.vid.kind === 'own') seqKeepPointer(m.vid.name, sv.handle);
   return m.pic || m.vid ? JSON.stringify(m) : '';
 }
 const mvLookNow = () => ({ ...clipLookNow(), n: loopCount, media: mvMediaNow() });
@@ -6486,7 +6557,8 @@ function mvRecBegin() {
   };
   mvRec.start = mvLookNow();
   mvRec.media = mvRec.start.media;
-  mvRec.start.mediaAt = r1(vid.video && uses('video') ? vid.video.currentTime || 0 : 0);
+  const sv = vidShown();
+  mvRec.start.mediaAt = r1(sv.video && vidInUse(sv) ? sv.video.currentTime || 0 : 0);
   mvRec.rec = new PhosphorMoves.Recorder(mvRec.start);
   mvRec.moves = null;
   mvRec.on = true;
@@ -6722,10 +6794,16 @@ window.__plMoves = { get rec() { return { on: mvRec.on, moves: mvRec.moves, blob
 function vcrTick() {
   snipBtnSync();
   snipTick();
+  for (const o of Object.values(vids)) {
+    const ov = o.video;
+    if (o === vid || !ov) continue;
+    if (o.loopB != null && ov.currentTime >= o.loopB) ov.currentTime = o.loopA ?? 0;
+    else if (o.loopA != null && ov.currentTime < o.loopA - 0.25 && !ov.seeking) ov.currentTime = o.loopA;
+  }
   const v = vid.video;
   if (!v || scrubbing) return;
-  if (vidLoopB != null && v.currentTime >= vidLoopB) v.currentTime = vidLoopA ?? 0;
-  else if (vidLoopA != null && v.currentTime < vidLoopA - 0.25 && !v.seeking) v.currentTime = vidLoopA;
+  if (vid.loopB != null && v.currentTime >= vid.loopB) v.currentTime = vid.loopA ?? 0;
+  else if (vid.loopA != null && v.currentTime < vid.loopA - 0.25 && !v.seeking) v.currentTime = vid.loopA;
   markBar();
   if (isFinite(v.duration) && v.duration > 0) {
     const pos = String(Math.round(v.currentTime / v.duration * 1000));
@@ -7527,7 +7605,7 @@ function applyRecipe(r) {
   if (ap.on) setAutopilot(false, true);
   markPreset(null);
   const p = JSON.parse(JSON.stringify(r.patch));
-  if (p.A.in1 === 'video' && !vid.on) { if (clipsReady()) clipPick(pick(clipsAp()), true); else p.A.in1 = 'picture'; }
+  if (p.A.in1 === 'video' && !anyVid()) { if (clipsReady()) clipPick(pick(clipsAp()), true); else p.A.in1 = 'picture'; }
   // A recipe is a look for two loops
   setLoopCount(2, 'load');
   patchLoop('A', p.A, true);
@@ -7783,9 +7861,9 @@ function loadPreset(pr, quiet) {
     burst();
     showOSD('PRESET', pr.name.toUpperCase().slice(0, 18));
   }
-  if (used.includes('video') && !vid.on && clipsReady()) clipPick(pick(clipsAp()), true);
+  if (used.includes('video') && !anyVid() && clipsReady()) clipPick(pick(clipsAp()), true);
   // (a session coming back with the page brings its library clip back by itself: see clipsStart)
-  else if (used.includes('video') && !vid.on && !(quiet && clipsWanted())) toast('This preset uses a video. Choose one under Video.');
+  else if (used.includes('video') && !anyVid() && !(quiet && clipsWanted())) toast('This preset uses a video. Choose one under Video.');
   else if (used.includes('spectro') && !snd.analyser && snd.src === 'off' && !quiet) toast('This look uses the Spectrograph. Under the inputs, pick Computer sound or Microphone.');
   else if (ap.on && !quiet) toast(`Autopilot is on with this preset’s settings${ap.pins.size ? ' and pins' : ''}.`);
 }
@@ -9395,8 +9473,8 @@ function updateTC(now) {
   tcEl.textContent = [h, m, s, ff].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
-function resolveSrc(src, motion) {
-  const live = LIVE_SRC[src];
+function resolveSrc(src, motion, k) {
+  const live = liveFor(k, src);
   if (live && live.frames < (motion ? 2 : 1)) return SRC_ID.none;
   return SRC_ID[src] ?? SRC_ID.none;
 }
@@ -9998,15 +10076,16 @@ function runLoop(k, xf, brush, f) {
   const traced = topoTrace(t);
   const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
   const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
-  const srcOf = (n) => (n === 'life' && !lifeTex ? SRC_ID.none : resolveSrc(n, t.motion));
+  const srcOf = (n) => (n === 'life' && !lifeTex ? SRC_ID.none : resolveSrc(n, t.motion, k));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(fbProg.p);
-  const [V, C, S, P] = [vid, cam, scr, pho].map((s) => s.texFor(t.subject));
+  const kVid = vidFor(k);
+  const [V, C, S, P] = [kVid, cam, scr, pho].map((s) => s.texFor(t.subject));
   // The see-through surround only once every live input here has its outlines; until then the plain picture
-  set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !LIVE_SRC[n] || LIVE_SRC[n].texFor(t.subject) !== LIVE_SRC[n]) ? 1 : 0);
+  set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !liveFor(k, n) || liveFor(k, n).texFor(t.subject) !== liveFor(k, n)) ? 1 : 0);
   const texs = [src.tex, otherTex, picTex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
                 (lifeIn1 && lifeTex) || flyTex1 || src.tex, (lifeIn2 && lifeTex) || flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
@@ -10110,7 +10189,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
   set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
   set1f(fbProg, 'uAspPic', picAspect);
-  set1f(fbProg, 'uAspVid', vid.aspect);
+  set1f(fbProg, 'uAspVid', kVid.aspect);
   set1f(fbProg, 'uAspCam', cam.aspect);
   set1f(fbProg, 'uAspScr', scr.aspect);
   set1f(fbProg, 'uAspPho', pho.aspect);
@@ -10510,6 +10589,7 @@ function seqRun(on, message) {
     if (seq.apMode) { seq.apMode = null; }
     seqStopRec();
     seq.ownsVideo = false;
+    for (const to of Object.values(vids)) seqVidRelease(to, true);
     if (was) seqGiveBack();
   }
   if (message) seqNote(message);
@@ -10609,20 +10689,21 @@ function seqKeepPointer(name, h) {
   filePointerDB.put(name, h).catch(() => {});
 }
 // What the Picture and Video inputs hold now, for a block with this look (and keeps copies of your own files)
-function seqCaptureMedia(look) {
+function seqCaptureMedia(look, K = edit) {
+  const sv = vidFor(K);
   const m = {};
   if (usesIn(look, 'picture') && inMedia.pic) {
     m.pic = { ...inMedia.pic };
     if (m.pic.kind === 'own') seqKeepPointer(m.pic.name, inMedia.picHandle);
   }
-  if (usesIn(look, 'video') && inMedia.vid) {
-    m.vid = { ...inMedia.vid, at: r1(vid.video?.currentTime || 0) };
-    if (m.vid.kind === 'own') seqKeepPointer(m.vid.name, inMedia.vidHandle);
+  if (usesIn(look, 'video') && sv.media) {
+    m.vid = { ...sv.media, at: r1(sv.video?.currentTime || 0) };
+    if (m.vid.kind === 'own') seqKeepPointer(m.vid.name, sv.handle);
   }
   return m.pic || m.vid ? m : null;
 }
-const seqMediaSig = (look) => JSON.stringify([usesIn(look, 'picture') ? inMedia.pic : null, usesIn(look, 'video') ? inMedia.vid : null]);
-const seqMediaAsk = { pic: 0, vid: 0 };
+const seqMediaSig = (look, K = edit) => JSON.stringify([usesIn(look, 'picture') ? inMedia.pic : null, usesIn(look, 'video') ? vidFor(K).media : null]);
+const seqMediaAsk = { pic: 0 };
 // Opens a file of your own for a block: through its pointer where there is one (and you've let the page open it this
 // visit), or else the file of that name you picked this visit. Throws with what to do when neither works.
 async function seqOwnFile(name, what) {
@@ -10681,38 +10762,93 @@ async function seqLoadPic(pm) {
     if (ask === seqMediaAsk.pic) seqNote(e?.message || `The picture “${pm.name}” isn’t available any more. Pick it again under Inputs.`);
   }
 }
-// Puts the video where the block wants it: its start point plus how far into the block the song is
-function seqVidTime(bl) {
-  const v = vid.video, at = (bl.media?.vid?.at || 0) + Math.max(0, seq.t - bl.a);
+// Puts a video player where the block wants it: its start point plus how far into the block the song is (a block
+// still to come: its start point)
+function seqVidTime(bl, to) {
+  const v = to.video, at = (bl.media?.vid?.at || 0) + Math.max(0, seq.t - bl.a);
   if (!v || !Number.isFinite(v.duration) || v.duration <= 0) return;
   const want = at % v.duration;
   if (Math.abs(v.currentTime - want) > 0.4) v.currentTime = want;
 }
-async function seqLoadVid(bl) {
-  const vm = bl.media.vid, ask = ++seqMediaAsk.vid;
+// While a block's video is on its way its loop shows nothing (black), never the video before it: the old video's
+// last picture is wiped, and nothing new is drawn until the new one is in and at the block's spot
+const blackCard = (() => { const c = document.createElement('canvas'); c.width = c.height = 2; const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 2, 2); return c; })();
+function seqVidWait(to) {
+  if (to.wait) return;
+  to.wait = true;
+  for (const t of to.tex) { try { uploadTo(t, blackCard); } catch (_) { /* no picture yet */ } }
+  // The silhouette pictures too, so a loop with Subject silhouette doesn't show the old video's outline
+  for (const sub of Object.values(to.sub)) sub.frames = 0;
+}
+function seqVidRelease(to, now) {
+  if (!to.wait) return;
+  const v = to.video;
+  const go = () => { to.wait = false; to.fresh = true; to.lastTime = -1; };
+  if (now || !v || !v.seeking) { go(); return; }
+  v.addEventListener('seeked', go, { once: true });
+  // A jump that never finishes doesn't keep the picture black for good
+  setTimeout(go, 3000);
+}
+// Loads a block's video into a loop's own player (to)
+async function seqLoadVid(bl, to = vid) {
+  const vm = bl.media.vid, ask = ++to.seqAsk;
+  to.loading = vm;
+  to.forBl = bl;
+  // Blacked out only when it's on screen now; a video loaded ahead (seqPreloadVid) isn't seen yet
+  if (vidInUse(to)) seqVidWait(to);
   try {
     if (vm.kind === 'clip') {
-      await clipList();
-      const c = (clips.all || []).find((x) => x.id === vm.id);
-      if (!c || !(await clipPick(c, true))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
+      // The library is asked again only for a clip it hasn't listed yet (one less wait before the video comes in)
+      const known = () => (clips.all || []).find((x) => x.id === vm.id);
+      if (!known() || !clips.base) await clipList(true);
+      const c = known();
+      if (!c || !(await clipPick(c, true, to))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
     } else {
       const { file, h } = await seqOwnFile(vm.name, 'video');
-      if (ask !== seqMediaAsk.vid) return;
-      clips.ask++;
-      if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
-      clips.own = true; clipNoCredit();
-      inMedia.vid = { ...vm }; delete inMedia.vid.at; inMedia.vidHandle = h;
+      if (ask !== to.seqAsk) return;
+      to.ask++;
+      if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true, to }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
+      to.own = true; clipNoCredit(to);
+      to.media = { ...vm }; delete to.media.at; to.handle = h;
+      vidPanelSync();
     }
-    if (ask === seqMediaAsk.vid) seqVidTime(bl);
-  } catch (e) { if (ask === seqMediaAsk.vid) seqNote(e.message); }
+    if (ask === to.seqAsk) seqVidTime(to.forBl && sameMedia(to.forBl.media?.vid, vm) ? to.forBl : bl, to);
+  } catch (e) { if (ask === to.seqAsk) seqNote(e.message); }
+  finally {
+    if (ask === to.seqAsk) { to.loading = null; seqVidRelease(to, false); }
+  }
 }
-function seqShowMedia(bl) {
+// A track's next block with a different video than its loop's player holds is loaded a few seconds early, while
+// nothing on screen shows that player, so it's ready (at its start point) the moment its block comes in
+// (15 s ahead: a long clip in 4K can take a few seconds to come over from Phosphor Clips)
+seq.preloadSecs = 15;
+function seqPreloadVid(t) {
+  if (!seq.playing) return;
+  for (let k = 0, used = seqTracksUsed(); k < TL.TRACKS; k++) {
+    const K = KEYS[k], to = vids[K];
+    if (!used.has(k) || !loopOn(K) || to.loading || vidInUse(to)) continue;
+    let next = null;
+    for (const b of seq.rec.blocks) {
+      if (b.track !== k || !b.media?.vid || b.a <= t || b.a - t > seq.preloadSecs) continue;
+      if (!next || b.a < next.a) next = b;
+    }
+    if (!next || sameMedia(next.media.vid, to.media)) continue;
+    seq.ownsVideo = true;
+    seqLoadVid(next, to);
+  }
+}
+function seqShowMedia(bl, K) {
   const m = bl?.media;
   if (!m) return;
   if (m.pic && !sameMedia(m.pic, inMedia.pic)) seqLoadPic(m.pic);
   if (m.vid) {
+    const to = vids[K];
     seq.ownsVideo = true;
-    if (sameMedia(m.vid, inMedia.vid)) seqVidTime(bl); else seqLoadVid(bl);
+    to.forBl = bl;
+    if (sameMedia(m.vid, to.media) && to.on) seqVidTime(bl, to);
+    // Already on its way (loaded ahead): the picture stays black until it's in, at this block's spot
+    else if (sameMedia(m.vid, to.loading)) seqVidWait(to);
+    else seqLoadVid(bl, to);
   }
 }
 function seqApplyTrack(k, x, now) {
@@ -10730,7 +10866,7 @@ function seqApplyTrack(k, x, now) {
     if (wasCross && !x.other) L.cur.blend = T.blend;
     seq.applied[k] = sig;
     // The outgoing block's picture or video first, then the incoming one's, which wins where they share an input
-    seqShowMedia(x.other); seqShowMedia(x.main);
+    seqShowMedia(x.other, K); seqShowMedia(x.main, K);
     const used = [T.in1, T.in2];
     if (used.includes('camera') && !cam.on) startCamera();
     if (used.includes('screen') && !scr.on) startScreen(true);
@@ -10819,13 +10955,15 @@ function seqTick(now) {
         }
         seq.jumped = false;
         seqTypeApply(now);
+        seqPreloadVid(r.at ?? p.t);
       }
     }
   }
   // A block's video plays and pauses with the song
-  if (seq.running && seq.ownsVideo && vid.video && uses('video')) {
-    if (!seq.playing || frozen) { if (!vid.video.paused) vid.video.pause(); }
-    else if (vid.video.paused && !vidUserPaused) vid.video.play().catch(() => {});
+  if (seq.running && seq.ownsVideo) for (const to of Object.values(vids)) {
+    if (!to.video || !vidInUse(to)) continue;
+    if (!seq.playing || frozen) { if (!to.video.paused) to.video.pause(); }
+    else if (to.video.paused && !to.userPaused) to.video.play().catch(() => {});
   }
   if (!$('#seq').hidden) seqDraw(now);
 }
@@ -10836,11 +10974,11 @@ function seqRecTick(p) {
   if (!seq.running || !p.playing) { seqStopRec(true); return; }
   const t = p.t;
   // A new look, or a different picture or video, starts the next block
-  if (seq.recBlock && (L.gen !== seq.recGen || t < seq.recBlock.a || seqMediaSig(L.tgt) !== seq.recMedia)) seqStopRec(true);
+  if (seq.recBlock && (L.gen !== seq.recGen || t < seq.recBlock.a || seqMediaSig(L.tgt, K) !== seq.recMedia)) seqStopRec(true);
   if (!seq.recBlock) {
     seq.recBefore ||= seqSnap();
-    seq.recGen = L.gen; seq.recMedia = seqMediaSig(L.tgt);
-    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0, media: seqCaptureMedia(L.tgt) });
+    seq.recGen = L.gen; seq.recMedia = seqMediaSig(L.tgt, K);
+    seq.recBlock = TL.cleanBlock({ track: seq.selTrack, a: t, b: t + TL.MIN_LEN, label: '', look: JSON.parse(JSON.stringify(L.tgt)), fin: 0, fout: 0, media: seqCaptureMedia(L.tgt, K) });
     seq.recBlock.rec = true;
     seq.rec.blocks.push(seq.recBlock);
   }
@@ -11373,7 +11511,7 @@ document.addEventListener('keydown', (e) => {
 function seqPlace(label, look, withMedia, len = 16) {
   const dur = seqDur(), a = r1(clamp(seq.t, 0, dur)), b = r1(Math.min(dur, a + Math.max(TL.MIN_LEN, len)));
   if (b - a < TL.MIN_LEN) { seqNote('Move the playhead before the end of the song first.'); return; }
-  const media = withMedia && typeof withMedia === 'object' ? withMedia : withMedia ? seqCaptureMedia(look) : null;
+  const media = withMedia && typeof withMedia === 'object' ? withMedia : withMedia ? seqCaptureMedia(look, KEYS[seq.selTrack]) : null;
   const nb = TL.cleanBlock({ track: seq.selTrack, a, b, label, look: JSON.parse(JSON.stringify(look)), media });
   seqChange(() => seq.rec.blocks.push(nb)); seq.selId = nb.id;
   seqNote(`Added “${seqName(nb)}” to track ${seq.selTrack + 1} at ${fmtSeq(a, true)}. Drag its ends to change how long it plays.`);
@@ -11597,7 +11735,7 @@ function seqSetOpen(open, save) {
   window.dispatchEvent(new Event('resize'));
 }
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
-window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
+window.__plSeq = { get rec() { return seq.rec; }, set preloadSecs(v) { seq.preloadSecs = v; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
   spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; }, seek: (t) => seqSeek(t),
   select: (id) => { seq.selId = id; seq.dirty = true; seqInspector(); }, redraw: () => seqDrawStatic() };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });
@@ -11695,7 +11833,19 @@ function frame() {
   staticAmt = Math.max(0, staticAmt - dt * 3);
   calmK += ((streamCalm ? 1 : 0) - calmK) * (1 - Math.exp(-dt * 0.8));
 
-  for (const [name, s] of Object.entries(LIVE_SRC)) if (s.video && uses(name)) s.update(subjectModes(name));
+  for (const name of ['camera', 'screen', 'phone']) { const s = LIVE_SRC[name]; if (s.video && uses(name)) s.update(subjectModes(name)); }
+  // Each video player that a loop on screen shows, with the Subject silhouette looks of the loops showing it
+  for (const s of Object.values(vids)) {
+    if (!s.video) continue;
+    let shown = false;
+    const modes = new Set();
+    for (const k of activeKeys()) {
+      if (!loopUsesVid(k) || vidFor(k) !== s) continue;
+      shown = true;
+      if (subjectOn(loops[k].tgt)) modes.add(loops[k].tgt.subject);
+    }
+    if (shown) s.update(modes);
+  }
   syncSubjectStatus();
   mvRecTick(now);
   movesTick(now);

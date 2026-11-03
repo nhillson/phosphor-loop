@@ -1147,3 +1147,6 @@ button.seq-card { cursor: pointer; }
   .seq-card .seq-txt, .seq-song-card svg, .seq-mini { display: none; }
   .seq-song-card::after { content: "\266A"; }
 }
+
+/* Video controls: whose video it is, when other loops have their own */
+.vid-whose { opacity: 0.7; font-weight: 400; }
