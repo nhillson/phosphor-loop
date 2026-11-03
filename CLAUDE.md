@@ -112,6 +112,9 @@ file don't rebuild the app.
    (`seqGradeRest`, `seq.gradeOwned`). **From the start** (`seqFromStart`, Home key): `python3 tests/seq_grade_check.py`.
    After the end's Autopilot, going back into the sequence puts things back as they were at the end (`seqApSnap`,
    `seqApBack`): `python3 tests/seq_ap_end_check.py`. Type art in this workspace takes seconds a frame: long ceilings.
+4v. **Edit this look** (right-click a block, or the button in its details: the sequence stops, the block's look and grading go
+   onto its loop and the Color grading faders; Save to block / Cancel in the bar under the picture; `seqEditStart`,
+   `seqEditEnd`, `seq.editing`): `python3 tests/seq_edit_check.py`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

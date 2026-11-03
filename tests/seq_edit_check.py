@@ -89,7 +89,9 @@ def main():
         ok(J("document.querySelector('#seqEditBar').hidden") and J("__plSeq.editing") is None, 'the bar goes')
         # Edit again, change, Cancel
         J("__plAp.loops.A.tgt.zoom = 10")
-        J("__plSeq.edit('e1')")
+        J("__plSeq.select('e1')")
+        c.wait_frames(2, 'selected')
+        click('#seqInsp [data-editlook]')   # the button in the block's details
         c.wait_frames(2, 'editing again')
         ok(A('zoom') == 55, 'editing again starts from the saved look')
         slider('#zoom', -40)

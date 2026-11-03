@@ -10596,6 +10596,7 @@ function seqLoadSong(key, song) {
   seqStopRec();
   seqSpecStore(true);
   if (seq.key !== key) seq.records.set(seq.key, seq.rec);
+  if (seq.editing) seqEditEnd(false);
   seq.key = key; seq.song = song || null;
   seq.apBefore = null;
   seq.rec = seq.records.get(key) || TL.newRecord();
@@ -10709,6 +10710,7 @@ function seqTakeOver(k) {
   toast('You took over, so the sequence stopped. Press Play in the sequencer to go back to it.');
 }
 async function seqPlay() {
+  if (seq.editing) { seqNote('Save to block or Cancel the look you’re editing first (the bar under the picture).'); return; }
   seqAskFiles();
   // Following a Spotify song: Play starts the song in Spotify too (on the device it was last playing on, or the
   // first one Spotify has open), and the looks run with it
@@ -10735,6 +10737,7 @@ async function seqStop() {
 $('#seqPlay').addEventListener('click', () => { if (seq.running) void seqStop(); else void seqPlay(); });
 // From the start: the sequence from its very beginning, and its song from the top in Spotify
 async function seqFromStart() {
+  if (seq.editing) { seqNote('Save to block or Cancel the look you’re editing first (the bar under the picture).'); return; }
   seqAskFiles();
   if (seq.song && spotify.token) {
     seqRun(true, 'Starting the song from the top in Spotify…');
@@ -10749,6 +10752,69 @@ async function seqFromStart() {
 }
 $('#seqTop').addEventListener('click', () => { void seqFromStart(); });
 $('#seqStop').addEventListener('click', () => { void seqStop(); if (!seq.song) { seq.local.pos = 0; seq.dirty = true; } });
+/* ---------- Edit this look ---------- */
+// A block's look, changed with the ordinary controls: the sequence stops, the block's look (its picture or video, and
+// its Color grading on the Color grading faders) goes onto its loop, and the loop is shown. Save to block keeps the look
+// as it then is (its change-over-time lines stay as they are); Cancel leaves the block alone. Either way your own Color
+// grading comes back, and Cancel puts the loop back as it was.
+function seqEditStart(bl) {
+  if (seq.editing) seqEditEnd(false);
+  if (exOn()) { seqNote('Wait for the export to finish first.'); return; }
+  const K = KEYS[bl.track];
+  if (seq.running) void seqStop();
+  if (ap.on) setAutopilot(false, true);
+  if (!loopOn(K)) { setLoopCount(LOOP_NUM[K] + 1, 'load'); syncUI(); }
+  const L = loops[K];
+  seq.editing = { id: bl.id, K, tgt: JSON.parse(JSON.stringify(L.tgt)), show: mix.tgt[SHOW[K]], grade: { ...grade } };
+  patchLoop(K, bl.look, true);
+  for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+  mirrorCut(K);
+  loopGrade[K] = null;
+  Object.assign(grade, GRADE_DEF, bl.grade || {});
+  syncGradeUI();
+  seqShowMedia(bl, K);
+  mix.tgt[SHOW[K]] = 100;
+  seq.selId = bl.id; seq.dirty = true;
+  setEdit(K);
+  settleDevices();
+  syncUI();
+  $('#seqEditText').innerHTML = `<b>Editing “${escapeHTML(seqName(bl))}”</b> on loop ${K} · change anything with the controls, then Save to block`;
+  $('#seqEditBar').hidden = false;
+  seqNote(`Editing “${seqName(bl)}”: its look is on loop ${K} now. Change anything, then press Save to block (under the picture).`);
+}
+function seqEditEnd(save) {
+  const ed = seq.editing;
+  if (!ed) return;
+  seq.editing = null;
+  $('#seqEditBar').hidden = true;
+  const bl = seq.rec.blocks.find((b) => b.id === ed.id), K = ed.K, L = loops[K];
+  if (save && bl) {
+    seqChange(() => {
+      bl.look = JSON.parse(JSON.stringify(L.tgt));
+      const g = seqGradeNow();
+      if (g) bl.grade = g; else delete bl.grade;
+      const m = seqCaptureMedia(bl.look, K);
+      if (m) bl.media = m; else delete bl.media;
+    });
+    seq.applied = [null, null, null, null];
+    seqNote(`Saved: “${seqName(bl)}” has its new look.`);
+  } else {
+    Object.assign(L.tgt, ed.tgt);
+    for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+    mirrorCut(K);
+    mix.tgt[SHOW[K]] = ed.show;
+    seqNote(bl ? `Cancelled: “${seqName(bl)}” is as it was.` : 'Cancelled.');
+  }
+  // Your own Color grading comes back
+  Object.assign(grade, ed.grade);
+  syncGradeUI();
+  saveGrade();
+  seq.dirty = true;
+  settleDevices();
+  syncUI();
+}
+$('#seqEditSave').addEventListener('click', () => seqEditEnd(true));
+$('#seqEditCancel').addEventListener('click', () => seqEditEnd(false));
 /* ---------- export a sequence as a video ---------- */
 // Export video… plays the sequence once from the top, by itself, while the picture is drawn at 4K (or 1440p / 1080p)
 // and recorded with this computer's sound (the song, playing in Spotify on this computer), then saves an MP4. It
@@ -10765,6 +10831,7 @@ const exEnd = () => (seq.song ? seq.song.durationMs / 1000 : Math.max(TL.MIN_LEN
 const exSay = (t) => { $('#seqExSay').textContent = t || ''; };
 function exOpen() {
   if (exOn()) return;
+  if (seq.editing) { seqNote('Save to block or Cancel the look you’re editing first (the bar under the picture).'); return; }
   const f = $('#seqExportForm');
   if (!f.hidden) { f.hidden = true; return; }
   if (!seq.rec.blocks.length) { seqNote('Add some looks to the tracks first: there’s nothing to export yet.'); return; }
@@ -11528,7 +11595,7 @@ function seqDraw(now) {
 function seqInspector() {
   const bl = seq.rec.blocks.find((b) => b.id === seq.selId), el = $('#seqInsp');
   if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
-  el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
+  el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><button type="button" class="chip" data-editlook="1" title="Put this block's look on its loop to change it with the ordinary controls, then Save to block">Edit this look…</button><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
     (bl.autos.length ? `<span class="seq-lines">Editing ${bl.autos.map((au, i) => `<button type="button" class="chip" data-line="${i}" aria-pressed="${i === seqLineAct(bl)}" title="Bring ${SEQ_NAME[au.key] || au.key}’s line to the front to edit it"><span class="led" style="background:${seqLineColor(i)}"></span>${SEQ_NAME[au.key] || au.key}</button>`).join('')}</span>` : '<span>No changes over time · right-click to add one</span>');
   // Its Color grading
@@ -11564,6 +11631,11 @@ $('#seqInsp').addEventListener('click', (e) => {
   if (!bl) return;
   seqSetLineAct(bl, +b.dataset.line);
   seqNote(`Editing ${SEQ_NAME[bl.autos[+b.dataset.line].key] || bl.autos[+b.dataset.line].key}: drag its points, double-click to add one.`);
+});
+// Edit this look…, from the block's details
+$('#seqInsp').addEventListener('click', (e) => {
+  const bl = e.target.closest('[data-editlook]') && seq.rec.blocks.find((x) => x.id === seq.selId);
+  if (bl) seqEditStart(bl);
 });
 // The block's Color grading, from its details
 $('#seqInsp').addEventListener('click', (e) => {
@@ -11852,6 +11924,8 @@ seqView.addEventListener('contextmenu', (e) => {
     const bl = seqBlock(blkEl.dataset.id); if (!bl) return;
     seq.selId = bl.id; seqSelectTrack(bl.track); seq.dirty = true;
     seqOpenCtx(e.clientX, e.clientY, [
+      { label: 'Edit this look…', run: () => seqEditStart(bl) },
+      '-',
       { label: 'Copy', key: 'Ctrl+C', run: () => seqCopy(bl) },
       { label: 'Paste here', key: 'Ctrl+V', disabled: !seq.clip, run: () => seqPaste(bl.track, t) },
       '-',
@@ -12127,7 +12201,7 @@ function seqSetOpen(open, save) {
   window.dispatchEvent(new Event('resize'));
 }
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
-window.__plSeq = { get rec() { return seq.rec; }, set preloadSecs(v) { seq.preloadSecs = v; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
+window.__plSeq = { get rec() { return seq.rec; }, get editing() { return seq.editing ? seq.editing.id : null; }, edit: (id) => seqEditStart(seq.rec.blocks.find((b) => b.id === id)), set preloadSecs(v) { seq.preloadSecs = v; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
   spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; }, seek: (t) => seqSeek(t),
   select: (id) => { seq.selId = id; seq.dirty = true; seqInspector(); }, redraw: () => seqDrawStatic() };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });

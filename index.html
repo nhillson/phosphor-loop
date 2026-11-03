@@ -228,6 +228,13 @@
         </form>
         <p class="hint snip-status" id="snipStatus" role="status" aria-live="polite"></p>
       </div>
+      <div class="session-bar edit-bar" id="seqEditBar" hidden>
+        <div class="session-row">
+          <span class="live" aria-hidden="true"></span><span id="seqEditText"></span>
+          <button class="btn small primary" id="seqEditSave" title="The block keeps the look as it is now on its loop">Save to block</button>
+          <button class="btn small" id="seqEditCancel" title="The block stays as it was">Cancel</button>
+        </div>
+      </div>
       <div class="session-bar moves-bar" id="expBar" hidden>
         <div class="session-row">
           <span class="live" aria-hidden="true"></span><span id="expText"></span>

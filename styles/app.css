@@ -1159,3 +1159,7 @@ button.seq-card { cursor: pointer; }
 .seq-ex-size { display: inline-flex; }
 .seq-ex-how { margin: 0; padding-left: 20px; color: var(--dim); font-size: 13px; line-height: 1.45; }
 .seq-ex-say { color: var(--loop-a-ink); font-size: 13px; flex: 1 1 220px; }
+
+/* Edit this look (sequencer): the bar while a block's look is being changed */
+.session-bar.edit-bar { border-color: rgba(176,108,255,.5); background: rgba(176,108,255,.08); }
+.edit-bar .session-row .live { background: var(--loop-a); box-shadow: 0 0 8px rgba(176,108,255,.7); }
