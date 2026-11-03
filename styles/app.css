@@ -1133,6 +1133,8 @@ button.seq-card { cursor: pointer; }
 .seq-xf span { margin-bottom: 2px; padding: 0 4px; border-radius: 3px; background: var(--well); }
 .seq-playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--press-ink); box-shadow: 0 0 6px rgba(242,217,252,.6); pointer-events: none; z-index: 4; }
 .seq-playhead::before { content: ""; position: absolute; top: 0; left: -5px; border: 6px solid transparent; border-top-color: var(--press-ink); }
+.seq-snapline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed #ffd84a; margin-left: -1px; pointer-events: none; z-index: 5; filter: drop-shadow(0 0 3px rgba(255,216,74,.7)); }
+.seq-snapline[hidden] { display: none; }
 .seq-ov { position: relative; border-radius: 7px; background: var(--well); border: 1px solid var(--line); cursor: pointer; touch-action: none; }
 .seq-thumb { position: absolute; top: 1px; bottom: 1px; border-radius: 6px; background: var(--raise-2); border: 1px solid var(--dim); box-sizing: border-box; cursor: grab; min-width: 12px; }
 .seq-ovmark { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--press-ink); pointer-events: none; }

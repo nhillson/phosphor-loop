@@ -143,13 +143,14 @@
             <div class="seq-card seq-song-card seq-h-spec"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 16v-3M7 18V8M11 17V4M15 18v-8M19 15v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="seq-txt"><b>Song</b><small>Spectrograph · saved with song</small></span></div>
           </div>
           <div class="seq-view-col">
-            <div class="seq-view" id="seqView" tabindex="0" title="Scroll moves along the song · Shift + scroll zooms · drag a block to move it (also to another track), its ends to resize, the top dots to fade · double-click a block to add a point to its change line · right-click for more" aria-label="Sequencer timeline. Scroll to move through the song, Shift and scroll to zoom. Arrow keys move, plus and minus zoom.">
+            <div class="seq-view" id="seqView" tabindex="0" title="Scroll moves along the song · Shift + scroll zooms · drag a block to move it (also to another track), its ends to resize (they snap to other blocks’ ends on any track, the playhead and markers; hold Alt to drag freely), the top dots to fade · double-click a block to add a point to its change line · right-click for more" aria-label="Sequencer timeline. Scroll to move through the song, Shift and scroll to zoom. Arrow keys move, plus and minus zoom.">
               <div class="seq-grid" id="seqGrid" aria-hidden="true"></div>
               <div class="seq-ruler seq-h-ruler" id="seqRuler" aria-hidden="true"></div>
               <div class="seq-marks seq-h-marks" id="seqMarks" aria-label="Section markers"></div>
               <div class="seq-spec-wrap seq-h-spec"><canvas class="seq-spec seq-h-spec" id="seqSpec" role="img" aria-label="Spectrograph of the song as heard so far: low sounds at the bottom, high at the top, louder is brighter. Parts not heard yet are dark."></canvas><span class="seq-unheard" id="seqUnheard" hidden>Not heard yet · fills in when this part plays with sound connected</span></div>
               <div class="seq-lanes" id="seqLanes"></div>
               <div class="seq-playhead" id="seqPh" aria-hidden="true"></div>
+              <div class="seq-snapline" id="seqSnapLine" aria-hidden="true" hidden></div>
             </div>
             <div class="seq-ov seq-h-ov" id="seqOv" aria-label="Whole song; drag the handle to move"><div class="seq-thumb" id="seqThumb"></div><div class="seq-ovmark" id="seqOvMark"></div></div>
           </div>

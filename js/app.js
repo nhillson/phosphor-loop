@@ -11769,6 +11769,23 @@ seqView.addEventListener('pointerdown', (e) => {
   seq.drag = d;
   seqView.setPointerCapture(e.pointerId);
 });
+// Snapping: a block's ends, dragged (moving the block or resizing it), snap to the ends of every other block, on any
+// track, and to the playhead, markers and the song's start, within a few pixels; a dashed line shows where. Alt drags
+// freely.
+const SEQ_SNAP_PX = 10;
+function seqSnapTo(edges, skip, e) {
+  if (e.altKey) return null;
+  const lim = SEQ_SNAP_PX / seq.view.pps, ts = [0, seq.t, ...seq.rec.markers.map((m) => m.t)];
+  for (const b of seq.rec.blocks) if (b !== skip) ts.push(b.a, b.b);
+  let best = null;
+  for (const t of ts) edges.forEach((x, i) => { const by = t - x; if (Math.abs(by) <= lim && (!best || Math.abs(by) < Math.abs(best.by))) best = { by, at: t, i }; });
+  return best;
+}
+function seqSnapLine(at) {
+  const el = $('#seqSnapLine');
+  el.hidden = at == null;
+  if (at != null) el.style.left = seqX(at) + 'px';
+}
 seqView.addEventListener('pointermove', (e) => {
   const d = seq.drag; if (!d) return;
   const dx = e.clientX - d.x;
@@ -11778,9 +11795,18 @@ seqView.addEventListener('pointermove', (e) => {
   if (d.kind === 'pan') { seqView.classList.add('dragging'); seq.view.start = d.start - dt; }
   else if (d.kind === 'marker') d.m.t = r1(clamp(o.t + dt, 0, dur));
   else if (d.kind === 'move') {
-    const len = o.b - o.a; bl.a = r1(clamp(o.a + dt, 0, Math.max(0, dur - len))); bl.b = r1(bl.a + len); bl.track = seqTrackAtY(e.clientY);
-  } else if (d.kind === 'l') bl.a = r1(clamp(o.a + dt, 0, o.b - TL.MIN_LEN));
-  else if (d.kind === 'r') bl.b = r1(clamp(o.b + dt, o.a + TL.MIN_LEN, dur));
+    const len = o.b - o.a, a = clamp(o.a + dt, 0, Math.max(0, dur - len)), sn = seqSnapTo([a, a + len], bl, e);
+    bl.a = sn ? clamp(sn.i === 0 ? sn.at : sn.at - len, 0, Math.max(0, dur - len)) : r1(a); bl.b = bl.a + len;
+    // (it changes track only once the pointer has gone up or down a little: pressing it can change the lanes' heights)
+    bl.track = Math.abs(e.clientY - d.y) < 16 ? o.track : seqTrackAtY(e.clientY);
+    seqSnapLine(sn ? sn.at : null);
+  } else if (d.kind === 'l') {
+    const a = clamp(o.a + dt, 0, o.b - TL.MIN_LEN), sn = seqSnapTo([a], bl, e);
+    bl.a = sn && sn.at <= o.b - TL.MIN_LEN ? sn.at : r1(a); seqSnapLine(sn && sn.at <= o.b - TL.MIN_LEN ? sn.at : null);
+  } else if (d.kind === 'r') {
+    const b = clamp(o.b + dt, o.a + TL.MIN_LEN, dur), sn = seqSnapTo([b], bl, e);
+    bl.b = sn && sn.at >= o.a + TL.MIN_LEN ? sn.at : r1(b); seqSnapLine(sn && sn.at >= o.a + TL.MIN_LEN ? sn.at : null);
+  }
   else if (d.kind === 'fin') bl.fin = r1(clamp(o.fin + dt, 0, bl.b - bl.a - bl.fout));
   else if (d.kind === 'fout') bl.fout = r1(clamp(o.fout - dt, 0, bl.b - bl.a - bl.fin));
   else if (d.kind === 'pt') {
@@ -11795,6 +11821,7 @@ seqView.addEventListener('pointermove', (e) => {
 seqView.addEventListener('pointerup', (e) => {
   const d = seq.drag; if (!d) return;
   seq.drag = null; seqView.classList.remove('dragging');
+  seqSnapLine(null);
   if (d.kind === 'pan' && !d.moved) {
     seq.selId = null; seq.dirty = true;
     seqSeek(seq.view.start + (e.clientX - seqView.getBoundingClientRect().left) / seq.view.pps);
@@ -11803,7 +11830,7 @@ seqView.addEventListener('pointerup', (e) => {
     seqCommit(d.before);
   }
 });
-seqView.addEventListener('pointercancel', () => { const d = seq.drag; if (d && d.kind !== 'pan') { seqRestore(d.before); seq.dirty = true; } seq.drag = null; });
+seqView.addEventListener('pointercancel', () => { seqSnapLine(null); const d = seq.drag; if (d && d.kind !== 'pan') { seqRestore(d.before); seq.dirty = true; } seq.drag = null; });
 // Double-click a block to add a point to its newest change line; a marker to rename it
 // Double-clicking a marker renames it. Double-clicking a block adds a point there: that one is counted here, from two
 // presses close together in time and place on the same block (see seqView's pointerdown), not left to the browser,

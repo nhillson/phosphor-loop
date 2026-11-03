@@ -115,6 +115,9 @@ file don't rebuild the app.
 4v. **Edit this look** (right-click a block, or the button in its details: the sequence stops, the block's look and grading go
    onto its loop and the Color grading faders; Save to block / Cancel in the bar under the picture; `seqEditStart`,
    `seqEditEnd`, `seq.editing`): `python3 tests/seq_edit_check.py`.
+4w. **Snapping** (a dragged block or its end snaps to other blocks' ends on any track, the playhead, markers and 0:00 within
+   10 px, a dashed line shows where, Alt drags freely; `seqSnapTo`, `seqSnapLine`; a block changes track only once the
+   pointer has moved up or down 16 px): `python3 tests/seq_snap_check.py` (real mouse drags).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
