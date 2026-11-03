@@ -10260,7 +10260,7 @@ const SEQ_SLIDERS = [
   ['Loop', [['show', 'Show'], ['feed', 'Feed into other loop'], ['blend', 'Blend'], ['size', 'Input size']]],
   ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
-    ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal']]],
+    ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'], ['mirror', 'Mirror']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
     ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
   // 3D lighting is one for the whole picture: when blocks on several tracks set it, it's a mix of them, each counted
@@ -10270,7 +10270,13 @@ const SEQ_SLIDERS = [
 const SEQ_NAME = Object.fromEntries(SEQ_SLIDERS.flatMap(([, list]) => list));
 const SEQ_LINES = ['#e9fbe9', '#ffd27a', '#8ff0ff', '#ffa3d1'];
 // A slider's range, from the control itself
+// Mirror steps: Off, 2, 4, 6 and 8 sides. Its change line goes from Off (bottom) to 8 (top), in steps, and each
+// step comes in through the Transition picked for the line (Cut, Melt, Iris or Ripple) over the time picked.
+const MIRROR_STEPS = [0, 2, 4, 6, 8];
+const mirrorSnap = (v) => MIRROR_STEPS.reduce((p, q) => (Math.abs(q - v) < Math.abs(p - v) ? q : p), 0);
+const snapLine = (key, val) => (key === 'mirror' ? mirrorSnap(val * 8) / 8 : val);
 function seqRange(key) {
+  if (key === 'mirror') return [0, 8];
   const el = key === 'show' ? $('#showA') : key === 'feed' ? $('#xab') : $('#' + key);
   return el ? [Number(el.min), Number(el.max)] : [0, 100];
 }
@@ -10681,8 +10687,10 @@ function seqApplyTrack(k, x, now) {
   // Change lines: on the block coming in, and (during a crossfade) the one going out, weighted by the crossfade
   let show = 100, feed = null;
   const vals = {};
+  let mirrorLine = null;
   const take = (blk, u, wt) => {
     for (const au of blk.autos) {
+      if (au.key === 'mirror' && (!mirrorLine || wt > mirrorLine.wt)) mirrorLine = { au, wt };
       const [lo, hi] = seqRange(au.key), v = lo + (hi - lo) * TL.autoValue(au.pts, u);
       if (!(au.key in vals)) vals[au.key] = { sum: 0, wt: 0 };
       vals[au.key].sum += v * wt; vals[au.key].wt += wt;
@@ -10698,6 +10706,15 @@ function seqApplyTrack(k, x, now) {
     else if (key === 'feed') feed = v;
     else if (key in GRADE_DEF) grade[key] = v;
     else if (key in RELIEF_DEF) rel[key] = v;
+    else if (key === 'mirror') {
+      // A new step comes in through the line's own Transition, over its own time (see mirrorStep)
+      const step = mirrorSnap(v);
+      if (step !== T.mirror) {
+        if (mirrorLine) { T.mirrorFx = mirrorLine.au.fx || 'melt'; L.mxSecs = mirrorLine.au.secs || MIRROR_SECS; }
+        T.mirror = step;
+        if (K === edit) syncUI();
+      }
+    }
     else if (key in T) T[key] = v;
   }
   mix.tgt[SHOW[K]] = clamp(show, 0, 100) * x.show;
@@ -10858,8 +10875,15 @@ function seqDrawStatic() {
     if (bl.fin > 0) html += `<div class="fi" style="width:${bl.fin * pps}px"></div>`;
     if (bl.fout > 0) html += `<div class="fo" style="width:${bl.fout * pps}px"></div>`;
     if (bl.autos.length) {
+      // (a Mirror line is drawn as the steps it really takes)
+      const linePts = (au) => {
+        if (au.key !== 'mirror') return au.pts.map(([u, val]) => `${u * 100},${100 - val * 100}`).join(' ');
+        const out = [];
+        for (let x = 0; x <= 100; x += 0.5) out.push(`${x},${100 - snapLine('mirror', TL.autoValue(au.pts, x / 100)) * 100}`);
+        return out.join(' ');
+      };
       html += '<svg class="auto" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + bl.autos.map((au, ai) =>
-        `<polyline points="${au.pts.map(([u, val]) => `${u * 100},${100 - val * 100}`).join(' ')}" fill="none" stroke="${SEQ_LINES[ai % 4]}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`).join('') + '</svg>';
+        `<polyline points="${linePts(au)}" fill="none" stroke="${SEQ_LINES[ai % 4]}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`).join('') + '</svg>';
       if (bl.id === seq.selId || w > 120) bl.autos.forEach((au, ai) => {
         html += au.pts.map(([u, val], pi) => `<span class="dot" data-h="pt" data-a="${ai}" data-p="${pi}" title="${SEQ_NAME[au.key] || au.key}" style="left:${u * 100}%;top:${100 - val * 100}%;background:${SEQ_LINES[ai % 4]}"></span>`).join('');
       });
@@ -10932,7 +10956,20 @@ function seqInspector() {
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
     (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
     (bl.autos.length ? `<span>Changes over time: ${bl.autos.map((au, i) => `<b style="color:${SEQ_LINES[i % 4]}">${SEQ_NAME[au.key] || au.key}</b>`).join(', ')}</span>` : '<span>No changes over time · right-click to add one</span>');
+  const mau = bl.autos.find((au) => au.key === 'mirror');
+  if (mau) el.innerHTML += `<span class="seq-mfx">Mirror changes come in with ` +
+    ['cut', 'melt', 'iris', 'ripple'].map((f) => `<button type="button" class="chip" data-mfx="${f}" aria-pressed="${mau.fx === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('') +
+    (mau.fx === 'cut' ? '' : ` over ` + [1, 3, 6, 10].map((n) => `<button type="button" class="chip" data-msecs="${n}" aria-pressed="${Math.abs((mau.secs || 3) - n) < 0.01}">${n} s</button>`).join('')) + '</span>';
 }
+// The Mirror line's Transition and time, picked in the block's details
+$('#seqInsp').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mfx], [data-msecs]');
+  const bl = b && seq.rec.blocks.find((x) => x.id === seq.selId), au = bl && bl.autos.find((x) => x.key === 'mirror');
+  if (!au) return;
+  seqChange(() => { if (b.dataset.mfx) au.fx = b.dataset.mfx; else au.secs = +b.dataset.msecs; });
+  seqInspector();
+  seqNote(au.fx === 'cut' ? 'Mirror changes in this block cut straight in.' : `Mirror changes in this block come in with ${au.fx[0].toUpperCase() + au.fx.slice(1)} over ${au.secs} s.`);
+});
 function seqMeasure() {
   const v = seq.view, zoom = v.pps / (v.minPps || 1);
   v.vw = seqView.clientWidth || 600;
@@ -11010,7 +11047,7 @@ seqView.addEventListener('pointermove', (e) => {
     const pts = bl.autos[d.ai].pts, [u0, v0] = o.autos[d.ai].pts[d.pi], i = d.pi;
     const lo = i === 0 ? 0 : pts[i - 1][0], hi = i === pts.length - 1 ? 1 : pts[i + 1][0];
     const u = i === 0 ? 0 : i === pts.length - 1 ? 1 : clamp(u0 + dx / d.w, lo, hi);
-    pts[i] = [u, clamp(v0 - (e.clientY - d.y) / d.h, 0, 1)];
+    pts[i] = [u, snapLine(bl.autos[d.ai].key, clamp(v0 - (e.clientY - d.y) / d.h, 0, 1))];
   }
   if (bl) { const len = bl.b - bl.a; bl.fin = Math.min(bl.fin, len); bl.fout = Math.min(bl.fout, len - bl.fin); }
   seq.dirty = true;
@@ -11036,7 +11073,7 @@ seqView.addEventListener('dblclick', (e) => {
   if (!bl.autos.length) { seqNote('Right-click the block and pick Change over time first.'); return; }
   const r = el.getBoundingClientRect(), u = clamp((e.clientX - r.left) / r.width, 0.01, 0.99), val = clamp(1 - (e.clientY - r.top) / r.height, 0, 1);
   const au = bl.autos[bl.autos.length - 1];
-  seqChange(() => { au.pts.push([u, val]); au.pts.sort((p, q) => p[0] - q[0]); });
+  seqChange(() => { au.pts.push([u, snapLine(au.key, val)]); au.pts.sort((p, q) => p[0] - q[0]); });
   seqNote(`Added a point to ${SEQ_NAME[au.key] || au.key}. Drag it to set the value.`);
 });
 function seqRenameMarker(el) {
@@ -11123,7 +11160,7 @@ function seqPickSlider(bl, x, y) {
             // The line starts at the block's own value for that slider
             const [lo, hi] = seqRange(key), cur = key === 'show' ? 100 : key === 'feed' ? 0 : key in GRADE_DEF ? GRADE_DEF[key] : key in RELIEF_DEF ? relief[key] : bl.look[key] ?? loopDefaults()[key] ?? lo;
             const v = clamp((cur - lo) / ((hi - lo) || 1), 0, 1);
-            bl.autos.push({ key, pts: [[0, v], [1, v]] });
+            bl.autos.push({ key, pts: [[0, v], [1, v]], ...(key === 'mirror' ? { fx: bl.look.mirrorFx in MIRROR_FX && bl.look.mirrorFx !== 'cut' ? bl.look.mirrorFx : 'melt', secs: MIRROR_SECS } : {}) });
           }
         });
         seqNote(has ? `${name} no longer changes in “${seqName(bl)}”.` : `${name} now changes over “${seqName(bl)}”. Drag the dots to shape it, double-click the block to add a point.`);
@@ -11413,7 +11450,8 @@ function seqSetOpen(open, save) {
 }
 $('#seqBtn').addEventListener('click', () => seqSetOpen($('#seq').hidden, true));
 window.__plSeq = { get rec() { return seq.rec; }, get t() { return seq.t; }, reliefNow: () => reliefNow(), get running() { return seq.running; },
-  spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; } };   // for tests/snips_check.py
+  spotify, pos: (now) => seqPos(now), follow: (song) => { seq.song = song; }, seek: (t) => seqSeek(t),
+  select: (id) => { seq.selId = id; seq.dirty = true; seqInspector(); } };   // for tests/snips_check.py
 $('#seqHide').addEventListener('click', () => { seqSetOpen(false, true); $('#seqBtn').focus(); });
 
 /* ---------- Spotify: which song is playing ---------- */
