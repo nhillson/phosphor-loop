@@ -136,6 +136,10 @@ file don't rebuild the app.
 4w. **Snapping** (a dragged block or its end snaps to other blocks' ends on any track, the playhead, markers and 0:00 within
    10 px, a dashed line shows where, Alt drags freely; `seqSnapTo`, `seqSnapLine`; a block changes track only once the
    pointer has moved up or down 16 px): `python3 tests/seq_snap_check.py` (real mouse drags).
+4x. **Moving pictures** (a dropped or picked GIF, or moving WebP/PNG, goes into the Video input as a looping WebM made in the page:
+   `movingToVideo` / `webmFile` / `asVideoFile` in js/app.js, ImageDecoder + VideoEncoder VP8, played through to at least 6 s; a still one
+   stays a Picture; a drop that brings only an address is fetched, `dropFetch`; the sequencer remakes the video from your GIF):
+   `python3 tests/gif_check.py` (about half a minute).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

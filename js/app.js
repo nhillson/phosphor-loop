@@ -5324,7 +5324,7 @@ const picFile = $('#picFile'), vidFile = $('#vidFile');
 async function pickOwn(kind, input) {
   if (!window.showOpenFilePicker) { input.click(); return; }
   try {
-    const [h] = await window.showOpenFilePicker({ types: [{ description: kind === 'image' ? 'Pictures' : 'Videos', accept: { [kind + '/*']: [] } }] });
+    const [h] = await window.showOpenFilePicker({ types: [{ description: kind === 'image' ? 'Pictures' : 'Videos and GIFs', accept: kind === 'image' ? { 'image/*': [] } : { 'video/*': [], 'image/gif': ['.gif'], 'image/webp': ['.webp'] } }] });
     loadFile(await h.getFile(), h);
   } catch (e) { if (e?.name !== 'AbortError') input.click(); }
 }
@@ -5366,9 +5366,141 @@ function feedInto(src) {
   syncUI();
   showOSD(`INPUT ${edit}`, SRC_LABEL[src].toUpperCase());
 }
+/* ---- moving pictures (GIFs, and moving WebP / PNG, as GIPHY and the like hand out) ----
+   A picture is drawn once, so a GIF fed in as a Picture would sit still on its first frame. A moving one is turned
+   into a short looping video here instead (decoded with the browser's ImageDecoder, encoded to VP8 with VideoEncoder,
+   wrapped in a small WebM below) and goes into the Video input, where it plays, loops and has the speed buttons,
+   Save clip and the sequencer like any video. Nothing leaves the computer. */
+const MOVING = { minSecs: 6, maxSecs: 60, maxFrames: 3000, maxSide: 1920 };
+const movingMade = new WeakMap();   // file -> its video (Promise), so a GIF picked again isn't made twice
+// What kind of picture the file really is, from its first bytes (a dragged picture's type can be missing or wrong)
+async function pictureKind(file) {
+  const b = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const s = (a, n) => String.fromCharCode(...b.slice(a, a + n));
+  if (s(0, 4) === 'GIF8') return 'image/gif';
+  if (s(0, 4) === 'RIFF' && s(8, 4) === 'WEBP') return 'image/webp';
+  if (b[0] === 0x89 && s(1, 3) === 'PNG') return 'image/png';
+  if (s(4, 4) === 'ftyp' && /avi[fs]/.test(s(8, 4))) return 'image/avif';
+  return (file.type || '').startsWith('image/') ? file.type : '';
+}
+// A WebM file holding VP8 pictures. frames: [{ data: Uint8Array, ms, key }]
+function webmFile(frames, w, h, durMs) {
+  const enc = new TextEncoder();
+  const cat = (parts) => { const n = parts.reduce((a, p) => a + p.length, 0); const o = new Uint8Array(n); let at = 0; for (const p of parts) { o.set(p, at); at += p.length; } return o; };
+  const idB = (id) => { const o = []; for (let v = id; v > 0; v = Math.floor(v / 256)) o.unshift(v & 255); return Uint8Array.from(o); };
+  const sizeB = (n) => { const o = new Uint8Array(8); o[0] = 1; for (let i = 7, v = n; i > 0; i--, v = Math.floor(v / 256)) o[i] = v & 255; return o; };
+  const el = (id, ...kids) => { const body = cat(kids); return cat([idB(id), sizeB(body.length), body]); };
+  const uint = (id, v) => { const o = []; do { o.unshift(v & 255); v = Math.floor(v / 256); } while (v > 0); return el(id, Uint8Array.from(o)); };
+  const str = (id, v) => el(id, enc.encode(v));
+  const flt = (id, v) => { const o = new Uint8Array(8); new DataView(o.buffer).setFloat64(0, v); return el(id, o); };
+  const head = el(0x1A45DFA3, uint(0x4286, 1), uint(0x42F7, 1), uint(0x42F2, 4), uint(0x42F3, 8), str(0x4282, 'webm'), uint(0x4287, 2), uint(0x4285, 2));
+  const info = el(0x1549A966, uint(0x2AD7B1, 1000000), str(0x4D80, 'Phosphor Loop'), str(0x5741, 'Phosphor Loop'), flt(0x4489, durMs));
+  const tracks = el(0x1654AE6B, el(0xAE, uint(0xD7, 1), uint(0x73C5, 1), uint(0x83, 1), str(0x86, 'V_VP8'), uint(0x9C, 0), el(0xE0, uint(0xB0, w), uint(0xBA, h))));
+  // One cluster per key picture (one at least every second, see below), so jumping around in it is quick
+  const clusters = [];
+  let cur = null;
+  for (const f of frames) {
+    if (f.key || !cur || f.ms - cur.t > 30000) { cur = { t: f.ms, blocks: [] }; clusters.push(cur); }
+    const blk = new Uint8Array(4 + f.data.length);
+    const rel = f.ms - cur.t;
+    blk[0] = 0x81; blk[1] = (rel >> 8) & 255; blk[2] = rel & 255; blk[3] = f.key ? 0x80 : 0;
+    blk.set(f.data, 4);
+    cur.blocks.push(el(0xA3, blk));
+  }
+  const seg = el(0x18538067, info, tracks, ...clusters.map((c) => el(0x1F43B675, uint(0xE7, c.t), ...c.blocks)));
+  return cat([head, seg]);
+}
+// Resolves to a video File made from a moving picture, or null when the picture doesn't move (or this browser can't
+// make videos: then it goes in as a still picture, as before)
+function movingToVideo(file) {
+  if (movingMade.has(file)) return movingMade.get(file);
+  const job = (async () => {
+    if (!window.ImageDecoder || !window.VideoEncoder) return null;
+    const type = await pictureKind(file);
+    if (!/^image\/(gif|webp|png|avif|apng)$/.test(type) || !(await ImageDecoder.isTypeSupported(type).catch(() => false))) return null;
+    const dec = new ImageDecoder({ data: await file.arrayBuffer(), type });
+    try {
+      await dec.tracks.ready;
+      const tr = dec.tracks.selectedTrack;
+      if (!tr || !tr.animated) return null;
+      await dec.completed.catch(() => {});
+      const count = Math.min(tr.frameCount, MOVING.maxFrames);
+      if (count < 2) return null;
+      // Each picture and how long it shows (browsers show very short GIF frames for a tenth of a second, as here)
+      const pics = [];
+      let total = 0;
+      for (let i = 0; i < count && total < MOVING.maxSecs * 1e6; i++) {
+        const { image } = await dec.decode({ frameIndex: i });
+        let d = image.duration || 0;
+        if (d <= 10000) d = 100000;
+        pics.push({ bmp: await createImageBitmap(image), d });
+        image.close();
+        total += d;
+      }
+      const src = pics[0].bmp;
+      const s = Math.min(1, MOVING.maxSide / Math.max(src.width, src.height));
+      const W = Math.max(2, Math.round(src.width * s / 2) * 2), H = Math.max(2, Math.round(src.height * s / 2) * 2);
+      const cfg = { codec: 'vp8', width: W, height: H, bitrate: Math.max(4e6, Math.min(40e6, W * H * 30 * 0.4)), framerate: 30 };
+      if (!(await VideoEncoder.isConfigSupported(cfg).catch(() => ({}))).supported) return null;
+      const cv = new OffscreenCanvas(W, H), cx = cv.getContext('2d');
+      const out = [];
+      let failed = null;
+      const venc = new VideoEncoder({
+        output: (chunk) => { const data = new Uint8Array(chunk.byteLength); chunk.copyTo(data); out.push({ data, ms: Math.round(chunk.timestamp / 1000), key: chunk.type === 'key' }); },
+        error: (e) => { failed = e; },
+      });
+      venc.configure(cfg);
+      // Short ones are played through a few times over, so the video is long enough to trim and loops less often
+      const rounds = Math.max(1, Math.min(20, Math.ceil(MOVING.minSecs * 1e6 / total)));
+      let t = 0, lastKey = -1e9;
+      for (let r = 0; r < rounds && !failed; r++) {
+        for (const p of pics) {
+          cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);   // see-through parts show as black
+          cx.drawImage(p.bmp, 0, 0, W, H);
+          const vf = new VideoFrame(cv, { timestamp: t, duration: p.d });
+          const key = t - lastKey >= 1e6;
+          if (key) lastKey = t;
+          venc.encode(vf, { keyFrame: key });
+          vf.close();
+          t += p.d;
+          if (venc.encodeQueueSize > 30) await new Promise((res) => venc.addEventListener('dequeue', res, { once: true }));
+        }
+      }
+      await venc.flush();
+      venc.close();
+      pics.forEach((p) => p.bmp.close());
+      if (failed || !out.length) return null;
+      out.sort((a, b) => a.ms - b.ms);
+      const name = file.name || 'Moving picture.gif';
+      return new File([webmFile(out, W, H, t / 1000)], name.replace(/\.[a-z0-9]{2,5}$/i, '') + '.webm', { type: 'video/webm' });
+    } finally { dec.close(); }
+  })().catch(() => null);
+  movingMade.set(file, job);
+  return job;
+}
+// A file as something the Video input can play: a video as it is, a moving picture made into one, else null
+async function asVideoFile(file) {
+  if (!file) return null;
+  if ((file.type || '').startsWith('video/')) return file;
+  return movingToVideo(file);
+}
+
 function loadFile(file, handle = null) {
   if (!file) return;
   const type = file.type || '';
+  // A moving picture (a GIF and the like) goes in as a video, so it moves; a still one carries on as a picture
+  if ((type.startsWith('image/') || !type) && !file.picChecked) {
+    const isGif = /gif/i.test(type) || /\.gif$/i.test(file.name || '');
+    if (isGif) toast(`Getting ${file.name || 'the GIF'} ready…`, 3000);
+    movingToVideo(file).then((v) => {
+      if (v) { loadMovingVideo(v, file.name || v.name, handle); return; }
+      if (isGif && !(window.ImageDecoder && window.VideoEncoder)) toast('This browser can only show GIFs still. Chrome or Edge plays them.', 6000);
+      if (!type) { pictureKind(file).then((k) => { if (k) { const f = new File([file], file.name, { type: k }); f.picChecked = true; loadFile(f, handle); } else toast('That file isn’t a picture or video.'); }); return; }
+      file.picChecked = true;
+      loadFile(file, handle);
+    });
+    return;
+  }
   // A taste profile someone sent (see Taste profiles)
   if (/\.json$/i.test(file.name || '') || type === 'application/json') { tasteFileOpen(file); return; }
   if (type.startsWith('image/')) {
@@ -5391,18 +5523,22 @@ function loadFile(file, handle = null) {
     img.onerror = () => { URL.revokeObjectURL(url); toast('That picture couldn’t be opened. Try a JPG or PNG.'); };
     img.src = url;
   } else if (type.startsWith('video/')) {
-    const to = vid;
-    to.ask++;   // a library clip still on its way doesn't replace this one
-    openVideo(URL.createObjectURL(file), file.name, { to }).then((ok) => {
-      if (!ok) return;
-      to.media = { kind: 'own', name: file.name }; to.handle = handle; ownFiles.set(file.name, file);
-      // A video of your own: Autopilot leaves it in place instead of bringing in library clips
-      to.own = true;
-      clipNoCredit(to);
-    });
+    loadMovingVideo(file, file.name, handle);
   } else {
     toast('That file isn’t a picture or video.');
   }
+}
+// A video of your own (or a moving picture made into one: file is then its video, name the picture's) into the Video input
+function loadMovingVideo(file, name, handle = null) {
+  const to = vid;
+  to.ask++;   // a library clip still on its way doesn't replace this one
+  openVideo(URL.createObjectURL(file), name, { to }).then((ok) => {
+    if (!ok) { toast(`${name} couldn’t be played.`); return; }
+    to.media = { kind: 'own', name }; to.handle = handle; ownFiles.set(name, file);
+    // A video of your own: Autopilot leaves it in place instead of bringing in library clips
+    to.own = true;
+    clipNoCredit(to);
+  });
 }
 // Puts a video (an object URL) in as the Video input. quiet: in place without switching any loop to it (Autopilot,
 // or the page opening). Resolves true once its first frame is ready, false if it can't be played.
@@ -6389,7 +6525,7 @@ window.__plClips = {
   wanted: () => clipsWanted(), ready: () => clipsReady(),
   input: (k, slot) => loops[k].tgt[slot], setInput: (k, slot, src) => { loops[k].tgt[slot] = src; settleDevices(); },
   detachVideo: () => { for (const o of Object.values(vids)) { o.detach(); o.clip = ''; o.media = null; o.credit = ''; } vidPanelSync(); },
-  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading, spare: vids[k].spare ? vids[k].spare.name : null }])),
+  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, dur: vids[k].video ? vids[k].video.duration : null, loops: vids[k].video ? vids[k].video.loop : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading, spare: vids[k].spare ? vids[k].spare.name : null }])),
   pickInto: (k, id) => clipPick((clips.all || []).find((c) => c.id === id), true, vids[k]),
   apClip: (k, gap) => { if (gap != null) ap.clipIn = gap; apClip(k); },
   videoUsable: () => apPool().includes('video') && apUsable('video'),
@@ -6406,8 +6542,30 @@ stage.addEventListener('drop', (e) => {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   // A dropped file's pointer has to be asked for during the drop itself
   const hp = e.dataTransfer?.items?.[0]?.getAsFileSystemHandle?.();
-  if (f) Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null), () => loadFile(f));
+  if (f) { Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null), () => loadFile(f)); return; }
+  // A picture dragged out of a web page can come as its address only: fetched here (sites like GIPHY allow it)
+  const dt = e.dataTransfer;
+  const html = dt?.getData('text/html') || '';
+  const fromImg = (html.match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1];
+  const url = [fromImg, ...(dt?.getData('text/uri-list') || '').split(/\r?\n/), dt?.getData('text/plain')]
+    .map((u) => (u || '').trim().replace(/&amp;/g, '&')).find((u) => /^https?:\/\//i.test(u));
+  if (url) dropFetch(url);
 });
+async function dropFetch(url) {
+  toast('Fetching what you dropped…', 3000);
+  try {
+    const r = await fetch(url, { mode: 'cors', credentials: 'omit' });
+    if (!r.ok) throw new Error(r.status);
+    const blob = await r.blob();
+    const type = (blob.type || '').split(';')[0];
+    if (!/^(image|video)\//.test(type)) throw new Error('not media');
+    let name = decodeURIComponent((new URL(url).pathname.split('/').pop() || '').replace(/\?.*$/, '')) || 'Dropped';
+    if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += '.' + (type.split('/')[1] || 'gif').replace('quicktime', 'mov');
+    loadFile(new File([blob], name, { type }));
+  } catch (_) {
+    toast('That site won’t hand the file over. Save it to your computer and drop the file, or grab it with Phosphor Clips.', 7000);
+  }
+}
 
 /* ================= video deck ================= */
 const vidPos = $('#vidPos'), vidTime = $('#vidTime');
@@ -11770,7 +11928,9 @@ async function seqLoadVid(bl, to = vid, spare = false) {
       const c = known();
       if (!c || !(await clipPick(c, true, to, spare))) throw new Error(`The clip “${vm.name}” couldn’t be loaded. Is Phosphor Clips running?`);
     } else {
-      const { file, h } = await seqOwnFile(vm.name, 'video');
+      const { file: own, h } = await seqOwnFile(vm.name, 'video');
+      const file = await asVideoFile(own);   // a GIF of your own is made into its video again
+      if (!file) throw new Error(`The video “${vm.name}” couldn’t be played.`);
       if (ask !== to.seqAsk) return;
       if (!spare) to.ask++;
       if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true, to, spare }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
