@@ -209,6 +209,21 @@
     background: rgba(5,5,5,.72);
   }
   .screen-msg { font-family: var(--f-body); font-size: 16px; color: var(--ink); background: #080708; }
+  /* Dropping onto the picture: one target per loop that's on (see dropZones in js/app.js) */
+  .drop { padding: 0; place-items: stretch; }
+  .drop.zones { grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+  .drop-zone {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    padding: 16px; outline: 2px dashed rgba(255,255,255,.28); outline-offset: -10px; transition: background .12s;
+  }
+  .drop-zone .tag { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 6px; font: 400 32px/1 var(--f-osd); color: #111; }
+  .drop-zone[data-k=A] .tag { background: var(--loop-a); }
+  .drop-zone[data-k=B] .tag { background: var(--loop-b); }
+  .drop-zone[data-k=C] .tag { background: var(--loop-c); }
+  .drop-zone[data-k=D] .tag { background: var(--loop-d); }
+  .drop.zones .drop-zone { font-size: 20px; }
+  .drop-zone.over { background: rgba(139,26,184,.38); outline-color: rgba(255,255,255,.75); }
+  [role=tab].drop-over { outline: 2px dashed var(--accent, #8b1ab8); outline-offset: 2px; }
 
   .transport { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
   .transport .spacer { width: 12px; }

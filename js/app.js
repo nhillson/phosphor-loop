@@ -669,7 +669,7 @@ class LiveSource {
   detach() {
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     if (this.video) { try { this.video.pause(); } catch (_) {} if (this.stream) this.video.srcObject = null; }
-    this.video = null; this.stream = null; this.frames = 0;
+    this.video = null; this.stream = null; this.frames = 0; this.sticker = false;
   }
   get on() { return !!this.video; }
   update(modes) {
@@ -680,8 +680,10 @@ class LiveSource {
     this.fresh = false;
     this.lastTime = v.currentTime;
     this.idx = 1 - this.idx;
-    try { uploadTo(this.tex[this.idx], v); this.frames++; } catch (_) {}
-    this.aspect = v.videoWidth / v.videoHeight;
+    // A sticker's video holds its picture over its see-through map (see stickerUnpack): made whole again here
+    this.sticker = stickerURLs.has(v.src);
+    try { uploadTo(this.tex[this.idx], this.sticker ? stickerUnpack(v, this) : v); this.frames++; } catch (_) {}
+    this.aspect = v.videoWidth / (this.sticker ? v.videoHeight / 2 : v.videoHeight);
     if (!modes || !modes.size) return;
     this.cutter ||= new PhosphorSubject.Cutter();
     if (!this.cutter.segment(v)) return;
@@ -697,6 +699,39 @@ class LiveSource {
     const s = this.sub[mode];
     return s && s.frames >= 2 ? { cur: s.tex[this.idx], prev: s.tex[1 - this.idx] } : this;
   }
+}
+// Stickers (GIFs with see-through parts, as GIPHY's stickers are). A browser can't make a video that keeps see-through
+// parts, so a sticker's video is twice as tall: its picture on top (on black), and under it the see-through map
+// (white where the sticker is solid, black where it's see-through). Each new frame is put back together here into
+// one picture with real see-through parts, and the loop takes it as a cutout (uVidCut in js/shaders.js).
+const stickerURLs = new Set();   // the addresses of sticker videos (made with videoURL)
+function videoURL(file) {
+  const u = URL.createObjectURL(file);
+  if (file && file.sticker) stickerURLs.add(u);
+  return u;
+}
+function stickerUnpack(v, src) {
+  const w = v.videoWidth, h = Math.floor(v.videoHeight / 2);
+  const u = src.unpack ||= { cv: document.createElement('canvas') };
+  if (u.cv.width !== w || u.cv.height !== h * 2) { u.cv.width = w; u.cv.height = h * 2; u.cx = u.cv.getContext('2d', { willReadFrequently: true }); u.out = null; }
+  u.cx.drawImage(v, 0, 0, w, h * 2);
+  const all = u.cx.getImageData(0, 0, w, h * 2).data;
+  u.out ||= new ImageData(w, h);
+  const o = u.out.data, half = w * h * 4;
+  for (let i = 0; i < half; i += 4) {
+    // The map's grey is how solid it is; a little blur from the video's squeezing is let go below a few steps
+    let a = all[half + i + 1];
+    a = a < 10 ? 0 : a > 245 ? 255 : a;
+    o[i + 3] = a;
+    if (!a) { o[i] = o[i + 1] = o[i + 2] = 0; continue; }
+    // The picture was drawn over black, so its color is scaled back up by how solid it is
+    const k = 255 / a;
+    o[i] = Math.min(255, all[i] * k); o[i + 1] = Math.min(255, all[i + 1] * k); o[i + 2] = Math.min(255, all[i + 2] * k);
+  }
+  u.ocv ||= document.createElement('canvas');
+  if (u.ocv.width !== w || u.ocv.height !== h) { u.ocv.width = w; u.ocv.height = h; u.ocx = u.ocv.getContext('2d'); }
+  u.ocx.putImageData(u.out, 0, 0);
+  return u.ocv;
 }
 // Each loop has a video player of its own, so loop A can play one video while loop B plays another. A loop whose
 // own player is empty shows another loop's video (the first one in A, B, C, D order that has one), the way the one
@@ -5359,19 +5394,19 @@ vidPlay.addEventListener('click', () => {
   else { vid.userPaused = true; vid.video.pause(); }
   vidPlay.textContent = vid.video.paused ? 'Play' : 'Pause';
 });
-function feedInto(src) {
-  const t = loops[edit].tgt;
+function feedInto(src, k = edit) {
+  const t = loops[k].tgt;
   if (t.in1 !== src && t.in2 !== src) t.in1 = src;
   settleDevices();
   syncUI();
-  showOSD(`INPUT ${edit}`, SRC_LABEL[src].toUpperCase());
+  showOSD(`INPUT ${k}`, SRC_LABEL[src].toUpperCase());
 }
 /* ---- moving pictures (GIFs, and moving WebP / PNG, as GIPHY and the like hand out) ----
    A picture is drawn once, so a GIF fed in as a Picture would sit still on its first frame. A moving one is turned
    into a short looping video here instead (decoded with the browser's ImageDecoder, encoded to VP8 with VideoEncoder,
    wrapped in a small WebM below) and goes into the Video input, where it plays, loops and has the speed buttons,
    Save clip and the sequencer like any video. Nothing leaves the computer. */
-const MOVING = { minSecs: 6, maxSecs: 60, maxFrames: 3000, maxSide: 1920 };
+const MOVING = { minSecs: 6, maxSecs: 60, maxFrames: 3000, maxSide: 1920, stickerSide: 720 };
 const movingMade = new WeakMap();   // file -> its video (Promise), so a GIF picked again isn't made twice
 // What kind of picture the file really is, from its first bytes (a dragged picture's type can be missing or wrong)
 async function pictureKind(file) {
@@ -5438,11 +5473,25 @@ function movingToVideo(file) {
         total += d;
       }
       const src = pics[0].bmp;
-      const s = Math.min(1, MOVING.maxSide / Math.max(src.width, src.height));
+      // A sticker: see-through parts in any of its pictures (looked at small, a few of them)
+      const probe = new OffscreenCanvas(48, 48).getContext('2d', { willReadFrequently: true });
+      let sticker = false;
+      for (let i = 0; i < pics.length && !sticker; i += Math.max(1, Math.floor(pics.length / 6))) {
+        probe.clearRect(0, 0, 48, 48); probe.drawImage(pics[i].bmp, 0, 0, 48, 48);
+        const d = probe.getImageData(0, 0, 48, 48).data;
+        let clear = 0;
+        for (let j = 3; j < d.length; j += 4) if (d[j] < 200) clear++;
+        sticker = clear > 48 * 48 * 0.02;
+      }
+      // Stickers are kept smaller: each of their frames is put back together as it plays (see stickerUnpack)
+      const side = sticker ? MOVING.stickerSide : MOVING.maxSide;
+      const s = Math.min(1, side / Math.max(src.width, src.height));
       const W = Math.max(2, Math.round(src.width * s / 2) * 2), H = Math.max(2, Math.round(src.height * s / 2) * 2);
-      const cfg = { codec: 'vp8', width: W, height: H, bitrate: Math.max(4e6, Math.min(40e6, W * H * 30 * 0.4)), framerate: 30 };
+      const VH = sticker ? H * 2 : H;   // a sticker's video: its picture on top, its see-through map under it
+      const cfg = { codec: 'vp8', width: W, height: VH, bitrate: Math.max(4e6, Math.min(40e6, W * VH * 30 * 0.4)), framerate: 30 };
       if (!(await VideoEncoder.isConfigSupported(cfg).catch(() => ({}))).supported) return null;
-      const cv = new OffscreenCanvas(W, H), cx = cv.getContext('2d');
+      const cv = new OffscreenCanvas(W, VH), cx = cv.getContext('2d');
+      const mask = sticker ? new OffscreenCanvas(W, H) : null, mx = mask && mask.getContext('2d');
       const out = [];
       let failed = null;
       const venc = new VideoEncoder({
@@ -5455,8 +5504,14 @@ function movingToVideo(file) {
       let t = 0, lastKey = -1e9;
       for (let r = 0; r < rounds && !failed; r++) {
         for (const p of pics) {
-          cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);   // see-through parts show as black
+          cx.fillStyle = '#000'; cx.fillRect(0, 0, W, VH);   // see-through parts show as black
           cx.drawImage(p.bmp, 0, 0, W, H);
+          if (sticker) {
+            // The see-through map: the sticker's shape filled white, on black, under the picture
+            mx.globalCompositeOperation = 'copy'; mx.drawImage(p.bmp, 0, 0, W, H);
+            mx.globalCompositeOperation = 'source-in'; mx.fillStyle = '#fff'; mx.fillRect(0, 0, W, H);
+            cx.drawImage(mask, 0, H);
+          }
           const vf = new VideoFrame(cv, { timestamp: t, duration: p.d });
           const key = t - lastKey >= 1e6;
           if (key) lastKey = t;
@@ -5472,7 +5527,9 @@ function movingToVideo(file) {
       if (failed || !out.length) return null;
       out.sort((a, b) => a.ms - b.ms);
       const name = file.name || 'Moving picture.gif';
-      return new File([webmFile(out, W, H, t / 1000)], name.replace(/\.[a-z0-9]{2,5}$/i, '') + '.webm', { type: 'video/webm' });
+      const made = new File([webmFile(out, W, VH, t / 1000)], name.replace(/\.[a-z0-9]{2,5}$/i, '') + '.webm', { type: 'video/webm' });
+      made.sticker = sticker;
+      return made;
     } finally { dec.close(); }
   })().catch(() => null);
   movingMade.set(file, job);
@@ -5485,19 +5542,21 @@ async function asVideoFile(file) {
   return movingToVideo(file);
 }
 
-function loadFile(file, handle = null) {
+// k: the loop it goes into (a drop picks one; otherwise the loop being edited)
+function loadFile(file, handle = null, k = edit) {
   if (!file) return;
+  if (!loops[k]) k = edit;
   const type = file.type || '';
   // A moving picture (a GIF and the like) goes in as a video, so it moves; a still one carries on as a picture
   if ((type.startsWith('image/') || !type) && !file.picChecked) {
     const isGif = /gif/i.test(type) || /\.gif$/i.test(file.name || '');
     if (isGif) toast(`Getting ${file.name || 'the GIF'} ready…`, 3000);
     movingToVideo(file).then((v) => {
-      if (v) { loadMovingVideo(v, file.name || v.name, handle); return; }
+      if (v) { loadMovingVideo(v, file.name || v.name, handle, k); return; }
       if (isGif && !(window.ImageDecoder && window.VideoEncoder)) toast('This browser can only show GIFs still. Chrome or Edge plays them.', 6000);
-      if (!type) { pictureKind(file).then((k) => { if (k) { const f = new File([file], file.name, { type: k }); f.picChecked = true; loadFile(f, handle); } else toast('That file isn’t a picture or video.'); }); return; }
+      if (!type) { pictureKind(file).then((k) => { if (k) { const f = new File([file], file.name, { type: k }); f.picChecked = true; loadFile(f, handle, k); } else toast('That file isn’t a picture or video.'); }); return; }
       file.picChecked = true;
-      loadFile(file, handle);
+      loadFile(file, handle, k);
     });
     return;
   }
@@ -5517,22 +5576,22 @@ function loadFile(file, handle = null) {
       natNoCredit();
       nat.own = true;
       nat.ask++;   // a nature picture still on its way doesn't replace this one
-      feedInto('picture');
-      toast(`Feeding ${file.name} into loop ${edit}.`);
+      feedInto('picture', k);
+      toast(`Feeding ${file.name} into loop ${k}.`);
     };
     img.onerror = () => { URL.revokeObjectURL(url); toast('That picture couldn’t be opened. Try a JPG or PNG.'); };
     img.src = url;
   } else if (type.startsWith('video/')) {
-    loadMovingVideo(file, file.name, handle);
+    loadMovingVideo(file, file.name, handle, k);
   } else {
     toast('That file isn’t a picture or video.');
   }
 }
 // A video of your own (or a moving picture made into one: file is then its video, name the picture's) into the Video input
-function loadMovingVideo(file, name, handle = null) {
-  const to = vid;
+function loadMovingVideo(file, name, handle = null, k = edit) {
+  const to = vids[k] || vid;
   to.ask++;   // a library clip still on its way doesn't replace this one
-  openVideo(URL.createObjectURL(file), name, { to }).then((ok) => {
+  openVideo(videoURL(file), name, { to }).then((ok) => {
     if (!ok) { toast(`${name} couldn’t be played.`); return; }
     to.media = { kind: 'own', name }; to.handle = handle; ownFiles.set(name, file);
     // A video of your own: Autopilot leaves it in place instead of bringing in library clips
@@ -5561,7 +5620,7 @@ function openVideo(url, name, { quiet = false, to = vid, spare = false } = {}) {
       if (to === vid) snipCloseForm();
       vidPanelSync();
       if (quiet) settleDevices();   // plays only while a loop uses it
-      else { feedInto('video'); toast(`Feeding ${name} into loop ${to.key}.`); }
+      else { feedInto('video', to.key); toast(`Feeding ${name} into loop ${to.key}.`); }
       resolve(true);
     }, { once: true });
     v.addEventListener('error', () => {
@@ -6525,33 +6584,73 @@ window.__plClips = {
   wanted: () => clipsWanted(), ready: () => clipsReady(),
   input: (k, slot) => loops[k].tgt[slot], setInput: (k, slot, src) => { loops[k].tgt[slot] = src; settleDevices(); },
   detachVideo: () => { for (const o of Object.values(vids)) { o.detach(); o.clip = ''; o.media = null; o.credit = ''; } vidPanelSync(); },
-  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, dur: vids[k].video ? vids[k].video.duration : null, loops: vids[k].video ? vids[k].video.loop : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading, spare: vids[k].spare ? vids[k].spare.name : null }])),
+  vids: () => Object.fromEntries(KEYS.map((k) => [k, { on: vids[k].on, name: vids[k].name, clip: vids[k].clip, frames: vids[k].frames, paused: vids[k].video ? vids[k].video.paused : null, t: vids[k].video ? vids[k].video.currentTime : null, dur: vids[k].video ? vids[k].video.duration : null, sticker: !!vids[k].sticker, aspect: vids[k].aspect, loops: vids[k].video ? vids[k].video.loop : null, shows: vidFor(k).key, wait: vids[k].wait, loading: !!vids[k].loading, spare: vids[k].spare ? vids[k].spare.name : null }])),
   pickInto: (k, id) => clipPick((clips.all || []).find((c) => c.id === id), true, vids[k]),
   apClip: (k, gap) => { if (gap != null) ap.clipIn = gap; apClip(k); },
   videoUsable: () => apPool().includes('video') && apUsable('video'),
   loadFile: (f) => loadFile(f), close: () => closeClips(),
+  // How much of a sticker's last frame is see-through, and how much solid (tests/gif_check.py)
+  stickerAlpha: (k) => { const u = vids[k].unpack; if (!u || !u.out) return null; const d = u.out.data; let c = 0, o = 0;
+    for (let i = 3; i < d.length; i += 4) { if (d[i] < 20) c++; else if (d[i] > 235) o++; } return [c / (d.length / 4), o / (d.length / 4)]; },
 };
 
+// Dropping something on the picture: while it's dragged over, the picture splits into a target for each loop that's
+// on, and what's dropped goes into the loop it lands on (with one loop, the whole picture is that loop's).
+// The loop tabs take drops too.
 const dropEl = $('#drop');
 let dragDepth = 0;
-stage.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; dropEl.hidden = false; });
-stage.addEventListener('dragover', (e) => { e.preventDefault(); });
+function dropZones() {
+  const ks = activeKeys();
+  dropEl.classList.toggle('zones', ks.length > 1);
+  dropEl.innerHTML = ks.map((k) => `<div class="drop-zone${k === edit ? ' cur' : ''}" data-k="${k}"><span class="tag">${k}</span>`
+    + `<span>${ks.length > 1 ? `Drop into loop ${k}` : 'Drop to feed it into the loop'}</span></div>`).join('');
+}
+const dropLoopAt = (e) => {
+  const z = e.target.closest?.('.drop-zone[data-k], [role=tab][id^=tab]');
+  const k = z && (z.dataset.k || z.id.slice(3));
+  return KEYS.includes(k) && activeKeys().includes(k) ? k : edit;
+};
+const dragHasMedia = (e) => [...(e.dataTransfer?.types || [])].some((t) => t === 'Files' || t === 'text/uri-list' || t === 'text/html');
+stage.addEventListener('dragenter', (e) => {
+  if (!dragHasMedia(e)) return;
+  e.preventDefault();
+  if (!dragDepth++) dropZones();
+  dropEl.hidden = false;
+});
+stage.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  const k = dropLoopAt(e);
+  dropEl.querySelectorAll('.drop-zone').forEach((z) => z.classList.toggle('over', z.dataset.k === k));
+});
 stage.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropEl.hidden = true; });
-stage.addEventListener('drop', (e) => {
-  e.preventDefault(); dragDepth = 0; dropEl.hidden = true;
+function dropTake(e, k) {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   // A dropped file's pointer has to be asked for during the drop itself
   const hp = e.dataTransfer?.items?.[0]?.getAsFileSystemHandle?.();
-  if (f) { Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null), () => loadFile(f)); return; }
+  if (f) { Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null, k), () => loadFile(f, null, k)); return; }
   // A picture dragged out of a web page can come as its address only: fetched here (sites like GIPHY allow it)
   const dt = e.dataTransfer;
   const html = dt?.getData('text/html') || '';
   const fromImg = (html.match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1];
   const url = [fromImg, ...(dt?.getData('text/uri-list') || '').split(/\r?\n/), dt?.getData('text/plain')]
     .map((u) => (u || '').trim().replace(/&amp;/g, '&')).find((u) => /^https?:\/\//i.test(u));
-  if (url) dropFetch(url);
+  if (url) dropFetch(url, k);
+}
+stage.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const k = dropLoopAt(e);
+  dragDepth = 0; dropEl.hidden = true;
+  dropTake(e, k);
 });
-async function dropFetch(url) {
+// The loop tabs: a drop on Loop B's tab goes into loop B
+KEYS.forEach((k) => {
+  const tab = $('#tab' + k);
+  if (!tab) return;
+  tab.addEventListener('dragover', (e) => { if (!dragHasMedia(e)) return; e.preventDefault(); tab.classList.add('drop-over'); });
+  tab.addEventListener('dragleave', () => tab.classList.remove('drop-over'));
+  tab.addEventListener('drop', (e) => { e.preventDefault(); tab.classList.remove('drop-over'); dropTake(e, k); });
+});
+async function dropFetch(url, k = edit) {
   toast('Fetching what you dropped…', 3000);
   try {
     const r = await fetch(url, { mode: 'cors', credentials: 'omit' });
@@ -6561,7 +6660,7 @@ async function dropFetch(url) {
     if (!/^(image|video)\//.test(type)) throw new Error('not media');
     let name = decodeURIComponent((new URL(url).pathname.split('/').pop() || '').replace(/\?.*$/, '')) || 'Dropped';
     if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += '.' + (type.split('/')[1] || 'gif').replace('quicktime', 'mov');
-    loadFile(new File([blob], name, { type }));
+    loadFile(new File([blob], name, { type }), null, k);
   } catch (_) {
     toast('That site won’t hand the file over. Save it to your computer and drop the file, or grab it with Phosphor Clips.', 7000);
   }
@@ -10760,6 +10859,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
   set1f(fbProg, 'uAspPic', picAspect);
   set1f(fbProg, 'uAspVid', kVid.aspect);
+  set1f(fbProg, 'uVidCut', kVid.sticker ? 1 : 0);
   set1f(fbProg, 'uAspCam', cam.aspect);
   set1f(fbProg, 'uAspScr', scr.aspect);
   set1f(fbProg, 'uAspPho', pho.aspect);
@@ -11933,7 +12033,7 @@ async function seqLoadVid(bl, to = vid, spare = false) {
       if (!file) throw new Error(`The video “${vm.name}” couldn’t be played.`);
       if (ask !== to.seqAsk) return;
       if (!spare) to.ask++;
-      if (!(await openVideo(URL.createObjectURL(file), vm.name, { quiet: true, to, spare }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
+      if (!(await openVideo(videoURL(file), vm.name, { quiet: true, to, spare }))) throw new Error(`The video “${vm.name}” couldn’t be played.`);
       const media = { ...vm };
       delete media.at;
       if (spare) { if (to.spare) Object.assign(to.spare, { media, handle: h, own: true, clip: '', credit: '' }); }

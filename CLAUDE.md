@@ -138,8 +138,12 @@ file don't rebuild the app.
    pointer has moved up or down 16 px): `python3 tests/seq_snap_check.py` (real mouse drags).
 4x. **Moving pictures** (a dropped or picked GIF, or moving WebP/PNG, goes into the Video input as a looping WebM made in the page:
    `movingToVideo` / `webmFile` / `asVideoFile` in js/app.js, ImageDecoder + VideoEncoder VP8, played through to at least 6 s; a still one
-   stays a Picture; a drop that brings only an address is fetched, `dropFetch`; the sequencer remakes the video from your GIF):
-   `python3 tests/gif_check.py` (about half a minute).
+   stays a Picture; a drop that brings only an address is fetched, `dropFetch`; the sequencer remakes the video from your GIF).
+   **Stickers** (see-through parts, as GIPHY's): Chrome can't encode alpha, so the video is twice as tall, picture over a white-on-black
+   see-through map (`file.sticker`, `videoURL` → `stickerURLs`); `stickerUnpack` rebuilds each frame with alpha in LiveSource.update
+   and the loop takes it as a cutout (`uVidCut`, the Subject silhouette path in `live()`). **Drop into a loop**: dragging over the picture
+   shows a target per loop that's on (`dropZones`, `dropLoopAt`); the loop tabs take drops too; `loadFile(file, handle, k)`.
+   `python3 tests/gif_check.py` (about a minute).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

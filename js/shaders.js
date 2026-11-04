@@ -158,6 +158,7 @@ uniform float uLifeT;    // Life: how far it is from one generation to the next 
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
 uniform int uIn1, uIn2;
+uniform float uVidCut;   // the loop's video is a sticker: its see-through parts are kept (see live)
 uniform vec2 uWave[81];     // the Wave curve's 81 points, worked out once per frame
 uniform vec4 uWaveBox[8];   // 8 stretches of 10 segments: centre and radius of each
 uniform vec4 uAdjA[11];  // per input: tracking, brightness, contrast, color
@@ -551,7 +552,8 @@ vec3 live(sampler2D cur, sampler2D prv, float asp, float flip, vec2 p, int id, f
   }
   if (uAdjB[id].y > 0.0) c = inputRelief(c, cur, q, 0.5 / hs, flip > 0.5 ? -1.0 : 1.0, id);
   // Subject silhouette: only the person, with how solid they are here in gCutA (see main)
-  if (uCutout > 0.5 && id >= 5 && id <= 8) {
+  // A sticker in Video (a GIF with see-through parts): only the sticker, the same way
+  if ((uCutout > 0.5 && id >= 5 && id <= 8) || (id == 5 && uVidCut > 0.5)) {
     float a = texture(cur, clamp(q, 0.0, 1.0)).a * m * e.x * e.y;
     gCutA = max(gCutA, a);
     return c * a;
