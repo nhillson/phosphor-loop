@@ -39,7 +39,7 @@ function createAdblock({ session, dataDir, fetch, log, pageUrl, isOn, allowList,
     } catch (_) { return null; }   // no cache yet, or one from an older version of the engine
   }
   async function fresh() {
-    const e = await lib.ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, { loadCosmeticFilters: true, loadNetworkFilters: true });
+    const e = await lib.ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
     try { await fsp.writeFile(cache, Buffer.from(e.serialize())); } catch (err) { log('adblock: lists not cached: ' + err.message); }
     return e;
   }
