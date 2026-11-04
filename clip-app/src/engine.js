@@ -202,7 +202,8 @@ function summarize(info, url) {
 const FORMAT = 'bv*[height<=?{H}]+ba/b[height<=?{H}]/bv*+ba/b';
 
 // Downloads the video (or only its part from..to, in seconds). Returns the downloaded file.
-async function downloadWithYtdlp(tools, infoFile, jobDir, { maxHeight = 1080, section, cookies, signal, log, onProgress } = {}) {
+// sponsors: cut out a YouTube video's sponsor parts (only for a whole video, so the marks and the trimmer agree)
+async function downloadWithYtdlp(tools, infoFile, jobDir, { maxHeight = 1080, section, cookies, sponsors, signal, log, onProgress } = {}) {
   const args = [...ytdlpBase(tools, { cookies }), '--load-info-json', infoFile,
     '-f', FORMAT.replace(/\{H\}/g, String(maxHeight)), '-S', `res:${maxHeight},fps:60,vcodec:h264,acodec:m4a`,
     '--merge-output-format', 'mp4/mkv', '-o', path.join(jobDir, 'source.%(ext)s'), '--no-mtime', '--no-part',
@@ -210,6 +211,7 @@ async function downloadWithYtdlp(tools, infoFile, jobDir, { maxHeight = 1080, se
     '--progress-template', 'download:@@P %(progress._percent_str)s|%(progress._eta_str)s',
     '--print', 'after_move:@@F %(filepath)s'];
   if (section) args.push('--download-sections', `*${section[0].toFixed(2)}-${section[1].toFixed(2)}`);
+  else if (sponsors) args.push('--sponsorblock-remove', 'sponsor,selfpromo,interaction');
   let file = '', part = 0, lastPct = -1;
   const r = await run(tools.ytdlp, args, {
     signal, log,
@@ -489,7 +491,7 @@ async function clearSources(jobDir) {
    The whole "get a video" step for one grab: from a page or link (yt-dlp first, then the page's own video file
    if yt-dlp finds nothing), or a file already on the computer.
    req: { url, direct, referer, file, marks: {start, end} (seconds in the original video), maxHeight, cookies,
-          cookieHeader }
+          cookieHeader, skipSponsors }
    Returns { source, playable, probe, info, offset, marks }: offset is where the downloaded file starts in the
    original video (more than 0 when only part was downloaded).
    --------------------------------------------------------------------------------------------------------------- */
@@ -535,7 +537,7 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
       if (!info.duration && req.pageDuration > 0) info.duration = req.pageDuration;
       // Marked: only the marked part comes down, whatever the video's length
       section = partOf(marks, info.duration);
-      const ytdl = (part) => downloadWithYtdlp(tools, found.file, jobDir, { maxHeight: req.maxHeight || 1080, section: part, cookies: req.cookies, signal, log, onProgress });
+      const ytdl = (part, sponsors) => downloadWithYtdlp(tools, found.file, jobDir, { maxHeight: req.maxHeight || 1080, section: part, cookies: req.cookies, sponsors, signal, log, onProgress });
       if (section) {
         onStatus('Downloading the marked part…');
         try { source = await ytdl(section); } catch (e) {
@@ -546,7 +548,19 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
           await clearSources(jobDir);
         }
       }
-      if (!section) { onStatus('Downloading…'); source = await ytdl(null); }
+      if (!section) {
+        onStatus('Downloading…');
+        // A whole YouTube video, with Skip sponsor parts on and nothing marked: comes down with them cut out. If
+        // SponsorBlock can't be reached, the video comes down as it is.
+        const cut = !!req.skipSponsors && !marks && /youtube/i.test(found.info.extractor_key || found.info.extractor || '');
+        try { source = await ytdl(null, cut); } catch (e) {
+          if (!cut || e.code === 'cancelled') throw e;
+          if (log) log('sponsor parts not cut (' + e.message + '), downloading the video as it is');
+          await clearSources(jobDir);
+          source = await ytdl(null, false);
+        }
+        if (cut) info.sponsorsCut = true;
+      }
     } else if (req.direct && /^https?:/i.test(req.direct)) {
       if (log) log('yt-dlp found nothing (' + (why && why.detail) + '), downloading the page’s own video');
       section = partOf(marks, req.pageDuration);

@@ -56,6 +56,17 @@ main { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
 .ib { width: 34px; height: 34px; border-radius: 50%; border: 0; background: none; color: var(--dim); display: inline-grid; place-items: center; flex: none; }
 .ib:hover:not(:disabled) { background: var(--card2); color: var(--text); }
 .ib:disabled { opacity: 0.35; cursor: default; }
+/* The ad blocker's shield: purple with a tick when it's blocking this page, grey and crossed out when it isn't */
+.shield { position: relative; margin-left: 4px; }
+.shield svg { width: 22px; height: 22px; }
+.shield .tick, .shield .slash { display: none; }
+.shield.on { color: var(--accent-hi); }
+.shield.on .sh { fill: var(--accent-soft); }
+.shield.on .tick { display: inline; }
+.shield.off .slash { display: inline; }
+.shield.off { color: var(--faint); }
+.adcount { position: absolute; right: -2px; bottom: 1px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--accent);
+  color: #fff; font: 600 9.5px/15px "Segoe UI", sans-serif; text-align: center; pointer-events: none; }
 .loading { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: linear-gradient(90deg, transparent, var(--accent-hi), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: slide 1.1s linear infinite; }
 @keyframes slide { from { background-position: -40% 0; } to { background-position: 140% 0; } }
 .webhost { flex: 1; position: relative; background: #0d0b0f; min-height: 0; }

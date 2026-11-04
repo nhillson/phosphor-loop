@@ -291,6 +291,42 @@ module.exports = async function selftest(h) {
       const u = await ceiling(navigated, 20000, 'the link\u2019s page');
       check('a phosphor-clips:// link opens its page', u.endsWith('video.html'), u);
     }
+
+    /* ---- the ad blocker (the shield by the address bar) ---- */
+    {
+      const ab = h.adblock();
+      check('the ad blocker gets its lists', ab && await ceiling(ab.ready, 120000, 'the ad lists'));
+      check('the ad blocker leaves the test videos alone', !ab.wouldBlock(base + 'swirl.mp4', base + 'video.html') && !ab.wouldBlock(base + 'spin.gif', base + 'gif.html'));
+      await loadPage(base + 'ads.html');
+      await panelFrames(30);
+      const st1 = ab.state();
+      check('adverts on a page are stopped', st1.active && st1.count >= 1, st1.count + ' stopped');
+      await panelUntil(`document.querySelector('#adShield').classList.contains('on') && !document.querySelector('#adCount').hidden`, 'the shield to light up', 20000);
+      check('the shield lights up and counts them', true, await pjs(`document.querySelector('#adCount').textContent + ' | ' + document.querySelector('#adShield').title`));
+      await shot('9-ad-blocker');
+      const reloaded = () => new Promise((r) => page().once('did-finish-load', r));
+      let back = reloaded();
+      h.setAdblock({ allow: true });
+      await ceiling(back, 60000, 'the page to load again');
+      await panelFrames(30);
+      const st2 = ab.state();
+      check('Allow ads on this site lets them through there', st2.allowed && !st2.active && st2.count === 0, JSON.stringify(st2));
+      check('the shield shows ads are allowed', await pjs(`document.querySelector('#adShield').classList.contains('off') && document.querySelector('#adCount').hidden`));
+      back = reloaded();
+      h.setAdblock({ allow: false });
+      await ceiling(back, 60000, 'the page to load again');
+      back = reloaded();
+      h.setAdblock({ on: false });
+      await ceiling(back, 60000, 'the page to load again');
+      await panelFrames(30);
+      const st3 = ab.state();
+      check('switching the ad blocker off stops it blocking', !st3.on && !st3.active && st3.count === 0, JSON.stringify(st3));
+      back = reloaded();
+      h.setAdblock({ on: true });
+      await ceiling(back, 60000, 'the page to load again');
+      await panelFrames(30);
+      check('switching it back on blocks again', ab.state().count >= 1, ab.state().count + ' stopped');
+    }
     code = checks.every((c) => c.ok) ? 0 : 1;
   } catch (e) {
     check('self-test ran to the end', false, e.message);

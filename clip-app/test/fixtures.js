@@ -42,6 +42,11 @@ function makeMedia(dir, ffmpeg) {
   fs.writeFileSync(path.join(dir, 'long.html'), page('Twelve minute test pattern',
     '<h1>Long</h1><video id="v" src="long.webm" autoplay muted playsinline controls></video>'));
   fs.writeFileSync(path.join(dir, 'blob.html'), page('Nothing to grab here', '<h1>No video on this page</h1>'));
+  // A page with adverts on it (Google's and DoubleClick's, as on many real sites) for the ad blocker
+  fs.writeFileSync(path.join(dir, 'ads.html'), page('A page with adverts',
+    '<h1>Adverts</h1><div class="adsbygoogle" style="width:300px;height:250px;background:#e33">AD</div>' +
+    '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>' +
+    '<img src="https://ad.doubleclick.net/ddm/ad/test.gif" width="1" height="1">'));
   return dir;
 }
 

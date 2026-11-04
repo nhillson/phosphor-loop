@@ -58,6 +58,9 @@ jobs:
       - name: Install
         run: npm install --no-audit --no-fund
 
+      - name: Test the ad blocker's site rules and Skip sponsor parts
+        run: node test/adblock-test.js
+
       - name: Test the engine (local test pages, then real videos from the internet)
         run: node test/engine-test.js
         env:

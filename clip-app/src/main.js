@@ -2,7 +2,7 @@
 // Phosphor Clips: one window with a web browser on the left and the grabbing controls on the right. Watch a video,
 // mark the part you want, grab it, trim it, pick its category (the app suggests one), and it's saved into the clip
 // library (Videos\Phosphor Clips, a folder per category) as an MP4 Phosphor Loop can play.
-const { app, BrowserWindow, WebContentsView, ipcMain, session, shell, dialog, Menu, clipboard, utilityProcess, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, shell, dialog, Menu, clipboard, utilityProcess, Tray, nativeImage, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = fs.promises;
@@ -13,6 +13,8 @@ const { Library, subOf } = require('./library.js');
 const { Vision, combine } = require('./vision.js');
 const { startServer } = require('./server.js');
 const Snip = require('./snip.js');
+const { createAdblock } = require('./adblock.js');
+const { createSponsors } = require('./sponsors.js');
 
 const TEST = process.env.CLIPS_TEST === '1';
 const START_PAGE = pathToFileURL(path.join(__dirname, 'start', 'index.html')).href;
@@ -51,7 +53,9 @@ let settings = {};
 function loadSettings() {
   let s = {};
   try { s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch (_) { /* first run */ }
-  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, chromeSeen: '', chromeVersion: '', ...s };
+  settings = { libraryDir: '', keepSound: false, maxHeight: 1080, ytdlpChecked: 0, startWithWindows: null, toldTray: false, chromeSeen: '', chromeVersion: '',
+    adblock: true, adAllow: [], skipSponsors: false, ...s };
+  if (!Array.isArray(settings.adAllow)) settings.adAllow = [];
   if (process.env.CLIPS_LIBRARY) settings.libraryDir = process.env.CLIPS_LIBRARY;
   if (!settings.libraryDir) settings.libraryDir = path.join(app.getPath('videos'), 'Phosphor Clips');
   if (![720, 1080, 1440, 2160].includes(+settings.maxHeight)) settings.maxHeight = 1080;
@@ -406,7 +410,8 @@ function onPageChange(url) {
     if (!pendingSeek.page) pendingSeek.page = k;
     else if (pendingSeek.page !== k) pendingSeek = null;
   }
-  if (k !== marks.page) { marks = { page: k, start: null, end: null }; sendVideo(); }
+  if (k !== marks.page) { marks = { page: k, start: null, end: null }; sendVideo(); if (adblock) adblock.newPage(); }
+  sendAdblock();
 }
 function videoState() {
   return {
@@ -423,10 +428,79 @@ function pollVideo() {
     try {
       video = await readVideo();
       if (pendingSeek) await applySeek(video);
+      else if (settings.skipSponsors && video) await skipSponsor(video);
       sendVideo();
     } finally { polling = false; }
   }, 400);
 }
+
+/* ---------- the ad blocker and Skip sponsor parts (the shield by the address bar) ---------- */
+let adblock = null, sponsors = null;
+const webFetch = (url, init) => net.fetch(url, init);
+function startAdblock() {
+  adblock = createAdblock({
+    session: session.fromPartition(WEB_PARTITION), dataDir: dataDir(), fetch: webFetch, log,
+    pageUrl: () => (web && !web.webContents.isDestroyed() ? web.webContents.getURL() : ''),
+    isOn: () => settings.adblock !== false, allowList: () => settings.adAllow, onChange: sendAdblock,
+  });
+  sponsors = createSponsors({ fetch: webFetch, log });
+}
+function adblockState() {
+  return { ...(adblock ? adblock.state() : { ready: false, on: settings.adblock !== false, host: '', allowed: false, active: false, count: 0 }), sponsors: !!settings.skipSponsors };
+}
+function sendAdblock() { send('adblock', adblockState()); }
+// Blocking switched on or off (or for this site): the page loads again so the change shows straight away
+function reloadForAdblock() {
+  if (web && !web.webContents.isDestroyed() && /^https?:/.test(web.webContents.getURL())) web.webContents.reload();
+}
+function setAdblock(o) {
+  if (!o) return adblockState();
+  let reload = false;
+  if ('on' in o && !!o.on !== (settings.adblock !== false)) { settings.adblock = !!o.on; reload = true; }
+  if ('allow' in o && adblock) {
+    const host = adblock.state().host;
+    if (host) {
+      const list = settings.adAllow.filter((h) => h !== host);
+      if (o.allow) list.push(host);
+      if (list.length !== settings.adAllow.length || o.allow !== adblock.state().allowed) reload = true;
+      settings.adAllow = list.slice(-200);
+    }
+  }
+  if ('sponsors' in o) settings.skipSponsors = !!o.sponsors;
+  saveSettings();
+  log('adblock: ' + JSON.stringify({ on: settings.adblock, allowed: settings.adAllow.length, sponsors: settings.skipSponsors }));
+  if (reload) { if (adblock) adblock.newPage(); reloadForAdblock(); }
+  sendAdblock();
+  return adblockState();
+}
+function adblockMenu(rect) {
+  const st = adblockState();
+  // (Windows menus show no second line, so what each does is in its own words)
+  const stopped = !st.ready ? ' (getting the ad lists…)' : st.active && st.count ? ' (' + st.count + ' stopped on this page)' : '';
+  const items = [
+    { label: 'Block ads' + stopped, type: 'checkbox', checked: st.on, click: (mi) => setAdblock({ on: mi.checked }) },
+    { label: st.host ? 'Allow ads on ' + st.host + ' (if it won’t work)' : 'Allow ads on this site (if it won’t work)', type: 'checkbox',
+      checked: st.allowed, enabled: st.on && !!st.host, click: (mi) => setAdblock({ allow: mi.checked }) },
+    { type: 'separator' },
+    { label: 'Skip sponsor parts in YouTube videos', type: 'checkbox', checked: st.sponsors, click: (mi) => setAdblock({ sponsors: mi.checked }) },
+  ];
+  const menu = Menu.buildFromTemplate(items);
+  const r = rect || {};
+  menu.popup({ window: win, x: Math.round((r.x || 0) + (r.width || 0) - 4), y: Math.round((r.y || 0) + (r.height || 0) + 2) });
+}
+// Playing a YouTube video with Skip sponsor parts on: jumps over each sponsor part as it starts
+async function skipSponsor(v) {
+  if (!sponsors || !v || !v.frame || v.paused || !web) return;
+  const to = await sponsors.jumpFor(web.webContents.getURL(), v).catch(() => null);
+  if (to == null) return;
+  try {
+    if (await withTimeout(v.frame.executeJavaScript(SEEK_JS(to)), 1500)) {
+      log('sponsors: skipped ' + v.t.toFixed(1) + ' to ' + to.toFixed(1) + ' s');
+      send('toast', { text: 'Skipped a sponsor part (' + fmtSecs(to - v.t) + ')' });
+    }
+  } catch (_) { /* the frame went away */ }
+}
+const fmtSecs = (s) => (s >= 60 ? Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s' : Math.round(s) + ' s');
 
 /* ---------- pages, videos and GIFs sent from Chrome (the Send to Phosphor Clips button, chrome-button/) ---------- */
 // A page sent with the time its video was at: once that page's video can play, it jumps there and plays
@@ -651,7 +725,7 @@ async function cookieHeaderFor(url) {
 async function runJob(job) {
   const signal = job.ac.signal;
   try {
-    const req = { ...job.req, maxHeight: +settings.maxHeight || 1080 };
+    const req = { ...job.req, maxHeight: +settings.maxHeight || 1080, skipSponsors: !!settings.skipSponsors };
     if (req.url && !req.file) {
       req.cookies = await writeCookies();
       req.cookieHeader = await cookieHeaderFor(req.direct || req.url);
@@ -788,7 +862,7 @@ function setupIpc() {
     panelReady = true;
     return {
       version: app.getVersion(), sharing: sharingState(), chrome: chromeState(),
-      settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows },
+      settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows }, adblock: adblockState(),
       library: libraryForPanel(), jobs: [...jobs.values()].map(jobForPanel), web: webState(), video: videoState(), vision: visionState,
     };
   });
@@ -818,6 +892,8 @@ function setupIpc() {
   handle('web:open', (url) => { if (/^https?:/i.test(url)) web.webContents.loadURL(url); });
   handle('web:mark', (which) => mark(which));
   handle('web:grab', () => grabFromPage({}));
+  handle('adblock:menu', (rect) => adblockMenu(rect));
+  handle('adblock:set', (o) => setAdblock(o));
 
   handle('grab:url', (url) => {
     const u = String(url || '').trim();
@@ -1087,6 +1163,7 @@ app.whenReady().then(async () => {
   findTools();
   await fsp.rm(jobsDir(), { recursive: true, force: true }).catch(() => {});
   setupIpc();
+  startAdblock();
   startVision();
   try { await openLibrary(); } catch (e) {
     log('library failed at ' + settings.libraryDir + ': ' + e.message);
@@ -1112,5 +1189,5 @@ app.whenReady().then(async () => {
   keepYtdlpFresh();
   if (!tools.ffmpeg || !tools.ytdlp) log('MISSING TOOLS: ' + JSON.stringify(tools));
   // (a self-test that can't even load ends the app, so a test run never hangs)
-  if (TEST && process.env.CLIPS_TEST_URL) (() => { try { return require('./selftest.js'); } catch (e) { log('selftest: FAIL could not load: ' + e.message); app.exit(1); return () => {}; } })()({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo, openFromLink, chromeDir, tools: () => tools, run: E.run });
+  if (TEST && process.env.CLIPS_TEST_URL) (() => { try { return require('./selftest.js'); } catch (e) { log('selftest: FAIL could not load: ' + e.message); app.exit(1); return () => {}; } })()({ app, win: () => win, web: () => web, jobs, library: () => library, sharing: () => sharing, log, mark, grabFromPage, startJob, readVideo, openFromLink, chromeDir, tools: () => tools, run: E.run, adblock: () => adblock, setAdblock, sponsors: () => sponsors });
 });

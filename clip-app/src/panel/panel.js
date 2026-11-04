@@ -80,6 +80,24 @@ $('#navBack').addEventListener('click', () => api.call('web:nav', 'back'));
 $('#navFwd').addEventListener('click', () => api.call('web:nav', 'forward'));
 $('#navReload').addEventListener('click', () => api.call('web:nav', S.web.loading ? 'stop' : 'reload'));
 $('#navHome').addEventListener('click', () => api.call('web:nav', 'home'));
+// The shield: a small menu (Block ads, Allow ads on this site, Skip sponsor parts)
+$('#adShield').addEventListener('click', () => {
+  const r = $('#adShield').getBoundingClientRect();
+  api.call('adblock:menu', { x: r.left, y: r.top, width: r.width, height: r.height });
+});
+function renderAdblock() {
+  const a = S.adblock || {};
+  const b = $('#adShield');
+  b.classList.toggle('on', !!a.active);
+  b.classList.toggle('off', !a.on || !!a.allowed);
+  b.title = !a.on ? 'Ad blocker is off. Click to turn it on.'
+    : a.allowed ? 'Ads are allowed on ' + a.host + '. Click to block them again.'
+    : !a.ready ? 'Ad blocker: getting the ad lists…'
+    : 'Ad blocker is on' + (a.count ? ': ' + a.count + ' ads and trackers stopped on this page' : '') + (a.sponsors ? '. Skipping sponsor parts.' : '.') + ' Click for options.';
+  const n = a.active ? a.count || 0 : 0;
+  $('#adCount').hidden = !n;
+  $('#adCount').textContent = n > 99 ? '99+' : String(n);
+}
 $('#addr').addEventListener('focus', () => $('#addr').select());
 function renderWeb() {
   const w = S.web;
@@ -923,6 +941,7 @@ function renderVision() {
 
 /* ---------- what main tells us ---------- */
 api.on('web', (w) => { S.web = w || {}; renderWeb(); });
+api.on('adblock', (a) => { S.adblock = a || {}; renderAdblock(); });
 api.on('video', (v) => { S.video = v || {}; renderVideo(); });
 api.on('jobs', (list) => { S.jobs = list || []; renderJobs(); });
 api.on('library', (lib) => {
@@ -949,6 +968,8 @@ api.on('toast', (t) => toast(t.text, t.kind));
 (async () => {
   const st = await api.call('panel:ready');
   S.settings = st.settings || S.settings;
+  S.adblock = st.adblock || {};
+  renderAdblock();
   S.lib = st.library;
   S.web = st.web || {};
   S.video = st.video || {};

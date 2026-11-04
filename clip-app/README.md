@@ -106,6 +106,25 @@ A Chrome (or Edge) extension that hands what you're watching to Phosphor Clips o
 - Tested by `test/chrome_test.py` (the real extension in Chromium, the real app beside it; on Linux under `xvfb-run`)
   and the app's self-test (the server side, the helper, the pick-up, the link).
 
+## Ad blocker and Skip sponsor parts (`src/adblock.js`, `src/sponsors.js`)
+
+- **The shield** by the address bar: purple with a tick and a count when it's blocking the page that's showing,
+  grey and crossed out when it's off or the site is allowed. Click it for a small menu: *Block ads* (on by default),
+  *Allow ads on <site>* (for a site that won't work with ads blocked; covers the site's sub-addresses), and
+  *Skip sponsor parts in YouTube videos* (off by default). Changing blocking reloads the page.
+- **Blocking**: Ghostery's engine (`@ghostery/adblocker-electron`, uBlock Origin-compatible lists: ads and trackers),
+  wired by hand into the `persist:web` session so it can be switched off or allowed per site at once and can count.
+  Lists are cached in the app data folder (`adblock-engine.bin`) and fetched fresh in the background once a day. If
+  they can't be fetched the browser just works without blocking. Grabs never go through it (yt-dlp and direct
+  downloads are separate).
+- **Skip sponsor parts**: SponsorBlock's marked parts (sponsor, self-promotion, subscribe reminders), asked for by a
+  4-letter hash prefix so the service never learns which video is watched. While watching, each part is jumped over
+  once per visit (a toast says so); a whole YouTube video grabbed with nothing marked is downloaded with them cut out
+  (`--sponsorblock-remove`), falling back to the full video if SponsorBlock can't be reached. Marked grabs are left
+  alone so the marks and the trimmer agree.
+- Settings: `adblock`, `adAllow` (sites), `skipSponsors`. Tests: `node test/adblock-test.js`, and the self-test's
+  ad page (`ads.html`).
+
 ## For Claude
 
 - Branch `clip-app`, folder `clip-app/`, built and tested by `.github/workflows/clip-app.yml` on a Windows runner.
