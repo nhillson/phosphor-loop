@@ -11123,6 +11123,18 @@ function exOpen() {
   exSay('');
   exHow();
 }
+// Export quality: the same three as Phosphor Stream's recordings (stream-app/src/record.js, REC_QUALITY), in
+// Mbps at 30 frames a second for each size. The export records at up to 60 frames a second, so it gets half as much
+// again, as Phosphor Stream does at 60, and never more than 300 Mbps.
+const EX_QUALITY = {
+  youtube: { label: 'YouTube standard', mbps: { 2160: 45, 1440: 24, 1080: 12 } },
+  clean: { label: 'Very clean', mbps: { 2160: 100, 1440: 50, 1080: 30 } },
+  perfect: { label: 'Near-perfect', mbps: { 2160: 250, 1440: 130, 1080: 70 } },
+};
+const EX_QUALITY_KEY = 'phosphor-ex-quality';
+let exQuality = EX_QUALITY[lsGet(EX_QUALITY_KEY)] ? lsGet(EX_QUALITY_KEY) : 'clean';
+const exBps = (h, q = exQuality) => Math.round(Math.min(300, EX_QUALITY[q].mbps[h] * 1.5) * 1e6);
+function syncExQuality() { $$('#seqExQuality button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.q === exQuality))); }
 function exHow() {
   const h = +($('#seqExSize [aria-pressed="true"]')?.dataset.h || 2160), wide = Math.round(h * 16 / 9);
   const sound = $('#seqExSound').checked, heard = exHeard();
@@ -11132,6 +11144,8 @@ function exHow() {
   else if (sound) steps.push('This sequence has no song, so the video gets whatever sound this computer plays meanwhile.');
   if (sound) steps.push(heard ? 'The sound is what React to sound already hears from this computer.'
     : 'When you press Start export, Chrome asks what to share: pick <b>Entire screen</b>, switch on <b>Also share system audio</b>, then press <b>Share</b>. Only the sound is used.');
+  const gb = ((exBps(h) + 320000) * exEnd()) / 8 / 1e9;
+  steps.push(`Quality: <b>${EX_QUALITY[exQuality].label}</b>, ${Math.round(exBps(h) / 1e6)} Mbps, the same as Phosphor Stream’s recordings. This video will be about ${gb < 1 ? Math.max(0.1, Math.round(gb * 10) / 10) : Math.round(gb * 10) / 10} GB${gb > 6 ? ': make sure there’s room on the drive your Downloads go to' : ''}.`);
   steps.push(`Leave this window open and in front until it’s done; you can watch it. If the picture stutters at ${h === 2160 ? '4K' : h + 'p'}, Cancel and pick a smaller size.`);
   $('#seqExHow').innerHTML = steps.map((t) => `<li>${t}</li>`).join('');
 }
@@ -11197,8 +11211,9 @@ function exBegin() {
     ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1,opus', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
     : ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
   EX.mime = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-  // Plenty of bits for fine feedback detail, but a song's length at 4K still fits in memory (about 65 Mbps at 4K)
-  const vbps = Math.round(clamp(canvas.width * canvas.height * 8, 16e6, 70e6));
+  // The quality picked in the export panel (the same rates as Phosphor Stream's recordings). Chrome keeps a long
+  // recording on the disk as it goes, rather than all in memory.
+  const vbps = exBps(EX.h);
   const abps = /mp4a/.test(EX.mime) ? 192000 : 320000;
   let vr;
   try { vr = new MediaRecorder(stream, EX.mime ? { mimeType: EX.mime, videoBitsPerSecond: vbps, audioBitsPerSecond: abps } : undefined); }
@@ -11324,6 +11339,10 @@ $$('#seqExSync button').forEach((b) => b.addEventListener('click', () => {
   recSync = +b.dataset.sync; lsSet(REC_SYNC_KEY, String(recSync)); syncRecSync();
 }));
 syncRecSync();
+$$('#seqExQuality button').forEach((b) => b.addEventListener('click', () => {
+  exQuality = b.dataset.q; lsSet(EX_QUALITY_KEY, exQuality); syncExQuality(); exHow();
+}));
+syncExQuality();
 $$('#seqExSize button').forEach((b) => b.addEventListener('click', () => {
   $$('#seqExSize button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   exHow();

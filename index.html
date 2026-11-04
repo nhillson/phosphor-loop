@@ -112,6 +112,15 @@
             <label class="seq-field"><input type="checkbox" id="seqExSound" checked> With the song’s sound</label>
           </div>
           <div class="seq-ex-row">
+            <span class="seq-field" title="The same three qualities as Phosphor Stream’s recordings. YouTube squeezes every upload again, and keeps fine feedback detail much better when it starts from a very clean file.">Quality
+              <span class="seg seg-3 seq-ex-size" id="seqExQuality" role="group" aria-label="Video quality">
+                <button type="button" data-q="youtube" aria-pressed="false">YouTube standard</button>
+                <button type="button" data-q="clean" aria-pressed="true">Very clean</button>
+                <button type="button" data-q="perfect" aria-pressed="false">Near-perfect</button>
+              </span>
+            </span>
+          </div>
+          <div class="seq-ex-row">
             <span class="seq-field" title="In a recording the picture comes a little after its sound. This holds the sound back by this much so the picture lines up with the music. Used by Export video, Record and Save clip.">Sound timing: hold the sound back
               <span class="seg seg-5 seq-ex-size" id="seqExSync" role="group" aria-label="Hold the sound back by">
                 <button type="button" data-sync="0" aria-pressed="false">0</button>

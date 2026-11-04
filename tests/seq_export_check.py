@@ -88,6 +88,18 @@ def main():
         ok(J("__plExport.sync") == 0.25 and J("localStorage.getItem('phosphor-rec-sync')") == '0.25', 'picking ¼ s is kept')
         ok(J("__plExport.blend(0.25)") == {'delayed': True, 'track': True}, 'a recording’s sound goes through the hold-back')
         click('#seqExSync [data-sync="0.5"]')
+        # Quality: Very clean to start with, as Phosphor Stream's recordings; the panel says the rate and the file size
+        ok(J("document.querySelector('#seqExQuality [aria-pressed=\"true\"]').dataset.q") == 'clean', 'Very clean is picked to start with')
+        how = J("document.querySelector('#seqExHow').textContent")
+        ok('Very clean' in how and '150 Mbps' in how and 'GB' in how, f'it says the quality and file size: “{how[how.find("Quality"):][:120]}”')
+        click('#seqExQuality [data-q="perfect"]')
+        how = J("document.querySelector('#seqExHow').textContent")
+        ok('Near-perfect' in how and '300 Mbps' in how and J("localStorage.getItem('phosphor-ex-quality')") == 'perfect', 'Near-perfect at 4K is 300 Mbps, and the pick is kept')
+        click('#seqExQuality [data-q="clean"]')
+        # The recorder is asked for the picked rate
+        J('''(() => { const MR = window.MediaRecorder; window.__mrOpts = [];
+          window.MediaRecorder = class extends MR { constructor(s, o) { super(s, o); __mrOpts.push(o || {}); } };
+          window.MediaRecorder.isTypeSupported = MR.isTypeSupported.bind(MR); })()''')
 
         # With the sound ticked, and no computer sound to share here: it says what to do, and nothing starts
         click('#seqExGo')
@@ -102,6 +114,8 @@ def main():
         click('#seqExGo')
         until("__plExport.stage === 'play' || __plExport.stage === 'start'", 'the export did not get under way', 60)
         until("__plExport.stage === 'play'", 'the sequence did not start playing for the export', 60)
+        bps = J("(__mrOpts[__mrOpts.length - 1] || {}).videoBitsPerSecond")
+        ok(bps == 45000000, f'at 1080p Very clean the recorder is asked for 45 Mbps ({bps})')
         size = J("__plExport.size")
         ok(size == {'w': 1920, 'h': 1080}, f'the picture is drawn at 1080p while it exports ({size})')
         ok(J("__plExport.from") < 1.5, f"the sequence plays from the start (under way at {J('__plExport.from'):.2f} s)")
