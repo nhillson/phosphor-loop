@@ -905,6 +905,7 @@
   /* ---------- clip library ---------- */
   .clips-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
   .clips-grid .nat-tile { aspect-ratio: 16 / 9; }
+  .nat-tile img.sticker-thumb { height: 200%; object-fit: contain; object-position: center top; }
   /* ---------- the clip explorer ---------- */
   .cx-search { flex: 1 1 260px; max-width: 460px; min-width: 0; }
   .nat-bar select { margin: 0; width: auto; flex: none; }

@@ -143,6 +143,11 @@ file don't rebuild the app.
    see-through map (`file.sticker`, `videoURL` → `stickerURLs`); `stickerUnpack` rebuilds each frame with alpha in LiveSource.update
    and the loop takes it as a cutout (`uVidCut`, the Subject silhouette path in `live()`). **Drop into a loop**: dragging over the picture
    shows a target per loop that's on (`dropZones`, `dropLoopAt`); the loop tabs take drops too; `loadFile(file, handle, k)`.
+   **Save clip of a sticker** keeps the packed video and always adds the tag `sticker` (`STICKER_TAG`, `clipIsSticker`); a library
+   clip with that tag is unpacked when picked (`clipPick`), and its thumbnail shows only the top half (`.sticker-thumb`).
+   **Each loop has its own picture** (`pics`, `pic` = the edited loop's, like `vids` / `vid`; `inMedia.pic` is `pic.media`;
+   `natPick(i, quiet, to)`, `picUseCard(to)`, `seqLoadPic(pm, K)`, `picPanelSync` on tab change; recordings keep `media.pics`
+   per loop, older ones' single `pic` goes to every loop; each loop's last nature picture is kept, `natLastKey(k)`).
    `python3 tests/gif_check.py` (about a minute).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,

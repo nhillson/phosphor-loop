@@ -9,6 +9,7 @@ ones play in the Video input (time moving on, frames drawn, at least 6 s long, l
 Picture, and nothing errors. Every wait is a number of frames the app has drawn, or a condition with a ceiling.
 """
 import base64
+import json
 import functools
 import os
 import socketserver
@@ -167,8 +168,87 @@ def main():
 
         # 4d. Dropped on Loop B's tab: a still picture goes into loop B
         pg.evaluate(DROP, [b64(still), 'tab-b.gif', 'image/gif', None, '#tabB'])
-        if until("document.querySelector('#picName').textContent === 'tab-b.gif'", 'drop on the Loop B tab: the picture did not come in'):
+        if until("__plClips.pics().B === 'tab-b.gif'", 'drop on the Loop B tab: the picture did not come in'):
             ok('picture' in pg.evaluate("[__plClips.input('B', 'in1'), __plClips.input('B', 'in2')]"), 'drop on the Loop B tab: loop B is not fed by Picture')
+
+        # 4e. Each loop has its own picture: a picture dropped on loop B leaves loop A's alone, and the Picture
+        # controls show the picture of the loop whose tab is picked
+        pg.evaluate(DROP, [b64(still), 'pic-a.gif', 'image/gif', None, '#drop .drop-zone[data-k=A]'])
+        until("__plClips.pics().A === 'pic-a.gif'", 'own pictures: loop A did not get its picture')
+        pg.evaluate(DROP, [b64(still), 'pic-b.gif', 'image/gif', None, '#drop .drop-zone[data-k=B]'])
+        until("__plClips.pics().B === 'pic-b.gif'", 'own pictures: loop B did not get its picture')
+        ps = pg.evaluate("__plClips.pics()")
+        ok(ps['A'] == 'pic-a.gif', f'own pictures: loop A\'s picture changed when one went into loop B ({ps})')
+        pg.evaluate("document.querySelector('#tabB').click()")
+        ok(pg.evaluate("document.querySelector('#picName').textContent") == 'pic-b.gif', 'own pictures: the Picture controls did not show loop B\'s picture on its tab')
+        pg.evaluate("document.querySelector('#tabA').click()")
+        ok(pg.evaluate("document.querySelector('#picName').textContent") == 'pic-a.gif', 'own pictures: the Picture controls did not show loop A\'s picture on its tab')
+        pg.evaluate("document.querySelector('#useCard').click()")
+        ps = pg.evaluate("__plClips.pics()")
+        ok(ps['A'] == 'the test card' and ps['B'] == 'pic-b.gif', f'own pictures: Use the test card on loop A changed loop B too ({ps})')
+        c.wait_frames(10, 'two pictures')
+
+        # 4f. ✂ Save clip of a sticker: saved with the "sticker" tag, and back from the library it plays as a sticker
+        # (Phosphor Clips is stood in for here: its library, /snip and /clip answered by the test)
+        pg.evaluate(DROP, [b64(sticker), 'save-me.gif', 'image/gif', None, '#drop .drop-zone[data-k=A]'])
+        until("__plClips.vids().A.name === 'save-me.gif' && __plClips.vids().A.sticker", 'save sticker: the sticker did not come into loop A')
+        lib = {'clips': []}
+        got = {}
+
+        def library(route):
+            route.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'},
+                          body=json.dumps({'app': 'Phosphor Clips', 'version': '1.10.0',
+                                           'cats': [{'id': 'looks', 'n': 'Looks', 'count': len(lib['clips'])}, {'id': 'other', 'n': 'Other', 'count': 0}],
+                                           'folders': [], 'clips': lib['clips']}))
+
+        def snipped(route):
+            req = route.request
+            if req.method == 'OPTIONS':
+                route.fulfill(status=204, headers={'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Private-Network': 'true'})
+                return
+            from urllib.parse import urlparse, parse_qs
+            q = parse_qs(urlparse(req.url).query)
+            got['tags'] = q.get('tags', [''])[0]
+            got['body'] = req.post_data_buffer
+            clip = {'id': 's1', 'n': 'Saved sticker', 'c': 'looks', 'p': '', 'd': 6, 'w': 200, 'h': 400, 'fps': 10, 'sound': False, 'thumb': False,
+                    'tags': [t for t in got['tags'].split(',') if t]}
+            lib['clips'] = [clip]
+            route.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'},
+                          body=json.dumps({'ok': True, 'clip': clip, 'cat': 'Looks'}))
+
+        def clip_file(route):
+            if route.request.method != 'GET':
+                route.fulfill(status=200, content_type='application/json', headers={'Access-Control-Allow-Origin': '*'}, body='{"ok":true}')
+                return
+            route.fulfill(status=200, content_type='video/webm', headers={'Access-Control-Allow-Origin': '*'}, body=got.get('body') or b'')
+
+        for port in (47811, 47812, 47813):
+            pg.route(f'http://127.0.0.1:{port}/library.json*', library)
+            pg.route(f'http://127.0.0.1:{port}/snip*', snipped)
+            pg.route(f'http://127.0.0.1:{port}/clip/**', clip_file)
+        pg.evaluate("document.querySelector('#snipOpen').click()")
+        if until("!document.querySelector('#snipPickTrim').closest('[hidden]')", 'save sticker: Save clip did not offer Trim'):
+            pg.evaluate("document.querySelector('#snipPickTrim').click()")
+            ok('sticker' in pg.evaluate("document.querySelector('#snipTags').value"), 'save sticker: the tags did not start with "sticker"')
+            pg.evaluate("document.querySelector('#snipTags').value = 'blue'")   # even with the tag typed over
+            pg.evaluate("document.querySelector('#snipPanel').requestSubmit()")
+            if until("document.querySelector('#snipStatus').textContent.includes('Saved')", 'save sticker: it was not saved'):
+                ok('sticker' in got.get('tags', '').split(','), f"save sticker: sent without the sticker tag ({got.get('tags')})")
+                # (the library is asked again just after saving: the clip may take a moment to be listed)
+                for _ in range(20):
+                    if pg.evaluate("__plClips.pickInto('B', 's1')"):
+                        break
+                    c.wait_frames(5, 'library listing the saved sticker')
+                pg.evaluate("__plClips.setInput('B', 'in1', 'video')")   # loop B shows it (it came in quietly)
+                if not until("__plClips.vids().B.name === 'Saved sticker' && __plClips.vids().B.frames > 2", 'save sticker: the saved clip did not play from the library'):
+                    print('   debug:', len(got.get('body') or b''), pg.evaluate("JSON.stringify(__plClips.vids().B)"))
+                else:
+                    c.wait_frames(10, 'saved sticker playing')
+                    vb = pg.evaluate("__plClips.vids().B")
+                    ok(vb['sticker'], 'save sticker: from the library it did not play as a sticker')
+                    alpha = pg.evaluate("__plClips.stickerAlpha('B')")
+                    ok(alpha and alpha[0] > 0.2 and alpha[1] > 0.05, f'save sticker: from the library it has no see-through parts ({alpha})')
+        pg.evaluate("document.querySelector('#snipCancel') && document.querySelector('#snipCancel').click()")
 
         # 5. A GIF with no type given (as some drags hand it over) is recognised from its bytes
         pg.evaluate(DROP, [b64(moving), 'notype.gif', '', None, None])

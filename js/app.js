@@ -659,6 +659,7 @@ class LiveSource {
     this.detach();
     this.video = video; this.stream = stream || null;
     this.frames = 0; this.lastTime = -1; this.fresh = true;
+    this.sticker = stickerURLs.has(video.src);
     for (const s of Object.values(this.sub)) s.frames = 0;
     this.rvfc = 'requestVideoFrameCallback' in video;
     if (this.rvfc) {
@@ -705,6 +706,10 @@ class LiveSource {
 // (white where the sticker is solid, black where it's see-through). Each new frame is put back together here into
 // one picture with real see-through parts, and the loop takes it as a cutout (uVidCut in js/shaders.js).
 const stickerURLs = new Set();   // the addresses of sticker videos (made with videoURL)
+// A sticker saved to the clip library (✂ Save clip) keeps its picture-over-map video and is tagged "sticker", which
+// is how it's known again when it's played from the library (and lets you search the library for stickers)
+const STICKER_TAG = 'sticker';
+const clipIsSticker = (c) => !!c && Array.isArray(c.tags) && c.tags.some((t) => String(t).toLowerCase() === STICKER_TAG);
 function videoURL(file) {
   const u = URL.createObjectURL(file);
   if (file && file.sticker) stickerURLs.add(u);
@@ -772,8 +777,15 @@ function mkVideo() {
 }
 
 /* picture */
-const picTex = makeSourceTex();
-let picAspect = 4 / 3;
+// Each loop has a picture of its own (the test card to start with), as each has a video player of its own: a
+// picture dropped on loop B, or a nature picture picked while editing loop B, goes into loop B only. pic is the
+// picture of the loop being edited, which the Picture controls show and change.
+const CARD = { kind: 'card', name: 'the test card' };
+const pics = Object.fromEntries(KEYS.map((k) => [k, {
+  key: k, tex: makeSourceTex(), aspect: 4 / 3, media: { ...CARD }, handle: null, own: false, ask: 0, seqAsk: 0, cur: -1, credit: '',
+}]));
+let pic = pics.A;
+const loopUsesPic = (k) => { const t = loops[k].tgt; return t.in1 === 'picture' || t.in2 === 'picture'; };
 function makeTestCard() {
   const c = document.createElement('canvas');
   c.width = 640; c.height = 480;
@@ -798,7 +810,7 @@ function makeTestCard() {
   return c;
 }
 const testCard = makeTestCard();
-uploadTo(picTex, testCard);
+for (const k of KEYS) uploadTo(pics[k].tex, testCard);
 
 /* text */
 // The Text input: the words typed under Text, drawn white with a soft glow into a picture of their own, which
@@ -1275,7 +1287,9 @@ function setEdit(k) {
   if (!loopOn(k)) k = 'A';
   edit = k;
   vid = vids[k];
+  pic = pics[k];
   vidPanelSync();
+  picPanelSync();
   editor.dataset.loop = k;
   for (const j of KEYS) $('#tab' + j).setAttribute('aria-selected', String(k === j));
   syncUI();
@@ -3585,23 +3599,24 @@ function apPicGap() { return 1 + Math.floor(Math.random() * 3); }
 // (k: the loop whose new look just came in, if one did)
 function apPicture(k) {
   const came = k && loops[k], want = came && came.favMix && came.favMix.nat;
-  if (want && !nat.own && apAllowed('picture') && tasteHow() && (came.tgt.in1 === 'picture' || came.tgt.in2 === 'picture')) {
+  const to = pics[k] || pic;   // the picture of the loop whose new look came in (each loop has its own)
+  if (want && !to.own && apAllowed('picture') && tasteHow() && (came.tgt.in1 === 'picture' || came.tgt.in2 === 'picture')) {
     natList().then(() => {
       const i = nat.pics.findIndex((p) => p.f === want);
-      if (i >= 0 && i !== nat.cur) natPick(i, true);
+      if (i >= 0 && i !== to.cur) natPick(i, true, to);
     }).catch(() => {});
     ap.picIn = apPicGap();
     return;
   }
   if (ap.picIn > 1) { ap.picIn--; return; }
   ap.picIn = apPicGap();
-  if (nat.own || !apAllowed('picture')) return;
+  if (to.own || !apAllowed('picture')) return;
   natList().then(() => {
-    const shown = natShown().filter((i) => i !== nat.cur);
+    const shown = natShown().filter((i) => i !== to.cur);
     if (!shown.length) return;
-    if (!tasteHow()) { natPick(pick(shown), true); return; }
+    if (!tasteHow()) { natPick(pick(shown), true, to); return; }
     const M = tasteModel(), few = shown.sort(() => Math.random() - 0.5).slice(0, 12);
-    natPick(tastePickBy(few, (i) => Math.tanh(((M.pref['natf:' + nat.pics[i].f] || 0) * 1.5 + (M.pref['natc:' + nat.pics[i].c] || 0) * 1.2) / 2)), true);
+    natPick(tastePickBy(few, (i) => Math.tanh(((M.pref['natf:' + nat.pics[i].f] || 0) * 1.5 + (M.pref['natc:' + nat.pics[i].c] || 0) * 1.2) / 2)), true, to);
   }).catch(() => { /* offline before the list was ever saved: keep the picture there is */ });
 }
 // Clips from the clip library (Phosphor Clips): when a look picks Video and no video is in yet, Autopilot brings in
@@ -4118,8 +4133,9 @@ function tasteBlendPic(a, b) {
 function tasteSceneNow() {
   const sc = { A: tasteLook('A'), B: tasteLook('B'), mix: { view: Math.round(mix.cur.view), xab: Math.round(mix.cur.xab), xba: Math.round(mix.cur.xba) } };
   // Which nature picture is showing, when a loop uses the picture (a picture of your own isn't kept)
-  const p = !nat.own && nat.pics && nat.pics[nat.cur];
-  if (p && uses('picture')) sc.nat = { f: p.f, c: p.c };
+  const P = activeKeys().map((k) => pics[k]).find((x) => loopUsesPic(x.key) && !x.own && x.cur >= 0);
+  const p = P && nat.pics && nat.pics[P.cur];
+  if (p) sc.nat = { f: p.f, c: p.c };
   return sc;
 }
 // Which looks are on the loops: a rating is "the same picture" only while neither loop has a new look
@@ -5348,7 +5364,10 @@ fsExit.addEventListener('click', () => { if (isFS()) toggleFS(); });
 // a nature picture by its file, the test card, a library clip by its id, or a picture or video of your own by its
 // file name. No copy of your own file is ever kept: where the browser offers it (Chrome, Edge), a pointer to the file
 // on disk is kept instead (picHandle, vidHandle; see filePointerDB), and the file is opened from there each time.
-const inMedia = { pic: { kind: 'card', name: 'the test card' }, picHandle: null };
+const inMedia = {};
+// The picture side is the edited loop's own picture's (each loop has its own: see pics)
+Object.defineProperty(inMedia, 'pic', { get: () => pic.media, set: (m) => { pic.media = m; }, enumerable: true });
+Object.defineProperty(inMedia, 'picHandle', { get: () => pic.handle, set: (h) => { pic.handle = h; }, enumerable: true });
 // The video side is the edited loop's own player's (each loop has its own: see vids)
 Object.defineProperty(inMedia, 'vid', { get: () => vid.media, set: (m) => { vid.media = m; }, enumerable: true });
 Object.defineProperty(inMedia, 'vidHandle', { get: () => vid.handle, set: (h) => { vid.handle = h; }, enumerable: true });
@@ -5367,16 +5386,25 @@ $('#pickPic').addEventListener('click', () => pickOwn('image', picFile));
 $('#pickVid').addEventListener('click', () => pickOwn('video', vidFile));
 picFile.addEventListener('change', () => { if (picFile.files[0]) loadFile(picFile.files[0]); picFile.value = ''; });
 vidFile.addEventListener('change', () => { if (vidFile.files[0]) loadFile(vidFile.files[0]); vidFile.value = ''; });
-$('#useCard').addEventListener('click', () => {
-  uploadTo(picTex, testCard);
-  picAspect = 4 / 3;
-  $('#picName').textContent = 'the test card';
-  inMedia.pic = { kind: 'card', name: 'the test card' }; inMedia.picHandle = null;
-  $('#useCard').hidden = true;
-  natNoCredit();
-  nat.own = false;
-  nat.ask++;   // nor the test card
-});
+function picUseCard(to = pic) {
+  uploadTo(to.tex, testCard);
+  to.aspect = 4 / 3;
+  to.media = { ...CARD }; to.handle = null;
+  natNoCredit(to);
+  to.own = false;
+  to.ask++;   // nor the test card
+  picPanelSync();
+}
+$('#useCard').addEventListener('click', () => picUseCard());
+// The Picture controls show the edited loop's picture
+function picPanelSync() {
+  $('#picName').textContent = pic.media?.name || 'the test card';
+  $('#useCard').hidden = !pic.media || pic.media.kind === 'card';
+  const credit = $('#picCredit');
+  credit.innerHTML = pic.credit || '';
+  credit.hidden = !pic.credit;
+  natMark();
+}
 function downscale(img) {
   const max = 1024;
   const w = img.naturalWidth, h = img.naturalHeight;
@@ -5565,17 +5593,17 @@ function loadFile(file, handle = null, k = edit) {
   if (type.startsWith('image/')) {
     const url = URL.createObjectURL(file);
     const img = new Image();
+    const to = pics[k] || pic;
     img.onload = () => {
       const small = downscale(img);
-      uploadTo(picTex, small);
-      picAspect = img.naturalWidth / img.naturalHeight;
+      uploadTo(to.tex, small);
+      to.aspect = img.naturalWidth / img.naturalHeight;
       URL.revokeObjectURL(url);
-      $('#picName').textContent = file.name;
-      inMedia.pic = { kind: 'own', name: file.name }; inMedia.picHandle = handle; ownFiles.set(file.name, file);
-      $('#useCard').hidden = false;
-      natNoCredit();
-      nat.own = true;
-      nat.ask++;   // a nature picture still on its way doesn't replace this one
+      to.media = { kind: 'own', name: file.name }; to.handle = handle; ownFiles.set(file.name, file);
+      natNoCredit(to);
+      to.own = true;
+      to.ask++;   // a nature picture still on its way doesn't replace this one
+      picPanelSync();
       feedInto('picture', k);
       toast(`Feeding ${file.name} into loop ${k}.`);
     };
@@ -5690,7 +5718,7 @@ function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&a
 // About 500 photos from Wikimedia Commons' Featured Pictures live in the nature folder, listed in
 // nature/pictures.json. The list loads the first time it's needed, the small thumbnails only when the
 // gallery opens, and a full picture only when it's picked.
-const nat = { pics: null, cats: [], cur: -1, cat: 'all', req: null, built: false, ask: 0, own: false };   // own: a picture of the person's own is in
+const nat = { pics: null, cats: [], cat: 'all', req: null, built: false };   // the nature picture list (which one each loop shows is in pics)
 const NAT_TAB_KEY = 'phosphor-nature-tab', NAT_LAST_KEY = 'phosphor-nature-last';
 try { nat.cat = localStorage.getItem(NAT_TAB_KEY) || 'all'; } catch (_) { /* fine, start on All */ }
 const natDlg = $('#nat'), natGrid = $('#natGrid'), natTabs = $('#natTabs');
@@ -5714,56 +5742,54 @@ function natShown() {
   const all = nat.pics.map((_, i) => i);
   return nat.cat === 'all' ? all : all.filter((i) => nat.pics[i].c === nat.cat);
 }
-function natNoCredit() {
-  nat.cur = -1;
-  try { localStorage.removeItem(NAT_LAST_KEY); } catch (_) { /* fine */ }
-  $('#picCredit').hidden = true;
-  natMark();
+// Each loop's last nature picture is kept for next time (loop A's under the name it always had)
+const natLastKey = (k) => (k === 'A' ? NAT_LAST_KEY : NAT_LAST_KEY + '-' + k);
+function natNoCredit(to = pic) {
+  to.cur = -1; to.credit = '';
+  try { localStorage.removeItem(natLastKey(to.key)); } catch (_) { /* fine */ }
+  if (to === pic) { $('#picCredit').hidden = true; natMark(); }
 }
 function natMark() {
-  for (const t of natGrid.children) t.setAttribute('aria-current', String(+t.dataset.i === nat.cur));
+  for (const t of natGrid.children) t.setAttribute('aria-current', String(+t.dataset.i === pic.cur));
 }
-// quiet: put the picture in place without switching any loop to it (used when the page opens)
-function natPick(i, quiet) {
+// quiet: put the picture in place without switching any loop to it (used when the page opens). to: the loop's
+// picture it goes into (the edited loop's unless said)
+function natPick(i, quiet, to = pic) {
   const p = nat.pics && nat.pics[i];
   if (!p) return;
-  const ask = ++nat.ask;
+  const ask = ++to.ask;
   const img = new Image();
   img.decoding = 'async';
   img.onload = () => {
-    if (ask !== nat.ask) return;   // a later pick overtook this one
-    uploadTo(picTex, downscale(img));
-    picAspect = img.naturalWidth / img.naturalHeight;
-    $('#picName').textContent = p.n;
-    inMedia.pic = { kind: 'nature', f: p.f, name: p.n }; inMedia.picHandle = null;
-    $('#useCard').hidden = false;
-    nat.cur = i;
-    nat.own = false;
-    const credit = $('#picCredit');
-    credit.innerHTML = `Photo: ${escapeHTML(p.by)} · <a href="${escapeHTML(p.src)}" target="_blank" rel="noopener">${escapeHTML(p.lic)}</a>`;
-    credit.hidden = false;
-    natMark();
-    try { localStorage.setItem(NAT_LAST_KEY, p.f); } catch (_) { /* fine */ }
+    if (ask !== to.ask) return;   // a later pick overtook this one
+    uploadTo(to.tex, downscale(img));
+    to.aspect = img.naturalWidth / img.naturalHeight;
+    to.media = { kind: 'nature', f: p.f, name: p.n }; to.handle = null;
+    to.cur = i;
+    to.own = false;
+    to.credit = `Photo: ${escapeHTML(p.by)} · <a href="${escapeHTML(p.src)}" target="_blank" rel="noopener">${escapeHTML(p.lic)}</a>`;
+    if (to === pic) picPanelSync();
+    try { localStorage.setItem(natLastKey(to.key), p.f); } catch (_) { /* fine */ }
     if (quiet) return;
-    const was = loops[edit].tgt.in1 === 'picture' || loops[edit].tgt.in2 === 'picture';
-    feedInto('picture');
+    const was = loopUsesPic(to.key);
+    feedInto('picture', to.key);
     if (was) showOSD('PICTURE', p.n.toUpperCase());
   };
-  img.onerror = () => { if (ask === nat.ask && !quiet) toast('That picture couldn’t be loaded. It needs internet the first time.'); };
+  img.onerror = () => { if (ask === to.ask && !quiet) toast('That picture couldn’t be loaded. It needs internet the first time.'); };
   img.src = `nature/${p.f}.jpg`;
 }
 function natStep(dir) {
   natList().then(() => {
     const shown = natShown();
     if (!shown.length) return;
-    const at = shown.indexOf(nat.cur);
+    const at = shown.indexOf(pic.cur);
     const next = at < 0 ? (dir > 0 ? 0 : shown.length - 1) : (at + dir + shown.length) % shown.length;
     natPick(shown[next]);
   }).catch(natNoList);
 }
 function natShuffle() {
   natList().then(() => {
-    const shown = natShown().filter((i) => i !== nat.cur);
+    const shown = natShown().filter((i) => i !== pic.cur);
     if (shown.length) natPick(pick(shown));
   }).catch(natNoList);
 }
@@ -5840,9 +5866,13 @@ natDlg.addEventListener('keydown', (e) => {
 });
 // The nature picture in use last time comes back when the page opens, so a saved look picks up where it was
 (() => {
-  let last = null;
-  try { last = localStorage.getItem(NAT_LAST_KEY); } catch (_) { /* fine */ }
-  if (last) natList().then((pics) => { const i = pics.findIndex((p) => p.f === last); if (i >= 0 && nat.cur < 0 && !nat.own) natPick(i, true); }).catch(() => {});
+  // (a loop with none of its own kept, as before this was per loop, starts from loop A's)
+  for (const k of KEYS) {
+    let last = null;
+    try { last = localStorage.getItem(natLastKey(k)) || localStorage.getItem(NAT_LAST_KEY); } catch (_) { /* fine */ }
+    const to = pics[k];
+    if (last) natList().then((all) => { const i = all.findIndex((p) => p.f === last); if (i >= 0 && to.cur < 0 && !to.own) natPick(i, true, to); }).catch(() => {});
+  }
 })();
 
 /* ================= clip library (Phosphor Clips) ================= */
@@ -5943,7 +5973,9 @@ function clipPick(c, quiet, to = vid, spare = false) {
     .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
     .then((blob) => {
       if (ask !== to.ask) return false;   // a later pick (or a video of your own) overtook this one
-      return openVideo(URL.createObjectURL(blob), c.n, { quiet, to, spare }).then((ok) => {
+      const url = URL.createObjectURL(blob);
+      if (clipIsSticker(c)) stickerURLs.add(url);
+      return openVideo(url, c.n, { quiet, to, spare }).then((ok) => {
         if (!ok || ask !== to.ask) return ok;
         const from = c.src && /^https?:/.test(c.src)
           ? ` · <a href="${escapeHTML(c.src)}" target="_blank" rel="noopener">${escapeHTML(c.by || 'source')}</a>` : (c.by ? ` · ${escapeHTML(c.by)}` : '');
@@ -6153,7 +6185,8 @@ function cxTile(c) {
   b.title = `${c.n} (${clipCatName(c.c)})${c.tags && c.tags.length ? ' · ' + c.tags.map((t) => '#' + t).join(' ') : ''}`;
   b.setAttribute('aria-selected', String(cx.sel.has(c.id)));
   b.setAttribute('aria-current', String(c.id === clips.cur));
-  const thumb = c.thumb ? `<img loading="lazy" decoding="async" alt="" src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : '';
+  // (a sticker's thumbnail is its picture over its see-through map: only the top half, the picture, is shown)
+  const thumb = c.thumb ? `<img loading="lazy" decoding="async" alt=""${clipIsSticker(c) ? ' class="sticker-thumb"' : ''} src="${escapeHTML(clips.base)}/thumb/${encodeURIComponent(c.id)}">` : '';
   b.innerHTML = `${thumb}<em class="clip-dur">${fmtT(c.d || 0)}</em>${c.mv ? '<i class="cx-fxb mv" title="Recorded settings: plays back live">REC</i>' : c.fx ? '<i class="cx-fxb" title="Effects saved with it">FX</i>' : ''}`
     + `${c.tags && c.tags.length ? `<span class="cx-tl">${escapeHTML(c.tags.map((t) => '#' + t).join(' '))}</span>` : ''}<span>${escapeHTML(c.n)}</span>`;
   return b;
@@ -6589,6 +6622,7 @@ window.__plClips = {
   apClip: (k, gap) => { if (gap != null) ap.clipIn = gap; apClip(k); },
   videoUsable: () => apPool().includes('video') && apUsable('video'),
   loadFile: (f) => loadFile(f), close: () => closeClips(),
+  pics: () => Object.fromEntries(KEYS.map((k) => [k, pics[k].media ? pics[k].media.name : null])),
   // How much of a sticker's last frame is see-through, and how much solid (tests/gif_check.py)
   stickerAlpha: (k) => { const u = vids[k].unpack; if (!u || !u.out) return null; const d = u.out.data; let c = 0, o = 0;
     for (let i = 3; i < d.length; i += 4) { if (d[i] < 20) c++; else if (d[i] > 235) o++; } return [c / (d.length / 4), o / (d.length / 4)]; },
@@ -7040,7 +7074,9 @@ function snipTrimStart() {
   [snip.v0, snip.v1] = trimViewFor();
   trimDraw();
   // A snip of a tagged clip starts with its tags; the suggestions are every tag in the library
-  $('#snipTags').value = ((src.from && cxClip(src.from)?.tags) || []).join(', ');
+  const tg = ((src.from && cxClip(src.from)?.tags) || []).slice();
+  if (vid.sticker && !tg.some((t) => String(t).toLowerCase() === STICKER_TAG)) tg.unshift(STICKER_TAG);
+  $('#snipTags').value = tg.join(', ');
   if (vid.video) { vid.video.currentTime = snip.a; vid.video.play().catch(() => {}); }
 }
 function snipCloseForm() {
@@ -7062,7 +7098,10 @@ async function snipSave() {
   if (!(r.b - r.a >= 0.2)) { snipSay('The trimmed part is too short. Drag the end handle further on.'); return; }
   const name = $('#snipName').value.trim(), where = $('#snipCat').value, { c: cat, p: folder } = splitKey(where);
   try { localStorage.setItem(SNIP_CAT_KEY, where); } catch (_) { /* fine */ }
-  const q = new URLSearchParams({ start: r.a.toFixed(3), name, cat, folder, sound: $('#snipSound').checked ? '1' : '0', tags: splitTags($('#snipTags').value).join(',') });
+  // A sticker always keeps its "sticker" tag, or it would play from the library as two pictures stacked
+  const tags = splitTags($('#snipTags').value);
+  if (vid.sticker && !tags.some((t) => t.toLowerCase() === STICKER_TAG)) tags.unshift(STICKER_TAG);
+  const q = new URLSearchParams({ start: r.a.toFixed(3), name, cat, folder, sound: $('#snipSound').checked ? '1' : '0', tags: tags.join(',') });
   // The effects on screen now (taken before the cut, so a change while it's cutting doesn't creep in)
   const look = $('#snipFx').checked ? clipLookNow() : null;
   if (r.b < r.d - 0.05) q.set('end', r.b.toFixed(3));
@@ -7145,12 +7184,16 @@ const mvRec = { pending: null, sound: false, on: false, rec: null, start: null, 
 // Which picture and video are in (when a loop shows them), as text, so a change is one event
 function mvMediaNow() {
   const m = {};
-  if (uses('picture') && inMedia.pic) m.pic = { ...inMedia.pic };
+  // Each loop's own picture, for the loops that show one
+  for (const k of activeKeys()) {
+    if (!loopUsesPic(k) || !pics[k].media) continue;
+    (m.pics ||= {})[k] = { ...pics[k].media };
+    if (pics[k].media.kind === 'own') seqKeepPointer(pics[k].media.name, pics[k].handle);
+  }
   const sv = vidShown();
   if (vidInUse(sv) && sv.media) { m.vid = { ...sv.media }; delete m.vid.at; }
-  if (m.pic && m.pic.kind === 'own') seqKeepPointer(m.pic.name, inMedia.picHandle);
   if (m.vid && m.vid.kind === 'own') seqKeepPointer(m.vid.name, sv.handle);
-  return m.pic || m.vid ? JSON.stringify(m) : '';
+  return m.pics || m.vid ? JSON.stringify(m) : '';
 }
 const mvLookNow = () => ({ ...clipLookNow(), n: loopCount, media: mvMediaNow() });
 function mvRecStart() {
@@ -7355,7 +7398,9 @@ function mvMedia(sig, at) {
   let m = null;
   try { m = sig ? JSON.parse(sig) : null; } catch (_) { m = null; }
   if (!m) return;
-  if (m.pic && !sameMedia(m.pic, inMedia.pic)) seqLoadPic(m.pic);
+  // (a recording from before each loop had its own picture has one picture for all of them)
+  const want = m.pics || (m.pic ? Object.fromEntries(activeKeys().map((k) => [k, m.pic])) : {});
+  for (const [k, pm] of Object.entries(want)) if (pics[k] && !sameMedia(pm, pics[k].media)) seqLoadPic(pm, k);
   if (m.vid && !sameMedia(m.vid, inMedia.vid)) seqLoadVid({ a: seq.t, media: { vid: { ...m.vid, at: at || 0 } } });
 }
 function movesPlay(c, look) {
@@ -10755,7 +10800,7 @@ function runLoop(k, xf, brush, f) {
   const [V, C, S, P] = [kVid, cam, scr, pho].map((s) => s.texFor(t.subject));
   // The see-through surround only once every live input here has its outlines; until then the plain picture
   set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !liveFor(k, n) || liveFor(k, n).texFor(t.subject) !== liveFor(k, n)) ? 1 : 0);
-  const texs = [src.tex, otherTex, picTex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
+  const texs = [src.tex, otherTex, pics[k].tex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
                 (lifeIn1 && lifeTex) || flyTex1 || src.tex, (lifeIn2 && lifeTex) || flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
   if (t.in1 === 'spectro' || t.in2 === 'spectro') {
@@ -10857,7 +10902,7 @@ function runLoop(k, xf, brush, f) {
   }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
   set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
-  set1f(fbProg, 'uAspPic', picAspect);
+  set1f(fbProg, 'uAspPic', pics[k].aspect);
   set1f(fbProg, 'uAspVid', kVid.aspect);
   set1f(fbProg, 'uVidCut', kVid.sticker ? 1 : 0);
   set1f(fbProg, 'uAspCam', cam.aspect);
@@ -11913,9 +11958,10 @@ function seqKeepPointer(name, h) {
 function seqCaptureMedia(look, K = edit) {
   const sv = vidFor(K);
   const m = {};
-  if (usesIn(look, 'picture') && inMedia.pic) {
-    m.pic = { ...inMedia.pic };
-    if (m.pic.kind === 'own') seqKeepPointer(m.pic.name, inMedia.picHandle);
+  const kp = pics[K] || pic;
+  if (usesIn(look, 'picture') && kp.media) {
+    m.pic = { ...kp.media };
+    if (m.pic.kind === 'own') seqKeepPointer(m.pic.name, kp.handle);
   }
   if (usesIn(look, 'video') && sv.media) {
     m.vid = { ...sv.media, at: r1(sv.video?.currentTime || 0) };
@@ -11923,8 +11969,7 @@ function seqCaptureMedia(look, K = edit) {
   }
   return m.pic || m.vid ? m : null;
 }
-const seqMediaSig = (look, K = edit) => JSON.stringify([usesIn(look, 'picture') ? inMedia.pic : null, usesIn(look, 'video') ? vidFor(K).media : null]);
-const seqMediaAsk = { pic: 0 };
+const seqMediaSig = (look, K = edit) => JSON.stringify([usesIn(look, 'picture') ? (pics[K] || pic).media : null, usesIn(look, 'video') ? vidFor(K).media : null]);
 // Opens a file of your own for a block: through its pointer where there is one (and you've let the page open it this
 // visit), or else the file of that name you picked this visit. Throws with what to do when neither works.
 async function seqOwnFile(name, what) {
@@ -11959,28 +12004,30 @@ function seqBlobImage(blob) {
     img.src = url;
   });
 }
-async function seqLoadPic(pm) {
-  const ask = ++seqMediaAsk.pic;
+// Into loop K's own picture (the edited loop's unless said)
+async function seqLoadPic(pm, K = edit) {
+  const to = pics[K] || pic;
+  const ask = ++to.seqAsk;
   try {
     if (pm.kind === 'nature') {
       await natList();
       const i = nat.pics.findIndex((p) => p.f === pm.f);
       if (i < 0) throw new Error();
-      if (ask === seqMediaAsk.pic) natPick(i, true);
+      if (ask === to.seqAsk) natPick(i, true, to);
     } else if (pm.kind === 'card') {
-      if (ask === seqMediaAsk.pic) $('#useCard').click();
+      if (ask === to.seqAsk) picUseCard(to);
     } else {
       const { file, h } = await seqOwnFile(pm.name, 'picture');
       const img = await seqBlobImage(file);
-      if (ask !== seqMediaAsk.pic) return;
-      uploadTo(picTex, downscale(img));
-      picAspect = img.naturalWidth / img.naturalHeight;
-      $('#picName').textContent = pm.name; $('#useCard').hidden = false;
-      natNoCredit(); nat.own = true; nat.ask++;
-      inMedia.pic = { ...pm }; inMedia.picHandle = h;
+      if (ask !== to.seqAsk) return;
+      uploadTo(to.tex, downscale(img));
+      to.aspect = img.naturalWidth / img.naturalHeight;
+      natNoCredit(to); to.own = true; to.ask++;
+      to.media = { ...pm }; to.handle = h;
+      picPanelSync();
     }
   } catch (e) {
-    if (ask === seqMediaAsk.pic) seqNote(e?.message || `The picture “${pm.name}” isn’t available any more. Pick it again under Inputs.`);
+    if (ask === to.seqAsk) seqNote(e?.message || `The picture “${pm.name}” isn’t available any more. Pick it again under Inputs.`);
   }
 }
 // Puts a video player where the block wants it: its start point plus how far into the block the song is (a block
@@ -12080,7 +12127,7 @@ function seqPreloadVid(t) {
 function seqShowMedia(bl, K) {
   const m = bl?.media;
   if (!m) return;
-  if (m.pic && !sameMedia(m.pic, inMedia.pic)) seqLoadPic(m.pic);
+  if (m.pic && !sameMedia(m.pic, pics[K].media)) seqLoadPic(m.pic, K);
   if (m.vid) {
     const to = vids[K];
     seq.ownsVideo = true;
