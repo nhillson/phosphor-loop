@@ -676,9 +676,11 @@ function renderLibrary() {
   for (const c of shown) grid.appendChild(clipCard(c));
   $('#libEmpty').hidden = shown.length > 0;
 }
+// A sticker's clip is the sticker over its see-through map (for Phosphor Loop): only the top half is shown here
+const isSticker = (c) => (c.tags || []).some((t) => String(t).toLowerCase() === 'sticker');
 function clipCard(c) {
   const card = el('div', 'clip');
-  const pic = el('div', 'pic');
+  const pic = el('div', isSticker(c) ? 'pic sticker' : 'pic');
   if (c.thumb) pic.style.backgroundImage = `url("${c.thumb}")`;
   if (S.libCat === 'all' || c.p) pic.appendChild(el('span', 'tag', [S.libCat === 'all' ? catName(c.c) : '', ...(c.p ? c.p.split('/') : [])].filter(Boolean).join(' › ')));
   pic.appendChild(el('span', 'dur', fmtLen(c.d || 0)));
@@ -763,6 +765,8 @@ function openClip(id) {
   clipOpen = id;
   stopHoverVideos();
   const v = $('#cmVideo');
+  v.classList.toggle('sticker', isSticker(c));
+  if (isSticker(c) && c.w && c.h) v.style.setProperty('--ar', String(c.w / (c.h / 2))); else v.style.removeProperty('--ar');
   v.src = c.url;
   $('#cmName').value = c.n;
   const sel = $('#cmCat');

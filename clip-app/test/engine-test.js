@@ -71,6 +71,29 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
     return `${r.probe.width}x${r.probe.height}, ${r.probe.duration.toFixed(2)} s`;
   });
 
+  await test('a sticker (a GIF with see-through parts): saved as the sticker over its see-through map', async () => {
+    const plain = await E.fetchVideo(tools, { file: path.join(media, 'spin.gif') }, job(), { log });
+    assert.equal(plain.sticker, false, 'a GIF with no see-through parts is not a sticker');
+    const r = await E.fetchVideo(tools, { file: path.join(media, 'sticker.gif') }, job(), { log });
+    assert.equal(r.sticker, true, 'found its see-through parts');
+    const out = path.join(job(), 'sticker.mp4');
+    const c = await E.cutClip(tools, r.source, out, { start: 0, end: 2, sticker: true, log });
+    assert.equal(c.sticker, true);
+    assert.equal(c.probe.width, 200);
+    assert.equal(c.probe.height, 320, 'twice as tall: the sticker, then its map');
+    // The map (bottom half): white where the ball is, black around it. The sticker (top half): black around the ball.
+    const stats = async (vf) => {
+      const s = await E.run(tools.ffmpeg, ['-hide_banner', '-nostdin', '-ss', '1', '-i', out, '-frames:v', '1', '-vf',
+        vf + ',signalstats,metadata=print:file=-', '-f', 'null', '-']);
+      const g = (k) => +((s.stdout.match(new RegExp('signalstats\\.' + k + '=([\\d.]+)')) || [])[1]);
+      return { min: g('YMIN'), max: g('YMAX'), avg: g('YAVG') };
+    };
+    const map = await stats('crop=iw:ih/2:0:ih/2'), corner = await stats('crop=20:20:0:0');
+    assert.ok(map.min < 30 && map.max > 225, 'the map has solid and see-through parts ' + JSON.stringify(map));
+    assert.ok(corner.max < 30, 'around the sticker is black ' + JSON.stringify(corner));
+    return `${c.probe.width}x${c.probe.height}, map ${map.min}-${map.max}`;
+  });
+
   await test('page with no video: a clear message', async () => {
     await assert.rejects(E.fetchVideo(tools, { url: site.url + 'blob.html' }, job(), { log }), (e) => {
       assert.equal(e.code, 'unsupported');

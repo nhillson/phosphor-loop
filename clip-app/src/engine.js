@@ -290,6 +290,21 @@ async function downloadDirect(url, jobDir, { referer, cookieHeader, signal, onPr
 const PLAYABLE_V = ['h264', 'vp8', 'vp9', 'av1'];
 const PLAYABLE_A = ['aac', 'opus', 'vorbis', 'mp3', 'flac'];
 
+// Stickers (GIFs with see-through parts, as GIPHY's stickers are). A video can't keep see-through parts, so a
+// sticker's clip is made twice as tall: the sticker on black on top, and under it its see-through map (white where
+// it's solid, black where it's see-through). Phosphor Loop puts the two back together as it plays (stickerUnpack
+// in its js/app.js) and knows such a clip by its "sticker" tag. The trimmer shows the sticker on black as before.
+const STICKER_TAG = 'sticker';
+const PICTURE_CODECS = ['gif', 'webp', 'apng', 'png'];
+// Whether a moving picture has see-through parts worth keeping (more than a sliver in some frame)
+async function hasSeeThrough(tools, file, p, { signal } = {}) {
+  if (!PICTURE_CODECS.includes(p.vcodec)) return false;
+  const r = await run(tools.ffmpeg, ['-hide_banner', '-nostdin', '-i', file, '-frames:v', '120', '-vf',
+    'format=rgba,alphaextract,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-', '-f', 'null', '-'], { signal });
+  if (r.code !== 0) return false;
+  return (r.stdout.match(/YAVG=([\d.]+)/g) || []).some((m) => +m.slice(5) < 250);
+}
+
 async function makePlayable(tools, file, jobDir, { signal, log, onProgress } = {}) {
   const p = await probe(tools, file, { signal });
   const ext = path.extname(file).toLowerCase();
@@ -315,7 +330,9 @@ async function makePlayable(tools, file, jobDir, { signal, log, onProgress } = {
   const total = p.duration || 0;
   const r = await run(tools.ffmpeg, args, { signal, log, onLine: progressReader(total, onProgress) });
   if (r.code !== 0) throw new ClipError('That video couldn’t be opened.', 'unreadable', r.stderr.slice(-500));
-  return { file: out, probe: await probe(tools, out, { signal }) };
+  const sticker = await hasSeeThrough(tools, file, p, { signal }).catch(() => false);
+  if (sticker && log) log('sticker: see-through parts found, it will be saved as a sticker');
+  return { file: out, probe: await probe(tools, out, { signal }), sticker };
 }
 
 // The size to make a picture: no taller than maxHeight (and no wider than 16:9 at that height would be, so
@@ -416,7 +433,8 @@ function pickEncoder(tools, log) {
   return encoderPick;
 }
 
-async function cutClip(tools, src, out, { start = 0, end, keepSound = false, maxHeight = 1080, crop = null, high = false, signal, log, onProgress } = {}) {
+// sticker: src is a moving picture with see-through parts; the clip is made as a sticker (see STICKER_TAG)
+async function cutClip(tools, src, out, { start = 0, end, keepSound = false, maxHeight = 1080, crop = null, high = false, sticker = false, signal, log, onProgress } = {}) {
   const p = await probe(tools, src, { signal });
   const stop = Math.min(end == null ? p.duration : end, p.duration || end || 0);
   const dur = Math.max(0.1, stop - start);
@@ -428,6 +446,8 @@ async function cutClip(tools, src, out, { start = 0, end, keepSound = false, max
   const fps = p.fps > 60 ? 60 : p.fps || 30;
   const vf = [cf, `scale=${w}:${h}:flags=lanczos`, 'setsar=1'].filter(Boolean);
   if (p.fps > 60) vf.push('fps=60');
+  // A sticker: the picture made solid on black, its see-through map under it
+  if (sticker) vf.push('format=gbrap,split[c][a];[c]premultiply=inplace=1,format=gbrp[cc];[a]alphaextract,format=gbrp[aa];[cc][aa]vstack');
   vf.push('format=yuv420p');
   const args = ['-hide_banner', '-y', '-nostdin', '-ss', start.toFixed(3), '-i', src, '-t', dur.toFixed(3), '-map', '0:v:0'];
   const sound = keepSound && p.hasAudio;
@@ -447,7 +467,7 @@ async function cutClip(tools, src, out, { start = 0, end, keepSound = false, max
   }
   if (r.code !== 0 || !fs.existsSync(out)) throw new ClipError('The clip couldn’t be made.', 'failed', r.stderr.slice(-500));
   const made = await probe(tools, out, { signal });
-  return { file: out, probe: made, sound, encoder: enc, crop: cf ? crop : null };
+  return { file: out, probe: made, sound, encoder: enc, crop: cf ? crop : null, sticker: !!sticker };
 }
 
 // The part to download for marked Start here / End here (seconds in the original video), with PAD either side so
@@ -577,7 +597,7 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
   // A part download starts at the key frame before the asked-for start, so it runs a little long at the front:
   // where it really starts is its end minus its length
   if (section) offset = Math.max(0, section[1] - made.probe.duration);
-  return { source, playable: made.file, probe: made.probe, info, offset, marks };
+  return { source, playable: made.file, probe: made.probe, info, offset, marks, sticker: !!made.sticker };
 }
 
 function titleFromUrl(url) {
@@ -590,5 +610,5 @@ function titleFromUrl(url) {
 module.exports = {
   ClipError, findTools, run, probe, isDirectLink, videoInfo, summarize, downloadWithYtdlp, downloadDirect,
   makePlayable, frames, frameAt, spread, cutClip, pickEncoder, fetchVideo, fitSize, titleFromUrl, explainYtdlp,
-  partOf, cropFilter, validCrop, PAD, UA,
+  partOf, cropFilter, validCrop, hasSeeThrough, STICKER_TAG, PAD, UA,
 };

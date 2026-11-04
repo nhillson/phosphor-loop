@@ -939,8 +939,11 @@ function setupIpc() {
     sendJobs();
     try {
       const out = path.join(job.dir, 'clip-' + Date.now() + '.mp4');
-      const made = await E.cutClip(tools, r.playable, out, {
-        start, end, keepSound: !!o.keepSound, maxHeight: +o.maxHeight || 1080, crop: E.validCrop(o.crop) ? o.crop : null, log,
+      // A sticker (a GIF with see-through parts) is cut from the GIF itself, which still has them (the trimmer's
+      // copy is on black), and saved as a sticker with the "sticker" tag (see STICKER_TAG in engine.js)
+      const sticker = !!r.sticker && !!r.source && fs.existsSync(r.source);
+      const made = await E.cutClip(tools, sticker ? r.source : r.playable, out, {
+        start, end, keepSound: !!o.keepSound, maxHeight: +o.maxHeight || 1080, crop: E.validCrop(o.crop) ? o.crop : null, sticker, log,
         onProgress: (p) => { job.pct = p.pct; sendJobsSoon(); },
       });
       const clip = await library.addClip(made.file, {
@@ -950,8 +953,9 @@ function setupIpc() {
         lic: r.info.lic || '', site: r.info.site || '', part: [round3(start + r.offset), round3(end + r.offset)],
         guess: job.suggestion && job.suggestion.id ? job.suggestion.id : undefined, thumbAt: made.probe.duration / 2,
         crop: made.crop ? ['x', 'y', 'w', 'h'].map((k) => Math.round(made.crop[k] * 10000) / 10000) : undefined,
+        tags: made.sticker ? E.STICKER_TAG : undefined,
       });
-      log('saved ' + clip.f + ' (' + clip.w + 'x' + clip.h + ', ' + clip.d + ' s, ' + made.encoder + (made.crop ? ', cropped' : '') + ')');
+      log('saved ' + clip.f + ' (' + clip.w + 'x' + clip.h + ', ' + clip.d + ' s, ' + made.encoder + (made.crop ? ', cropped' : '') + (made.sticker ? ', a sticker' : '') + ')');
       settings.keepSound = !!o.keepSound;
       settings.maxHeight = +o.maxHeight || 1080;
       saveSettings();

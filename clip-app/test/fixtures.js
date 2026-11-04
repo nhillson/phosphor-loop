@@ -23,6 +23,12 @@ function makeMedia(dir, ffmpeg) {
   if (!has('spin.gif')) {
     ff(ffmpeg, ['-f', 'lavfi', '-i', 'testsrc2=s=320x240:r=15:d=4', '-vf', 'split[a][b];[a]palettegen[p];[b][p]paletteuse', path.join(dir, 'spin.gif')]);
   }
+  // A sticker: a ball moving over a see-through background, as GIPHY's stickers are
+  if (!has('sticker.gif')) {
+    ff(ffmpeg, ['-f', 'lavfi', '-i', 'nullsrc=s=200x160:r=10:d=2', '-vf',
+      "format=rgba,geq=r='255':g='60':b='200':a='if(lt(hypot(X-50-T*50,Y-80),35),255,0)',split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse=alpha_threshold=128",
+      path.join(dir, 'sticker.gif')]);
+  }
   // 12 minutes, small and cheap: long enough that a marked part is downloaded on its own
   if (!has('long.webm')) {
     ff(ffmpeg, ['-f', 'lavfi', '-i', 'testsrc2=s=320x180:r=10:d=720', '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8',

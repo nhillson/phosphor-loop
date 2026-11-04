@@ -49,6 +49,15 @@ trimmer (H.264 MP4, at the size picked in the trimmer last, sound only if *Keep 
   reading the library stays open to any `*.github.io`. Phosphor Clips must be running on the same computer.
 - Test: `node test/snip-test.js`.
 
+## Stickers (GIFs with see-through parts, as GIPHY's)
+
+A grabbed GIF with see-through parts is saved as a sticker (`hasSeeThrough`, `cutClip(..., { sticker })` in
+`src/engine.js`). A video can't keep see-through parts, so the clip is twice as tall: the sticker on black on top,
+its see-through map (white solid, black see-through) underneath, cut from the GIF itself (the trimmer plays a copy
+on black). It is tagged `sticker`; Phosphor Loop knows it by that tag and puts the two halves back together as it
+plays. This app's library shows only the top half of a sticker (`.pic.sticker`, `#cmVideo.sticker`). Snips Phosphor
+Loop saves of a sticker arrive already packed and tagged. Since 1.11.
+
 ## Tags, saved effects, and copying clips to another computer
 
 - **Tags** (`fractal`, `industrial`, `neon glow`…): set in Phosphor Loop's clip explorer, in the snip form, or in

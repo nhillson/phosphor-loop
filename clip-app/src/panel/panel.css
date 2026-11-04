@@ -202,6 +202,9 @@ main { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
 .clip:hover { border-color: var(--accent-hi); }
 .clip .pic { position: relative; aspect-ratio: 16 / 9; background: #0d0b0f center/cover no-repeat; }
 .clip .pic video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Stickers: only the top half (the sticker; the bottom half is its see-through map for Phosphor Loop) */
+.clip .pic.sticker { overflow: hidden; background-size: auto 200%; background-position: center top; }
+.clip .pic.sticker video { height: 200%; object-fit: contain; object-position: center top; }
 .clip .dur { position: absolute; right: 6px; bottom: 6px; background: rgba(0, 0, 0, 0.7); border-radius: 4px; padding: 1px 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .clip .tag { position: absolute; left: 6px; top: 6px; background: rgba(0, 0, 0, 0.7); border-radius: 4px; padding: 1px 7px; font-size: 11.5px; }
 .clip .meta { padding: 8px 10px 10px; }
@@ -220,6 +223,7 @@ main { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
 .sheet .close { position: absolute; top: 10px; right: 10px; }
 .clipsheet { width: min(980px, calc(100vw - 80px)); padding: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
 .clipsheet video { width: 100%; height: 100%; max-height: 70vh; background: #000; display: block; object-fit: contain; }
+.clipsheet video.sticker { height: auto; aspect-ratio: var(--ar, 1); object-fit: cover; object-position: center top; }
 .cmbody { padding: 46px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
 .facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12.5px; }
 .facts dt { color: var(--faint); }
