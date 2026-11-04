@@ -2318,7 +2318,7 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false,
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true,
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
 // Autopilot never changes them, and moving their controls neither pins anything nor stops it.
@@ -2367,6 +2367,8 @@ try {
     for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.type = s.type === true;
+    apSet.cue = s.cue === true;
+    apSet.cuePreviews = s.cuePreviews !== false;
     apSet.check = s.check !== false;
     apSet.hints = s.hints !== false;
     apSet.fsKeep = s.fsKeep === true;
@@ -2438,8 +2440,8 @@ const apOwns = (key, k) => (key === 'poster' || key === 'halftone' ? false : key
 // how much is lit at all, how much detail it has, how colorful it is and how fast it's changing.
 // Check each look and the white-out watch, below, decide what to do with them.
 const EYE_W = 64, EYE_H = 36;
-const eye = { tgt: null, prog: null, pbo: null, sync: null, failed: false, key: '', gen: { A: 0, B: 0, comp: 0 }, askGen: 0, askLook: 0, wantUntil: 0,
-  askT: 0, age: 0, turn: 0, buf: new Uint8Array(EYE_W * EYE_H * 4), last: {}, hist: { A: [], B: [], comp: [] } };
+const eye = { tgt: null, prog: null, pbo: null, sync: null, failed: false, key: '', gen: { A: 0, B: 0, C: 0, comp: 0 }, askGen: 0, askLook: 0, wantUntil: 0,
+  askT: 0, age: 0, turn: 0, buf: new Uint8Array(EYE_W * EYE_H * 4), last: {}, hist: { A: [], B: [], C: [], comp: [] } };
 // A picture that has just been wiped or given a whole new look starts with a clean slate (a copy already on its
 // way of what was there before is thrown away when it arrives)
 function eyeForget(key) { delete eye.last[key]; eye.hist[key] = []; eye.gen[key]++; }
@@ -2887,6 +2889,7 @@ function setAutopilot(on, quiet) {
     }
   } else {
     for (const k of KEYS) loops[k].ramp = null;
+    cueSleep();
     settleDevices();
     if (!quiet) showOSD('AUTOPILOT', 'OFF');
   }
@@ -3596,6 +3599,8 @@ function apClip(k) {
 // for a taste session starting). Only Next look itself counts as a quick skip.
 function nextLook(how) {
   const was = ap.on;
+  // Cue mode: straight to the look waiting on the hidden loop
+  if (was && cueActive()) { if (frozen) toggleFreeze(false); cueGo(); showOSD('CUE', 'NEXT LOOK'); return; }
   // Learn from hints: skipping a look that came in only a few seconds ago counts a little against it
   if (was && !how) tasteHintSkip(performance.now());
   if (frozen) toggleFreeze(false);
@@ -3611,6 +3616,266 @@ function nextLook(how) {
   if (!was) toast('Autopilot is on, starting with a new look. Press Next look any time to skip ahead.');
 }
 $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
+/* ================= cue mode ================= */
+// Cue mode (under Autopilot, for DJing live and making videos): Autopilot stops changing the picture by itself.
+// Nothing on screen moves except with the music and your hands. Out of sight it keeps looking for new looks the
+// whole time, on a spare loop (the "scout", loop C's place while only loops A and B are on). Each look is tried for
+// a few seconds and judged the way Check each look judges, and the good ones go on a list of up to five ready looks,
+// each with a little picture of itself (Show 5 previews puts them under the picture). The next look always waits on
+// the hidden loop, already built up, so Next look (or L) cuts to it on the very frame you press: on the hit of the
+// song. Click a preview to make it the next look instead (it builds up out of sight in about a second).
+// The scout's looks never read the other loop (no Other loop input, no Pushed by or Dyed by, nothing fed in), so
+// what's on screen can't be changed by what's being tried behind it. The white-out and black-out watches stay out
+// of it too: every look was checked before it got on the list.
+// It needs Autopilot running loops A and B, with loops C and D switched off and What you see not pinned or limited.
+const CUE = { max: 5, settle: 1.5, judge: 3.5, built: 1.2, snapW: 160 };
+const cue = { scout: false, trial: null, list: [], pick: null, deck: null, n: 0, savedC: null, hover: false, cut: 0 };
+const cueCan = () => ap.on && apPair() && loopCount === 2 && !ap.pins.has('view') && !limSpan('view') && !eye.failed;
+const cueActive = () => apSet.cue && cueCan();
+// Why Cue mode can't work just now (for the status line), or ''
+function cueWhy() {
+  if (!apSet.cue || !ap.on) return '';
+  if (eye.failed) return 'This browser can’t look at the picture, so Cue mode can’t check looks here.';
+  if (loopCount !== 2) return 'Cue mode needs loops C and D switched off (Loops › How many loops: 2).';
+  if (!apPair()) return 'Cue mode needs Autopilot to run loops A and B (Loops Autopilot runs).';
+  if (ap.pins.has('view') || limSpan('view')) return 'Cue mode needs What you see free: unpin it and take off its fader limit.';
+  return '';
+}
+const cueShown = () => (mix.tgt.view >= 50 ? 'B' : 'A');
+const cueHidden = () => (cueShown() === 'A' ? 'B' : 'A');
+// A new look for the hidden loop k, as Autopilot would make it, that leaves the other loop alone
+function cueScene(k) {
+  const sc = apScene(k), shown = otherLoop(k);
+  delete sc.favMix;
+  if (sc.in1 === 'loop') sc.in1 = apRealInput();
+  if (sc.in2 === 'loop') sc.in2 = 'none';
+  if (sc.in1 === sc.in2) sc.in2 = 'none';
+  sc.push = 0; sc.dye = 0;
+  if (topoTrace({ ...loopDefaults(), ...sc }) === 'loop') sc.topoPic = false;
+  apLimit(sc, k);
+  capTrails(sc, shown, k);
+  // 3D worlds and fractals need room to be seen: their effects are kept light, the way Autopilot's build-up peaks
+  if (is3D(sc.in1) && !sc.asInput) {
+    for (const [key, c] of Object.entries(RAMP_CLEAN)) {
+      if (isPinned(key, k)) continue;
+      const clean = nearLim(key, c), full = sc[key] ?? loopDefaults()[key];
+      if (typeof full === 'number') sc[key] = Math.round((clean + (full - clean) * 0.35) * 100) / 100;
+    }
+  }
+  return sc;
+}
+// Puts a look on loop k from a clean slate, its mirror and sliders where they're going straight away
+function cueLoad(k, look) {
+  const L = loops[k];
+  patchLoop(k, look, true);
+  L.favMix = null;
+  L.ramp = null;
+  for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+  mirrorCut(k);
+  clearLoop(k);
+  eyeForget(k);
+}
+function cueStartScout() {
+  if (cue.scout) return;
+  ensureTargets('C');
+  // Loop C's own look (if it was ever switched on) comes back when Cue mode stops
+  cue.savedC = { tgt: { ...loops.C.tgt }, cur: { ...loops.C.cur } };
+  cue.scout = true;
+  cue.trial = null;
+  if (!eye.gen.C) { eye.gen.C = 0; eye.hist.C = []; }
+}
+function cueStopScout() {
+  if (!cue.scout) return;
+  cue.scout = false;
+  cue.trial = null;
+  if (cue.savedC) { Object.assign(loops.C.tgt, cue.savedC.tgt); Object.assign(loops.C.cur, cue.savedC.cur); mirrorCut('C'); clearLoopTargets('C'); }
+  cue.savedC = null;
+}
+// Ends Cue mode's work (Autopilot off, Cue mode off, or it can't run just now); the list is kept for next time
+function cueSleep() {
+  cueStopScout();
+  cue.deck = null;
+  cueStrip();
+}
+// A small picture of the scout's look, for the previews
+let cueSnapTgt = null;
+function cueSnap() {
+  const w = CUE.snapW, h = Math.round(w * simH / simW);
+  try {
+    if (!cueSnapTgt || cueSnapTgt.w !== w || cueSnapTgt.h !== h) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      cueSnapTgt = { tex, fbo, w, h, buf: new Uint8Array(w * h * 4) };
+    }
+    const T = cueSnapTgt;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, T.fbo);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(eye.prog.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, mixTex('C'));
+    set2f(eye.prog, 'uOut', w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, T.buf);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d'), img = x.createImageData(w, h);
+    for (let y = 0; y < h; y++) img.data.set(T.buf.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+    x.putImageData(img, 0, 0);
+    return c;
+  } catch (_) { return null; }
+}
+// A look on the list goes onto the hidden loop, ready for the next cut
+function cueNextItem() {
+  const d = cue.deck;
+  return cue.list.find((it) => it.id === cue.pick) || (d && cue.list.find((it) => it.id === d.id)) ||
+    cue.list.slice().sort((a, b) => b.v.score - a.v.score)[0] || null;
+}
+function cueDeck(now) {
+  const k = cueHidden(), want = cueNextItem(), d = cue.deck;
+  // A look already waiting stays (unless you picked another), so the next cut is never one still building up
+  if (d && d.k === k && (cue.pick ? d.id === cue.pick : !want || (d.id != null && cue.list.some((it) => it.id === d.id)))) return;
+  if (!want) {
+    // Nothing on the list yet: the hidden loop takes a new look of its own (not checked), so a cut still brings something new
+    if (cue.deck && cue.deck.k === k) return;
+    cueLoad(k, cueScene(k));
+    cue.deck = { k, id: null, at: now };
+  } else {
+    cueLoad(k, want.look);
+    cue.deck = { k, id: want.id, at: now };
+  }
+  cueStrip();
+}
+// Every frame while Cue mode works (from eyeTick): keeps the next look waiting, tries looks on the scout, judges them
+function cueTick(now) {
+  if (!cueActive()) { if (cue.scout || cue.deck) cueSleep(); return false; }
+  ap.prep = null; ap.glide = null;
+  for (const k of ['A', 'B']) loops[k].ramp = null;
+  // One loop on screen at a time (the other one waits, hidden)
+  if (mix.tgt.view !== 0 && mix.tgt.view !== 100) mix.tgt.view = mix.tgt.view >= 50 ? 100 : 0;
+  cueStartScout();
+  cueDeck(now);
+  const T = cue.trial, k = cueHidden();
+  if (!T) {
+    const sc = cueScene(k);
+    cueLoad('C', sc);
+    cue.trial = { look: JSON.parse(JSON.stringify(loops.C.tgt)), since: now };
+    return true;
+  }
+  const age = (now - T.since) / 1000;
+  if (age < CUE.judge) return true;
+  const S = eye.hist.C.filter((s) => s.t >= T.since + CUE.settle * 1000);
+  if (S.length < 3 && age < 10) return true;
+  cue.trial = null;
+  if (!S.length) return true;
+  const v = tasteJudge(lookVerdict(S), k, T.look, S);
+  checkTally(v, true);
+  if (!v.pass) return true;
+  // Kept while the mouse is over the previews only if there's room, so a picture doesn't change as you reach for it
+  const free = cue.list.filter((it) => it.id !== cue.pick && !(cue.deck && cue.deck.id === it.id));
+  if (cue.list.length >= CUE.max) {
+    if (cue.hover || !free.length) return true;
+    const worst = free.sort((a, b) => a.v.score - b.v.score)[0];
+    if (worst.v.score >= v.score) return true;
+    cue.list.splice(cue.list.indexOf(worst), 1);
+  }
+  cue.list.push({ id: ++cue.n, look: T.look, v, pic: cueSnap(), t: now });
+  cueStrip();
+  apStatus();
+  return true;
+}
+// Next look in Cue mode: cuts to the hidden loop on this very frame
+function cueGo() {
+  const now = performance.now();
+  if (!cue.deck || cue.deck.k !== cueHidden()) cueDeck(now);
+  const k = cue.deck.k, id = cue.deck.id;
+  mix.tgt.view = mix.cur.view = k === 'B' ? 100 : 0;
+  for (const f of ['xab', 'xba']) if (!ap.pins.has(f) && apOwnsMix(f)) mix.tgt[f] = mix.cur[f] = 0;
+  if (id != null) cue.list = cue.list.filter((it) => it.id !== id);
+  if (cue.pick === id) cue.pick = null;
+  cue.deck = null;
+  cue.cut = now;
+  ap.cameIn = { k, at: now, gen: loops[k].gen };
+  lookOnScreen++;
+  eyeForget('comp');
+  cueDeck(now);
+  syncUI();
+  cueStrip();
+  apStatus();
+}
+// The previews under the picture
+function cueStrip() {
+  const el = $('#cueStrip');
+  if (!el) return;
+  const show = apSet.cue && apSet.cuePreviews && ap.on && !cueWhy();
+  el.hidden = !show;
+  if (!show) return;
+  const next = cueNextItem(), slots = $$('#cueStrip .cue-pic');
+  slots.forEach((b, i) => {
+    const it = cue.list[i];
+    const cv = b.querySelector('canvas');
+    b.disabled = !it;
+    b.dataset.id = it ? String(it.id) : '';
+    b.classList.toggle('next', !!it && next === it);
+    b.classList.toggle('picked', !!it && cue.pick === it.id);
+    if (it && b.dataset.drawn !== String(it.id) && it.pic) {
+      cv.width = it.pic.width; cv.height = it.pic.height;
+      cv.getContext('2d').drawImage(it.pic, 0, 0);
+      b.dataset.drawn = String(it.id);
+    } else if (!it && b.dataset.drawn) {
+      cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+      b.dataset.drawn = '';
+    }
+    const name = it ? SRC_LABEL[it.look.in1] || it.look.in1 : '';
+    b.querySelector('.cue-name').textContent = it ? (next === it ? 'Next · ' : '') + name : 'Looking…';
+    b.title = it ? `${name}${next === it ? ' — this is the next look. Press Next look (L) to cut to it.' : ' — click to make this the next look'}` : 'Autopilot is still looking for a good one';
+  });
+}
+$$('#cueStrip .cue-pic').forEach((b) => b.addEventListener('click', () => {
+  const id = +b.dataset.id;
+  if (!id) return;
+  cue.pick = cue.pick === id ? null : id;
+  cue.deck = null;
+  cueDeck(performance.now());
+  cueStrip();
+}));
+$('#cueStrip')?.addEventListener('pointerenter', () => { cue.hover = true; });
+$('#cueStrip')?.addEventListener('pointerleave', () => { cue.hover = false; });
+$('#cueGo')?.addEventListener('click', () => nextLook());
+function syncCueUI() {
+  $('#apCue')?.setAttribute('aria-pressed', String(apSet.cue));
+  $('#apCuePrev')?.setAttribute('aria-pressed', String(apSet.cuePreviews));
+  const p = $('#apCuePrevCtl');
+  if (p) p.hidden = !apSet.cue;
+  cueStrip();
+}
+$('#apCue')?.addEventListener('click', () => {
+  apSet.cue = !apSet.cue;
+  saveAp();
+  if (apSet.cue) {
+    if (!ap.on) setAutopilot(true, true);
+    const why = cueWhy();
+    toast(why || 'Cue mode is on. Autopilot leaves the picture alone and gets new looks ready out of sight. Press Next look (L) to cut to the next one on the hit.', 9000);
+  } else {
+    cueSleep();
+    ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
+    ap.due = ap.next; ap.span = ap.next - performance.now();
+    toast('Cue mode is off. Autopilot changes looks by itself again.');
+  }
+  syncCueUI();
+  apStatus();
+});
+$('#apCuePrev')?.addEventListener('click', () => {
+  apSet.cuePreviews = !apSet.cuePreviews;
+  saveAp();
+  syncCueUI();
+});
+window.__plCue = { cue, cueActive, cueGo, cueWhy };
 // For tests/ap_loops_check.py: a way in to Autopilot's loops
 window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 0; apStep(performance.now(), false); } };
 
@@ -4776,10 +5041,18 @@ $('#apReset').addEventListener('click', () => {
 function apStatus() {
   let html;
   if (!ap.on) html = 'Autopilot is off. Press <b>Autopilot</b> (at the top of Autopilot, under the picture, or the P key) to start it.';
-  else {
+  else if (cueActive()) {
+    const n = cue.list.length, d = cue.deck;
+    html = '<span class="live"></span><b>Cue mode.</b> Autopilot leaves the picture alone. ' +
+      (n ? `${n} new look${n === 1 ? '' : 's'} ready. ` : 'Looking for good new looks… ') +
+      (d && d.id != null && performance.now() - d.at > CUE.built * 1000 ? 'Press <b>Next look</b> (L) to cut to the next one.'
+        : d && d.id != null ? 'The next look is building up…' : 'Next look (L) still cuts to a new look, not yet checked.');
+    if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
+  } else {
+    const cw = cueWhy();
     const s = Math.max(0, Math.round((ap.next - performance.now()) / 1000));
     const P = ap.prep, holding = P && P.hold && !P.ok;
-    html = '<span class="live"></span><b>Autopilot is on.</b> ' +
+    html = (cw ? `<b>${cw}</b> Until then Autopilot changes looks by itself. ` : '') + '<span class="live"></span><b>Autopilot is on.</b> ' +
       (holding ? 'New look as soon as one passes its check.'
         : ap.beatWait ? 'New look on the next beat.' : s <= 1 ? 'New look coming now.' : `Next new look in about ${s < 60 ? s + ' seconds' : fmtDur(s).toLowerCase()}.`);
     if (watch.easing) html += ` Easing off loop ${watch.easing} so it doesn’t turn white.`;
@@ -4952,6 +5225,7 @@ function lookClock() {
   const say = (long, sh) => { short = sh; return `<span class="lc-l">${long}</span><span class="lc-s">${sh}</span>`; };
   if (!ap.on) { text = say('Autopilot off', 'Off'); off = true; }
   else if (frozen) { text = say('Frozen', 'Frozen'); off = true; }
+  else if (cueActive()) { const n = cue.list.length; text = say(n ? `Cue · <b>${n}</b> ready` : 'Cue · looking…', n ? `<b>${n}</b> ready` : 'Looking'); }
   else if (ap.beatWait) text = say('Next look on the beat', 'On beat');
   else {
     const left = (ap.due - performance.now()) / 1000;
@@ -4967,6 +5241,7 @@ function lookClock() {
 }
 setInterval(lookClock, 200);
 syncApUI();
+syncCueUI();
 
 /* ================= transport ================= */
 const freezeBtn = $('#freeze');
@@ -10432,7 +10707,9 @@ function eyeTick(now, dt, wA, wB) {
   const got = eyeCollect();
   if (got) tasteFill(now);
   if (frozen) return;
-  if (ap.on) {
+  if (ap.on && cueTick(now)) {
+    // Cue mode does its own looking (see cueTick)
+  } else if (ap.on) {
     if (got && ap.prep && got === ap.prep.k) prepJudge(now);
     // Looks are only tried out of sight when Autopilot swaps loops A and B (it runs both)
     if (checking() && canTryOut() && apPair()) {
@@ -10447,7 +10724,7 @@ function eyeTick(now, dt, wA, wB) {
     darkWatch(now, dt, wA, wB);
   }
   if (looking && !eye.sync && now - eye.askT > 55) {
-    const P = ap.prep, keys = P ? [P.k, 'comp', P.k] : ['comp'];
+    const P = ap.prep, keys = cue.scout ? ['C', 'comp', 'C'] : P ? [P.k, 'comp', P.k] : ['comp'];
     for (const k of ['A', 'B']) if ((k === 'A' ? wA : wB) > 0.02 && !(P && P.k === k)) keys.push(k);
     const key = keys[eye.turn++ % keys.length];
     eyeAsk(key, key === 'comp' ? comp.tex : shownTex(key), now);
@@ -12652,7 +12929,7 @@ function frame() {
     const own = !apOwnsMix(p);
     mix.cur[p] += (mix.tgt[p] - mix.cur[p]) * (own || pinned(pinKeyOf(p)) || rampingMix(p) ? k : kMix);
   }
-  if (ap.on && !frozen && now >= ap.next) apTick(now);
+  if (ap.on && !frozen && now >= ap.next && !cueActive()) apTick(now);
   followSliders();
   if (lookOnScreen !== ratedLook) syncRated();
   if (!frozen) simT += dt;
@@ -12697,11 +12974,11 @@ function frame() {
     }
     for (const name of Object.keys(SCENES)) {
       const sc = SCENES[name];
-      if (frozen || !uses(name)) continue;
+      if (frozen || !(uses(name) || (cue.scout && (loops.C.tgt.in1 === name || loops.C.tgt.in2 === name)))) continue;
       const step = dt * sc.speed * pace * (1 + (sceneReacts(name) ? surge - 1 : 0) * (sc.kick ?? 1));
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
-      if (sc.fly) for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step, { style: 'glide', drive: 0 });
+      if (sc.fly) for (const k of cue.scout ? [...activeKeys(), 'C'] : activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step, { style: 'glide', drive: 0 });
       // Mount Ribbit's hikers walk on, the same way
       if (sc.ext) {
         const drive = ribDriven(), ctl = ribControls();
@@ -12731,6 +13008,8 @@ function frame() {
     }
     for (const key of act) mirrorStep(key, dt);
     for (const key of act) if (need[key]) { runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f); typeInLoop(key, f); }
+    // Cue mode's scout: the spare loop where new looks are tried out of sight
+    if (cue.scout && loops.C.rt) { mirrorStep('C', dt); runLoop('C', 0, null, f); }
   }
 
   for (const key of KEYS) finalPass(key);

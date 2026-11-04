@@ -1170,3 +1170,16 @@ button.seq-card { cursor: pointer; }
 /* Edit this look (sequencer): the bar while a block's look is being changed */
 .session-bar.edit-bar { border-color: rgba(176,108,255,.5); background: rgba(176,108,255,.08); }
 .edit-bar .session-row .live { background: var(--loop-a); box-shadow: 0 0 8px rgba(176,108,255,.7); }
+
+/* Cue mode's previews: the ready looks under the picture */
+.cue-strip { display: flex; gap: 6px; align-items: stretch; flex-wrap: nowrap; overflow: hidden; }
+.cue-strip[hidden] { display: none; }
+.cue-pic { flex: 1 1 0; min-width: 0; position: relative; padding: 0; border: 2px solid var(--line, #333); border-radius: 6px; background: #000; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+.cue-pic canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
+.cue-pic .cue-name { font-size: 11px; line-height: 1.3; padding: 2px 4px; color: var(--muted, #aaa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; background: rgba(0,0,0,.6); }
+.cue-pic:disabled { cursor: default; opacity: .45; }
+.cue-pic.next { border-color: #8b1ab8; box-shadow: 0 0 0 1px #8b1ab8, 0 0 10px rgba(139,26,184,.6); }
+.cue-pic.next .cue-name { color: #fff; }
+.cue-pic.picked::after { content: '★'; position: absolute; top: 2px; right: 5px; color: #fff; font-size: 13px; text-shadow: 0 0 3px #000; }
+.cue-go { flex: 0 0 auto; align-self: center; }
+.cue-go kbd { font: inherit; opacity: .7; margin-left: 4px; }

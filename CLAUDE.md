@@ -71,6 +71,11 @@ file don't rebuild the app.
 4h2. **Autopilot's black-out watch** (`darkWatch` / `liftLoop` in js/app.js, next to the white-out watch: Trails, Input size and
    brightness up a notch on a loop going black, show the lit loop, next look after 4 s; never while the white-out watch is busy):
    `python3 tests/ap_dark_check.py` (about 2 minutes; it hands the eye copies of a black screen, since this workspace's graphics are too slow).
+4h3. **Cue mode** (Autopilot › Cue mode, `apSet.cue` / `apSet.cuePreviews`; `cueTick`, `cueGo`, `cueDeck`, `cueScene` in js/app.js): no timed
+   looks, watches or build-ups; a scout runs in loop C's place (only with 2 loops) trying looks, judged by `lookVerdict` + `tasteJudge`;
+   up to 5 ready looks with snapshots in `#cueStrip`; the next waits built up on the hidden loop and Next look cuts on the same frame.
+   Cue looks never read the other loop (no Other loop input, push, dye or feeds). `python3 tests/cue_check.py` (about 2.5 minutes;
+   feeds the eye copies for the scout, leaves out 3D worlds and fractals, which take seconds a frame here). Reaches in via `window.__plCue`.
 4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
    `python3 tests/ap_type_check.py` (about a minute and a half).
 4m. **The sequencer's playhead with Spotify** (`seqPos` in js/app.js: small differences caught up by speed, skips over
