@@ -1438,6 +1438,7 @@ function syncUI() {
   $('#xcFrom').textContent = otherLoop('C');
   $('#xcFrom').className = `mini ${otherLoop('C').toLowerCase()}`;
   $('#loopSrcBtn').textContent = `Loop ${otherK}’s picture`;
+  $('#loopNeutral').textContent = `Neutral loop ${edit}`;
   $('#loopStatus').textContent = `Loop ${otherK}’s picture is feeding loop ${edit}.`;
   in2Sel.querySelector('option[value="loop"]').textContent = `Loop ${otherK}’s picture`;
   for (const id of ['#pushFrom', '#dyeFrom']) { const el = $(id); el.textContent = otherK; el.className = `mini ${otherK.toLowerCase()}`; }
@@ -2262,6 +2263,55 @@ function neutral() {
   toast('Neutral: just the input, with every effect off. Raise Trails to bring the feedback back, then try Zoom and Spin.');
 }
 $('#neutral').addEventListener('click', neutral);
+// Neutral this loop (Inputs, for the loop being edited, and in each Spread out column): just that loop's input,
+// every effect on it off and nothing fed into it. The other loops and the whole-picture settings stay as they are.
+// A loop Autopilot runs is handed back to you (Autopilot stops if it was its only loop); a sequence playing it
+// stops, as when you pick an input on it.
+function neutralLoop(k) {
+  if (!loopOn(k)) return;
+  if (MV.play && !MV.applying) movesStop(true);
+  seqTakeOver(k);
+  let handed = '';
+  if (ap.on && apRuns(k)) {
+    if (apMine().length <= 1) setAutopilot(false, true);
+    else {
+      apSet.runs = apSet.runs.filter((x) => x !== k);
+      loops[k].ramp = null;
+      if (!apPair()) { ap.prep = null; if (ap.glide && !apRuns(ap.glide.k)) ap.glide = null; }
+      ap.turnN = 0;
+      saveAp();
+      syncApUI();
+      handed = ` Loop ${k} is yours now: Autopilot leaves it alone.`;
+    }
+  }
+  markPreset(null);
+  loopGrade[k] = null; seqRelief[k] = null;
+  const L = loops[k], src = L.tgt.in1;
+  patchLoop(k, {
+    in1: src, in2: 'none', blend: 50, motion: false,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'loop'].includes(src) ? 100 : 50,
+    zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
+    form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic,
+  }, true);
+  for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
+  mirrorCut(k);
+  // Nothing fed into this loop from the others
+  for (const [q, to] of Object.entries(FEED_TO)) if (to === k) { mix.tgt[q] = 0; mix.cur[q] = 0; }
+  mix.base = { ...mix.tgt };
+  // The input's own picture adjustments, unless another loop on screen uses the same input
+  if (ADJ_SRC.includes(src) && !activeKeys().some((j) => j !== k && (loops[j].tgt.in1 === src || loops[j].tgt.in2 === src))) { adj[src] = adjDefaults(); syncAdjUI(); }
+  // Its old trails go, so it starts clean
+  gl.clearColor(0, 0, 0, 1);
+  for (const t of L.rt) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.clear(gl.COLOR_BUFFER_BIT); }
+  twForget(L);
+  settleDevices();
+  syncUI();
+  syncApLoops();
+  showOSD(`NEUTRAL ${k}`, (SRC_LABEL[src] || 'Nothing').toUpperCase());
+  toast(`Loop ${k} is neutral: just its input, with its effects off.${handed} Raise Trails to bring its feedback back.`);
+}
+$('#loopNeutral').addEventListener('click', () => neutralLoop(edit));
+window.__plNeutralLoop = neutralLoop;   // for tests/neutral_loop_check.py
 
 /* ================= autopilot ================= */
 // Every half minute or so (New look every, under Autopilot settings) the hidden loop gets a new look, then the
