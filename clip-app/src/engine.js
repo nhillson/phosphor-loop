@@ -423,16 +423,19 @@ const validCrop = (c) => !!c && ['x', 'y', 'w', 'h'].every((k) => Number.isFinit
 
 async function frameAt(tools, file, t, out, { width = 320, signal, crop } = {}) {
   const vf = [cropFilter(crop), `scale=${width}:-2:flags=bicubic`].filter(Boolean).join(',');
-  const r = await run(tools.ffmpeg, ['-hide_banner', '-y', '-nostdin', '-ss', Math.max(0, t).toFixed(3), '-i', file,
-    '-frames:v', '1', '-vf', vf, '-q:v', '3', out], { signal });
-  if (r.code !== 0 || !fs.existsSync(out)) {
-    // Right at the end of a file there may be no frame: try a moment earlier
-    if (t > 0.5) return frameAt(tools, file, t - 0.5, out, { width, signal, crop });
-    throw new ClipError('Couldn’t take a picture from the video.', 'failed', r.stderr.slice(-300));
+  // Right at the end of a file (or in a very short one, as stickers often are) there may be no frame at that
+  // moment: a moment earlier, half way there, the very start, and at last the first frame there is
+  const tries = [t, t - 0.5, t / 2, 0].map((x) => Math.max(0, x)).filter((x, i, a) => a.indexOf(x) === i);
+  let r = null;
+  for (const at of tries) {
+    r = await run(tools.ffmpeg, ['-hide_banner', '-y', '-nostdin', '-ss', at.toFixed(3), '-i', file,
+      '-frames:v', '1', '-vf', vf, '-q:v', '3', out], { signal });
+    if (r.code === 0 && fs.existsSync(out)) return out;
   }
-  return out;
+  r = await run(tools.ffmpeg, ['-hide_banner', '-y', '-nostdin', '-i', file, '-vf', vf, '-frames:v', '1', '-q:v', '3', out], { signal });
+  if (r.code === 0 && fs.existsSync(out)) return out;
+  throw new ClipError('Couldn’t take a picture from the video.', 'failed', r.stderr.slice(-300));
 }
-
 async function frames(tools, file, times, dir, prefix, { width = 320, signal, crop } = {}) {
   await fsp.mkdir(dir, { recursive: true });
   const outs = new Array(times.length);
@@ -440,10 +443,14 @@ async function frames(tools, file, times, dir, prefix, { width = 320, signal, cr
   const worker = async () => {
     while (next < times.length) {
       const i = next++;
-      outs[i] = await frameAt(tools, file, times[i], path.join(dir, `${prefix}-${String(i).padStart(2, '0')}.jpg`), { width, signal, crop });
+      // One picture that can't be had doesn't stop the rest: its neighbour stands in for it below
+      try { outs[i] = await frameAt(tools, file, times[i], path.join(dir, `${prefix}-${String(i).padStart(2, '0')}.jpg`), { width, signal, crop }); }
+      catch (e) { if (e && e.code === 'cancelled') throw e; outs[i] = null; }
     }
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
+  if (!outs.some(Boolean)) throw new ClipError('Couldn’t take a picture from the video.', 'failed');
+  for (let i = 0; i < outs.length; i++) if (!outs[i]) outs[i] = outs.slice(0, i).reverse().find(Boolean) || outs.slice(i + 1).find(Boolean);
   return outs;
 }
 

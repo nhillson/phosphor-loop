@@ -94,6 +94,18 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
     return `${c.probe.width}x${c.probe.height}, map ${map.min}-${map.max}`;
   });
 
+  await test('a very short sticker (a third of a second): its filmstrip and thumbnail can be had', async () => {
+    const gif = path.join(job(), 'short.gif');
+    await E.run(tools.ffmpeg, ['-y', '-f', 'lavfi', '-i', 'nullsrc=s=120x90:r=10:d=0.3', '-vf',
+      "format=rgba,geq=r='255':g='60':b='200':a='if(lt(hypot(X-40-T*60,Y-45),25),255,0)',split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse=alpha_threshold=128", gif]);
+    const r = await E.fetchVideo(tools, { file: gif }, job(), { log });
+    const strip = await E.frames(tools, r.playable, E.spread(0, r.probe.duration, 16), path.join(job(), 'strip'), 's', { width: 200 });
+    assert.equal(strip.filter(Boolean).length, 16, 'every filmstrip picture');
+    const c = await E.cutClip(tools, r.source, path.join(job(), 'c.mp4'), { start: 0, end: r.probe.duration, sticker: !!r.sticker, log });
+    await E.frameAt(tools, c.file, c.probe.duration / 2, path.join(job(), 't.jpg'), { width: 480 });
+    return `${r.probe.duration.toFixed(2)} s, ${c.probe.width}x${c.probe.height}`;
+  });
+
   await test('page with no video: a clear message', async () => {
     await assert.rejects(E.fetchVideo(tools, { url: site.url + 'blob.html' }, job(), { log }), (e) => {
       assert.equal(e.code, 'unsupported');

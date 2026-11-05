@@ -63,6 +63,15 @@ Chrome's own picture reader unpacks them in a hidden window (`decodePicture` in 
 and `picturesToVideo` in `src/engine.js` turns the frames into a lossless FFV1 video with see-through parts, which is
 used from then on like a GIF. Since 1.11.1; the self-test grabs `sticker.webp` and `sticker.gif` from the test pages.
 
+## Folders, and dragging clips out (1.12)
+
+In the Library, picking a category shows a folder bar under the category chips: where you are (Abstract › Fractals),
+the folders here with how many clips are in each, and + New folder. A clip dragged onto a folder, a step of that path or
+a category chip is moved there (file and settings file with it, `lib:update` with `p`); a clip's details also have a
+Folder list. Dragging a clip anywhere else (Phosphor Loop's picture, a folder on the computer) carries its file
+(`lib:drag`, `webContents.startDrag`). Phosphor Loop knows such a file by its name and length and loads it as the
+library clip, so stickers stay see-through. The self-test makes a folder and moves a sticker into it.
+
 ## Tags, saved effects, and copying clips to another computer
 
 - **Tags** (`fractal`, `industrial`, `neon glow`…): set in Phosphor Loop's clip explorer, in the snip form, or in

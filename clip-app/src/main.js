@@ -232,6 +232,8 @@ function libraryForPanel() {
   return {
     dir: library.dir,
     cats: d.cats.map((c) => ({ id: c.id, n: c.n, sys: !!c.sys, count: d.clips.filter((x) => x.c === c.id).length })),
+    // Every folder inside the categories, empty ones too: { c: category id, p: Fractals/Blue }
+    dirs: (d.dirs || []).map((x) => ({ c: x.c, p: x.p })),
     clips: d.clips.slice().sort((a, b) => String(b.added || '').localeCompare(String(a.added || ''))).map(clipForPanel),
   };
 }
@@ -908,6 +910,21 @@ function handle(channel, fn) {
 }
 
 function setupIpc() {
+  // A library clip dragged out of the window: the operating system carries its file (to Phosphor Loop's picture,
+  // a folder, another app), with its thumbnail under the pointer. Phosphor Loop knows the file by its name and
+  // asks this library for the clip itself, so a sticker stays a sticker.
+  ipcMain.on('lib:drag', (e, id) => {
+    const c = library && library.data.clips.find((x) => x.id === id);
+    if (!c) return;
+    const file = library.abs(c);
+    if (!fs.existsSync(file)) return;
+    let icon = null;
+    try { if (c.t) icon = nativeImage.createFromPath(library.thumbAbs(c)); } catch (_) { icon = null; }
+    if (!icon || icon.isEmpty()) icon = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
+    const sz = icon.getSize();
+    if (sz.width > 160) icon = icon.resize({ width: 160 });
+    try { e.sender.startDrag({ file, icon }); } catch (err) { log('drag failed: ' + err.message); }
+  });
   handle('panel:ready', () => {
     panelReady = true;
     return {
@@ -1031,7 +1048,9 @@ function setupIpc() {
     }
   });
 
-  handle('lib:update', async ({ id, n, c, tags }) => { const clip = await library.updateClip(id, { n, c, ...(tags !== undefined ? { tags } : {}) }); sendLibrary(); return { ok: true, clip: clipForPanel(clip) }; });
+  // p: the folder inside the category ('' for its top) to move the clip to
+  handle('lib:update', async ({ id, n, c, tags, p }) => { const clip = await library.updateClip(id, { n, c, ...(tags !== undefined ? { tags } : {}), ...(p !== undefined ? { p } : {}) }); sendLibrary(); return { ok: true, clip: clipForPanel(clip) }; });
+  handle('folder:add', async ({ c, p }) => { const f = await library.addFolder(c, p); sendLibrary(); return { ok: true, ...f }; });
   handle('lib:remove', async (id) => { await library.removeClip(id); sendLibrary(); return { ok: true }; });
   handle('lib:show', (id) => { const c = library.data.clips.find((x) => x.id === id); if (c) shell.showItemInFolder(library.abs(c)); });
   handle('lib:open', () => shell.openPath(library.dir));

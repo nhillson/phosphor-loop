@@ -11,4 +11,6 @@ contextBridge.exposeInMainWorld('clips', {
     return () => ipcRenderer.removeListener(channel, f);
   },
   pathOf: (file) => { try { return webUtils.getPathForFile(file); } catch (_) { return ''; } },
+  // Drags a library clip's file out of the window (onto Phosphor Loop, a folder, another app)
+  drag: (id) => ipcRenderer.send('lib:drag', id),
 });

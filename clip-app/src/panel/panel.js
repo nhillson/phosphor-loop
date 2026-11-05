@@ -8,7 +8,8 @@ const MIN_LEN = 0.2;
 
 const S = {
   tab: 'get', web: {}, video: {}, jobs: [], lib: null, vision: {}, settings: { keepSound: false, maxHeight: 1080 },
-  ed: null, libCat: 'all', libQuery: '', modals: 0, opened: new Set(),
+  ed: null, libCat: 'all', libFolder: '', libQuery: '', modals: 0, opened: new Set(),
+  dragId: null,   // the library clip being dragged (onto a folder to move it, or out of the window)
 };
 
 /* ---------- small helpers ---------- */
@@ -156,6 +157,8 @@ document.addEventListener('drop', async (e) => {
   e.preventDefault();
   dragDepth = 0;
   document.body.classList.remove('dragging');
+  // A library clip dragged and let go back inside this window: nothing to grab
+  if (S.draggingOut) { S.draggingOut = false; S.dragId = null; return; }
   const files = [...(e.dataTransfer.files || [])];
   let started = 0;
   for (const f of files) {
@@ -656,17 +659,21 @@ function renderLibrary() {
   const chip = (id, name, n) => {
     const b = el('button', 'chip' + (S.libCat === id ? ' on' : ''), name);
     b.appendChild(el('span', 'n', String(n)));
-    b.addEventListener('click', () => { S.libCat = id; renderLibrary(); });
+    b.addEventListener('click', () => { S.libCat = id; S.libFolder = ''; renderLibrary(); });
+    if (id !== 'all') moveTarget(b, id, '');   // a clip dropped on a category goes to its top
     chips.appendChild(b);
   };
   chip('all', 'All', lib.clips.length);
   for (const c of lib.cats) chip(c.id, c.n, c.count);
+  renderFolders();
   if (S.tab !== 'lib') return;
   stopHoverVideos();
   const q = S.libQuery.trim().toLowerCase();
   // Every word has to match the name, a tag, where it came from or who made it
   const words = q.split(/\s+/).filter(Boolean);
-  const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat)
+  // In a category: the clips in the folder you're in (while searching: in it and the folders inside it)
+  const inFolder = (c) => S.libCat === 'all' || (words.length ? !S.libFolder || c.p === S.libFolder || (c.p || '').startsWith(S.libFolder + '/') : (c.p || '') === S.libFolder);
+  const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat) && inFolder(c)
     && words.every((w) => (c.n + ' ' + (c.tags || []).join(' ') + ' ' + (c.p || '') + ' ' + (c.page || '') + ' ' + (c.by || '')).toLowerCase().includes(w)));
   S.libShown = shown.map((c) => c.id);
   $('#libCopy').disabled = !shown.length || S.copying;
@@ -676,6 +683,81 @@ function renderLibrary() {
   for (const c of shown) grid.appendChild(clipCard(c));
   $('#libEmpty').hidden = shown.length > 0;
 }
+/* folders inside a category: where you are (Category › Fractals › Blue), the folders here, + New folder */
+const FOLDER_SVG = '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+// Every folder in category c (from the library's list, and from where its clips are)
+function foldersOf(c) {
+  const set = new Set();
+  const add = (p) => { const parts = String(p || '').split('/').filter(Boolean); for (let i = 1; i <= parts.length; i++) set.add(parts.slice(0, i).join('/')); };
+  for (const d of S.lib.dirs || []) if (d.c === c) add(d.p);
+  for (const x of S.lib.clips) if (x.c === c) add(x.p);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+function renderFolders() {
+  const box = $('#libFolders');
+  box.textContent = '';
+  box.hidden = S.libCat === 'all';
+  if (box.hidden) return;
+  const all = foldersOf(S.libCat);
+  if (S.libFolder && !all.includes(S.libFolder)) S.libFolder = '';
+  // Where you are: the category, then each folder down to this one (click one to go back up; drop a clip on it)
+  const parts = S.libFolder ? S.libFolder.split('/') : [];
+  const crumbs = [[catName(S.libCat), ''], ...parts.map((n, i) => [n, parts.slice(0, i + 1).join('/')])];
+  crumbs.forEach(([n, p], i) => {
+    if (i) box.appendChild(el('span', 'sep', '›'));
+    const here = i === crumbs.length - 1;
+    const b = el('button', 'crumb' + (here ? ' here' : ''), n);
+    if (!here) b.addEventListener('click', () => { S.libFolder = p; renderLibrary(); });
+    moveTarget(b, S.libCat, p);
+    box.appendChild(b);
+  });
+  box.appendChild(el('span', 'gap'));
+  // The folders just inside this one
+  const depth = parts.length;
+  for (const p of all) {
+    const ps = p.split('/');
+    if (ps.length !== depth + 1 || (S.libFolder && !p.startsWith(S.libFolder + '/'))) continue;
+    const n = S.lib.clips.filter((x) => x.c === S.libCat && (x.p === p || (x.p || '').startsWith(p + '/'))).length;
+    const b = el('button', 'fold');
+    b.innerHTML = FOLDER_SVG;
+    b.appendChild(el('span', '', ps[ps.length - 1]));
+    b.appendChild(el('span', 'n', String(n)));
+    b.title = 'Open this folder. Drag a clip onto it to move the clip here.';
+    b.addEventListener('click', () => { S.libFolder = p; renderLibrary(); });
+    moveTarget(b, S.libCat, p);
+    box.appendChild(b);
+  }
+  const add = el('button', 'btn small ghost', '+ New folder');
+  add.title = S.libFolder ? 'A new folder inside this one' : 'A new folder in ' + catName(S.libCat);
+  add.addEventListener('click', async () => {
+    const name = await ask(S.libFolder ? `Name for the new folder inside “${parts[parts.length - 1]}”:` : `Name for the new folder in ${catName(S.libCat)}:`, { input: '', yes: 'Make it' });
+    const clean = String(name || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    const r = await call('folder:add', { c: S.libCat, p: (S.libFolder ? S.libFolder + '/' : '') + clean });
+    if (r && r.ok) { S.libFolder = r.p; renderLibrary(); toast('Made the folder “' + clean + '”. Drag clips onto it to move them in.', 'ok', 3500); }
+  });
+  box.appendChild(add);
+}
+// A place a dragged clip can be dropped to move it there: category c, folder p ('' for the category's top)
+function moveTarget(elm, c, p) {
+  const isClip = () => !!S.dragId;
+  elm.addEventListener('dragover', (e) => { if (!isClip()) return; e.preventDefault(); e.stopPropagation(); elm.classList.add('drop-here'); });
+  elm.addEventListener('dragleave', () => elm.classList.remove('drop-here'));
+  elm.addEventListener('drop', async (e) => {
+    elm.classList.remove('drop-here');
+    if (!isClip()) return;
+    e.preventDefault(); e.stopPropagation();
+    const id = S.dragId;
+    S.dragId = null; S.draggingOut = false;
+    dragDepth = 0; document.body.classList.remove('dragging');
+    const clip = S.lib.clips.find((x) => x.id === id);
+    if (!clip || (clip.c === c && (clip.p || '') === p)) return;
+    const r = await call('lib:update', { id, c, p });
+    if (r && r.ok) toast(`Moved “${r.clip.n}” to ${[catName(c), ...p.split('/').filter(Boolean)].join(' › ')}.`, 'ok', 3000);
+    else if (r && r.message) toast(r.message, 'bad', 4000);
+  });
+}
+
 // A sticker's clip is the sticker over its see-through map (for Phosphor Loop): only the top half is shown here
 const isSticker = (c) => (c.tags || []).some((t) => String(t).toLowerCase() === 'sticker');
 function clipCard(c) {
@@ -699,6 +781,16 @@ function clipCard(c) {
   });
   card.addEventListener('mouseleave', () => { const v = pic.querySelector('video'); if (v) { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); } });
   card.addEventListener('click', () => openClip(c.id));
+  // Drag a clip out: onto Phosphor Loop's picture (into the loop it's dropped on), a folder or another app
+  card.draggable = true;
+  card.title = 'Click to open it. Drag it onto Phosphor Loop to feed it into a loop.';
+  card.addEventListener('dragstart', (e) => {
+    e.preventDefault();
+    S.draggingOut = true;
+    S.dragId = c.id;
+    setTimeout(() => { S.draggingOut = false; S.dragId = null; }, 30000);
+    api.drag(c.id);
+  });
   return card;
 }
 function stopHoverVideos() { $$('#grid video').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); }); }
@@ -773,6 +865,7 @@ function openClip(id) {
   sel.textContent = '';
   for (const cat of S.lib.cats) { const o = el('option', '', cat.n); o.value = cat.id; sel.appendChild(o); }
   sel.value = c.c;
+  folderOptions(c.c, c.p || '');
   $('#cmTags').value = (c.tags || []).join(', ');
   const facts = $('#cmFacts');
   facts.textContent = '';
@@ -805,7 +898,21 @@ $('#cmName').addEventListener('change', renameClip);
 $('#cmName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#cmName').blur(); });
 $('#cmCat').addEventListener('change', async () => {
   const r = await call('lib:update', { id: clipOpen, c: $('#cmCat').value });
-  if (r && r.ok) toast('Moved to ' + catName(r.clip.c) + '.', 'ok', 2500);
+  if (r && r.ok) { folderOptions(r.clip.c, r.clip.p || ''); toast('Moved to ' + catName(r.clip.c) + '.', 'ok', 2500); }
+});
+// The folders of the clip's category, for moving it from its details
+function folderOptions(c, cur) {
+  const sel = $('#cmFolder');
+  sel.textContent = '';
+  const top = el('option', '', '(top of ' + catName(c) + ')');
+  top.value = '';
+  sel.appendChild(top);
+  for (const p of foldersOf(c)) { const o = el('option', '', p.split('/').join(' › ')); o.value = p; sel.appendChild(o); }
+  sel.value = cur;
+}
+$('#cmFolder').addEventListener('change', async () => {
+  const r = await call('lib:update', { id: clipOpen, p: $('#cmFolder').value });
+  if (r && r.ok) toast('Moved to ' + [catName(r.clip.c), ...String(r.clip.p || '').split('/').filter(Boolean)].join(' › ') + '.', 'ok', 2500);
 });
 // Tags: typed with commas between them; saved in the clip's settings file too, so they travel with it
 $('#cmTags').addEventListener('change', async () => {

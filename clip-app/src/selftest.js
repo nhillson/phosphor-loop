@@ -347,6 +347,23 @@ module.exports = async function selftest(h) {
     await panelFrames(20);
     await shot('10-stickers-in-library');
 
+    /* ---- folders: a new folder in a category, a clip moved into it, and the folder bar showing it ---- */
+    {
+      const made = await pjs(`clips.call('folder:add', { c: 'abstract', p: 'Stickers' })`);
+      check('a new folder is made in a category', made && made.ok && fs.existsSync(path.join(h.library().dir, 'Abstract', 'Stickers')), JSON.stringify(made));
+      const st = await pjs(`(S.lib.clips.find((c) => (c.tags || []).includes('sticker') && c.c === 'abstract') || {}).id`);
+      const moved = await pjs(`clips.call('lib:update', { id: ${JSON.stringify(st || '')}, p: 'Stickers' })`);
+      check('a clip moves into the folder (its file too)', moved && moved.ok && /^Abstract\/Stickers\//.test(moved.clip.f) && fs.existsSync(path.join(h.library().dir, ...moved.clip.f.split('/'))), moved && (moved.clip ? moved.clip.f : moved.message));
+      await pjs(`(() => { S.libCat = 'abstract'; S.libFolder = ''; renderLibrary(); })()`);
+      await panelUntil(`[...document.querySelectorAll('#libFolders .fold')].some((b) => /Stickers/.test(b.textContent))`, 'the folder in the folder bar', 10000);
+      check('the folder shows in the folder bar with its clip', true, await pjs(`[...document.querySelectorAll('#libFolders .fold')].map((b) => b.textContent).join(' | ')`));
+      await pjs(`document.querySelector('#libFolders .fold').click()`);
+      await panelFrames(10);
+      check('opening the folder shows only its clips', await pjs(`S.libFolder === 'Stickers' && document.querySelectorAll('#grid .clip').length === 1`), await pjs(`S.libFolder + ': ' + document.querySelectorAll('#grid .clip').length + ' cards'`));
+      await shot('11-folder');
+      await pjs(`(() => { S.libFolder = ''; renderLibrary(); })()`);
+    }
+
     code = checks.every((c) => c.ok) ? 0 : 1;
   } catch (e) {
     check('self-test ran to the end', false, e.message);
