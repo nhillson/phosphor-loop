@@ -523,7 +523,9 @@ TIPS
     projector sees and drag its four dots onto that side's corners. The
     picture then lands only on the boxes, black around them, one picture
     across the whole stack. Tops, fronts and sides can be shaded for depth.
-    Kept for next time; Mapping off shows the whole picture.
+    Kept for next time; Mapping off shows the whole picture. Not just boxes:
+    + Corner (or double-click an edge) and - Corner (or right-click a dot)
+    make triangles, odd cut-outs and curves (lots of dots along the curve).
   - Fix projector shape (under the picture, while the Output window is
     open): a crooked or wider-at-one-end projector picture is squared up by
     dragging its four corners, on the projector or on the little map under

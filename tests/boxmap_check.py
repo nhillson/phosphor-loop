@@ -88,8 +88,36 @@ def run(c, base, out, problems):
       B.bmMoveDot(f1, 0, 0.35 + 6 / innerWidth, 0.30 + 5 / innerHeight); }""")
     sn = pg.evaluate("() => window.__plBm.bm.faces[1].pts[0]")
     expect(abs(sn[0] - 0.35) < 1e-9 and abs(sn[1] - 0.30) < 1e-9, f'a corner dragged near another face’s corner snaps onto it ({sn})')
-    bad = pg.evaluate("() => { const B = window.__plBm; return B.bmMoveDot(B.bm.faces[1], 0, 0.7, 0.9, false); }")
-    expect(bad is False, 'a corner that would fold its face over is refused')
+    bad = pg.evaluate("() => { const B = window.__plBm; return B.bmMoveDot(B.bm.faces[1], 0, 0.7, 0.6, false); }")
+    expect(bad is False, 'a corner that would make its face’s edges cross is refused')
+
+    # Other shapes: − Corner makes a triangle, never fewer than three; + Corner and double-clicking an edge add corners
+    pg.evaluate("() => { const B = window.__plBm; B.bm.sel = 1; B.bm.dot = -1; B.bmDraw(); document.querySelector('#bmDotDel').click(); }")
+    n1 = pg.evaluate("() => window.__plBm.bm.faces[1].pts.length")
+    off = pg.evaluate("() => { document.querySelector('#bmDotDel').click(); return [window.__plBm.bm.faces[1].pts.length, document.querySelector('#bmDotDel').disabled]; }")
+    expect(n1 == 3 and off == [3, True], f'− Corner makes a triangle, and a face never has fewer than three corners ({n1}, then {off})')
+    pg.evaluate("() => document.querySelector('#bmDotAdd').click()")
+    c.wait_frames(2, 'corner added', ceiling=120)
+    n2, dots = pg.evaluate("() => [window.__plBm.bm.faces[1].pts.length, [...window.__plBm.bm.dots].filter((d) => !d.hidden).length]")
+    expect(n2 == 4 and dots == 4, f'+ Corner adds a corner, with its dot on the projector ({n2} corners, {dots} dots)')
+    # Double-click the middle of the face's bottom edge on the projector
+    P = pg.evaluate("() => window.__plBm.bm.faces[1].pts")
+    e = max(range(4), key=lambda i: P[i][1] + P[(i + 1) % 4][1])
+    mx, my = (P[e][0] + P[(e + 1) % 4][0]) / 2 * W, (P[e][1] + P[(e + 1) % 4][1]) / 2 * H
+    w.mouse.dblclick(mx, my + 4)
+    c.wait_frames(3, 'double-clicked an edge', ceiling=120)
+    n3 = pg.evaluate("() => window.__plBm.bm.faces[1].pts.length")
+    fs = w.evaluate("() => !!document.fullscreenElement")
+    expect(n3 == 5 and not fs, f'double-clicking an edge on the projector adds a corner there, without going full screen ({n3} corners)')
+    # Right-click a dot on the map takes it away
+    pg.evaluate("() => document.querySelector('#bmMap .ks-dot[data-i=\"2\"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))")
+    n4 = pg.evaluate("() => window.__plBm.bm.faces[1].pts.length")
+    maps = pg.evaluate("() => document.querySelectorAll('#bmMap .ks-dot').length")
+    expect(n4 == 4 and maps == 4, f'right-clicking a dot on the map removes that corner ({n4} corners, {maps} map dots)')
+    # A face that bends in (an L shape) is fine; a curve is lots of corners
+    ok = pg.evaluate("""() => { const B = window.__plBm; return B.bmSimple([[0.1,0.1],[0.3,0.1],[0.3,0.2],[0.2,0.2],[0.2,0.4],[0.1,0.4]]) &&
+      B.bmSimple(Array.from({ length: 40 }, (_, i) => [0.5 + 0.2 * Math.cos(i / 40 * 6.283), 0.5 + 0.3 * Math.sin(i / 40 * 6.283)])); }""")
+    expect(ok, 'an L-shaped face and a round one (40 corners) are allowed')
 
     # Lay out three faces for measuring: a Top (left), a Side (middle), a Front (right); a gap of black between them
     pg.evaluate("""() => { const B = window.__plBm, F = B.bm.faces;
@@ -137,6 +165,14 @@ def run(c, base, out, problems):
     gap, top = lit(img, (0.33 * W, 0.3 * H, 0.37 * W, 0.7 * H)), lit(img, (0.1 * W, 0.3 * H, 0.25 * W, 0.7 * H))
     kinds = pg.evaluate("() => window.__plBm.bm.faces.map((f) => f.kind)")
     expect(gap < 3 and top > 240 and kinds == ['top', 'side', 'front'], f'opened again, the same faces map the picture ({kinds})')
+
+    # A triangle face lights a triangle: inside it lit, the empty corner of its box black
+    pg.evaluate("""() => { const B = window.__plBm, F = B.bm.faces; F.length = 1;
+      F[0].pts = [[0.2, 0.1], [0.8, 0.9], [0.2, 0.9]]; F[0].kind = 'top'; B.bmDraw(); }""")
+    c.wait_frames(3, 'triangle', ceiling=120)
+    img = shot(w)
+    inside, corner = lit(img, (0.22 * W, 0.7 * H, 0.32 * W, 0.85 * H)), lit(img, (0.65 * W, 0.15 * H, 0.78 * W, 0.35 * H))
+    expect(inside > 240 and corner < 3, f'a triangle face lights a triangle (inside {inside:.0f}, beside it {corner:.0f})')
     pg.evaluate("() => document.querySelector('#outBtn').click()")
 
 

@@ -10490,7 +10490,9 @@ window.__plKs = { ks, ksMove, ksMatrix, ksEdit, ksConvex };
 // on the Output window (an SVG with a mask), so the picture itself is drawn as always and costs nothing more; a
 // bent picture from Fix projector shape sits under it. Depth shading darkens fronts a little and sides more, the
 // way light falls on real boxes (tops stay full brightness). Corners are parts of the window's size, kept with the
-// faces in phosphor-boxmap. Faces must stay four-sided shapes with no dents (ksConvex).
+// faces in phosphor-boxmap. A face starts with four corners and can have any number from three up (+ Corner, or
+// double-click its edge; − Corner), so triangles, odd cut-outs and curved edges (many corners along the curve) work
+// too. Its outline may bend in, but its edges mustn't cross each other (bmSimple).
 const BM_KEY = 'phosphor-boxmap';
 const BM_SHADE = { top: 0, front: 0.22, side: 0.45 };
 const BM_SNAP_PX = 14;
@@ -10499,7 +10501,7 @@ const bm = { faces: [], on: true, shade: true, editing: false, sel: -1, dot: -1,
   try {
     const v = JSON.parse(lsGet(BM_KEY) || 'null');
     if (v && Array.isArray(v.faces)) {
-      bm.faces = v.faces.filter((f) => f && Array.isArray(f.pts) && f.pts.length === 4 && f.pts.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
+      bm.faces = v.faces.filter((f) => f && Array.isArray(f.pts) && f.pts.length >= 3 && f.pts.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
         .map((f) => ({ id: ++bm.n, pts: f.pts, kind: BM_SHADE[f.kind] != null ? f.kind : 'front' }));
       bm.on = v.on !== false;
       bm.shade = v.shade !== false;
@@ -10512,6 +10514,72 @@ function bmSave() {
 }
 const bmLive = () => bm.on && bm.faces.length > 0;
 const bmWH = () => [ks.win ? ks.win.innerWidth || 1 : 1600, ks.win ? ks.win.innerHeight || 1 : 900];
+const BM_MAX_DOTS = 64;
+// An outline with no crossing edges and some size to it (in projector pixels, so it's judged the same at any shape)
+function bmSimple(P) {
+  const [W, H] = bmWH(), Q = P.map(([x, y]) => [x * W, y * H]), n = Q.length;
+  if (n < 3) return false;
+  let area = 0;
+  for (let i = 0; i < n; i++) { const a = Q[i], b = Q[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
+  if (Math.abs(area) / 2 < 30) return false;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const hits = (a, b, c, d) => {
+    const d1 = cross(c, d, a), d2 = cross(c, d, b), d3 = cross(a, b, c), d4 = cross(a, b, d);
+    return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 && d2 && d3 && d4;
+  };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+      if (hits(Q[i], Q[(i + 1) % n], Q[j], Q[(j + 1) % n])) return false;
+    }
+    // Two corners on the same spot make a fold
+    for (let j = i + 1; j < n; j++) if (Math.hypot(Q[i][0] - Q[j][0], Q[i][1] - Q[j][1]) < 2) return false;
+  }
+  return true;
+}
+// One more corner on the picked face: on edge e (after corner e) at t along it, or in the middle of the edge after
+// the picked dot, else of the longest edge. Returns the new corner's place.
+function bmAddDot(e, t = 0.5) {
+  const f = bm.faces[bm.sel];
+  if (!f || f.pts.length >= BM_MAX_DOTS) return -1;
+  const [W, H] = bmWH(), n = f.pts.length;
+  if (e == null) {
+    if (bm.dot >= 0) e = bm.dot;
+    else { let best = -1; e = 0; for (let i = 0; i < n; i++) { const a = f.pts[i], b = f.pts[(i + 1) % n], d = Math.hypot((b[0] - a[0]) * W, (b[1] - a[1]) * H); if (d > best) { best = d; e = i; } } }
+  }
+  const a = f.pts[e], b = f.pts[(e + 1) % n];
+  f.pts.splice(e + 1, 0, [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+  bm.dot = e + 1;
+  bmDraw(); bmSave(); bmSync();
+  return e + 1;
+}
+// One corner fewer (the picked dot, else the last added); three is the least a face can have
+function bmDelDot() {
+  const f = bm.faces[bm.sel];
+  if (!f || f.pts.length <= 3) return false;
+  const i = bm.dot >= 0 ? bm.dot : f.pts.length - 1;
+  const P = f.pts.filter((_, j) => j !== i);
+  if (!bmSimple(P)) return false;
+  f.pts = P;
+  bm.dot = -1;
+  bmDraw(); bmSave(); bmSync();
+  return true;
+}
+// The edge of the picked face nearest a point (parts of the window), if it's within px projector pixels: [edge, t]
+function bmEdgeAt(x, y, px) {
+  const f = bm.faces[bm.sel];
+  if (!f) return null;
+  const [W, H] = bmWH(), n = f.pts.length, P = [x * W, y * H];
+  let best = null, bd = px;
+  for (let i = 0; i < n; i++) {
+    const a = [f.pts[i][0] * W, f.pts[i][1] * H], b = [f.pts[(i + 1) % n][0] * W, f.pts[(i + 1) % n][1] * H];
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+    const t = Math.min(1, Math.max(0, ((P[0] - a[0]) * dx + (P[1] - a[1]) * dy) / L));
+    const d = Math.hypot(a[0] + dx * t - P[0], a[1] + dy * t - P[1]);
+    if (d < bd && t > 0.02 && t < 0.98) { bd = d; best = [i, t]; }
+  }
+  return best;
+}
 // Corner i of face f to (x, y), snapped onto a nearby corner of another face so neighbouring faces meet with no gap
 function bmMoveDot(f, i, x, y, snap = true) {
   const [W, H] = bmWH();
@@ -10525,7 +10593,7 @@ function bmMoveDot(f, i, x, y, snap = true) {
   }
   const P = f.pts.map((p) => p.slice());
   P[i] = best ? best.slice() : [Math.min(1.1, Math.max(-0.1, x)), Math.min(1.1, Math.max(-0.1, y))];
-  if (!ksConvex(P)) return false;
+  if (!bmSimple(P)) return false;
   f.pts = P;
   bmDraw(); bmSave();
   return true;
@@ -10554,7 +10622,7 @@ function bmDel() {
 }
 // Which face is under a point (parts of the window), the picked one first
 function bmFaceAt(x, y) {
-  const inside = (P) => { let c = false; for (let i = 0, j = 3; i < 4; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  const inside = (P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
   if (bm.sel >= 0 && bm.faces[bm.sel] && inside(bm.faces[bm.sel].pts)) return bm.sel;
   for (let i = bm.faces.length - 1; i >= 0; i--) if (inside(bm.faces[i].pts)) return i;
   return -1;
@@ -10568,6 +10636,7 @@ function bmAttach(w, doc) {
 .bmdot{position:fixed;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(139,26,184,.85);border:3px solid #fff;box-sizing:border-box;
   box-shadow:0 0 0 3px rgba(0,0,0,.5),0 0 14px rgba(176,108,255,.9);cursor:grab;touch-action:none;z-index:6}
 .bmdot.on{background:#d39bff}.bmdot[hidden]{display:none}
+.bmdot.small{width:24px;height:24px;margin:-12px 0 0 -12px;border-width:2px}
 .hint{z-index:5}.fsx{z-index:7}`;
   doc.head.appendChild(st);
   bm.svg = doc.createElementNS(NS, 'svg');
@@ -10575,10 +10644,11 @@ function bmAttach(w, doc) {
   doc.body.appendChild(bm.svg);
   bm.dots = [];
   const pos = (e) => [e.clientX / (w.innerWidth || 1), e.clientY / (w.innerHeight || 1)];
-  for (let i = 0; i < 4; i++) {
+  // As many dots as the picked face has corners, made as they're needed (bmDraw)
+  bm.mkDot = (i) => {
     const d = doc.createElement('div');
     d.className = 'bmdot'; d.hidden = true;
-    d.title = 'Drag this corner onto the corner of the box face';
+    d.title = 'Drag this corner onto the corner of the box face. Right-click it to remove it.';
     doc.body.appendChild(d);
     d.addEventListener('pointerdown', (e) => {
       const f = bm.faces[bm.sel];
@@ -10592,8 +10662,16 @@ function bmAttach(w, doc) {
       d.addEventListener('pointermove', move); d.addEventListener('pointerup', up); d.addEventListener('pointercancel', up);
       bmDraw();
     });
+    d.addEventListener('contextmenu', (e) => { e.preventDefault(); bm.dot = i; bmDelDot(); });
     bm.dots.push(d);
-  }
+  };
+  // Double-click an edge of the picked face to put a new corner there
+  bm.svg.addEventListener('dblclick', (e) => {
+    if (!bm.editing) return;
+    e.preventDefault(); e.stopPropagation();
+    const p = pos(e), at = bmEdgeAt(p[0], p[1], 20);
+    if (at) bmAddDot(at[0], at[1]);
+  });
   // Clicking a face on the projector picks it; dragging it moves it whole
   bm.svg.addEventListener('pointerdown', (e) => {
     if (!bm.editing) return;
@@ -10615,7 +10693,7 @@ function bmAttach(w, doc) {
   if (bmLive()) toast(`Your box mapping is on (${bm.faces.length} face${bm.faces.length === 1 ? '' : 's'}). Map my boxes, under the picture, changes it.`, 6000);
 }
 function bmDetach() {
-  bm.svg = null; bm.dots = [];
+  bm.svg = null; bm.dots = []; bm.mkDot = null;
   bmEdit(false);
   $('#bmBtn').hidden = true;
 }
@@ -10628,7 +10706,9 @@ function bmDraw() {
   if (bm.editing) {
     // Tracing: black everywhere, every face lit up so you can see where it lands on the boxes
     h = `<rect width="${W}" height="${H}" fill="#000"/>` + bm.faces.map((f, i) =>
-      `<polygon class="bmf" points="${pts(f)}" fill="${i === bm.sel ? 'rgba(176,108,255,.55)' : 'rgba(255,255,255,.45)'}" stroke="${i === bm.sel ? '#e9c8ff' : '#fff'}" stroke-width="${i === bm.sel ? 4 : 2}" stroke-linejoin="round"/>`).join('');
+      `<polygon class="bmf" points="${pts(f)}" fill="${i === bm.sel ? 'rgba(176,108,255,.55)' : 'rgba(255,255,255,.45)'}" stroke="${i === bm.sel ? '#e9c8ff' : '#fff'}" stroke-width="${i === bm.sel ? 4 : 2}" stroke-linejoin="round"/>`).join('') +
+      // A wide, see-through edge on the picked face, so a double-click near its edge lands on it
+      (bm.faces[bm.sel] ? `<polygon class="bmf" points="${pts(bm.faces[bm.sel])}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="28" style="pointer-events:stroke"/>` : '');
   } else if (bmLive()) {
     h = `<defs><mask id="bmm" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/>` +
       bm.faces.map((f) => `<polygon points="${pts(f)}" fill="#000"/>`).join('') + `</mask></defs>` +
@@ -10639,33 +10719,43 @@ function bmDraw() {
   bm.svg.innerHTML = h;
   bm.svg.classList.toggle('edit', bm.editing);
   const f = bm.faces[bm.sel];
+  if (f && bm.mkDot) while (bm.dots.length < f.pts.length) bm.mkDot(bm.dots.length);
   bm.dots.forEach((d, i) => {
-    d.hidden = !(bm.editing && f);
+    d.hidden = !(bm.editing && f && i < f.pts.length);
     if (d.hidden) return;
+    d.classList.toggle('small', f.pts.length > 8);
     d.style.left = Math.min(W - 20, Math.max(20, f.pts[i][0] * W)) + 'px';
     d.style.top = Math.min(H - 20, Math.max(20, f.pts[i][1] * H)) + 'px';
     d.classList.toggle('on', bm.dot === i);
   });
 }
-// The map under the picture: every face, the picked one with its four dots
+// The map under the picture: every face, the picked one with its dots
 const bmMapEl = $('#bmMap');
 function bmMap() {
   if (!bmMapEl || !bm.editing) return;
   const [W, H] = bmWH(), mw = 160, mh = Math.max(40, Math.min(160, Math.round(mw * H / W))), pad = 12;
   bmMapEl.setAttribute('viewBox', `${-pad} ${-pad} ${mw + pad * 2} ${mh + pad * 2}`);
-  if (!bmMapEl.querySelector('.ks-frame')) {
-    bmMapEl.innerHTML = '<rect class="ks-frame" x="0" y="0"/><g class="bm-faces"></g>' +
-      [0, 1, 2, 3].map((i) => `<circle class="ks-dot" data-i="${i}" tabindex="0" r="5"><title>Drag this corner (arrow keys nudge it)</title></circle>`).join('');
+  if (!bmMapEl.querySelector('.ks-frame')) bmMapEl.innerHTML = '<rect class="ks-frame" x="0" y="0"/><g class="bm-faces"></g>';
+  // One circle per corner of the picked face; the ones there already stay, so a dot picked with the keyboard keeps its focus
+  const want = bm.faces[bm.sel] ? bm.faces[bm.sel].pts.length : 0;
+  const have = bmMapEl.querySelectorAll('.ks-dot');
+  for (let i = have.length; i < want; i++) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('class', 'ks-dot'); c.dataset.i = String(i); c.setAttribute('tabindex', '0'); c.setAttribute('r', '5');
+    c.innerHTML = '<title>Drag this corner (arrow keys nudge it). Right-click to remove it.</title>';
+    bmMapEl.appendChild(c);
   }
+  for (let i = have.length - 1; i >= want; i--) have[i].remove();
   const fr = bmMapEl.querySelector('.ks-frame');
   fr.setAttribute('width', mw); fr.setAttribute('height', mh);
   bmMapEl.querySelector('.bm-faces').innerHTML = bm.faces.map((f, i) =>
     `<polygon class="bm-face${i === bm.sel ? ' on' : ''}" data-f="${i}" points="${f.pts.map(([x, y]) => `${x * mw},${y * mh}`).join(' ')}"/>`).join('');
   const f = bm.faces[bm.sel];
+  const rad = f && f.pts.length > 8 ? 3.5 : 5;
   bmMapEl.querySelectorAll('.ks-dot').forEach((c, i) => {
     c.style.display = f ? '' : 'none';
     if (!f) return;
-    c.setAttribute('cx', f.pts[i][0] * mw); c.setAttribute('cy', f.pts[i][1] * mh);
+    c.setAttribute('cx', f.pts[i][0] * mw); c.setAttribute('cy', f.pts[i][1] * mh); c.setAttribute('r', rad);
     c.classList.toggle('on', bm.dot === i);
   });
   // The dots stay on top of the faces
@@ -10705,6 +10795,18 @@ if (bmMapEl) {
   const end = () => { drag = null; };
   bmMapEl.addEventListener('pointerup', end);
   bmMapEl.addEventListener('pointercancel', end);
+  // Double-click near an edge of the picked face: a new corner there. Right-click a dot: that corner goes.
+  bmMapEl.addEventListener('dblclick', (e) => {
+    const p = mapPos(e), [W] = bmWH(), at = bmEdgeAt(p[0], p[1], 5 * W / 160);
+    if (at) { e.preventDefault(); bmAddDot(at[0], at[1]); }
+  });
+  bmMapEl.addEventListener('contextmenu', (e) => {
+    const dot = e.target.closest && e.target.closest('.ks-dot');
+    if (!dot) return;
+    e.preventDefault();
+    bm.dot = +dot.dataset.i;
+    bmDelDot();
+  });
   bmMapEl.addEventListener('focusin', (e) => { const dot = e.target.closest && e.target.closest('.ks-dot'); if (dot && bm.dot !== +dot.dataset.i) { bm.dot = +dot.dataset.i; bmDraw(); } });
   // Arrow keys nudge the picked corner one projector pixel (ten with Shift); with no corner picked, the whole face
   bmMapEl.addEventListener('keydown', (e) => {
@@ -10725,9 +10827,11 @@ function bmSync() {
   $('#bmOn').lastChild.textContent = bm.on ? 'Mapping on' : 'Mapping off';
   const f = bm.faces[bm.sel];
   $('#bmDel').disabled = !f;
+  $('#bmDotAdd').disabled = !f || f.pts.length >= BM_MAX_DOTS;
+  $('#bmDotDel').disabled = !f || f.pts.length <= 3;
   $$('#bmPanel .bm-kind .btn').forEach((b) => { b.disabled = !f; b.setAttribute('aria-pressed', String(!!f && f.kind === b.dataset.kind)); });
   const n = bm.faces.length;
-  $('#bmCount').textContent = n ? `${n} face${n === 1 ? '' : 's'} traced${f ? ` · face ${bm.sel + 1} picked` : ''}` : 'No faces yet. Press Add a face to start.';
+  $('#bmCount').textContent = n ? `${n} face${n === 1 ? '' : 's'} traced${f ? ` · face ${bm.sel + 1} picked, ${f.pts.length} corners` : ''}` : 'No faces yet. Press Add a face to start.';
 }
 function bmEdit(on) {
   bm.editing = !!on && outputOpen();
@@ -10745,6 +10849,8 @@ $('#bmDone').addEventListener('click', () => {
 });
 $('#bmAdd').addEventListener('click', bmAdd);
 $('#bmDel').addEventListener('click', bmDel);
+$('#bmDotAdd').addEventListener('click', () => bmAddDot());
+$('#bmDotDel').addEventListener('click', () => { if (!bmDelDot()) toast('That corner can’t go: a face needs at least three, and its edges can’t cross.'); });
 $('#bmShade').addEventListener('click', () => { bm.shade = !bm.shade; bmSave(); bmSync(); bmDraw(); });
 $('#bmOn').addEventListener('click', () => { bm.on = !bm.on; bmSave(); bmSync(); bmDraw(); });
 $$('#bmPanel .bm-kind .btn').forEach((b) => b.addEventListener('click', () => {
@@ -10753,7 +10859,7 @@ $$('#bmPanel .bm-kind .btn').forEach((b) => b.addEventListener('click', () => {
   f.kind = b.dataset.kind;
   bmSave(); bmSync(); bmDraw();
 }));
-window.__plBm = { bm, bmAdd, bmDel, bmMoveDot, bmMoveFace, bmEdit, bmDraw };
+window.__plBm = { bm, bmAdd, bmDel, bmMoveDot, bmMoveFace, bmEdit, bmDraw, bmAddDot, bmDelDot, bmSimple, bmEdgeAt };
 // Android app: plugging in a projector or TV puts the picture there by itself; unplugging brings it back
 onApp('display', (d) => {
   appInfo.display = !!d.connected;

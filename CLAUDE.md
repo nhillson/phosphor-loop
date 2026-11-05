@@ -87,6 +87,8 @@ file don't rebuild the app.
    window): faces are four corners each (parts of the window's size, kept with on/shade/kind in `phosphor-boxmap`); the Output window gets an
    SVG overlay: black with the faces cut out by a mask (one picture across all faces), plus black at `BM_SHADE[kind]` over Front/Side faces
    while Depth shading is on; while tracing, faces lit with the picked one's dots. Corners snap within 14 px (`BM_SNAP_PX`, Alt to stop).
+   Faces have 3 to 64 corners (`bmAddDot` / `bmDelDot`, + Corner / − Corner, double-click an edge, right-click a dot); outlines may bend
+   in but mustn't cross themselves (`bmSimple`).
    `python3 tests/boxmap_check.py` (about 1.5 minutes; opens the real Output window, measures its pixels).
 4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
    `python3 tests/ap_type_check.py` (about a minute and a half).
