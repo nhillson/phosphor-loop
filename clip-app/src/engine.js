@@ -335,12 +335,26 @@ async function hasSeeThrough(tools, file, p, { signal } = {}) {
   return (r.stdout.match(/YAVG=([\d.]+)/g) || []).some((m) => +m.slice(5) < 250);
 }
 
+// A WebP or AVIF picture, by its first bytes
+async function chromeReads(file) {
+  try {
+    const fh = await fsp.open(file, 'r');
+    const b = Buffer.alloc(16);
+    await fh.read(b, 0, 16, 0);
+    await fh.close();
+    const t = (a, n) => b.toString('latin1', a, a + n);
+    return (t(0, 4) === 'RIFF' && t(8, 4) === 'WEBP') || (t(4, 4) === 'ftyp' && /^avi[fs]/.test(t(8, 4)));
+  } catch (_) { return false; }
+}
+
 async function makePlayable(tools, file, jobDir, { signal, log, onProgress, decodePicture } = {}) {
   let p = null, why = null;
   try { p = await probe(tools, file, { signal }); } catch (e) { why = e; }
-  // ffmpeg reads a moving WebP as a picture with no size (it can't unpack those): Chrome's reader does it instead
+  // Moving WebP and AVIF go through Chrome's reader: older ffmpeg reads a moving WebP as a picture with no size, and
+  // newer ffmpeg (9) plays it but without its see-through parts, so stickers would come out on black. Anything else
+  // ffmpeg can't read gets a try with Chrome's reader too.
   let unpacked = null;
-  if ((!p || !p.width || !p.height) && decodePicture) {
+  if ((!p || !p.width || !p.height || (await chromeReads(file))) && decodePicture) {
     try {
       unpacked = await picturesToVideo(tools, file, jobDir, decodePicture, { signal, log });
       file = unpacked;

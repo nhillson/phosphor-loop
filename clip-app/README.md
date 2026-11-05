@@ -58,7 +58,7 @@ on black). It is tagged `sticker`; Phosphor Loop knows it by that tag and puts t
 plays. This app's library shows only the top half of a sticker (`.pic.sticker`, `#cmVideo.sticker`). Snips Phosphor
 Loop saves of a sticker arrive already packed and tagged. Since 1.11.
 
-Moving WebP (how GIPHY hands out most stickers) and AVIF can't be read by ffmpeg (it sees a picture with no size), so
+Moving WebP (how GIPHY hands out most stickers) and AVIF go through Chrome's reader whatever ffmpeg can do (older ffmpeg sees a picture with no size; ffmpeg 9 plays a moving WebP but without its see-through parts), so
 Chrome's own picture reader unpacks them in a hidden window (`decodePicture` in `src/main.js`, page `src/decode.html`)
 and `picturesToVideo` in `src/engine.js` turns the frames into a lossless FFV1 video with see-through parts, which is
 used from then on like a GIF. Since 1.11.1; the self-test grabs `sticker.webp` and `sticker.gif` from the test pages.
