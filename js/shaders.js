@@ -1230,7 +1230,7 @@ precision highp sampler2DArray;
 uniform sampler2D uNow;
 uniform sampler2DArray uHist;
 uniform vec2 uSim;
-uniform float uHead, uFilled, uLayers, uSince, uRate, uSpan, uShape;
+uniform float uHead, uFilled, uLayers, uSince, uRate, uSpan, uShape, uTime;
 out vec4 o;
 vec3 kept(float j, vec2 uv) { return texture(uHist, vec3(uv, mod(uHead - j + uLayers, uLayers))).rgb; }
 void main() {
@@ -1239,7 +1239,21 @@ void main() {
   float d;
   if (uShape < 0.5) d = 1.0 - uv.y;            // the top is now, the bottom is longest ago
   else if (uShape < 1.5) d = uv.x;             // the left is now, the right is longest ago
-  else d = min(1.0, length((uv - 0.5) * vec2(asp, 1.0)) / (0.5 * length(vec2(asp, 1.0))));   // the middle is now
+  else if (uShape < 2.5) d = min(1.0, length((uv - 0.5) * vec2(asp, 1.0)) / (0.5 * length(vec2(asp, 1.0))));   // the middle is now
+  else if (uShape < 3.5) d = 0.5 * ((1.0 - uv.y) + uv.x);   // corner to corner: the top left is now
+  else if (uShape < 4.5) {
+    // Rings: bands of time spreading out from the middle, now and the past taking turns
+    float r = length((uv - 0.5) * vec2(asp, 1.0)) * 3.0;
+    d = abs(fract(r) * 2.0 - 1.0);
+  } else if (uShape < 5.5) {
+    // Sweep: like a clock hand going slowly round, just behind it is now, and the past trails round behind
+    vec2 q = (uv - 0.5) * vec2(asp, 1.0);
+    d = fract(atan(q.y, q.x) / 6.2831853 + uTime * 0.04);
+  } else {
+    // By brightness: the bright parts are now and the dark parts show the past
+    vec3 c = texture(uNow, uv).rgb;
+    d = 1.0 - smoothstep(0.05, 0.8, dot(c, vec3(0.299, 0.587, 0.114)));
+  }
   float age = d * uSpan;                       // seconds ago
   vec4 nowA = texture(uNow, uv);   // its alpha: where a Subject silhouette is now (see FS_FEEDBACK)
   vec3 now = nowA.rgb;
@@ -1254,6 +1268,71 @@ void main() {
   j = min(j, uFilled - 1.0);
   float j0 = floor(j);
   o = vec4(mix(kept(j0, uv), kept(min(j0 + 1.0, uFilled - 1.0), uv), j - j0), nowA.a);
+}`;
+
+// Slit-scan (see "slit-scan" in js/app.js). Each frame a thin line of a loop's picture (the slit, top to bottom
+// at uX) is written into a few columns of a strip, the strip's newest columns, going round and round. FS_SLIT
+// writes them; FS_SCAN redraws the loop from the strip:
+//  - Photo finish: to the left of the slit each column is the slit as it was a moment ago, further back the
+//    further left, so anything passing through the slit is drawn out across the screen, like a race-finish photo.
+//    Right of the slit the picture is as it is.
+//  - Corridor, like the end of 2001: the strip is laid on the walls (or floor and ceiling, or all four) of a
+//    corridor running to a far point. The newest columns are at the far end and the oldest closest, so the
+//    picture's streaks rush toward you, faster as they come near, and the far end fades into black.
+const FS_SLIT = `#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform float uX, uH;
+out vec4 o;
+// The slit is a few pixels wide: the brightest of five spots across it, so a thin bright line is never missed
+void main() {
+  float y = gl_FragCoord.y / uH;
+  vec3 c = vec3(0.0);
+  for (int i = -2; i <= 2; i++) c = max(c, texture(uSrc, vec2(uX + float(i) * 0.004, y)).rgb);
+  o = vec4(c, 1.0);
+}`;
+
+const FS_SCAN = `#version 300 es
+precision highp float;
+uniform sampler2D uNow, uBuf;
+uniform vec2 uSim;
+uniform float uW, uHead, uFilled;    // the strip's width in columns, its newest column and how many are written
+uniform float uPhoto, uSlitX;        // Photo finish: how much (0-1) and where the slit is (0 left, 1 right)
+uniform float uCorr, uShape;         // Corridor: how much (0-1); 0 a tunnel of four sides, 1 floor and ceiling, 2 two walls
+uniform vec2 uVP;                    // the corridor's far point, from the middle (screen heights)
+out vec4 o;
+// The strip's column 'age' columns back from the newest, at height y (0 bottom, 1 top)
+vec3 strip(float age, float y) {
+  age = clamp(age, 0.0, max(uFilled - 1.0, 0.0));
+  return texture(uBuf, vec2((mod(uHead - age, uW) + 0.5) / uW, y)).rgb;
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  float asp = uSim.x / uSim.y;
+  vec4 nowA = texture(uNow, uv);
+  vec3 c = nowA.rgb;
+  if (uFilled < 2.0) { o = nowA; return; }
+  if (uPhoto > 0.0 && uv.x < uSlitX) {
+    float age = (uSlitX - uv.x) / max(uSlitX, 0.01) * (uW - 2.0);
+    c = mix(c, strip(age, uv.y), uPhoto);
+  }
+  if (uCorr > 0.0) {
+    vec2 p = (uv - 0.5) * vec2(asp, 1.0) - uVP;
+    vec2 ap = abs(p);
+    // Which surface this spot is on: the walls (left, right) or the floor and ceiling
+    bool wall = uShape > 1.5 ? true : uShape > 0.5 ? false : ap.x * 0.7 > ap.y;
+    float a = wall ? ap.x : ap.y;           // how far from the far point, across the surface
+    float along = wall ? p.y / max(ap.x, 1e-4) : p.x / max(ap.y, 1e-4);   // where on the surface, along its height
+    // Depth into the corridor: close (1 / a small) is the oldest part of the strip, far is the newest
+    float depth = 0.12 / max(a, 1e-4);
+    float age = (1.0 - clamp((depth - 0.12) / 2.4, 0.0, 1.0)) * (uW - 2.0);
+    // Across the surface the strip's height is laid out back and forth, so the walls carry many fine streaks
+    float yy = along * 0.8 + 0.5;
+    vec3 w = strip(age, 1.0 - abs(fract(yy * 0.5) * 2.0 - 1.0));
+    w = min(w * 1.35, 1.0) * smoothstep(0.0, 0.18, a);   // a little brighter, and the far end fades to black
+    c = mix(c, w, uCorr);
+  }
+  o = vec4(c, nowA.a);
 }`;
 
 const FS_DISPLAY = `#version 300 es
@@ -3046,5 +3125,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();

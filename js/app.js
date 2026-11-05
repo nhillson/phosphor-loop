@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const { FR, makeDrone } = window.PhosphorFractals;
-const { VS, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
+const { VS, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
 const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.PhosphorHelpers;
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
@@ -171,18 +171,22 @@ function loopDefaults() {
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
-           offc: 0, wind: 0, windDir: 0 };
+           offc: 0, wind: 0, windDir: 0, scan: 0, scanSpeed: 1, corr: 0, corrShape: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
 const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
 // Halftone's slider: how far apart its dots are, in Standard-size pixels (3 to 24)
 const halftoneCell = (v) => 3 + 21 * clamp(v, 0, 100) / 100;
 // The sliders under Effects › Feeds on itself
+// Time warp's ways across the picture (FS_TIMEWARP's uShape)
+const TIME_SHAPES = 7;
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
 // The sliders under Effects › Lopsided: Off-center and Wind, which break the picture's symmetry
 const ASYM = ['offc', 'wind'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM];
+// The sliders under Effects › Slit-scan: Photo finish and Corridor
+const SLIT = ['scan', 'corr'];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM, ...SLIT];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -565,6 +569,14 @@ try {
   gl.useProgram(twProg.p);
   set1i(twProg, 'uNow', 0); set1i(twProg, 'uHist', 1);
 } catch (_) { twProg = null; }
+// Slit-scan (Photo finish and Corridor) too: its two small programs
+let slitProg = null, scanProg = null;
+try {
+  slitProg = program(FS_SLIT);
+  scanProg = program(FS_SCAN);
+  gl.useProgram(scanProg.p);
+  set1i(scanProg, 'uNow', 0); set1i(scanProg, 'uBuf', 1);
+} catch (_) { slitProg = scanProg = null; }
 // Time warp keeps TW_RATE frames a second. Phones and small computers keep fewer, smaller ones.
 const TW_RATE = 30;
 const twLowMem = !!APP || (navigator.deviceMemory > 0 && navigator.deviceMemory <= 4);
@@ -965,7 +977,7 @@ function sliderText(k, v) {
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
     case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
     case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal':
-    case 'offc': case 'wind': return v === 0 ? 'OFF' : String(v);
+    case 'offc': case 'wind': case 'scan': case 'corr': return v === 0 ? 'OFF' : String(v);
     case 'poster': return v === 0 ? 'OFF' : `${Math.round(posterSteps(v))} STEPS`;
     case 'halftone': return v === 0 ? 'OFF' : `${Math.round(halftoneCell(v))} PX`;
     // How far back the far edge reaches
@@ -1205,6 +1217,24 @@ function syncTextUI() {
 const GROW_SIZE_NAME = ['FINE', 'MEDIUM', 'BIG'];
 // Wind's directions: the way it blows, 0 to the right and on round anticlockwise in eighths, then 8 Turning
 // (it slowly comes round). Picking one with Wind off turns it on.
+const SCAN_SPEED_NAME = ['SLOW', 'MEDIUM', 'FAST'], CORR_SHAPE_NAME = ['TUNNEL', 'FLOOR AND CEILING', 'TWO WALLS'];
+$$('.scan-speed button').forEach((b) => b.addEventListener('click', () => {
+  const key = b.closest('.scan-speed').dataset.for;
+  takeOver(key);
+  const t = loops[edit].tgt;
+  t.scanSpeed = +b.dataset.sspeed;
+  if (!(t[key] > 0)) t[key] = 80;
+  syncUI();
+  showOSD(`${key === 'scan' ? 'PHOTO FINISH' : 'CORRIDOR'} ${edit}`, SCAN_SPEED_NAME[t.scanSpeed]);
+}));
+$$('#corrShape button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('corr');
+  const t = loops[edit].tgt;
+  t.corrShape = +b.dataset.cshape;
+  if (!(t.corr > 0)) t.corr = 85;
+  syncUI();
+  showOSD(`CORRIDOR ${edit}`, CORR_SHAPE_NAME[t.corrShape]);
+}));
 const WIND_DIRS = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘', 'TURNING'];
 $$('#windDir button').forEach((b) => b.addEventListener('click', () => {
   takeOver('wind');
@@ -1245,7 +1275,7 @@ $$('#posterWhere button').forEach((b) => b.addEventListener('click', () => {
 }));
 // A fractal's camera always glides: it wanders and rolls through (Runner, Crawler and Mix it up were removed;
 // looks saved with them glide too)
-const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE'];
+const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE', 'DIAGONAL', 'RINGS', 'SWEEP', 'BY BRIGHTNESS'];
 $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
   takeOver('time');
   const t = loops[edit].tgt;
@@ -1434,6 +1464,8 @@ function syncUI() {
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
+  $$('.scan-speed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.sspeed === (t.scanSpeed ?? 1))));
+  $$('#corrShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.cshape === (t.corrShape ?? 0))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
   // Only the real switches: each Spread out column's copy is brought up to date for its own loop (mirrorRefresh)
   $$('.where[data-where]').filter(notCopy).forEach((g) => g.querySelectorAll('button').forEach((b) =>
@@ -1552,10 +1584,12 @@ function randomLoop() {
     push: Math.random() < 0.2 ? Math.round(rnd(30, 75)) : 0,
     dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
     grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, growSize: Math.floor(Math.random() * 3),
-    time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * 3),
+    time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * TIME_SHAPES),
     ...surpriseSelf(),
     offc: Math.random() < 0.15 ? Math.round(rnd(35, 80)) : 0,
     wind: Math.random() < 0.15 ? Math.round(rnd(25, 70)) : 0, windDir: Math.floor(Math.random() * 9),
+    scan: Math.random() < 0.06 ? Math.round(rnd(60, 100)) : 0, corr: Math.random() < 0.08 ? Math.round(rnd(70, 100)) : 0,
+    scanSpeed: Math.floor(Math.random() * 3), corrShape: Math.floor(Math.random() * 3),
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
     edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
@@ -2367,6 +2401,8 @@ const PINS = {
   crystal: { name: 'Crystal', fields: ['crystal'] },
   offc: { name: 'Off-center', fields: ['offc'] },
   wind: { name: 'Wind', fields: ['wind', 'windDir'] },
+  scan: { name: 'Photo finish', fields: ['scan', 'scanSpeed'] },
+  corr: { name: 'Corridor', fields: ['corr', 'corrShape', 'scanSpeed'] },
   // The Show A and Show B faders together (one pin, on either fader, holds both)
   view: { name: 'Show A and B', fields: ['showA', 'showB'], mix: true },
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
@@ -2379,7 +2415,7 @@ const PINS = {
 // on one: a value it picks inside the range stays as it is, and one outside gets a fresh value from somewhere
 // inside it. Sliders moved by hand, and pinned ones, aren't limited. Kept as { trails: [40, 90], ... }, listing
 // only the sliders whose range is narrowed.
-const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'mirror', 'split', 'time', ...SELF, ...ASYM];
+const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'mirror', 'split', 'time', ...SELF, ...ASYM, ...SLIT];
 const LIM_MIX = ['view', 'xab', 'xba'];
 const limScale = (k) => (k === 'zoom' || k === 'spin' ? [-100, 100] : k === 'mirror' ? [0, 8] : [0, 100]);
 // Mirror has only five stops (Off, 2, 4, 6, 8), so its limits move two at a time, and both of its handles are
@@ -3325,6 +3361,8 @@ const AP_FX = {
   time: (w) => rnd(30, 30 + 70 * w),
   offc: (w) => rnd(30, 30 + 60 * w),
   wind: (w) => rnd(20, 20 + 60 * w),
+  scan: (w) => rnd(50, 50 + 50 * w),
+  corr: (w) => rnd(55, 55 + 45 * w),
 };
 function apFx(sc, w) {
   for (const [key, val] of Object.entries(AP_FX)) {
@@ -3332,8 +3370,11 @@ function apFx(sc, w) {
     sc[key] = Math.random() < apOdds(w) ? Math.round(val(w)) : 0;
   }
   if (sc.grow && sc.growSize == null) sc.growSize = Math.floor(Math.random() * 3);
-  if (sc.time && sc.timeShape == null) sc.timeShape = Math.floor(Math.random() * 3);
+  if (sc.time && sc.timeShape == null) sc.timeShape = Math.floor(Math.random() * TIME_SHAPES);
   if (sc.wind && sc.windDir == null) sc.windDir = Math.floor(Math.random() * WIND_DIRS.length);
+  // Photo finish and Corridor take over the whole picture, so they come in less often than the rest
+  for (const key of SLIT) if (sc[key] > 0 && Math.random() < 0.6) sc[key] = 0;
+  if (sc.scan || sc.corr) { if (sc.scanSpeed == null) sc.scanSpeed = Math.floor(Math.random() * 3); if (sc.corr && sc.corrShape == null) sc.corrShape = Math.floor(Math.random() * 3); }
 }
 // The look as Autopilot would make it without your taste (apScene, under Learn my taste, leans it your way)
 const apMate = (k) => (k === 'A' ? 'B' : k === 'B' ? 'A' : k);
@@ -3366,7 +3407,7 @@ function apSceneRaw(k) {
       in1, form: 2 + Math.floor(Math.random() * 4), zoom,
       spin: Math.round(rnd(-1, 1) * (10 + 70 * w)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 8 + 48 * w)),
       warp: Math.round(Math.random() < 0.9 - 0.6 * w ? rnd(0, 5 + 20 * w) : rnd(15, 15 + 60 * w)),
-      growSize: Math.floor(Math.random() * 3), timeShape: Math.floor(Math.random() * 3), windDir: Math.floor(Math.random() * 9),
+      growSize: Math.floor(Math.random() * 3), timeShape: Math.floor(Math.random() * TIME_SHAPES), windDir: Math.floor(Math.random() * 9),
       mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
       edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
     };
@@ -3489,7 +3530,7 @@ function glideLook(k) {
 // white-out watch lowers the peak as well as what's on screen.
 const WORLD_STAY = 5 / 3;
 const RAMP_CLEAN = { trails: 0, zoom: 0, spin: 0, color: 0, warp: 0, blur: 0, shiftX: 0, shiftY: 0, blend: 0,
-  flow: 0, melt: 0, push: 0, dye: 0, split: 0, grow: 0, time: 0, ...Object.fromEntries([...SELF, ...ASYM].map((x) => [x, 0])) };
+  flow: 0, melt: 0, push: 0, dye: 0, split: 0, grow: 0, time: 0, ...Object.fromEntries([...SELF, ...ASYM, ...SLIT].map((x) => [x, 0])) };
 // Starts the build-up on loop k if its new look is a 3D world or fractal (snap: it came in out of sight, so it can
 // jump straight to clean). Returns whether it did.
 function rampStart(k, now, snap) {
@@ -4112,8 +4153,8 @@ window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 
 //   3. Check each look leans towards tries that look like your favourites, alone and blended with the other loop
 //   4. how the loops are shown and fed into each other is picked the same way, as a whole picture
 const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
-const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM];
-const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], offc: [30, 90], wind: [20, 80], ...SELF_RANGE };
+const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT];
+const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], offc: [30, 90], wind: [20, 80], scan: [50, 100], corr: [55, 100], ...SELF_RANGE };
 const TASTE_DEF = loopDefaults();
 const TASTE_LOOK = Object.keys(TASTE_DEF).filter((f) => f !== 'mirrorFx' && f !== 'mirrorSpin');
 const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
@@ -4239,6 +4280,7 @@ function tasteFeats(L) {
   if (b.fx.includes('grow')) f.push('growsize:' + (L.growSize ?? 1));
   if (b.fx.includes('time')) f.push('timeshape:' + (L.timeShape ?? 0));
   if (b.fx.includes('wind')) f.push('winddir:' + (L.windDir ?? 0));
+  if (b.fx.includes('corr')) f.push('corrshape:' + (L.corrShape ?? 0));
   if (L.motion && LIVE.includes(L.in1)) f.push('motion:on');
   if (b.zoom === 'out') f.push('edge:' + (L.edge ? 'fold' : 'dark'));
   if (L.in1 === 'spectro' || L.in2 === 'spectro') f.push('spec:' + (L.specRound ? 'round' : 'scroll'));
@@ -8372,6 +8414,16 @@ const RECIPES = [
     how: 'SHAPE · OFF-CENTER 80 · ZOOM IN 22 · SPIN 10 · TRAILS 92',
     sw: 'repeating-radial-gradient(circle at 72% 38%,#120822 0 7px,#8b1ab8 7px 9px,#4fd1c5 9px 11px)',
     patch: { A: { in1: 'shape', form: 4, zoom: 22, spin: 10, trails: 92, color: 14, offc: 80 } } },
+  { name: 'Light corridor', after: 'Try Floor & ceiling under Corridor, or another nature picture with ◀ ▶ under Picture.',
+    text: 'The picture is scanned into streaks of light that rush toward you down a corridor, like the end of 2001: A Space Odyssey.',
+    how: 'PICTURE · CORRIDOR 100 TUNNEL · TRAILS 60',
+    sw: 'conic-gradient(from 0deg at 50% 50%,#ff3b8b,#3bd1ff,#ffd23b,#8b1ab8,#3bff9a,#ff3b8b)',
+    patch: { A: { in1: 'picture', size: 100, zoom: 6, spin: 0, trails: 60, color: 8, corr: 100, corrShape: 0, scanSpeed: 1 } } },
+  { name: 'Photo finish', after: 'Try it with the camera and wave your arms through the line.',
+    text: 'One line of the picture is recorded over and over and spread out to the left, so anything moving through it is drawn out across the screen.',
+    how: 'WAVE · PHOTO FINISH 100 · TRAILS 80',
+    sw: 'linear-gradient(90deg,#3bd1ff 0 8%,#8b1ab8 8% 14%,#ffd23b 14% 18%,#3bd1ff 18% 30%,#ff3b8b 30% 38%,#8b1ab8 38% 66%,#0b0614 66%)',
+    patch: { A: { in1: 'wave', form: 4, zoom: 8, spin: 15, trails: 80, color: 22, scan: 100, scanSpeed: 1 } } },
   { name: 'Smoke on the wind', after: 'Pick a different arrow under Wind, or the middle one to keep the wind turning.',
     text: 'The picture streams off to one side in gusts, curling like smoke in a breeze.',
     how: 'WAVE · WIND 65 TO THE RIGHT · TRAILS 93 · BLUR',
@@ -11197,13 +11249,16 @@ function twStep(k, dt) {
   set1f(twProg, 'uRate', TW_RATE);
   set1f(twProg, 'uSpan', twSpan(L.cur.time));
   set1f(twProg, 'uShape', L.tgt.timeShape || 0);
+  set1f(twProg, 'uTime', simT + (11.0 * LOOP_OFF[k]));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
   tw.wf = 1 - tw.wf;
   tw.live = true;
 }
 // What a loop shows (and what the other loop sees of it): its time-warped picture while Time warp is on
-function shownTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[L.tw.wf].tex : L.rt[L.front].tex; }
+function warpedTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[L.tw.wf].tex : L.rt[L.front].tex; }
+// ...and after slit-scan, when Photo finish or Corridor is on
+function shownTex(k) { const L = loops[k]; return L.sc && L.sc.live ? L.sc.out[L.sc.of].tex : warpedTex(k); }
 // What loop k gives the mix: its picture, or that picture after its final pass (see finalPass)
 function mixTex(k) { const pz = loops[k].pz; return pz && pz.live ? pz.rt[pz.f].tex : shownTex(k); }
 // The effects that can work in the final pass instead of within the loop, each with the switch that says so.
@@ -11249,7 +11304,93 @@ function finalPass(k) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   pz.live = true;
 }
-function shownPrev(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp[1 - L.tw.wf].tex : L.rt[1 - L.front].tex; }
+function shownPrev(k) {
+  const L = loops[k];
+  if (L.sc && L.sc.live) return L.sc.out[1 - L.sc.of].tex;
+  return L.tw && L.tw.live ? L.tw.warp[1 - L.tw.wf].tex : L.rt[1 - L.front].tex;
+}
+
+/* ================= slit-scan: Photo finish and Corridor ================= */
+// While a loop uses either, a thin top-to-bottom line of its picture (the slit) is written each frame into the
+// newest columns of a strip (SC_W columns, going round), SC_SPEED columns a second for Slow, Medium and Fast;
+// FS_SCAN then redraws the loop from it (see FS_SLIT). Photo finish's slit stands still, two thirds of the way
+// across, so things moving through it are drawn out to its left. Corridor's slit drifts slowly across the
+// picture, so even a still picture keeps changing as it streams down the walls (when both are on, it drifts).
+// Like Time warp, what you see and the other loop get the slit-scanned picture; the loop feeds back its own plain
+// frames. The strip is let go a minute after both are turned off.
+const SC_W = 720, SC_SPEED = [90, 200, 420];
+const SC_SLIT = 0.66;
+function scanStep(k, dt) {
+  const L = loops[k], c = L.cur, t = L.tgt;
+  const on = !!scanProg && (t.scan > 0 || c.scan > 0.3 || t.corr > 0 || c.corr > 0.3);
+  if (L.sc && L.sc.sh !== simH) scanDrop(L);
+  if (!on) {
+    if (L.sc) { L.sc.live = false; L.sc.idle += dt; if (L.sc.idle > 60) scanDrop(L); }
+    return;
+  }
+  if (!L.sc) {
+    const buf = makeTarget(SC_W, simH);
+    gl.clearColor(0, 0, 0, 1);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, buf.fbo); gl.clear(gl.COLOR_BUFFER_BIT);
+    L.sc = { buf, out: [makeTarget(), makeTarget()], of: 0, head: -1, filled: 0, acc: 1, idle: 0, sh: simH, sw: simW, ph: Math.random() * 10, live: false };
+  }
+  const S = L.sc;
+  if (S.sw !== simW) { S.out.forEach(dropTarget); S.out = [makeTarget(), makeTarget()]; S.sw = simW; }
+  S.idle = 0;
+  const src = warpedTex(k);
+  const corrOn = c.corr > 0.3 || t.corr > 0;
+  S.ph += dt;
+  const slitX = corrOn ? 0.5 + 0.42 * Math.sin(S.ph * 0.11) * Math.cos(S.ph * 0.037) : SC_SLIT;
+  // How many new columns this frame
+  S.acc += dt * SC_SPEED[t.scanSpeed ?? 1];
+  let n = Math.min(SC_W >> 2, Math.floor(S.acc));
+  S.acc -= n;
+  if (n > 0) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.buf.fbo);
+    gl.useProgram(slitProg.p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src);
+    set1f(slitProg, 'uX', slitX);
+    set1f(slitProg, 'uH', simH);
+    gl.enable(gl.SCISSOR_TEST);
+    // The new columns, in at most two runs (where they go round past the end)
+    let start = (S.head + 1) % SC_W;
+    while (n > 0) {
+      const run = Math.min(n, SC_W - start);
+      gl.viewport(start, 0, run, simH);
+      gl.scissor(start, 0, run, simH);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      S.head = (start + run - 1) % SC_W;
+      S.filled = Math.min(SC_W, S.filled + run);
+      n -= run; start = 0;
+    }
+    gl.disable(gl.SCISSOR_TEST);
+  }
+  const dst = S.out[1 - S.of];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(scanProg.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, S.buf.tex);
+  set2f(scanProg, 'uSim', simW, simH);
+  set1f(scanProg, 'uW', SC_W);
+  set1f(scanProg, 'uHead', S.head);
+  set1f(scanProg, 'uFilled', S.filled);
+  set1f(scanProg, 'uPhoto', clamp(c.scan, 0, 100) / 100);
+  set1f(scanProg, 'uSlitX', SC_SLIT);
+  set1f(scanProg, 'uCorr', clamp(c.corr, 0, 100) / 100);
+  set1f(scanProg, 'uShape', t.corrShape ?? 0);
+  set2f(scanProg, 'uVP', L.offAt[0] + L.offKick[0], L.offAt[1] + L.offKick[1]);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  S.of = 1 - S.of;
+  S.live = true;
+}
+function scanDrop(L) {
+  const S = L.sc;
+  if (!S) return;
+  dropTarget(S.buf);
+  S.out.forEach(dropTarget);
+  L.sc = null;
+}
 
 /* ================= ink drops ================= */
 // Six droppers, each on its own uneven rhythm, land a drop of ink somewhere on screen about twice a second.
@@ -11865,6 +12006,7 @@ function runLoop(k, xf, brush, f) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   L.front = 1 - L.front;
   twStep(k, f / 60);
+  scanStep(k, f / 60);
   if (c.chase > 0.5 || c.breathe > 0.5 || c.crystal > 0.5) probeTick(k, performance.now());
 }
 
@@ -11992,7 +12134,7 @@ const SEQ_SLIDERS = [
   ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'],
-    ['offc', 'Off-center'], ['wind', 'Wind'], ['mirror', 'Mirror']]],
+    ['offc', 'Off-center'], ['wind', 'Wind'], ['scan', 'Photo finish'], ['corr', 'Corridor'], ['mirror', 'Mirror']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
     ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
   // 3D lighting is one for the whole picture: when blocks on several tracks set it, it's a mix of them, each counted

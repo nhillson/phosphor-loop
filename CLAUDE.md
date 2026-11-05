@@ -195,3 +195,10 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    Off-center, `snd.map.asym`: hits shove it, `L.offKick`; the bass widens its wander). **Wind** (`uWind`, `windDir` 0-7 eighths from →
    anticlockwise, 8 Turning; compass buttons `#windDir`) doesn't react to sound. Glitch slide was tried and removed at Nick's request.
    Check with `--shot "Leaning tunnel"` and `--shot "Smoke on the wind"`.
+4z2. **Slit-scan** (Effects › Slit-scan, `SLIT` = scan / corr in js/app.js; `scanStep`, FS_SLIT + FS_SCAN in js/shaders.js): each frame a
+   slit (brightest of 5 spots across it) of the loop's picture after Time warp (`warpedTex`) goes into the newest columns of a round strip
+   (`L.sc.buf`, `SC_W` columns, `SC_SPEED[scanSpeed]` a second); `shownTex` then gives `L.sc.out`. **Photo finish** (`scan`): slit fixed at
+   `SC_SLIT`, its past spread to the left. **Corridor** (`corr`, `corrShape` 0 Tunnel / 1 Floor & ceiling / 2 Two walls): the strip on a
+   corridor's surfaces, newest at the far point (which follows Off-center's `offAt`), slit drifting across. Autopilot brings them in less
+   often (`apFx`). Time warp's shapes (`TIME_SHAPES` = 7): + Diagonal, Rings, Sweep (needs `uTime`), By brightness. Check with
+   `--shot "Light corridor"`, `--shot "Photo finish"`, `--shot "Prism|time=90|click=#timeShape [data-tshape='4']"`.

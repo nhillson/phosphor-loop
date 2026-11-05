@@ -775,8 +775,41 @@
               <button data-tshape="0" aria-pressed="true">Top to bottom</button>
               <button data-tshape="1" aria-pressed="false">Side to side</button>
               <button data-tshape="2" aria-pressed="false">From the middle</button>
+              <button data-tshape="3" aria-pressed="false">Diagonal</button>
+              <button data-tshape="4" aria-pressed="false">Rings</button>
+              <button data-tshape="5" aria-pressed="false">Sweep</button>
+              <button data-tshape="6" aria-pressed="false" title="Bright parts show now, dark parts show the past">By brightness</button>
             </div>
             <span class="hint">Each part of the picture shows a different moment. One edge (or the middle) is right now, and the further from it, the longer ago, so anything moving stretches into ribbons and waves.</span>
+          </div>
+          <h3 class="subhead">Slit-scan</h3>
+          <p class="hint">A thin line of the picture is recorded over time and spread out across the screen.</p>
+          <div class="ctl">
+            <div class="ctl-head"><label for="scan">Photo finish</label><output id="scanOut" for="scan"></output></div>
+            <input type="range" id="scan" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Full</span></div>
+            <div class="seg seg-3 scan-speed" data-for="scan" role="group" aria-label="How fast it scans">
+              <button data-sspeed="0" aria-pressed="false">Slow</button>
+              <button data-sspeed="1" aria-pressed="true">Medium</button>
+              <button data-sspeed="2" aria-pressed="false">Fast</button>
+            </div>
+            <span class="hint">Like a race-finish camera: one upright line two thirds of the way across is recorded over and over, and its past spreads out to the left, so anything moving through the line is drawn out across the screen. Best with Camera, Video, Phone or anything that moves. Slow reaches further back.</span>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="corr">Corridor</label><output id="corrOut" for="corr"></output></div>
+            <input type="range" id="corr" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Full</span></div>
+            <div class="seg seg-3" id="corrShape" role="group" aria-label="The corridor's shape">
+              <button data-cshape="0" aria-pressed="true">Tunnel</button>
+              <button data-cshape="1" aria-pressed="false">Floor &amp; ceiling</button>
+              <button data-cshape="2" aria-pressed="false">Two walls</button>
+            </div>
+            <div class="seg seg-3 scan-speed" data-for="corr" role="group" aria-label="How fast it rushes">
+              <button data-sspeed="0" aria-pressed="false">Slow</button>
+              <button data-sspeed="1" aria-pressed="true">Medium</button>
+              <button data-sspeed="2" aria-pressed="false">Fast</button>
+            </div>
+            <span class="hint">Like the end of 2001: A Space Odyssey. The picture is scanned into streaks of light that rush toward you along the walls of a corridor running into the distance. Works with any input, even a still picture. With Off-center on, the far end wanders.</span>
           </div>
           <h3 class="subhead">Lopsided</h3>
           <p class="hint">These break the picture’s symmetry, so it leans and blows to one side.</p>
@@ -1513,7 +1546,7 @@
             <dt>Grow</dt><dd>The picture grows patterns out of itself, the way stripes and spots form on animals: coral, zebra stripes, fingerprints, mazes. They start at outlines and spread through anything lit, and keep re-forming as the loop zooms and spins. Fine, Medium and Big set how far apart the stripes sit. Low is a fine texture, high takes over the whole picture. Keep Trails high.</dd>
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides. Transition sets how a new mirror comes in, over 3 seconds, whether you press it or Autopilot, Surprise or a recipe picks it: Melt blends the old mirror into the new one, Iris grows or shrinks the number of sides (from or to Off it melts), Ripple spreads the new mirror out from the middle, and Cut switches at once. Spin also turns the pattern once round as it changes. Autopilot always uses your Transition; loading a preset switches straight to its mirror.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
-            <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
+            <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Diagonal runs corner to corner; Rings spreads bands of now and the past out from the middle; Sweep turns slowly round like a clock hand, with the past trailing behind it; By brightness shows the bright parts as they are now and the dark parts from the past. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
           </dl></div>
           <div class="g-card"><h3>Effects: feeds on itself</h3><dl>
             <dt>Look-up</dt><dd>Each spot copies from a spot its own color points to: how red it is says how far to the side, how green how far up or down, and how blue turns that direction round. The picture keeps rearranging itself by its own colors into folds and liquid-metal swirls. Dark parts stay put. More Color shift gives it more to work with.</dd>
@@ -1522,6 +1555,8 @@
             <dt>Color chase</dt><dd>Red is pushed around by the green parts of the picture, green by the blue and blue by the red. Each color slides along the outlines of the one pushing it, so the three chase each other round and split into rainbow fringes and braids.</dd>
             <dt>Restless</dt><dd>Only what's changing gets to stay. Each frame the picture is compared with the one before, and the parts that held still fade away, leaving a shimmer of moving outlines. Lovely with the camera.</dd>
             <dt>Fractal fold</dt><dd>Instead of a plain zoom, every frame folds the picture through the formula behind the Mandelbrot set, so anything that comes in grows into fractal flowers, spirals and lace. The fractal slowly changes shape by itself; Zoom and Spin reshape it too. Low mixes a little of it into the usual tunnel.</dd>
+            <dt>Photo finish</dt><dd>A slit-scan, like the camera at a race finish. One upright line of the picture, two thirds of the way across, is recorded over and over, and its past spreads out to the left: the further left, the longer ago. Anything moving through the line is drawn out across the screen; something standing still becomes straight stripes. Right of the line the picture stays as it is. Slow, Medium and Fast set how quickly it scans (Slow reaches further back). Wonderful with the camera, the phone or a video of people dancing.</dd>
+            <dt>Corridor</dt><dd>A slit-scan like the light corridor at the end of 2001: A Space Odyssey. A line of the picture, drifting slowly across it, is recorded over time and laid on the walls of a corridor running to a far point: the newest at the far end, so streaks of the picture's colors rush toward you, faster as they come close, and the far end fades into black. Tunnel uses all four sides, Floor &amp; ceiling only the top and bottom (like the film), Two walls only the sides. Slow, Medium and Fast set how fast it rushes. Works with any input, even a still picture. With Off-center on, the far point wanders.</dd>
             <dt>Off-center</dt><dd>Zoom and Spin normally turn around the middle, so the picture is balanced. With Off-center they turn around a point that wanders around the screen, and the input is drawn there too, so the whole tunnel sits off to one side and drifts. Higher goes further from the middle. If there's no Zoom or Spin, it pulls in gently by itself. With React to sound, the music drives it: every hit shoves it somewhere new (it drifts back), and the bass pushes it further out.</dd>
             <dt>Wind</dt><dd>The picture is carried one way, in uneven gusts with a little curl, so it streams off like smoke in a breeze. Pick the way it blows with the arrows; the middle button makes the wind slowly turn round.</dd>
             <dt>Crystal</dt><dd>The picture cracks into ten pieces centred on its brightest spots. Each piece turns and zooms in its own way, like a broken mirror, and the cracks move as the light does.</dd>
