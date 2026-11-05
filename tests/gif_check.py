@@ -66,6 +66,12 @@ def main():
         d.rectangle((x + 25, 90, x + 55, 110), fill=2)
         frames.append(im)
     frames[0].save(sticker, save_all=True, append_images=frames[1:], duration=100, loop=0, transparency=0, disposal=2)
+    sticker_webp = os.path.join(work, 'sticker.webp')
+    rgba = []
+    for f in frames:   # palette entry 0 is the see-through background
+        g = f.copy(); g.info['transparency'] = 0
+        rgba.append(g.convert('RGBA'))
+    rgba[0].save(sticker_webp, save_all=True, append_images=rgba[1:], duration=100, loop=0, lossless=True)
     b64 = lambda f: base64.b64encode(open(f, 'rb').read()).decode()
 
     html, _ = check.patched_index(216)
@@ -156,6 +162,14 @@ def main():
         ok(abs((st.get('aspect') or 0) - 1.0) < 0.05, f"sticker: its shape is wrong (aspect {st.get('aspect')}, should be 1)")
         alpha = pg.evaluate("__plClips.stickerAlpha(__plClips.edit)")
         ok(alpha and alpha[0] > 0.2 and alpha[1] > 0.05, f'sticker: no see-through parts and solid parts both ({alpha})')
+
+        # 4b2. A moving WebP sticker (how GIPHY hands most stickers out) keeps its see-through parts too
+        pg.evaluate(DROP, [b64(sticker_webp), 'sticker.webp', 'image/webp', None, None])
+        shows_moving('sticker.webp', 'WebP sticker')
+        sw = pg.evaluate("__plClips.vids()[__plClips.edit]")
+        ok(sw.get('sticker') is True, f"WebP sticker: not played as a sticker ({sw.get('sticker')})")
+        alpha = pg.evaluate("__plClips.stickerAlpha(__plClips.edit)")
+        ok(alpha and alpha[0] > 0.2 and alpha[1] > 0.05, f'WebP sticker: no see-through parts and solid parts both ({alpha})')
 
         # 4c. Dropped onto loop B's target: it goes into loop B, and A keeps what it had
         a_before = pg.evaluate("__plClips.vids().A.name")
