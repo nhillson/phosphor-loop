@@ -10240,6 +10240,7 @@ function openOutput() {
   }
   w.addEventListener('resize', fit);
   ksAttach(w, doc);
+  bmAttach(w, doc);
   outBtn.textContent = 'Close output window';
   outBtn.setAttribute('aria-pressed', 'true');
   $$('#shape button').forEach((b) => { b.disabled = true; });
@@ -10254,6 +10255,7 @@ function closeOutput(alreadyClosed) {
   if (outWin && !alreadyClosed) { try { outWin.close(); } catch (_) {} }
   outWin = null; outCanvas = null; outCtx = null;
   ksDetach();
+  bmDetach();
   outBtn.textContent = 'Output window';
   outBtn.setAttribute('aria-pressed', 'false');
   $$('#shape button').forEach((b) => { b.disabled = false; });
@@ -10468,6 +10470,7 @@ if (ksMapEl) {
 }
 function ksEdit(on) {
   ks.editing = !!on && outputOpen();
+  if (ks.editing && bm.editing) bmEdit(false);
   if (!ks.editing) ks.sel = -1;
   $('#ksPanel').hidden = !ks.editing;
   $('#ksBtn').setAttribute('aria-pressed', String(ks.editing));
@@ -10479,6 +10482,278 @@ $('#ksDone').addEventListener('click', () => ksEdit(false));
 $('#ksGrid').addEventListener('click', () => { ks.grid = !ks.grid; $('#ksGrid').setAttribute('aria-pressed', String(ks.grid)); ksApply(); });
 $('#ksReset').addEventListener('click', () => { ks.pts = KS_SQUARE.map((p) => p.slice()); ksSave(); ksApply(); });
 window.__plKs = { ks, ksMove, ksMatrix, ksEdit, ksConvex };
+/* ================= map my boxes (projection mapping onto a stack of boxes) ================= */
+// For projecting onto white boxes stacked about: each side of a box the projector can see is a "face", four
+// corners traced onto it (Add a face, then drag its dots on the projector or on the map under the picture). The
+// Output window then lights only the faces: everything else is black, so nothing spills onto the wall behind, and
+// one picture runs across the whole stack, each face showing the part of the picture behind it. It's an overlay
+// on the Output window (an SVG with a mask), so the picture itself is drawn as always and costs nothing more; a
+// bent picture from Fix projector shape sits under it. Depth shading darkens fronts a little and sides more, the
+// way light falls on real boxes (tops stay full brightness). Corners are parts of the window's size, kept with the
+// faces in phosphor-boxmap. Faces must stay four-sided shapes with no dents (ksConvex).
+const BM_KEY = 'phosphor-boxmap';
+const BM_SHADE = { top: 0, front: 0.22, side: 0.45 };
+const BM_SNAP_PX = 14;
+const bm = { faces: [], on: true, shade: true, editing: false, sel: -1, dot: -1, n: 0, svg: null, dots: [] };
+(function bmLoad() {
+  try {
+    const v = JSON.parse(lsGet(BM_KEY) || 'null');
+    if (v && Array.isArray(v.faces)) {
+      bm.faces = v.faces.filter((f) => f && Array.isArray(f.pts) && f.pts.length === 4 && f.pts.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
+        .map((f) => ({ id: ++bm.n, pts: f.pts, kind: BM_SHADE[f.kind] != null ? f.kind : 'front' }));
+      bm.on = v.on !== false;
+      bm.shade = v.shade !== false;
+    }
+  } catch (_) {}
+})();
+function bmSave() {
+  if (!bm.faces.length) { try { localStorage.removeItem(BM_KEY); } catch (_) {} return; }
+  lsSet(BM_KEY, JSON.stringify({ on: bm.on, shade: bm.shade, faces: bm.faces.map((f) => ({ pts: f.pts, kind: f.kind })) }));
+}
+const bmLive = () => bm.on && bm.faces.length > 0;
+const bmWH = () => [ks.win ? ks.win.innerWidth || 1 : 1600, ks.win ? ks.win.innerHeight || 1 : 900];
+// Corner i of face f to (x, y), snapped onto a nearby corner of another face so neighbouring faces meet with no gap
+function bmMoveDot(f, i, x, y, snap = true) {
+  const [W, H] = bmWH();
+  let best = null, bd = BM_SNAP_PX;
+  if (snap) for (const g of bm.faces) {
+    if (g === f) continue;
+    for (const p of g.pts) {
+      const d = Math.hypot((p[0] - x) * W, (p[1] - y) * H);
+      if (d < bd) { bd = d; best = p; }
+    }
+  }
+  const P = f.pts.map((p) => p.slice());
+  P[i] = best ? best.slice() : [Math.min(1.1, Math.max(-0.1, x)), Math.min(1.1, Math.max(-0.1, y))];
+  if (!ksConvex(P)) return false;
+  f.pts = P;
+  bmDraw(); bmSave();
+  return true;
+}
+function bmMoveFace(f, from, dx, dy) {
+  f.pts = from.map(([x, y]) => [Math.min(1.1, Math.max(-0.1, x + dx)), Math.min(1.1, Math.max(-0.1, y + dy))]);
+  bmDraw(); bmSave();
+}
+// A new face: a square in the middle (a little to the side of the last one), ready to drag onto a box
+function bmAdd() {
+  const [W, H] = bmWH(), s = 0.22 * Math.min(W, H), k = bm.faces.length % 6;
+  const cx = 0.5 + (k % 3 - 1) * 0.18, cy = 0.5 + (k >= 3 ? 0.2 : 0) - 0.1;
+  const hw = s / 2 / W, hh = s / 2 / H;
+  const f = { id: ++bm.n, kind: 'front', pts: [[cx - hw, cy - hh], [cx + hw, cy - hh], [cx + hw, cy + hh], [cx - hw, cy + hh]] };
+  bm.faces.push(f);
+  bm.sel = bm.faces.length - 1; bm.dot = -1;
+  if (!bm.on) bm.on = true;
+  bmDraw(); bmSave(); bmSync();
+}
+function bmDel() {
+  if (bm.sel < 0) return;
+  bm.faces.splice(bm.sel, 1);
+  bm.sel = bm.faces.length ? Math.min(bm.sel, bm.faces.length - 1) : -1;
+  bm.dot = -1;
+  bmDraw(); bmSave(); bmSync();
+}
+// Which face is under a point (parts of the window), the picked one first
+function bmFaceAt(x, y) {
+  const inside = (P) => { let c = false; for (let i = 0, j = 3; i < 4; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+  if (bm.sel >= 0 && bm.faces[bm.sel] && inside(bm.faces[bm.sel].pts)) return bm.sel;
+  for (let i = bm.faces.length - 1; i >= 0; i--) if (inside(bm.faces[i].pts)) return i;
+  return -1;
+}
+// The Output window's overlay: black with the faces cut out, their shading, and while tracing, outlines and dots
+function bmAttach(w, doc) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const st = doc.createElement('style');
+  st.textContent = `.bmsvg{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:4}
+.bmsvg.edit .bmf{pointer-events:auto;cursor:move}
+.bmdot{position:fixed;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(139,26,184,.85);border:3px solid #fff;box-sizing:border-box;
+  box-shadow:0 0 0 3px rgba(0,0,0,.5),0 0 14px rgba(176,108,255,.9);cursor:grab;touch-action:none;z-index:6}
+.bmdot.on{background:#d39bff}.bmdot[hidden]{display:none}
+.hint{z-index:5}.fsx{z-index:7}`;
+  doc.head.appendChild(st);
+  bm.svg = doc.createElementNS(NS, 'svg');
+  bm.svg.setAttribute('class', 'bmsvg');
+  doc.body.appendChild(bm.svg);
+  bm.dots = [];
+  const pos = (e) => [e.clientX / (w.innerWidth || 1), e.clientY / (w.innerHeight || 1)];
+  for (let i = 0; i < 4; i++) {
+    const d = doc.createElement('div');
+    d.className = 'bmdot'; d.hidden = true;
+    d.title = 'Drag this corner onto the corner of the box face';
+    doc.body.appendChild(d);
+    d.addEventListener('pointerdown', (e) => {
+      const f = bm.faces[bm.sel];
+      if (!f) return;
+      e.preventDefault(); e.stopPropagation();
+      bm.dot = i;
+      try { d.setPointerCapture(e.pointerId); } catch (_) {}
+      const start = pos(e), from = f.pts[i].slice();
+      const move = (ev) => { const p = pos(ev); bmMoveDot(f, i, from[0] + p[0] - start[0], from[1] + p[1] - start[1], !ev.altKey); };
+      const up = () => { d.removeEventListener('pointermove', move); d.removeEventListener('pointerup', up); d.removeEventListener('pointercancel', up); };
+      d.addEventListener('pointermove', move); d.addEventListener('pointerup', up); d.addEventListener('pointercancel', up);
+      bmDraw();
+    });
+    bm.dots.push(d);
+  }
+  // Clicking a face on the projector picks it; dragging it moves it whole
+  bm.svg.addEventListener('pointerdown', (e) => {
+    if (!bm.editing) return;
+    const p = pos(e), i = bmFaceAt(p[0], p[1]);
+    if (i < 0) return;
+    e.preventDefault(); e.stopPropagation();
+    bm.sel = i; bm.dot = -1;
+    // Followed on the whole window: the face's shape is redrawn as it moves, so it can't hold on to the pointer itself
+    const f = bm.faces[i], from = f.pts.map((q) => q.slice());
+    const move = (ev) => { const q = pos(ev); bmMoveFace(f, from, q[0] - p[0], q[1] - p[1]); };
+    const up = () => { w.removeEventListener('pointermove', move); w.removeEventListener('pointerup', up); w.removeEventListener('pointercancel', up); };
+    w.addEventListener('pointermove', move); w.addEventListener('pointerup', up); w.addEventListener('pointercancel', up);
+    bmDraw(); bmSync();
+  });
+  w.addEventListener('resize', bmDraw);
+  doc.addEventListener('fullscreenchange', () => setTimeout(bmDraw, 80));
+  $('#bmBtn').hidden = false;
+  bmDraw();
+  if (bmLive()) toast(`Your box mapping is on (${bm.faces.length} face${bm.faces.length === 1 ? '' : 's'}). Map my boxes, under the picture, changes it.`, 6000);
+}
+function bmDetach() {
+  bm.svg = null; bm.dots = [];
+  bmEdit(false);
+  $('#bmBtn').hidden = true;
+}
+function bmDraw() {
+  bmMap();
+  if (!bm.svg || !ks.win) return;
+  const [W, H] = bmWH();
+  const pts = (f) => f.pts.map(([x, y]) => `${(x * W).toFixed(1)},${(y * H).toFixed(1)}`).join(' ');
+  let h = '';
+  if (bm.editing) {
+    // Tracing: black everywhere, every face lit up so you can see where it lands on the boxes
+    h = `<rect width="${W}" height="${H}" fill="#000"/>` + bm.faces.map((f, i) =>
+      `<polygon class="bmf" points="${pts(f)}" fill="${i === bm.sel ? 'rgba(176,108,255,.55)' : 'rgba(255,255,255,.45)'}" stroke="${i === bm.sel ? '#e9c8ff' : '#fff'}" stroke-width="${i === bm.sel ? 4 : 2}" stroke-linejoin="round"/>`).join('');
+  } else if (bmLive()) {
+    h = `<defs><mask id="bmm" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/>` +
+      bm.faces.map((f) => `<polygon points="${pts(f)}" fill="#000"/>`).join('') + `</mask></defs>` +
+      `<rect width="${W}" height="${H}" fill="#000" mask="url(#bmm)"/>` +
+      (bm.shade ? bm.faces.map((f) => BM_SHADE[f.kind] ? `<polygon points="${pts(f)}" fill="#000" fill-opacity="${BM_SHADE[f.kind]}"/>` : '').join('') : '');
+  }
+  bm.svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  bm.svg.innerHTML = h;
+  bm.svg.classList.toggle('edit', bm.editing);
+  const f = bm.faces[bm.sel];
+  bm.dots.forEach((d, i) => {
+    d.hidden = !(bm.editing && f);
+    if (d.hidden) return;
+    d.style.left = Math.min(W - 20, Math.max(20, f.pts[i][0] * W)) + 'px';
+    d.style.top = Math.min(H - 20, Math.max(20, f.pts[i][1] * H)) + 'px';
+    d.classList.toggle('on', bm.dot === i);
+  });
+}
+// The map under the picture: every face, the picked one with its four dots
+const bmMapEl = $('#bmMap');
+function bmMap() {
+  if (!bmMapEl || !bm.editing) return;
+  const [W, H] = bmWH(), mw = 160, mh = Math.max(40, Math.min(160, Math.round(mw * H / W))), pad = 12;
+  bmMapEl.setAttribute('viewBox', `${-pad} ${-pad} ${mw + pad * 2} ${mh + pad * 2}`);
+  if (!bmMapEl.querySelector('.ks-frame')) {
+    bmMapEl.innerHTML = '<rect class="ks-frame" x="0" y="0"/><g class="bm-faces"></g>' +
+      [0, 1, 2, 3].map((i) => `<circle class="ks-dot" data-i="${i}" tabindex="0" r="5"><title>Drag this corner (arrow keys nudge it)</title></circle>`).join('');
+  }
+  const fr = bmMapEl.querySelector('.ks-frame');
+  fr.setAttribute('width', mw); fr.setAttribute('height', mh);
+  bmMapEl.querySelector('.bm-faces').innerHTML = bm.faces.map((f, i) =>
+    `<polygon class="bm-face${i === bm.sel ? ' on' : ''}" data-f="${i}" points="${f.pts.map(([x, y]) => `${x * mw},${y * mh}`).join(' ')}"/>`).join('');
+  const f = bm.faces[bm.sel];
+  bmMapEl.querySelectorAll('.ks-dot').forEach((c, i) => {
+    c.style.display = f ? '' : 'none';
+    if (!f) return;
+    c.setAttribute('cx', f.pts[i][0] * mw); c.setAttribute('cy', f.pts[i][1] * mh);
+    c.classList.toggle('on', bm.dot === i);
+  });
+  // The dots stay on top of the faces
+  bmMapEl.querySelectorAll('.ks-dot').forEach((c) => bmMapEl.appendChild(c));
+}
+if (bmMapEl) {
+  const mapPos = (e) => {
+    const r = bmMapEl.getBoundingClientRect(), [W, H] = bmWH(), mw = 160, mh = Math.max(40, Math.min(160, Math.round(mw * H / W))), pad = 12;
+    return [((e.clientX - r.left) * (mw + pad * 2) / r.width - pad) / mw, ((e.clientY - r.top) * (mh + pad * 2) / r.height - pad) / mh];
+  };
+  let drag = null;
+  bmMapEl.addEventListener('pointerdown', (e) => {
+    const p = mapPos(e), dot = e.target.closest && e.target.closest('.ks-dot');
+    if (dot && bm.faces[bm.sel]) {
+      const i = +dot.dataset.i, f = bm.faces[bm.sel];
+      bm.dot = i;
+      drag = { kind: 'dot', f, i, start: p, from: f.pts[i].slice(), id: e.pointerId };
+    } else {
+      const i = bmFaceAt(p[0], p[1]);
+      if (i < 0) return;
+      bm.sel = i; bm.dot = -1;
+      const f = bm.faces[i];
+      drag = { kind: 'face', f, start: p, from: f.pts.map((q) => q.slice()), id: e.pointerId };
+      bmSync();
+    }
+    e.preventDefault();
+    try { bmMapEl.setPointerCapture(e.pointerId); } catch (_) {}
+    bmDraw();
+    if (drag.kind === 'dot') bmMapEl.querySelector(`.ks-dot[data-i="${drag.i}"]`)?.focus({ preventScroll: true });
+  });
+  bmMapEl.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const p = mapPos(e), dx = p[0] - drag.start[0], dy = p[1] - drag.start[1];
+    if (drag.kind === 'dot') bmMoveDot(drag.f, drag.i, drag.from[0] + dx, drag.from[1] + dy, !e.altKey);
+    else bmMoveFace(drag.f, drag.from, dx, dy);
+  });
+  const end = () => { drag = null; };
+  bmMapEl.addEventListener('pointerup', end);
+  bmMapEl.addEventListener('pointercancel', end);
+  bmMapEl.addEventListener('focusin', (e) => { const dot = e.target.closest && e.target.closest('.ks-dot'); if (dot && bm.dot !== +dot.dataset.i) { bm.dot = +dot.dataset.i; bmDraw(); } });
+  // Arrow keys nudge the picked corner one projector pixel (ten with Shift); with no corner picked, the whole face
+  bmMapEl.addEventListener('keydown', (e) => {
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    const f = bm.faces[bm.sel];
+    if (!d || !f) return;
+    e.preventDefault(); e.stopPropagation();
+    const [W, H] = bmWH(), step = e.shiftKey ? 10 : 1, dx = d[0] * step / W, dy = d[1] * step / H;
+    if (bm.dot >= 0) bmMoveDot(f, bm.dot, f.pts[bm.dot][0] + dx, f.pts[bm.dot][1] + dy, false);
+    else bmMoveFace(f, f.pts.map((q) => q.slice()), dx, dy);
+  });
+}
+// The panel's buttons, kept in step with the faces
+function bmSync() {
+  $('#bmBtn').setAttribute('aria-pressed', String(bm.editing));
+  $('#bmShade').setAttribute('aria-pressed', String(bm.shade));
+  $('#bmOn').setAttribute('aria-pressed', String(bm.on));
+  $('#bmOn').lastChild.textContent = bm.on ? 'Mapping on' : 'Mapping off';
+  const f = bm.faces[bm.sel];
+  $('#bmDel').disabled = !f;
+  $$('#bmPanel .bm-kind .btn').forEach((b) => { b.disabled = !f; b.setAttribute('aria-pressed', String(!!f && f.kind === b.dataset.kind)); });
+  const n = bm.faces.length;
+  $('#bmCount').textContent = n ? `${n} face${n === 1 ? '' : 's'} traced${f ? ` · face ${bm.sel + 1} picked` : ''}` : 'No faces yet. Press Add a face to start.';
+}
+function bmEdit(on) {
+  bm.editing = !!on && outputOpen();
+  if (bm.editing && ks.editing) ksEdit(false);
+  if (bm.editing && bm.sel < 0 && bm.faces.length) bm.sel = 0;
+  if (!bm.editing) bm.dot = -1;
+  $('#bmPanel').hidden = !bm.editing;
+  bmSync();
+  bmDraw();
+}
+$('#bmBtn').addEventListener('click', () => bmEdit(!bm.editing));
+$('#bmDone').addEventListener('click', () => {
+  bmEdit(false);
+  if (bmLive()) toast('Box mapping on: the picture lands only on your boxes. Mapping off (in Map my boxes) shows the whole picture again.', 6000);
+});
+$('#bmAdd').addEventListener('click', bmAdd);
+$('#bmDel').addEventListener('click', bmDel);
+$('#bmShade').addEventListener('click', () => { bm.shade = !bm.shade; bmSave(); bmSync(); bmDraw(); });
+$('#bmOn').addEventListener('click', () => { bm.on = !bm.on; bmSave(); bmSync(); bmDraw(); });
+$$('#bmPanel .bm-kind .btn').forEach((b) => b.addEventListener('click', () => {
+  const f = bm.faces[bm.sel];
+  if (!f) return;
+  f.kind = b.dataset.kind;
+  bmSave(); bmSync(); bmDraw();
+}));
+window.__plBm = { bm, bmAdd, bmDel, bmMoveDot, bmMoveFace, bmEdit, bmDraw };
 // Android app: plugging in a projector or TV puts the picture there by itself; unplugging brings it back
 onApp('display', (d) => {
   appInfo.display = !!d.connected;

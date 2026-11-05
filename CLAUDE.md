@@ -83,6 +83,11 @@ file don't rebuild the app.
    is open): the Output window's canvas gets a CSS `matrix3d` from four corners (parts of the window's size, clockwise from top left,
    kept in `phosphor-keystone`); dots and a CSS test grid in the Output window, a little SVG map with arrow-key nudging in `#ksPanel`.
    Folding shapes are refused (`ksConvex`). `python3 tests/keystone_check.py` (about 50 s; opens the real Output window).
+4h5. **Map my boxes** (projection mapping onto boxes, `bm`, `bmAttach`, `bmDraw`, `bmMoveDot` in js/app.js; button `#bmBtn` with the Output
+   window): faces are four corners each (parts of the window's size, kept with on/shade/kind in `phosphor-boxmap`); the Output window gets an
+   SVG overlay: black with the faces cut out by a mask (one picture across all faces), plus black at `BM_SHADE[kind]` over Front/Side faces
+   while Depth shading is on; while tracing, faces lit with the picked one's dots. Corners snap within 14 px (`BM_SNAP_PX`, Alt to stop).
+   `python3 tests/boxmap_check.py` (about 1.5 minutes; opens the real Output window, measures its pixels).
 4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
    `python3 tests/ap_type_check.py` (about a minute and a half).
 4m. **The sequencer's playhead with Spotify** (`seqPos` in js/app.js: small differences caught up by speed, skips over

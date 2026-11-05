@@ -518,6 +518,12 @@ TIPS
   - Camera: a phone's back camera shows the world the right way round; a
     front camera or computer webcam works like a mirror. With more than one
     camera, a list under Camera picks which one.
+  - Map my boxes (under the picture, while the Output window is open):
+    projecting onto a stack of boxes. Add a face for each box side the
+    projector sees and drag its four dots onto that side's corners. The
+    picture then lands only on the boxes, black around them, one picture
+    across the whole stack. Tops, fronts and sides can be shaded for depth.
+    Kept for next time; Mapping off shows the whole picture.
   - Fix projector shape (under the picture, while the Output window is
     open): a crooked or wider-at-one-end projector picture is squared up by
     dragging its four corners, on the projector or on the little map under

@@ -1216,3 +1216,13 @@ button.seq-card { cursor: pointer; }
 .ks-map .ks-dot:focus, .ks-map .ks-dot.on { fill: #d39bff; }
 .ks-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 #ksBtn[aria-pressed="true"] .led { background: #b06cff; box-shadow: 0 0 8px rgba(176,108,255,.7); }
+
+/* Map my boxes: the faces traced onto a stack of boxes */
+.bm-side { display: flex; flex-direction: column; gap: 8px; }
+.bm-lbl { align-self: center; font-size: 13px; color: var(--muted, #aaa); }
+.bm-kind .btn[aria-pressed="true"] { border-color: #b06cff; color: var(--ink); box-shadow: 0 0 0 1px #b06cff inset; }
+.bm-kind .btn:disabled { opacity: .45; }
+.bm-count { font-size: 12px; color: var(--muted, #aaa); }
+.ks-map .bm-face { fill: rgba(255,255,255,.18); stroke: rgba(255,255,255,.7); stroke-width: .6; cursor: move; }
+.ks-map .bm-face.on { fill: rgba(176,108,255,.35); stroke: #d39bff; stroke-width: .9; }
+#bmBtn[aria-pressed="true"] .led, #bmShade[aria-pressed="true"] .led, #bmOn[aria-pressed="true"] .led { background: #b06cff; box-shadow: 0 0 8px rgba(176,108,255,.7); }
