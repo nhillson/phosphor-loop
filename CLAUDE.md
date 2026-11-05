@@ -82,6 +82,10 @@ file don't rebuild the app.
    look (`cueDrop(i)`; if it was waiting on the hidden loop the next best takes its place). **Fade between looks** (`apSet.cueFade`,
    `cueFadeSecs` ½–8 s; also `#cueFadeBar` beside Cut): `cueGo` starts `cue.fade` and `cueFadeTick` eases What you see across; no new look is
    loaded (`cueDeck` waits) until it's done; pressing again finishes it and goes on. Checked at the end of `tests/cue_check.py`.
+   Previews show Clips (`apSet.cueLive` false: `cueCapture` tiles the scout into `clipSheet` 15 fps from 1.5 s, read back async by
+   `readLater`/`cueReads` only when a look passes) or Live (`MINI` loops P0–P4 run at 180 lines inside `withMini`, which swaps
+   simW/simH; `miniRun` gives draw3D its own scene targets; `liveSheet` read back every other frame). `extraLoop`/`picOf` let the
+   scout and minis use the deck loop's picture and get their final pass. `cuePlay` draws both into the previews.
 4h4. **Fix projector shape** (keystone, `ks`, `ksAttach`, `ksMatrix`, `ksMap` in js/app.js; button `#ksBtn` shows while the Output window
    is open): the Output window's canvas gets a CSS `matrix3d` from four corners (parts of the window's size, clockwise from top left,
    kept in `phosphor-keystone`); dots and a CSS test grid in the Output window, a little SVG map with arrow-key nudging in `#ksPanel`.

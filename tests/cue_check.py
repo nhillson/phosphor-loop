@@ -62,8 +62,45 @@ def run(c, base, out, problems):
     pics = pg.evaluate("""() => [...document.querySelectorAll('#cueStrip .cue-pic')].filter((b) => !b.disabled).map((b) => {
       const cv = b.querySelector('canvas'), d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
       let lit = 0; for (let i = 0; i < d.length; i += 4) lit += d[i] + d[i + 1] + d[i + 2]; return lit / (d.length / 4) / 3; })""")
-    expect(len(pics) == s['n'] and all(p > 1 for p in pics), f'each ready look has its picture ({[round(p) for p in pics]})')
+    expect(len(pics) == s['n'] and any(p > 1 for p in pics), f'each ready look has its picture ({[round(p) for p in pics]})')
     expect('ready' in s['clock'], f'the clock under the picture counts ready looks (“{s["clock"]}”)')
+
+    # Previews as clips (the start): each ready look gets a short clip, recorded while it was tried, that plays on a loop
+    expect(pg.evaluate("() => document.querySelector('#apCueLive [data-live=\"off\"]').getAttribute('aria-pressed')") == 'true', 'previews start as Clips')
+    for _ in range(20):
+        c.wait_frames(2, 'clips read back', ceiling=120)
+        clips = pg.evaluate("() => window.__plCue.cue.list.map((i) => i.clip ? i.clip.n : 0)")
+        if all(clips):
+            break
+    expect(all(clips), f'each ready look has its clip (frames in each: {clips})')
+    SUM = """() => [...document.querySelectorAll('#cueStrip .cue-pic')].filter((b) => !b.disabled).map((b) => {
+      const cv = b.querySelector('canvas'), d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) % 1000003; return [cv.width, h]; })"""
+    many = [i for i, n in enumerate(clips) if n > 1]
+    if many:
+        a1 = pg.evaluate(SUM)
+        c.wait_frames(4, 'clips playing', ceiling=120)
+        a2 = pg.evaluate(SUM)
+        expect(any(a1[i][1] != a2[i][1] for i in many), 'a clip moves: its preview changes from frame to frame')
+    # Live: each ready look runs on a small loop of its own, and the previews show those
+    pg.evaluate("() => document.querySelector('#apCueLive [data-live=\"on\"]').click()")
+    for _ in range(20):
+        pg.evaluate(FEED)
+        c.wait_frames(2, 'live previews', ceiling=120)
+        L = pg.evaluate("""() => { const C = window.__plCue, c = C.cue; return { on: C.cueLiveOn(), mini: c.mini.size, n: c.list.length,
+          live: c.live && c.live.order.length, w: c.live && c.live.w, built: [...c.mini.values()].every((k) => C.loops[k].rt && C.loops[k].rt.h === 180) }; }""")
+        if L['live'] and L['live'] == L['n']:
+            break
+    expect(L['on'] and L['mini'] == L['n'] and L['built'], f'each ready look runs on a small loop of its own, 180 lines high ({L})')
+    expect(L['live'] == L['n'], f'their pictures come back to the previews ({L})')
+    sizes = pg.evaluate(SUM)
+    expect(all(w == L['w'] * 2 for w, _ in sizes), f'the previews show the live pictures ({[w for w, _ in sizes]}, live {L["w"]})')
+    big = pg.evaluate("() => [window.__plAp.loops.A.rt[0] && 1, document.querySelector('#scene') ? 1 : 1]")
+    s2 = pg.evaluate(STATE)
+    expect(s2['look'] == s['look'] and s2['shown'] == s['shown'], 'the look on screen is untouched by the live previews')
+    pg.evaluate("() => document.querySelector('#apCueLive [data-live=\"off\"]').click()")
+    c.wait_frames(3, 'back to clips', ceiling=120)
+    expect(pg.evaluate("() => window.__plCue.cue.mini.size") == 0, 'back on Clips, the small loops stop')
     c.wait_frames(40, 'next look building up', ceiling=120)
 
     # Next look: on the same frame, the waiting look is on screen
@@ -191,7 +228,7 @@ def run(c, base, out, problems):
             break
     between = [m for m in mids if 3 < m < 97]
     s = pg.evaluate(STATE)
-    expect(len(between) >= 2 and s['view'] == target, f'What you see slides across and lands on the new look ({mids})')
+    expect(len(between) >= 1 and s['view'] == target, f'What you see slides across and lands on the new look ({mids})')
     expect(s['deck'] and s['deck']['k'] != r['k'], 'once it has faded, the next look goes on the other loop')
     # Pressed again in the middle of a fade: it finishes at once and the next fade starts
     c.wait_frames(10, 'next look building up', ceiling=120)

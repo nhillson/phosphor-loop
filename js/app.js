@@ -190,8 +190,11 @@ const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', '
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
+// Cue mode's live previews: five small loops drawn out of sight, one for each ready look (see "cue mode")
+const MINI = ['P0', 'P1', 'P2', 'P3', 'P4'];
+MINI.forEach((m, i) => { LOOP_NUM[m] = 4 + i; });
 // How far apart the loops' own clocks, colors and camera routes start, so no two loops move in step
-const LOOP_OFF = { A: 0, B: 1, C: 0.62, D: 1.38 };
+const LOOP_OFF = { A: 0, B: 1, C: 0.62, D: 1.38, P0: 0.31, P1: 0.83, P2: 1.17, P3: 1.61, P4: 0.47 };
 let loopCount = 2;
 const loopOn = (k) => LOOP_NUM[k] < loopCount;
 const activeKeys = () => KEYS.slice(0, loopCount);
@@ -263,6 +266,7 @@ function mkLoop() {
            probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], offAt: [0, 0], offKick: [0, 0], offPh: Math.random() * 100, offBeats: 0, windAng: Math.random() * 6.28, cells: crystalStart(), breath: { z: 0, s: 1 } };
 }
 const loops = { A: mkLoop(), B: mkLoop(), C: mkLoop(), D: mkLoop() };
+for (const m of MINI) loops[m] = mkLoop();
 // Mirror transitions: a new mirror (from its buttons, Autopilot, Surprise or a recipe) glides in over MIRROR_SECS
 // in the loop's Transition style (Cut switches at once), and with Spin on the pattern turns once round as it goes.
 // L.mx is the change under way: the mirror it's leaving, the one it's going to, and how far along it is (1 done).
@@ -2484,7 +2488,7 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true, cueFade: false, cueFadeSecs: 2,
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true, cueLive: false, cueFade: false, cueFadeSecs: 2,
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
 // Autopilot never changes them, and moving their controls neither pins anything nor stops it.
@@ -2535,6 +2539,7 @@ try {
     apSet.type = s.type === true;
     apSet.cue = s.cue === true;
     apSet.cuePreviews = s.cuePreviews !== false;
+    apSet.cueLive = s.cueLive === true;
     apSet.check = s.check !== false;
     apSet.hints = s.hints !== false;
     apSet.fsKeep = s.fsKeep === true;
@@ -3803,8 +3808,8 @@ $$('.next-look').forEach((b) => b.addEventListener('click', () => nextLook()));
 // what's on screen can't be changed by what's being tried behind it. The white-out and black-out watches stay out
 // of it too: every look was checked before it got on the list.
 // It needs Autopilot running loops A and B, with loops C and D switched off and What you see not pinned or limited.
-const CUE = { max: 5, settle: 1.5, judge: 3.5, built: 1.2, snapW: 160 };
-const cue = { scout: false, trial: null, list: [], pick: null, deck: null, n: 0, savedC: null, hover: false, cut: 0 };
+const CUE = { max: 5, settle: 1.5, judge: 3.5, built: 1.2, snapW: 160, clipW: 192, clipCols: 6, clipN: 30, clipFps: 15, clipFrom: 1.5, miniH: 180 };
+const cue = { scout: false, trial: null, list: [], pick: null, deck: null, n: 0, savedC: null, hover: false, cut: 0, reads: [], mini: new Map(), live: null, liveTick: 0 };
 const cueCan = () => ap.on && apPair() && loopCount === 2 && !ap.pins.has('view') && !limSpan('view') && !eye.failed;
 const cueActive = () => apSet.cue && cueCan();
 // Why Cue mode can't work just now (for the status line), or ''
@@ -3869,6 +3874,8 @@ function cueStopScout() {
 // Ends Cue mode's work (Autopilot off, Cue mode off, or it can't run just now); the list is kept for next time
 function cueSleep() {
   cueStopScout();
+  if (cue.mini.size) miniDropAll();
+  cue.live = null;
   cue.deck = null;
   cueStrip();
 }
@@ -3904,6 +3911,178 @@ function cueSnap() {
     x.putImageData(img, 0, 0);
     return c;
   } catch (_) { return null; }
+}
+// Loops drawn out of sight for Cue mode: the scout (loop C's place) and the live previews' small loops
+const extraLoop = (k) => (k === 'C' && cue.scout) || [...cue.mini.values()].includes(k);
+const extraKeys = () => [...activeKeys(), ...(cue.scout ? ['C'] : []), ...cue.mini.values()];
+const extraUses = (name) => (cue.scout ? ['C', ...cue.mini.values()] : []).some((k) => loops[k].tgt.in1 === name || loops[k].tgt.in2 === name);
+// The looks tried out of sight use the picture of the loop they'll go on
+function picOf(k) { return extraLoop(k) ? pics[cue.deck ? cue.deck.k : cueHidden()] : pics[k]; }
+// A small copy of one picture into a box of a target (any box of it, unlike copyInto)
+const tileProg = program(`#version 300 es
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec4 uBox;
+out vec4 o;
+void main() { o = vec4(clamp(texture(uSrc, (gl_FragCoord.xy - uBox.xy) / uBox.zw).rgb, 0.0, 1.0), 1.0); }`);
+function tileInto(T, tex, x, y, w, h) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, T.fbo);
+  gl.viewport(x, y, w, h);
+  gl.useProgram(tileProg.p);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform4f(U(tileProg, 'uBox'), x, y, w, h);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function plainTarget(T, w, h) {
+  if (T && T.w === w && T.h === h) return T;
+  if (T) { gl.deleteTexture(T.tex); gl.deleteFramebuffer(T.fbo); }
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fbo, w, h };
+}
+// Reads a target back without making the picture wait: the copy lands in a buffer and is picked up a few frames
+// later, once the graphics card says it's there (cueReads). done(canvas) gets it the right way up.
+function readLater(T, done) {
+  const size = T.w * T.h * 4, pbo = gl.createBuffer();
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+  gl.bufferData(gl.PIXEL_PACK_BUFFER, size, gl.STREAM_READ);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, T.fbo);
+  gl.readPixels(0, 0, T.w, T.h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  gl.flush();
+  cue.reads.push({ pbo, sync, w: T.w, h: T.h, size, done, t: performance.now() });
+}
+function cueReads() {
+  for (const r of cue.reads.slice()) {
+    const st = gl.clientWaitSync(r.sync, 0, 0);
+    if (st === gl.TIMEOUT_EXPIRED && performance.now() - r.t < 3000) continue;
+    cue.reads.splice(cue.reads.indexOf(r), 1);
+    gl.deleteSync(r.sync);
+    if (st !== gl.TIMEOUT_EXPIRED && st !== gl.WAIT_FAILED) {
+      const buf = new Uint8Array(r.size);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, r.pbo);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, buf);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      const c = document.createElement('canvas');
+      c.width = r.w; c.height = r.h;
+      const x = c.getContext('2d'), img = x.createImageData(r.w, r.h);
+      for (let y = 0; y < r.h; y++) img.data.set(buf.subarray((r.h - 1 - y) * r.w * 4, (r.h - y) * r.w * 4), y * r.w * 4);
+      x.putImageData(img, 0, 0);
+      r.done(c);
+    }
+    gl.deleteBuffer(r.pbo);
+  }
+}
+// Preview clips: while the scout tries a look, a small picture of it goes into a sheet 15 times a second (once it has
+// had a moment to build up, for two seconds). If the look passes, the sheet is read back and its preview
+// plays it on a loop. Looks that don't pass are never read back, so trying costs next to nothing.
+let clipSheet = null;
+function cueCapture(now) {
+  const T = cue.trial;
+  if (!T || !cue.scout || !loops.C.rt) return;
+  const age = (now - T.since) / 1000;
+  if (age < CUE.clipFrom || T.frames >= CUE.clipN || now < T.nextCap) return;
+  T.nextCap = Math.max(now, T.nextCap || now) + 1000 / CUE.clipFps - 4;
+  const tw = CUE.clipW, th = Math.round(tw / simAspect), cols = CUE.clipCols, rows = Math.ceil(CUE.clipN / cols);
+  clipSheet = plainTarget(clipSheet, cols * tw, rows * th);
+  if (!T.frames) T.sheet = { tw, th, cols, rows };
+  else if (T.sheet.th !== th) return;
+  const i = T.frames++;
+  tileInto(clipSheet, mixTex('C'), (i % cols) * tw, Math.floor(i / cols) * th, tw, th);
+}
+function clipRead(item, T) {
+  if (!T.frames || !clipSheet || !T.sheet) return;
+  const S = T.sheet, n = T.frames;
+  readLater(clipSheet, (c) => { item.clip = { sheet: c, n, ...S }; cueStrip(); });
+}
+// Live previews (Show 5 previews › Live): each ready look also runs on a small loop of its own, out of sight,
+// drawn about a quarter of the picture's height. Their pictures are gathered side by side, read back the same way
+// (about 30 times a second) and shown in the previews, moving with the music.
+const miniSize = () => { const h = CUE.miniH; return [Math.max(4, Math.round(h * simAspect)), h]; };
+function withMini(fn) {
+  const sw = simW, sh = simH, sa = simAspect;
+  [simW, simH] = miniSize();
+  simAspect = simW / simH;
+  miniRun = true;
+  try { fn(); } finally { simW = sw; simH = sh; simAspect = sa; miniRun = false; }
+}
+const cueLiveOn = () => apSet.cuePreviews && apSet.cueLive && cueActive();
+function miniLoad(k, look) {
+  withMini(() => {
+    const L = loops[k];
+    if (L.rt && (L.rt.w !== simW || L.rt.h !== simH)) { L.rt.forEach(dropTarget); L.rt = null; }
+    if (!L.rt) { L.rt = [makeTarget(), makeTarget()]; L.rt.w = simW; L.rt.h = simH; L.front = 0; }
+    cueLoad(k, look);
+  });
+}
+function miniDropAll() {
+  for (const k of cue.mini.values()) {
+    const L = loops[k];
+    if (L.rt) { L.rt.forEach(dropTarget); L.rt = null; }
+    if (L.pz) { L.pz.rt.forEach(dropTarget); L.pz = null; }
+    twDrop(L);
+  }
+  cue.mini.clear();
+}
+let liveSheet = null;
+function cueMinis(dt, f) {
+  if (!cueLiveOn() || !cue.list.length) { if (cue.mini.size) miniDropAll(); return; }
+  const ids = new Set(cue.list.map((it) => it.id));
+  for (const id of [...cue.mini.keys()]) if (!ids.has(id)) cue.mini.delete(id);
+  for (const it of cue.list) {
+    if (cue.mini.has(it.id)) continue;
+    const used = new Set(cue.mini.values()), k = MINI.find((m) => !used.has(m));
+    if (!k) break;
+    cue.mini.set(it.id, k);
+    miniLoad(k, it.look);
+  }
+  withMini(() => {
+    for (const k of cue.mini.values()) {
+      if (!loops[k].rt) continue;
+      mirrorStep(k, dt);
+      runLoop(k, 0, null, f);
+      finalPass(k);
+    }
+  });
+  // Side by side, in the list's order, read back every other frame (one read at a time)
+  cue.liveTick = (cue.liveTick || 0) + 1;
+  if (cue.liveTick % 2 || cue.reads.some((r) => r.live)) return;
+  const [w, h] = miniSize(), order = cue.list.map((it) => it.id);
+  liveSheet = plainTarget(liveSheet, w * CUE.max, h);
+  order.forEach((id, i) => { const k = cue.mini.get(id); if (k && loops[k].rt) tileInto(liveSheet, mixTex(k), i * w, 0, w, h); });
+  readLater(liveSheet, (c) => { cue.live = { sheet: c, w, h, order }; });
+  cue.reads[cue.reads.length - 1].live = true;
+}
+// Draws the previews' moving pictures: the live ones when Live is on, otherwise each look's clip
+function cuePlay(now) {
+  cueReads();
+  const el = $('#cueStrip');
+  if (!el || el.hidden) return;
+  const live = cueLiveOn() && cue.live;
+  $$('#cueStrip .cue-pic').forEach((b, i) => {
+    const it = cue.list[i];
+    if (!it) return;
+    const cv = b.querySelector('canvas');
+    let src = null, sx = 0, sy = 0, sw = 0, sh = 0;
+    const li = live ? live.order.indexOf(it.id) : -1;
+    if (li >= 0) { src = live.sheet; sx = li * live.w; sw = live.w; sh = live.h; }
+    else if (it.clip && !apSet.cueLive) {
+      const C = it.clip, n = Math.floor((now / 1000) * CUE.clipFps) % C.n;
+      src = C.sheet; sx = (n % C.cols) * C.tw; sy = (C.rows - 1 - Math.floor(n / C.cols)) * C.th; sw = C.tw; sh = C.th;   // read back upside down: the first row is at the bottom
+    }
+    if (!src) return;
+    if (cv.width !== sw * 2 || cv.height !== sh * 2) { cv.width = sw * 2; cv.height = sh * 2; }
+    cv.getContext('2d').drawImage(src, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    b.dataset.drawn = String(it.id);
+  });
 }
 // A look on the list goes onto the hidden loop, ready for the next cut
 function cueNextItem() {
@@ -3944,7 +4123,7 @@ function cueTick(now) {
   if (!T) {
     const sc = cueScene(k);
     cueLoad('C', sc);
-    cue.trial = { look: JSON.parse(JSON.stringify(loops.C.tgt)), since: now };
+    cue.trial = { look: JSON.parse(JSON.stringify(loops.C.tgt)), since: now, frames: 0, nextCap: 0 };
     return true;
   }
   const age = (now - T.since) / 1000;
@@ -3958,7 +4137,9 @@ function cueTick(now) {
   if (!v.pass) return true;
   // Never replaces a ready look: only fills an empty place
   if (cue.list.length >= CUE.max) return true;
-  cue.list.push({ id: ++cue.n, look: T.look, v, pic: cueSnap(), t: now });
+  const item = { id: ++cue.n, look: T.look, v, pic: cueSnap(), t: now };
+  cue.list.push(item);
+  clipRead(item, T);
   cueStrip();
   apStatus();
   return true;
@@ -4092,6 +4273,9 @@ function syncCueUI() {
   const fc = $('#apCueFadeCtl');
   if (fc) fc.hidden = !apSet.cue;
   $('#apCuePrev')?.setAttribute('aria-pressed', String(apSet.cuePreviews));
+  $$('#apCueLive button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.live === 'on') === apSet.cueLive)));
+  const lv = $('#apCueLiveCtl');
+  if (lv) lv.hidden = !apSet.cue || !apSet.cuePreviews;
   const p = $('#apCuePrevCtl');
   if (p) p.hidden = !apSet.cue;
   cueStrip();
@@ -4122,12 +4306,17 @@ function cueSetFade(on) {
 $('#apCueFade')?.addEventListener('click', () => cueSetFade(!apSet.cueFade));
 $('#cueFadeBar')?.addEventListener('click', (e) => { cueSetFade(!apSet.cueFade); e.currentTarget.blur(); });
 $$('#apCueFadeSecs button').forEach((b) => b.addEventListener('click', () => { apSet.cueFadeSecs = +b.dataset.s; saveAp(); syncCueUI(); }));
+$$('#apCueLive button').forEach((b) => b.addEventListener('click', () => {
+  apSet.cueLive = b.dataset.live === 'on';
+  saveAp();
+  syncCueUI();
+}));
 $('#apCuePrev')?.addEventListener('click', () => {
   apSet.cuePreviews = !apSet.cuePreviews;
   saveAp();
   syncCueUI();
 });
-window.__plCue = { cue, cueActive, cueGo, cueWhy, cuePickSlot, cueDrop, cueSetFade, apSet };
+window.__plCue = { cue, loops, cueLiveOn, cueActive, cueGo, cueWhy, cuePickSlot, cueDrop, cueSetFade, apSet };
 // For tests/ap_loops_check.py: a way in to Autopilot's loops
 window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 0; apStep(performance.now(), false); } };
 
@@ -11277,7 +11466,7 @@ function finalPass(k) {
   const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
   const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
   const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
-  const on = L.rt && loopOn(k) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
+  const on = L.rt && (loopOn(k) || extraLoop(k)) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
   if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
@@ -11446,13 +11635,15 @@ function computeInk(t, scale, flowPerSec) {
 }
 // The 3D flights are drawn into one of two pictures: the loop's main input's flight into the first,
 // its second input's into the other. How brightly they glow follows the music; see frame().
-const sceneRT = [null, null];
+const sceneRT = [null, null, null, null];
+let miniRun = false;
 let sceneGlow = 1;
 function draw3D(k, name, slot, scale) {
   const sc = SCENES[name];
   if (sc.ext) return drawExt(k, sc, scale);
   if (!sceneReady(sc, true)) return null;
   const w = Math.max(2, Math.round(simW * (sc.res || 1))), h = Math.max(2, Math.round(simH * (sc.res || 1)));
+  if (miniRun) slot += 2;   // the live previews' smaller pictures have targets of their own
   let rt = sceneRT[slot];
   if (!rt || rt.w !== w || rt.h !== h) {
     if (rt) dropTarget(rt);
@@ -11866,7 +12057,7 @@ function runLoop(k, xf, brush, f) {
   const [V, C, S, P] = [kVid, cam, scr, pho].map((s) => s.texFor(t.subject));
   // The see-through surround only once every live input here has its outlines; until then the plain picture
   set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !liveFor(k, n) || liveFor(k, n).texFor(t.subject) !== liveFor(k, n)) ? 1 : 0);
-  const texs = [src.tex, otherTex, pics[k].tex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
+  const texs = [src.tex, otherTex, picOf(k).tex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
                 (lifeIn1 && lifeTex) || flyTex1 || src.tex, (lifeIn2 && lifeTex) || flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
   if (t.in1 === 'spectro' || t.in2 === 'spectro') {
@@ -11977,7 +12168,7 @@ function runLoop(k, xf, brush, f) {
   }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
   set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
-  set1f(fbProg, 'uAspPic', pics[k].aspect);
+  set1f(fbProg, 'uAspPic', picOf(k).aspect);
   set1f(fbProg, 'uAspVid', kVid.aspect);
   set1f(fbProg, 'uVidCut', kVid.sticker ? 1 : 0);
   set1f(fbProg, 'uAspCam', cam.aspect);
@@ -14359,11 +14550,11 @@ function frame() {
     }
     for (const name of Object.keys(SCENES)) {
       const sc = SCENES[name];
-      if (frozen || !(uses(name) || (cue.scout && (loops.C.tgt.in1 === name || loops.C.tgt.in2 === name)))) continue;
+      if (frozen || !(uses(name) || extraUses(name))) continue;
       const step = dt * sc.speed * pace * (1 + (sceneReacts(name) ? surge - 1 : 0) * (sc.kick ?? 1));
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
-      if (sc.fly) for (const k of cue.scout ? [...activeKeys(), 'C'] : activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step, { style: 'glide', drive: 0 });
+      if (sc.fly) for (const k of extraKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step, { style: 'glide', drive: 0 });
       // Mount Ribbit's hikers walk on, the same way
       if (sc.ext) {
         const drive = ribDriven(), ctl = ribControls();
@@ -14394,7 +14585,10 @@ function frame() {
     for (const key of act) mirrorStep(key, dt);
     for (const key of act) if (need[key]) { runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f); typeInLoop(key, f); }
     // Cue mode's scout: the spare loop where new looks are tried out of sight
-    if (cue.scout && loops.C.rt) { mirrorStep('C', dt); runLoop('C', 0, null, f); }
+    if (cue.scout && loops.C.rt) { mirrorStep('C', dt); runLoop('C', 0, null, f); cueCapture(performance.now()); }
+    // ... and the live previews' small loops, and the previews' moving pictures
+    if (cue.scout) cueMinis(dt, f);
+    cuePlay(performance.now());
   }
 
   for (const key of KEYS) finalPass(key);
