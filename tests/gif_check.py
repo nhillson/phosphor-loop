@@ -264,6 +264,14 @@ def main():
                     ok(alpha and alpha[0] > 0.2 and alpha[1] > 0.05, f'save sticker: from the library it has no see-through parts ({alpha})')
         pg.evaluate("document.querySelector('#snipCancel') && document.querySelector('#snipCancel').click()")
 
+        # 4g. A clip dragged out of Phosphor Clips' library (its file, named after the clip) dropped on loop A: it comes in as
+        # that library clip, so the saved sticker plays as a sticker
+        if got.get('body'):
+            pg.evaluate(DROP, [base64.b64encode(got['body']).decode(), 'Saved sticker.mp4', 'video/webm', None, '#drop .drop-zone[data-k=A]'])
+            if until("__plClips.vids().A.name === 'Saved sticker' && __plClips.vids().A.clip === 's1'", 'drag from Phosphor Clips: the dropped clip did not come in as the library clip'):
+                c.wait_frames(10, 'dropped library clip playing')
+                ok(pg.evaluate("__plClips.vids().A.sticker"), 'drag from Phosphor Clips: the dropped sticker clip did not play as a sticker')
+
         # 5. A GIF with no type given (as some drags hand it over) is recognised from its bytes
         pg.evaluate(DROP, [b64(moving), 'notype.gif', '', None, None])
         shows_moving('notype.gif', 'GIF with no type')

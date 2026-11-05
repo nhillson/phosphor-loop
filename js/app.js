@@ -6672,7 +6672,12 @@ function dropTake(e, k) {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   // A dropped file's pointer has to be asked for during the drop itself
   const hp = e.dataTransfer?.items?.[0]?.getAsFileSystemHandle?.();
-  if (f) { Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null, k), () => loadFile(f, null, k)); return; }
+  if (f) {
+    const own = () => Promise.resolve(hp).then((h) => loadFile(f, h?.kind === 'file' ? h : null, k), () => loadFile(f, null, k));
+    // A clip dragged out of Phosphor Clips' library comes in as that library clip (a sticker stays a sticker)
+    dropLibraryClip(f, k).then((done) => { if (!done) own(); }, own);
+    return;
+  }
   // A picture dragged out of a web page can come as its address only: fetched here (sites like GIPHY allow it)
   const dt = e.dataTransfer;
   const html = dt?.getData('text/html') || '';
@@ -6695,6 +6700,27 @@ KEYS.forEach((k) => {
   tab.addEventListener('dragleave', () => tab.classList.remove('drop-over'));
   tab.addEventListener('drop', (e) => { e.preventDefault(); tab.classList.remove('drop-over'); dropTake(e, k); });
 });
+// Whether a dropped video is one of Phosphor Clips' library clips (its file, dragged out of Phosphor Clips): known by
+// its name and length. Asked only when the clip library has been used on this computer, so a video of your own isn't
+// held up looking for Phosphor Clips. Resolves true once the library clip is going into loop k.
+async function dropLibraryClip(f, k) {
+  if (APP || inArtifact || lsGet(CLIP_ON_KEY) !== '1') return false;
+  if (!/^video\//.test(f.type || '') && !/\.(mp4|m4v|webm|mov)$/i.test(f.name || '')) return false;
+  const base = String(f.name || '').replace(/\.[^.]+$/, '');
+  const dur = await new Promise((res) => {
+    const v = document.createElement('video'), u = URL.createObjectURL(f);
+    const done = (d) => { URL.revokeObjectURL(u); v.removeAttribute('src'); res(d); };
+    v.preload = 'metadata'; v.muted = true;
+    v.onloadedmetadata = () => done(v.duration);
+    v.onerror = () => done(NaN);
+    setTimeout(() => done(NaN), 4000);
+    v.src = u;
+  });
+  try { await clipList(true); } catch (_) { return false; }
+  const c = (clips.all || []).find((x) => x.n === base && (!Number.isFinite(dur) || !x.d || Math.abs(x.d - dur) < 0.25));
+  if (!c) return false;
+  return !!(await clipPick(c, false, vids[k] || vid));
+}
 async function dropFetch(url, k = edit) {
   toast('Fetching what you dropped…', 3000);
   try {

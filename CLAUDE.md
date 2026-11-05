@@ -148,6 +148,8 @@ file don't rebuild the app.
    **Each loop has its own picture** (`pics`, `pic` = the edited loop's, like `vids` / `vid`; `inMedia.pic` is `pic.media`;
    `natPick(i, quiet, to)`, `picUseCard(to)`, `seqLoadPic(pm, K)`, `picPanelSync` on tab change; recordings keep `media.pics`
    per loop, older ones' single `pic` goes to every loop; each loop's last nature picture is kept, `natLastKey(k)`).
+   **A clip dragged out of Phosphor Clips** (1.12, `lib:drag`) arrives as its file; `dropLibraryClip` knows it by name and length
+   (only when the clip library has been used here, `CLIP_ON_KEY`) and loads it as that library clip with `clipPick`.
    `python3 tests/gif_check.py` (about a minute).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
