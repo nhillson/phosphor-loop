@@ -903,7 +903,14 @@
               <button class="chip" data-map="color" aria-pressed="true" title="Colors jump with the highs and the beat"><span class="led"></span>Color</button>
               <button class="chip" data-map="warp" aria-pressed="true" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
               <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
+              <button class="chip" data-map="lines" aria-pressed="true" title="The lines of Wave, Shape, Bars and Topo map carry the music’s own sound wave, like an oscilloscope"><span class="led"></span>Sound on lines</button>
             </div>
+          </div>
+          <div class="ctl" id="sndDetailRow">
+            <div class="ctl-head"><label for="sndDetail">Line detail</label><output id="sndDetailOut" for="sndDetail"></output></div>
+            <input type="range" id="sndDetail" min="0" max="100" step="1" value="30">
+            <div class="ends"><span>Smooth</span><span>Fuzzy</span></div>
+            <span class="hint">How much of the sound the lines show. Smooth shows the kick and bass as big swells; Fuzzy shows every hi-hat and voice too.</span>
           </div>
         </div>
         <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else. The picture reacts straight away: low, mid and high sounds, and a pulse on every hit (a kick, a snare, a strum) as it’s heard. Record keeps the sound too.</p>

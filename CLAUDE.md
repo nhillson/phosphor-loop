@@ -165,3 +165,9 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
 - Before starting a task, give a rough ETA. Send short progress updates with a fresh ETA at milestones, as
   long as they cost next to nothing. Progress updates don't wait for an answer.
 - He isn't technical: explain things plainly, step by step, with pictures where they help.
+4y. **Sound on lines** (React to sound › What the music moves › Sound on lines, `snd.map.lines`, on to start with; Line detail
+   `snd.detail`, shown only while it's on): once a frame `sndLinesTick` reads the raw sound (`getFloatTimeDomainData`, also on the fast
+   analyser), smooths it (Smooth ≈150 Hz to Fuzzy ≈9 kHz), starts at a rising zero crossing so it holds still, evens out its level
+   and packs 96 steps into `uSnd` (vec4[24]); `sndLineAmp(k)` → `uSndAmp`. Wave (per-stretch thirds pushed along the curve's
+   normals, `reach` grows its boxes), Shape (one wave all the way round), Bars (a wave through the bar, sharp core) and Topo map
+   (`topoHum`, the land ripples). Input size swells half as much meanwhile. `python3 tests/sound_lines_check.py` (about 2 minutes).

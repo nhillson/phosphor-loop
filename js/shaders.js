@@ -161,6 +161,8 @@ uniform int uIn1, uIn2;
 uniform float uVidCut;   // the loop's video is a sticker: its see-through parts are kept (see live)
 uniform vec2 uWave[81];     // the Wave curve's 81 points, worked out once per frame
 uniform vec4 uWaveBox[8];   // 8 stretches of 10 segments: centre and radius of each
+uniform vec4 uSnd[24];      // Sound on lines: the music's sound wave in 96 steps, about -1.4 to 1.4 (see "sound on lines")
+uniform float uSndAmp;      // how far it pushes this loop's lines (0: the lines stay plain)
 uniform vec4 uAdjA[11];  // per input: tracking, brightness, contrast, color
 uniform vec4 uAdjB[11];  // per input: cut-out level; 3D lighting's depth, smoothness and shine
 uniform vec3 uReliefL;   // 3D lighting: which way the light comes from (shared with the finished picture's)
@@ -181,6 +183,20 @@ float sdSeg(vec2 p, vec2 a, vec2 b) {
   float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-8), 0.0, 1.0);
   return length(pa - ba * h);
 }
+// Sound on lines: how far the sound pushes a line at u, 0 at the start of the line to 1 at its end
+float sndAt(float u) {
+  float f = clamp(u, 0.0, 1.0) * 95.0;
+  int i = int(f), j = min(i + 1, 95);
+  return mix(uSnd[i >> 2][i & 3], uSnd[j >> 2][j & 3], f - float(i)) * uSndAmp;
+}
+// Eased away near both ends, so a line that closes on itself (Wave, Shape) meets up without a jump
+float sndEnds(float u) { return smoothstep(0.0, 0.06, u) * smoothstep(1.0, 0.94, u); }
+// Topo map: the whole land ripples up and down with the sound, the wave running across the screen
+vec2 topoHum(vec2 p) {
+  if (uSndAmp <= 0.0) return p;
+  float u = p.x / (uSim.x / uSim.y) + 0.5;
+  return p + vec2(0.0, 0.6 * sndAt(u) * sndEnds(u));
+}
 ${MIRROR}
 vec3 hueRot(vec3 c, float a) {
   const vec3 k = vec3(0.57735027);
@@ -195,7 +211,20 @@ vec3 seedWave(vec2 p, float t) {
     if (length(p - bx.xy) - bx.z > min(d, 0.08)) continue;
     for (int i = 0; i < 10; i++) {
       int j = c * 10 + i;
-      d = min(d, sdSeg(p, uWave[j], uWave[j + 1]));
+      if (uSndAmp <= 0.0) { d = min(d, sdSeg(p, uWave[j], uWave[j + 1])); continue; }
+      // Sound on lines: the curve is pushed sideways by the sound. Each stretch is split in three, each third's ends
+      // pushed out along the curve's own sideways direction there (shared with the next stretch, so there are no seams)
+      vec2 a = uWave[j], b = uWave[j + 1];
+      vec2 ta = b - uWave[j == 0 ? 79 : j - 1], tb = uWave[j == 79 ? 1 : j + 2] - a;
+      vec2 na = normalize(vec2(-ta.y, ta.x) + 1e-6), nb = normalize(vec2(-tb.y, tb.x) + 1e-6);
+      float u0 = float(j) / 80.0;
+      vec2 P0 = a + na * sndAt(u0) * sndEnds(u0);
+      for (int s = 1; s <= 3; s++) {
+        float f = float(s) / 3.0, u1 = (float(j) + f) / 80.0;
+        vec2 P1 = mix(a, b, f) + normalize(mix(na, nb, f) + 1e-6) * sndAt(u1) * sndEnds(u1);
+        d = min(d, sdSeg(p, P0, P1));
+        P0 = P1;
+      }
     }
   }
   if (d > 0.08) return vec3(0.0);
@@ -210,13 +239,19 @@ vec3 seedShape(vec2 p, float t) {
   float a = atan(q.x, q.y);
   float seg = TAU / n;
   float d = cos(floor(0.5 + a / seg) * seg - a) * length(q) - r;
+  // Sound on lines: one sound wave carried all the way round the outline
+  if (uSndAmp > 0.0) { float u = a / TAU + 0.5; d -= 0.8 * sndAt(u) * sndEnds(u); }
   float w = 0.005;
   float g = exp(-d * d / (w * w)) + 0.14 * exp(-abs(d) / 0.01);
   return hsv(fract(t * 0.06 + 0.5), 0.65, 1.0) * g;
 }
 vec3 seedBars(vec2 p, float t) {
   vec2 q = rot(t * 0.12) * p;
+  // Sound on lines: the bar becomes the sound wave, running along it
+  if (uSndAmp > 0.0) { float u = clamp(q.x + 0.5, 0.0, 1.0); q.y -= 0.9 * sndAt(u) * sndEnds(u); }
   float band = exp(-q.y * q.y / (0.035 * 0.035));
+  // With the sound on it, a sharp bright core runs down the middle so the wave's shape reads through the glow
+  if (uSndAmp > 0.0) band = 0.45 * band + 0.9 * exp(-q.y * q.y / (0.009 * 0.009));
   vec3 osc = 0.5 + 0.5 * vec3(sin(q.x * 9.0 + t * 2.1), sin(q.x * 13.0 - t * 1.7 + 2.0), sin(q.x * 6.0 + t * 1.3 + 4.0));
   osc = pow(osc, vec3(2.5));
   float len = smoothstep(0.5, 0.35, abs(q.x));
@@ -825,6 +860,7 @@ vec3 contours(float h, vec2 g, float N) {
   return c * a * (bold ? 1.0 : 0.6);
 }
 vec3 seedTopo(vec2 p, float t) {
+  p = topoHum(p);
   float h = topoLand(p * (5.0 / uScale), t);
   // Its slope from the neighbouring pixels (the graphics chip works them out together), in screen units
   vec2 g = vec2(dFdx(h), dFdy(h)) * uSim.y;
@@ -968,6 +1004,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
 // Topo map with Height from the picture: contour lines traced over how bright another input is, as if bright were
 // high ground. Its brightness is softened a little first, so grain doesn't break the lines up.
 vec3 topoTraced(vec2 p) {
+  p = topoHum(p);
   vec2 ts = vec2(textureSize(uScene2, 0)), px = 1.0 / ts;
   vec2 uv = p / vec2(uSim.x / uSim.y, 1.0) + 0.5;
   // A 3 by 3 patch of the small picture, a little softer still, and its slope

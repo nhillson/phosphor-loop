@@ -1574,7 +1574,9 @@ const snd = {
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
   beats: 0, shakeDir: [1, 0], amount: 60,
-  map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true },
+  map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true, lines: true },
+  // Sound on lines: how much of the sound wave the lines show (0 Smooth, just the kick and bass; 100 Fuzzy, everything)
+  detail: 30,
   // Which loops move with the sound (Loops that react, at the top of React to sound)
   react: { A: true, B: true, C: true, D: true },
 };
@@ -1763,6 +1765,10 @@ function syncSoundUI() {
   sndAmt.value = snd.amount;
   fillTrack(sndAmt);
   $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
+  $('#sndDetailRow').hidden = !snd.map.lines;
+  $('#sndDetail').value = snd.detail;
+  fillTrack($('#sndDetail'));
+  $('#sndDetailOut').textContent = snd.detail < 34 ? 'Smooth' : snd.detail < 67 ? 'Medium' : 'Fuzzy';
 }
 // Does the same sums as the browser's own sound analyser (Blackman window, FFT, smoothing, 0-255 levels,
 // checked to match it bin for bin), but is handed the raw sound the moment it arrives. The browser's audio
@@ -1778,7 +1784,10 @@ function makeFastAnalyser(rate) {
   let w = 0;
   return {
     fftSize: N, frequencyBinCount: H, rate,
+    timeSize: 4096,   // Sound on lines reads a longer stretch of the raw sound than the analysis uses
     push(x) { for (let i = 0; i < x.length; i++) { ring[w] = x[i]; w = w + 1 === R ? 0 : w + 1; } },
+    // The latest stretch of raw sound, as the browser's own analyser gives it
+    getFloatTimeDomainData(out) { for (let i = 0, j = w - out.length + R; i < out.length; i++, j++) out[i] = ring[j % R]; },
     getByteFrequencyData(out) {
       for (let i = 0, j = w - N + R; i < N; i++, j++) { const k = rev[i]; re[k] = ring[j % R] * win[i]; im[k] = 0; }
       for (let size = 2; size <= N; size <<= 1) {
@@ -2064,6 +2073,8 @@ $$('#specListen button').forEach((b) => b.addEventListener('click', () => {
 sndRetry.addEventListener('click', () => setSound(snd.src === 'off' ? 'system' : snd.src));
 sndAmt.addEventListener('input', () => { snd.amount = +sndAmt.value; syncSoundUI(); });
 sndAmt.addEventListener('dblclick', () => { snd.amount = 60; syncSoundUI(); });
+$('#sndDetail').addEventListener('input', (e) => { snd.detail = +e.target.value; syncSoundUI(); });
+$('#sndDetail').addEventListener('dblclick', () => { snd.detail = 30; syncSoundUI(); });
 $$('#sndMap button').forEach((b) => b.addEventListener('click', () => { snd.map[b.dataset.map] = !snd.map[b.dataset.map]; syncSoundUI(); }));
 $$('#sndLoops button').forEach((b) => b.addEventListener('click', () => {
   const k = b.dataset.react;
@@ -7448,7 +7459,7 @@ function movesTick(now) {
         if (rest === 'in1' || rest === 'in2') d.add('devices');
       } else if (g === 'mix' && rest && Number.isFinite(v)) { mix.tgt[rest] = v; d.add('loops'); }
       else if (g === 'adj' && rest && v !== null) { if (setPath(adj, rest, v)) d.add('adj'); }
-      else if (g === 'snd' && rest && v !== null) { if (rest === 'amount' ? (snd.amount = v, true) : /^(map|react)\./.test(rest) && setPath(snd, rest, v)) d.add('snd'); }
+      else if (g === 'snd' && rest && v !== null) { if (rest === 'amount' || rest === 'detail' ? (snd[rest] = v, true) : /^(map|react)\./.test(rest) && setPath(snd, rest, v)) d.add('snd'); }
       else if (g === 'grade' && rest in GRADE_DEF && Number.isFinite(v)) { grade[rest] = v; d.add('grade'); }
       else if (g === 'relief' && rest in RELIEF_DEF && v !== null) { relief[rest] = v; d.add('relief'); }
       else if (g === 'type' && rest && v !== null && rest in typeArt) { typeArt[rest] = v; d.add('type'); }
@@ -8331,6 +8342,7 @@ function applyRecipe(r) {
   if (r.sound) {
     if (r.soundMap) Object.assign(snd.map, r.soundMap);
     if (r.soundAmount != null) snd.amount = r.soundAmount;
+    if (r.soundDetail != null) snd.detail = r.soundDetail;
     syncSoundUI();
     if (r.anySound) {
       // Any sound will do: keep whatever is already listening, and use the microphone where the computer's sound can't be shared
@@ -8399,7 +8411,7 @@ function snapshot() {
     mix: { view: mix.tgt.view, xab: mix.tgt.xab, xba: mix.tgt.xba, showA: mix.tgt.showA, showB: mix.tgt.showB,
            ...(loopCount > 2 ? { showC: mix.tgt.showC, xc: mix.tgt.xc } : {}), ...(loopCount > 3 ? { showD: mix.tgt.showD, xd: mix.tgt.xd } : {}) },
     adj: clone(adj),
-    snd: { amount: snd.amount, map: clone(snd.map), react: clone(snd.react) },
+    snd: { amount: snd.amount, detail: snd.detail, map: clone(snd.map), react: clone(snd.react) },
     text: { str: txt.str, style: txt.style },
     grade: { ...grade },
     relief: { ...relief },
@@ -8514,7 +8526,7 @@ function loadPreset(pr, quiet) {
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((d.adj && d.adj[src]) || {}) }; });
   syncAdjUI();
-  if (d.snd) { if (d.snd.amount != null) snd.amount = d.snd.amount; if (d.snd.map) Object.assign(snd.map, d.snd.map); syncSoundUI(); }
+  if (d.snd) { if (d.snd.amount != null) snd.amount = d.snd.amount; if (d.snd.detail != null) snd.detail = d.snd.detail; if (d.snd.map) Object.assign(snd.map, d.snd.map); syncSoundUI(); }
   // Loops that react: as saved, or every loop for a preset saved before the switches existed
   snd.react = { A: true, B: true, C: true, D: true, ...((d.snd && d.snd.react) || {}) };
   syncSoundUI();
@@ -10198,7 +10210,7 @@ let simT = 0;
 
 // The Wave input's curve, worked out on the CPU once per loop per frame instead of per pixel
 const wavePts = new Float32Array(81 * 2), waveBoxes = new Float32Array(8 * 4);
-function computeWave(t, form) {
+function computeWave(t, form, reach = 0) {
   const A = Math.floor(form + 0.5), B = A - 1, R = 0.27, ph = t * 0.5, ph2 = t * 0.17;
   for (let i = 0; i <= 80; i++) {
     const u = i / 80 * Math.PI * 2;
@@ -10213,8 +10225,81 @@ function computeWave(t, form) {
     }
     waveBoxes[c * 4] = (x0 + x1) / 2;
     waveBoxes[c * 4 + 1] = (y0 + y1) / 2;
-    waveBoxes[c * 4 + 2] = Math.hypot(x1 - x0, y1 - y0) / 2;
+    waveBoxes[c * 4 + 2] = Math.hypot(x1 - x0, y1 - y0) / 2 + reach;
   }
+}
+
+/* ================= sound on lines ================= */
+// The music's own sound wave, laid along the lines of Wave, Shape, Bars and Topo map like an oscilloscope (React to
+// sound › Sound on lines). Once a frame the latest stretch of raw sound is smoothed by Line detail, started at a point
+// where it rises through the middle (so it holds still instead of sliding, as an oscilloscope's trigger does), evened
+// out so quiet and loud songs both show, and squeezed into SND_N steps for the graphics card (uSnd). Each loop that
+// reacts gets it at its own strength (uSndAmp, 0: plain lines).
+const SND_N = 96;
+const sndLine = new Float32Array(SND_N);
+const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo'];
+const usesLines = (t) => LINE_INPUTS.includes(t.in1) || LINE_INPUTS.includes(t.in2);
+let sndTD = null, sndLP = null, sndAgc = 0.05, sndLineOn = false;
+function sndLinesTick(dt) {
+  const an = snd.analyser;
+  if (frozen) return;
+  sndLineOn = false;
+  if (!an || !snd.map.lines || typeof an.getFloatTimeDomainData !== 'function' || !activeKeys().some((k) => reacts(k) && usesLines(loops[k].tgt))) return;
+  const len = Math.min(4096, an.timeSize || an.fftSize || 2048);
+  if (!sndTD || sndTD.length !== len) { sndTD = new Float32Array(len); sndLP = new Float32Array(len); }
+  an.getFloatTimeDomainData(sndTD);
+  // Smoothed twice over: Smooth keeps sound below about 150 Hz (kick and bass), Fuzzy up to about 9 kHz
+  const fc = 150 * Math.pow(60, clamp(snd.detail, 0, 100) / 100), al = 1 - Math.exp(-2 * Math.PI * fc / (snd.rate || 48000));
+  let y1 = sndTD[0], y2 = y1, mean = 0;
+  for (let i = 0; i < len; i++) { y1 += al * (sndTD[i] - y1); y2 += al * (y1 - y2); sndLP[i] = y2; mean += y2; }
+  mean /= len;
+  // The latest place the sound rises through the middle, leaving room for the stretch that's shown after it
+  const win = Math.floor(len * 0.6);
+  let start = len - win;
+  for (let i = len - win; i > 1; i--) if (sndLP[i - 1] < mean && sndLP[i] >= mean) { start = i; break; }
+  const step = win / SND_N;
+  let peak = 0;
+  for (let n = 0; n < SND_N; n++) {
+    const a = start + Math.floor(n * step), b = Math.max(a + 1, start + Math.floor((n + 1) * step));
+    let sum = 0;
+    for (let i = a; i < b; i++) sum += sndLP[i];
+    const v = sum / (b - a) - mean;
+    sndLine[n] = v;
+    peak = Math.max(peak, Math.abs(v));
+  }
+  // Evened out: catches up at once with a louder moment, sinks back over a couple of seconds
+  sndAgc = peak > sndAgc ? peak : sndAgc + (peak - sndAgc) * (1 - Math.exp(-dt / 2));
+  const k = 1 / Math.max(sndAgc, 0.02);
+  for (let n = 0; n < SND_N; n++) sndLine[n] = clamp(sndLine[n] * k, -1.4, 1.4);
+  sndLineOn = true;
+}
+// For tests/sound_lines_check.py: made-up music (a kick every half second, a bass line, off-beat hi-hats and a chord)
+// fed in as raw sound, the way Computer sound arrives in Chrome
+window.__plSnd = { snd, get line() { return Array.from(sndLine); }, get on() { return sndLineOn; }, amp: (k) => sndLineAmp(k),
+  fake() {
+    const R = 48000, fa = makeFastAnalyser(R);
+    setAnalyser(fa, R);
+    let n = 0, t0 = performance.now(), rnd = 1;
+    const notes = [55, 55, 65.4, 49], buf = new Float32Array(R);
+    const feed = () => {
+      if (snd.analyser !== fa) return;
+      const want = Math.min(R, Math.round((performance.now() - t0) / 1000 * R) - n);
+      for (let i = 0; i < want; i++, n++) {
+        const time = n / R, beat = time % 0.5, f0 = notes[Math.floor(time / 2) % 4];
+        const kick = beat < 0.35 ? Math.sin(2 * Math.PI * (45 * beat + 80 * (1 - Math.exp(-beat * 30)) / 30)) * Math.exp(-beat * 9) : 0;
+        rnd = (rnd * 16807) % 2147483647;
+        const hat = (rnd / 1073741823 - 1) * Math.exp(-((time + 0.25) % 0.5) * 90) * 0.3;
+        buf[i] = 0.5 * kick + 0.25 * Math.sin(2 * Math.PI * f0 * time) + hat + 0.05 * (Math.sin(2 * Math.PI * f0 * 4 * time) + Math.sin(2 * Math.PI * f0 * 5 * time));
+      }
+      if (want > 0) fa.push(buf.subarray(0, want));
+      requestAnimationFrame(feed);
+    };
+    feed();
+  } };
+// How far the sound pushes loop k's lines (picture units at Input size 100), 0 when they stay plain
+function sndLineAmp(k) {
+  if (!sndLineOn || !reacts(k) || !usesLines(loops[k].tgt)) return 0;
+  return 0.045 * sndPower() * (reduceMotion ? 0.5 : 1);
 }
 const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
 const LOOK_K = 0.05;     // how far Look-up at 100 lets each spot read from where its color points, in one frame
@@ -10765,6 +10850,8 @@ function runLoop(k, xf, brush, f) {
     if (m.warp) w += a * (E.beat * 50 + E.mid * 15);
     if (m.size) sizeBoost = a * (E.low * 30 + E.beat * 22);
     if (m.flash) gainBoost = 1 + a * E.beat * 0.8;
+    // With Sound on lines the lines already move with the bass, so they swell half as much
+    if (m.lines && sndLineOn && usesLines(t)) sizeBoost *= 0.5;
   }
   const br = clamp(c.breathe, 0, 100) / 100;
   if (br > 0.005) { const B = breathe(k, br, f / 60); z += B.z; s *= B.s; }
@@ -10865,8 +10952,11 @@ function runLoop(k, xf, brush, f) {
   set2f(fbProg, 'uShift', sx * f, sy * f);
   set1f(fbProg, 'uGain', c.gain * gainBoost);
   set1f(fbProg, 'uForm', t.form);
+  const hum = sndLineAmp(k);
+  set1f(fbProg, 'uSndAmp', hum);
+  if (hum > 0) { const ls = U(fbProg, 'uSnd[0]'); if (ls) gl.uniform4fv(ls, sndLine); }
   if (t.in1 === 'wave' || t.in2 === 'wave') {
-    computeWave(simT + (11.0 * LOOP_OFF[k]), t.form);
+    computeWave(simT + (11.0 * LOOP_OFF[k]), t.form, hum * 1.4);
     const lw = U(fbProg, 'uWave[0]'), lb = U(fbProg, 'uWaveBox[0]');
     if (lw) gl.uniform2fv(lw, wavePts);
     if (lb) gl.uniform4fv(lb, waveBoxes);
@@ -13264,6 +13354,7 @@ function frame() {
   vcrTick();
   packAdj();
   analyzeSound(dt, now);
+  sndLinesTick(dt);
   drawMeter();
   seqTick(now);
   shapesTick(now, dt);
