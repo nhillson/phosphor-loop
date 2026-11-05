@@ -32,6 +32,56 @@ if (!TEST && !app.requestSingleInstanceLock()) app.exit(0);
 
 /* ---------- log (the app data folder's log.txt: the first place to look when something goes wrong) ---------- */
 const dataDir = () => app.getPath('userData');
+
+/* ---------- moving pictures ffmpeg can't read (moving WebP, as GIPHY's stickers are; AVIF) ---------- */
+// Chrome's own picture reader (ImageDecoder) unpacks them in a hidden window: each frame as a PNG (see-through
+// parts kept) and how long it shows. engine.js (makePlayable) turns the frames into a video file ffmpeg can use.
+// Returns { w, h, frames: [{ png: Buffer, ms }] }.
+async function decodePicture(file, { signal } = {}) {
+  const data = await fsp.readFile(file);
+  if (data.length > 200 * 1024 * 1024) throw new Error('too big');
+  const win = new BrowserWindow({ show: false, width: 64, height: 64, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+  const stop = () => { if (!win.isDestroyed()) win.destroy(); };
+  if (signal) signal.addEventListener('abort', stop, { once: true });
+  try {
+    await win.loadFile(path.join(__dirname, 'decode.html'));
+    const got = await win.webContents.executeJavaScript(`(async (b64) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const t = (a, n) => String.fromCharCode(...bytes.slice(a, a + n));
+      const type = t(0, 4) === 'RIFF' && t(8, 4) === 'WEBP' ? 'image/webp' : t(0, 4) === 'GIF8' ? 'image/gif'
+        : bytes[0] === 0x89 && t(1, 3) === 'PNG' ? 'image/png' : t(4, 4) === 'ftyp' ? 'image/avif' : '';
+      if (!type || !window.ImageDecoder || !(await ImageDecoder.isTypeSupported(type))) return { error: 'not a picture this reader knows (' + type + ')' };
+      const dec = new ImageDecoder({ data: bytes, type });
+      await dec.tracks.ready;
+      await dec.completed.catch(() => {});
+      const count = Math.min(dec.tracks.selectedTrack ? dec.tracks.selectedTrack.frameCount : 1, 3000);
+      let cv = null, cx = null;
+      const frames = [];
+      let total = 0;
+      for (let i = 0; i < count && total < 120000; i++) {
+        const { image } = await dec.decode({ frameIndex: i });
+        if (!cv) { cv = new OffscreenCanvas(image.displayWidth, image.displayHeight); cx = cv.getContext('2d'); }
+        cx.clearRect(0, 0, cv.width, cv.height);
+        cx.drawImage(image, 0, 0, cv.width, cv.height);
+        let ms = (image.duration || 0) / 1000;
+        if (ms <= 10) ms = 100;   // as browsers show very short frames
+        image.close();
+        const blob = await cv.convertToBlob({ type: 'image/png' });
+        const r = new FileReader();
+        const url = await new Promise((res) => { r.onload = () => res(r.result); r.readAsDataURL(blob); });
+        frames.push({ png: url.slice(url.indexOf(',') + 1), ms });
+        total += ms;
+      }
+      dec.close();
+      return { w: cv ? cv.width : 0, h: cv ? cv.height : 0, frames };
+    })(${JSON.stringify(data.toString('base64'))})`);
+    if (!got || got.error) throw new Error(got ? got.error : 'nothing came back');
+    return { w: got.w, h: got.h, frames: got.frames.map((f) => ({ png: Buffer.from(f.png, 'base64'), ms: f.ms })) };
+  } finally {
+    if (signal) signal.removeEventListener('abort', stop);
+    stop();
+  }
+}
 let logStream = null;
 function log(text) {
   const line = new Date().toISOString().replace('T', ' ').slice(0, 19) + '  ' + text;
@@ -731,7 +781,7 @@ async function runJob(job) {
       req.cookieHeader = await cookieHeaderFor(req.direct || req.url);
     }
     const r = await E.fetchVideo(tools, req, job.dir, {
-      signal, log,
+      signal, log, decodePicture,
       onStatus: (t) => { job.text = t; sendJobsSoon(); },
       onProgress: (p) => { job.pct = p.pct; job.part = p.part; sendJobsSoon(); },
     });

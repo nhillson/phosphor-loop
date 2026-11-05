@@ -29,6 +29,12 @@ function makeMedia(dir, ffmpeg) {
       "format=rgba,geq=r='255':g='60':b='200':a='if(lt(hypot(X-50-T*50,Y-80),35),255,0)',split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse=alpha_threshold=128",
       path.join(dir, 'sticker.gif')]);
   }
+  // The same sticker as a moving WebP, the way GIPHY hands most of them out (ffmpeg can write these but not read them)
+  if (!has('sticker.webp')) {
+    ff(ffmpeg, ['-f', 'lavfi', '-i', 'nullsrc=s=200x160:r=10:d=2', '-vf',
+      "format=rgba,geq=r='255':g='60':b='200':a='if(lt(hypot(X-50-T*50,Y-80),35),255,0)'",
+      '-c:v', 'libwebp_anim', '-lossless', '1', '-loop', '0', path.join(dir, 'sticker.webp')]);
+  }
   // 12 minutes, small and cheap: long enough that a marked part is downloaded on its own
   if (!has('long.webm')) {
     ff(ffmpeg, ['-f', 'lavfi', '-i', 'testsrc2=s=320x180:r=10:d=720', '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8',

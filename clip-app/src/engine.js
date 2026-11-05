@@ -128,7 +128,7 @@ async function probe(tools, file, { signal } = {}) {
 /* ---------------------------------------------------------------------------------------------------------------
    Getting a video off the web
    --------------------------------------------------------------------------------------------------------------- */
-const DIRECT_EXT = /\.(mp4|m4v|webm|mov|mkv|ogv|gif|gifv)(?:[?#]|$)/i;
+const DIRECT_EXT = /\.(mp4|m4v|webm|mov|mkv|ogv|gif|gifv|webp|avif)(?:[?#]|$)/i;
 const isDirectLink = (url) => {
   try { const u = new URL(url); return /^https?:$/.test(u.protocol) && DIRECT_EXT.test(u.pathname); } catch (_) { return false; }
 };
@@ -295,7 +295,37 @@ const PLAYABLE_A = ['aac', 'opus', 'vorbis', 'mp3', 'flac'];
 // it's solid, black where it's see-through). Phosphor Loop puts the two back together as it plays (stickerUnpack
 // in its js/app.js) and knows such a clip by its "sticker" tag. The trimmer shows the sticker on black as before.
 const STICKER_TAG = 'sticker';
-const PICTURE_CODECS = ['gif', 'webp', 'apng', 'png'];
+// (ffv1: the frames of a picture ffmpeg couldn't read itself, see picturesToVideo)
+const PICTURE_CODECS = ['gif', 'webp', 'apng', 'png', 'ffv1'];
+
+// A moving picture ffmpeg can't read (moving WebP, as GIPHY's stickers are, or AVIF), unpacked by Chrome's own
+// reader in main.js (decodePicture): its frames go into a lossless video that keeps see-through parts (FFV1, BGRA),
+// which everything after this can read like a GIF.
+async function picturesToVideo(tools, file, jobDir, decodePicture, { signal, log } = {}) {
+  const got = await decodePicture(file, { signal });
+  if (!got || !got.frames || !got.frames.length || !got.w) throw new ClipError('That file isn’t a video this app can read.', 'unreadable');
+  const dir = path.join(jobDir, 'frames');
+  await fsp.mkdir(dir, { recursive: true });
+  // A still picture shows for 3 seconds
+  if (got.frames.length === 1) got.frames[0].ms = 3000;
+  const list = [];
+  for (let i = 0; i < got.frames.length; i++) {
+    const name = 'f' + String(i).padStart(5, '0') + '.png';
+    await fsp.writeFile(path.join(dir, name), got.frames[i].png);
+    list.push(`file '${name}'`, `duration ${(got.frames[i].ms / 1000).toFixed(4)}`);
+  }
+  // The concat list's last frame is listed twice, or its time is lost
+  list.push(list[list.length - 2]);
+  await fsp.writeFile(path.join(dir, 'list.txt'), list.join('\n') + '\n');
+  const out = path.join(jobDir, 'source-frames.mkv');
+  const w = 2 * Math.ceil(got.w / 2), h = 2 * Math.ceil(got.h / 2);
+  const r = await run(tools.ffmpeg, ['-hide_banner', '-y', '-nostdin', '-f', 'concat', '-safe', '0', '-i', path.join(dir, 'list.txt'),
+    '-vf', `format=bgra,pad=${w}:${h}:0:0:color=black@0`, '-fps_mode', 'vfr', '-c:v', 'ffv1', '-pix_fmt', 'bgra', out], { signal, log });
+  await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  if (r.code !== 0 || !fs.existsSync(out)) throw new ClipError('That file isn’t a video this app can read.', 'unreadable', r.stderr.slice(-400));
+  if (log) log(`picture: ${got.frames.length} frames of ${got.w}x${got.h} read by Chrome's picture reader`);
+  return out;
+}
 // Whether a moving picture has see-through parts worth keeping (more than a sliver in some frame)
 async function hasSeeThrough(tools, file, p, { signal } = {}) {
   if (!PICTURE_CODECS.includes(p.vcodec)) return false;
@@ -305,11 +335,22 @@ async function hasSeeThrough(tools, file, p, { signal } = {}) {
   return (r.stdout.match(/YAVG=([\d.]+)/g) || []).some((m) => +m.slice(5) < 250);
 }
 
-async function makePlayable(tools, file, jobDir, { signal, log, onProgress } = {}) {
-  const p = await probe(tools, file, { signal });
+async function makePlayable(tools, file, jobDir, { signal, log, onProgress, decodePicture } = {}) {
+  let p = null, why = null;
+  try { p = await probe(tools, file, { signal }); } catch (e) { why = e; }
+  // ffmpeg reads a moving WebP as a picture with no size (it can't unpack those): Chrome's reader does it instead
+  let unpacked = null;
+  if ((!p || !p.width || !p.height) && decodePicture) {
+    try {
+      unpacked = await picturesToVideo(tools, file, jobDir, decodePicture, { signal, log });
+      file = unpacked;
+      p = await probe(tools, file, { signal });
+    } catch (e) { if (e && e.code === 'cancelled') throw e; if (log) log('picture reader: ' + (e && e.message)); }
+  }
+  if (!p || !p.width) throw why || new ClipError('That file isn’t a video this app can read.', 'unreadable');
   const ext = path.extname(file).toLowerCase();
   const okCodecs = PLAYABLE_V.includes(p.vcodec) && (!p.hasAudio || PLAYABLE_A.includes(p.acodec));
-  const isGif = p.vcodec === 'gif' || ext === '.gif';
+  const isGif = p.vcodec === 'gif' || ext === '.gif' || !!unpacked;
   if (!isGif && okCodecs && /mp4|mov|webm/.test(p.format) && ext !== '.mkv') return { file, probe: p };
   const out = path.join(jobDir, 'playable.mp4');
   if (!isGif && okCodecs && p.vcodec !== 'vp8') {
@@ -332,7 +373,7 @@ async function makePlayable(tools, file, jobDir, { signal, log, onProgress } = {
   if (r.code !== 0) throw new ClipError('That video couldn’t be opened.', 'unreadable', r.stderr.slice(-500));
   const sticker = await hasSeeThrough(tools, file, p, { signal }).catch(() => false);
   if (sticker && log) log('sticker: see-through parts found, it will be saved as a sticker');
-  return { file: out, probe: await probe(tools, out, { signal }), sticker };
+  return { file: out, probe: await probe(tools, out, { signal }), sticker, unpacked };
 }
 
 // The size to make a picture: no taller than maxHeight (and no wider than 16:9 at that height would be, so
@@ -515,7 +556,7 @@ async function clearSources(jobDir) {
    Returns { source, playable, probe, info, offset, marks }: offset is where the downloaded file starts in the
    original video (more than 0 when only part was downloaded).
    --------------------------------------------------------------------------------------------------------------- */
-async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}, onProgress = () => {} } = {}) {
+async function fetchVideo(tools, req, jobDir, { signal, log, decodePicture, onStatus = () => {}, onProgress = () => {} } = {}) {
   await fsp.mkdir(jobDir, { recursive: true });
   let source = '', info = { title: '', url: req.url || '' }, offset = 0, section = null;
   const marks = req.marks && Number.isFinite(req.marks.start) ? { ...req.marks } : null;
@@ -593,7 +634,9 @@ async function fetchVideo(tools, req, jobDir, { signal, log, onStatus = () => {}
   if (!info.title && req.pageTitle) info.title = req.pageTitle;
   onStatus('Getting it ready…');
   onProgress({ pct: -1, part: 0 });
-  const made = await makePlayable(tools, source, jobDir, { signal, log, onProgress });
+  const made = await makePlayable(tools, source, jobDir, { signal, log, onProgress, decodePicture });
+  // A picture Chrome's reader unpacked: its frames are the source from here on (they keep see-through parts)
+  if (made.unpacked) source = made.unpacked;
   // A part download starts at the key frame before the asked-for start, so it runs a little long at the front:
   // where it really starts is its end minus its length
   if (section) offset = Math.max(0, section[1] - made.probe.duration);

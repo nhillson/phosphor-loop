@@ -327,6 +327,26 @@ module.exports = async function selftest(h) {
       await panelFrames(30);
       check('switching it back on blocks again', ab.state().count >= 1, ab.state().count + ' stopped');
     }
+    /* ---- stickers: a moving WebP (as GIPHY hands out) and a GIF with see-through parts, saved as stickers ---- */
+    for (const [file, what] of [['sticker.webp', 'moving WebP sticker'], ['sticker.gif', 'GIF sticker']]) {
+      const before = (await pjs('S.lib.clips.length')) || 0;
+      h.startJob({ url: base + file, pageTitle: 'A ' + what });
+      await panelUntil(`S.ed && !document.querySelector('#editor').hidden`, `the ${what} in the trimmer`, 120000);
+      await editorFrames(10);
+      check(`the ${what} opens in the trimmer`, (await pjs('S.ed.d')) > 0.5, (await pjs('S.ed.d')).toFixed(2) + ' s');
+      await click('#edCats [data-cat="abstract"]');
+      await panelFrames(3);
+      await shot('10-' + file.replace('.', '-'));
+      await click('#edSave');
+      await panelUntil(`S.lib.clips.length > ${before} && !S.ed`, `the ${what} save`, 120000);
+      const st = await pjs(`S.lib.clips.find((c) => /${what}/i.test(c.n) || (c.page || '').includes(${JSON.stringify(what)}))`) || (await pjs('S.lib.clips[S.lib.clips.length - 1]'));
+      check(`the ${what} is saved tagged "sticker"`, st && (st.tags || []).includes('sticker'), st && (st.tags || []).join(','));
+      check(`the ${what} is the sticker over its see-through map`, st && st.h === 160 * 2 && st.w === 200, st && `${st.w}x${st.h}`);
+    }
+    await click('#tabLib');
+    await panelFrames(20);
+    await shot('10-stickers-in-library');
+
     code = checks.every((c) => c.ok) ? 0 : 1;
   } catch (e) {
     check('self-test ran to the end', false, e.message);
