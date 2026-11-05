@@ -3900,6 +3900,8 @@ function cueTick(now) {
   else if (mix.tgt.view !== 0 && mix.tgt.view !== 100) mix.tgt.view = mix.tgt.view >= 50 ? 100 : 0;
   cueStartScout();
   cueDeck(now);
+  // A full list stays as it is until you clear a look (its ✕, or Shift + its number) or cut to one: no trying meanwhile
+  if (cue.list.length >= CUE.max) { cue.trial = null; return true; }
   const T = cue.trial, k = cueHidden();
   if (!T) {
     const sc = cueScene(k);
@@ -3916,14 +3918,8 @@ function cueTick(now) {
   const v = tasteJudge(lookVerdict(S), k, T.look, S);
   checkTally(v, true);
   if (!v.pass) return true;
-  // Kept while the mouse is over the previews only if there's room, so a picture doesn't change as you reach for it
-  const free = cue.list.filter((it) => it.id !== cue.pick && !(cue.deck && cue.deck.id === it.id));
-  if (cue.list.length >= CUE.max) {
-    if (cue.hover || !free.length) return true;
-    const worst = free.sort((a, b) => a.v.score - b.v.score)[0];
-    if (worst.v.score >= v.score) return true;
-    cue.list.splice(cue.list.indexOf(worst), 1);
-  }
+  // Never replaces a ready look: only fills an empty place
+  if (cue.list.length >= CUE.max) return true;
   cue.list.push({ id: ++cue.n, look: T.look, v, pic: cueSnap(), t: now });
   cueStrip();
   apStatus();
@@ -5264,7 +5260,7 @@ function apStatus() {
   else if (cueActive()) {
     const n = cue.list.length, d = cue.deck;
     html = '<span class="live"></span><b>Cue mode.</b> Autopilot leaves the picture alone. ' +
-      (n ? `${n} new look${n === 1 ? '' : 's'} ready. ` : 'Looking for good new looks… ') +
+      (n >= CUE.max ? `${n} looks ready (full: clear one with its ✕ to look for another). ` : n ? `${n} new look${n === 1 ? '' : 's'} ready. ` : 'Looking for good new looks… ') +
       (d && d.id != null && performance.now() - d.at > CUE.built * 1000 ? 'Press <b>Space</b> (or L) to cut to the next one; 1 to 5 pick a preview.'
         : d && d.id != null ? 'The next look is building up…' : 'Space (or L) still cuts to a new look, not yet checked.');
     if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;

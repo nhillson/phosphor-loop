@@ -152,6 +152,26 @@ def run(c, base, out, problems):
     else:
         expect(False, f'the waiting look is on the list ({waiting}, {s["ids"]})')
 
+    # A full list stays put: no new look replaces one until it's cleared
+    pg.evaluate("""() => { const c = window.__plCue.cue, it = c.list[0];
+      while (c.list.length < 5) c.list.push({ ...it, id: ++c.n, v: { ...it.v, score: -99 } }); }""")
+    before = pg.evaluate("() => window.__plCue.cue.list.map((i) => i.id)")
+    for _ in range(25):
+        pg.evaluate(FEED)
+        c.wait_frames(3, 'full list', ceiling=120)
+    after = pg.evaluate("() => [window.__plCue.cue.list.map((i) => i.id), window.__plCue.cue.trial]")
+    expect(after[0] == before and after[1] is None, f'with five ready, none is replaced and no more are tried ({before} → {after[0]})')
+    pg.evaluate("() => document.querySelectorAll('#cueStrip .cue-x')[4].click()")
+    for _ in range(60):
+        pg.evaluate(FEED)
+        c.wait_frames(3, 'refill', ceiling=120)
+        ids = pg.evaluate("() => window.__plCue.cue.list.map((i) => i.id)")
+        if len(ids) == 5:
+            break
+    expect(ids[:4] == before[:4] and len(ids) == 5 and ids[4] not in before, f'clearing one lets a new look fill just that place ({ids})')
+    # Back to a short list for the checks after this
+    pg.evaluate("() => { const c = window.__plCue.cue; c.list.splice(2); }")
+
     # Fade between looks: the Cut/Fade button beside Cut; What you see slides over the fade time, nothing new loads meanwhile
     pg.evaluate("() => { window.__plCue.apSet.cueFadeSecs = 8; document.querySelector('#cueFadeBar').click(); }")
     lbl = pg.evaluate("() => [document.querySelector('#cueFadeBarLabel').textContent, document.querySelector('#apCueFade').getAttribute('aria-pressed')]")
