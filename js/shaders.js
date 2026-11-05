@@ -141,6 +141,7 @@ uniform float uPush, uPushTurn;   // Pushed by the other loop: the same idea, bu
 uniform float uDye, uDyeTurn;     // Dyed by the other loop: how far its bright parts turn this loop's colors this frame
 uniform float uLook;              // Look-up: how far each spot moves towards the place its own color points at, this frame
 uniform vec2 uCenter;             // Chase: the point Zoom and Spin turn around (the middle unless Chase moves it)
+uniform vec3 uWind;               // Wind: which way it blows (x, y) and how far it carries the picture this frame (z)
 uniform float uChroma, uChromaTurn;   // Color chase: how far each color is pushed by another this frame, and a slow turn
 uniform float uRestless;          // Restless: how much of what holds still fades this frame
 uniform float uJulia;             // Fractal fold: how much of the fold (0 none, 1 all of it)
@@ -1060,6 +1061,13 @@ void main() {
   if (uInkDt > 0.0) q -= uInkDt * inkPush(pf);
   q += uWarp * vec2(sin(q.y * 7.0 + uTime * 1.1 + sin(q.x * 3.0 + uTime * 0.5)),
                     cos(q.x * 7.0 - uTime * 0.9 + sin(q.y * 2.0 - uTime * 0.3)));
+  // Wind: the picture is carried one way, in gusts (some patches blow harder than others) with a little curl,
+  // so it streams off to one side like smoke instead of spreading evenly
+  if (uWind.z > 0.0) {
+    vec2 wd = uWind.xy, wp = vec2(-wd.y, wd.x);
+    float g = noiseD(q * 1.6 - wd * uTime * 0.9 + vec2(7.0, 3.0)).x;
+    q -= wd * uWind.z * (0.35 + 1.3 * g) + wp * uWind.z * 0.18 * flowAt(q, uTime * 0.8).y;
+  }
   if (uMelt > 0.0) q += meltAt(q, asp);
   if (uPush > 0.0) q += pushAt(q, asp);
   if (uLook > 0.0) q = lookAt(q, asp);
@@ -1077,6 +1085,8 @@ void main() {
   }
   vec2 px = uPxK / uSim;
   vec3 c0 = uChroma > 0.0 ? chromaAt(st, asp) : texture(uPrev, st).rgb;
+  // Wind leaves streaks: a little of what's further upwind is smeared in
+  if (uWind.z > 0.0) c0 = mix(c0, texture(uPrev, st - uWind.xy / vec2(asp, 1.0) * uWind.z * 3.0).rgb, min(0.35, uWind.z * 90.0));
   vec3 cb = 0.25 * (texture(uPrev, st + vec2(px.x, 0.0)).rgb + texture(uPrev, st - vec2(px.x, 0.0)).rgb +
                     texture(uPrev, st + vec2(0.0, px.y)).rgb + texture(uPrev, st - vec2(0.0, px.y)).rgb);
   vec3 fb = c0 + (cb - c0) * uBlur;
@@ -1163,6 +1173,10 @@ uniform float uPxK, uTime;
 uniform float uMirror, uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;   // Mirror (uMirror 0 and uMirrorT 1: none)
 uniform float uSplit, uWarp, uChroma, uChromaTurn;
 uniform float uN, uFresh, uHalftone;
+// Glitch slide: up to 6 bands of the picture slipped sideways, each its middle (0 bottom to 1 top), half its
+// height, how far it slips (a part of the width) and how strong it still is (1 just hit, 0 settled back)
+uniform vec4 uGlB[6];
+uniform float uGlN;
 out vec4 o;
 ${COMMON}
 ${MIRROR}
@@ -1192,8 +1206,29 @@ void main() {
   if (uWarp > 0.0) p += uWarp * vec2(sin(p.y * 7.0 + uTime * 1.1 + sin(p.x * 3.0 + uTime * 0.5)),
                                      cos(p.x * 7.0 - uTime * 0.9 + sin(p.y * 2.0 - uTime * 0.3)));
   vec2 st = p / vec2(asp, 1.0) + 0.5;
+  // Glitch slide: which bands this spot is in, how far they slip it, and how near it is to a band's edge
+  float gs = 0.0, gk = 0.0, ge = 0.0;
+  for (int i = 0; i < 6; i++) {
+    if (float(i) >= uGlN) break;
+    vec4 b = uGlB[i];
+    float d = abs(uv.y - b.x);
+    if (d < b.y) {
+      gs += b.z; gk = max(gk, b.w);
+      ge = max(ge, b.w * smoothstep(b.y - 3.0 * px.y * uPxK, b.y, d));
+    }
+  }
+  if (gk > 0.0) st.x = fract(st.x + gs);
   vec4 now = texture(uNow, st);
   vec3 c = uChroma > 0.0 ? chromaOnce(st, asp) : now.rgb;
+  if (gk > 0.0) {
+    // Inside a band: red and blue slip further apart, then a rainbow sweeps across it (keeping its light and
+    // dark), with bright rainbow seams along its edges
+    c = vec3(texture(uNow, vec2(fract(st.x + gs * 0.4), st.y)).r, c.g, texture(uNow, vec2(fract(st.x - gs * 0.4), st.y)).b);
+    vec3 bow = hsv(fract(uv.x * 1.3 + uv.y * 0.6 - uTime * 0.5 + gs * 3.0), 0.9, 1.0);
+    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+    c = mix(c, bow * (0.25 + 1.1 * lum), 0.6 * gk);
+    c = clamp(c + bow * ge * 0.7, 0.0, 1.0);
+  }
   if (uN > 0.0) {
     c = 0.5 * c + 0.125 * (texture(uNow, st + vec2(px.x, 0.0)).rgb + texture(uNow, st - vec2(px.x, 0.0)).rgb +
                            texture(uNow, st + vec2(0.0, px.y)).rgb + texture(uNow, st - vec2(0.0, px.y)).rgb);

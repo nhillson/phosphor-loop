@@ -422,6 +422,8 @@
   .seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .ctl .seg + .hint, .ctl .ends + .seg { margin-top: 4px; }
   .seg-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .wind-dirs { max-width: 168px; margin-inline: auto; }
+  .wind-dirs button { font-size: 17px; line-height: 1; padding: 6px 0; }
   .seg button {
     min-height: 36px; padding: 6px 2px; border-radius: 6px;
     border: 1px solid var(--line); border-bottom-color: #0b0a0c;
