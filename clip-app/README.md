@@ -63,6 +63,18 @@ Chrome's own picture reader unpacks them in a hidden window (`decodePicture` in 
 and `picturesToVideo` in `src/engine.js` turns the frames into a lossless FFV1 video with see-through parts, which is
 used from then on like a GIF. Since 1.11.1; the self-test grabs `sticker.webp` and `sticker.gif` from the test pages.
 
+## Folders you make, kinds as tags (1.13)
+
+The library is folders: All at the top, then the folders you make (+ New folder at All makes one at the top; inside a
+folder, one inside it), as deep as you like. Inside the app a top folder is still a "category" (`cats`, a folder on disk
+named after it), which is also how Phosphor Loop's clip explorer and Autopilot see them. The kinds the picture
+recogniser tells apart (nature, water, sky & space…, `KINDS` in `src/categories.js`) are tags now: the one it sees goes
+in the trimmer's Tags box, which you can change. The trimmer saves to the folder picked under Save to folder (the last
+one used, `settings.lastFolder`). The Library's tag row (every tag, most used first) and a clip's #tags can be clicked:
+every clip with that tag, from every folder. A new library starts with only Other and Looks (`startEmpty`); a library
+from before 1.13 is switched over once when it opens (`toFolders`): clips in the old kind folders get that kind as a
+tag, kind folders nobody used go, nothing moves.
+
 ## Folders, and dragging clips out (1.12)
 
 In the Library, picking a category shows a folder bar under the category chips: where you are (Abstract › Fractals),

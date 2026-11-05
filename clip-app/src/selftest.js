@@ -56,6 +56,16 @@ module.exports = async function selftest(h) {
     check('panel opened', true);
     await shot('0-start-page');
 
+    /* ---- 0. a new library has only Other (and Looks); the folders are the ones you make ---- */
+    const cats0 = await pjs(`S.lib.cats.map((c) => c.id)`);
+    check('a new library starts with just Other and Looks', cats0.length === 2 && cats0.includes('other') && cats0.includes('looks'), cats0.join(', '));
+    const mkTop = async (n) => { const r = await pjs(`clips.call('cat:add', ${JSON.stringify(n)})`); return r && r.ok ? r.cat.id : ''; };
+    const ABS = await mkTop('Abstract'), RETRO = await mkTop('Retro & glitch');
+    await panelUntil(`S.lib.cats.some((c) => c.id === ${JSON.stringify(ABS)}) && S.lib.cats.some((c) => c.id === ${JSON.stringify(RETRO)})`, 'the new folders', 10000);
+    check('new folders at the top of the library (All)', ABS && RETRO, ABS + ', ' + RETRO);
+    // The trimmer's Save to folder list
+    const pickFolder = (id) => pjs(`(() => { if (!S.ed) return false; S.ed.folder = ${JSON.stringify(id + '|')}; renderEdCats(); return S.ed.cat === ${JSON.stringify(id)}; })()`);
+
     /* ---- 1. a page with a video: mark a part while it plays, grab, trim, save ---- */
     await loadPage(base + 'video.html');
     const t0 = await videoFrames(20);
@@ -106,8 +116,10 @@ module.exports = async function selftest(h) {
     await panelFrames(5);
     const trimmed = await pjs(`({ start: S.ed.start, end: S.ed.end })`);
     await shot('2-trimmer');
-    if (!(await pjs(`!!S.ed.cat`))) await click('#edCats [data-cat="abstract"]');
+    await pickFolder(ABS);
     const cat1 = await pjs(`S.ed.cat`);
+    const tag1 = await pjs(`$('#edTags').value.trim()`);
+    check('the kind it looks like goes in as a tag', !sug || !sug.tag || tag1 === sug.tag, tag1);
     await click('#edSave');
     await panelUntil(`S.lib && S.lib.clips.length >= 1 && !S.ed`, 'the save', 180000);
     const clip1 = await pjs(`S.lib.clips[0]`);
@@ -115,7 +127,8 @@ module.exports = async function selftest(h) {
     const file1 = path.join(lib.dir, ...clip1.f.split('/'));
     check('the clip is in the library folder', fs.existsSync(file1), clip1.f);
     check('the clip is the trimmed length', Math.abs(clip1.d - (trimmed.end - trimmed.start)) < 0.15, clip1.d + ' s vs ' + (trimmed.end - trimmed.start).toFixed(2));
-    check('the clip went to the chosen category', clip1.c === cat1, clip1.c);
+    check('the clip went to the chosen folder', clip1.c === cat1 && cat1 === ABS, clip1.c);
+    check('the clip has the tag', !tag1 || (clip1.tags || []).includes(tag1), (clip1.tags || []).join(','));
     check('the clip remembers where it came from', /video\.html/.test(clip1.src) && clip1.page, clip1.src + ' | ' + clip1.page);
 
     /* ---- 2. a GIF, the way right-click > Grab this GIF does it ---- */
@@ -125,7 +138,7 @@ module.exports = async function selftest(h) {
     await editorFrames(10);
     const gd = await pjs(`S.ed.d`);
     check('the GIF opens in the trimmer as a video', Math.abs(gd - 4) < 0.3, gd.toFixed(2) + ' s');
-    await click('#edCats [data-cat="retro"]');
+    await pickFolder(RETRO);
     await panelFrames(3);
     await shot('3-gif');
     // Crop it: Square, then drag the box to the left edge with the mouse, then Done
@@ -159,7 +172,7 @@ module.exports = async function selftest(h) {
       await pjs(`document.querySelector('#cropBtnText').textContent`));
     await click('#edSave');
     await panelUntil(`S.lib.clips.length >= 2 && !S.ed`, 'the GIF save', 120000);
-    const clip2 = await pjs(`S.lib.clips.find((c) => c.c === 'retro')`);
+    const clip2 = await pjs(`S.lib.clips.find((c) => c.c === ${JSON.stringify(RETRO)})`);
     check('the GIF is saved as an MP4 clip in Retro & glitch', clip2 && /^Retro & glitch\/.+\.mp4$/.test(clip2.f), clip2 && clip2.f);
     check('the cropped clip is the crop\u2019s size', clip2 && clip2.w === 240 && clip2.h === 240 && Array.isArray(clip2.crop), clip2 && `${clip2.w}x${clip2.h}`);
     // ...and really is the left square of the GIF: compared with the GIF itself, cropped there and elsewhere
@@ -334,7 +347,7 @@ module.exports = async function selftest(h) {
       await panelUntil(`S.ed && !document.querySelector('#editor').hidden`, `the ${what} in the trimmer`, 120000);
       await editorFrames(10);
       check(`the ${what} opens in the trimmer`, (await pjs('S.ed.d')) > 0.5, (await pjs('S.ed.d')).toFixed(2) + ' s');
-      await click('#edCats [data-cat="abstract"]');
+      await pickFolder(ABS);
       await panelFrames(3);
       await shot('10-' + file.replace('.', '-'));
       await click('#edSave');
@@ -349,19 +362,26 @@ module.exports = async function selftest(h) {
 
     /* ---- folders: a new folder in a category, a clip moved into it, and the folder bar showing it ---- */
     {
-      const made = await pjs(`clips.call('folder:add', { c: 'abstract', p: 'Stickers' })`);
+      const made = await pjs(`clips.call('folder:add', { c: ${JSON.stringify(ABS)}, p: 'Stickers' })`);
       check('a new folder is made in a category', made && made.ok && fs.existsSync(path.join(h.library().dir, 'Abstract', 'Stickers')), JSON.stringify(made));
-      const st = await pjs(`(S.lib.clips.find((c) => (c.tags || []).includes('sticker') && c.c === 'abstract') || {}).id`);
+      const st = await pjs(`(S.lib.clips.find((c) => (c.tags || []).includes('sticker') && c.c === ${JSON.stringify(ABS)}) || {}).id`);
       const moved = await pjs(`clips.call('lib:update', { id: ${JSON.stringify(st || '')}, p: 'Stickers' })`);
       check('a clip moves into the folder (its file too)', moved && moved.ok && /^Abstract\/Stickers\//.test(moved.clip.f) && fs.existsSync(path.join(h.library().dir, ...moved.clip.f.split('/'))), moved && (moved.clip ? moved.clip.f : moved.message));
-      await pjs(`(() => { S.libCat = 'abstract'; S.libFolder = ''; renderLibrary(); })()`);
+      await pjs(`(() => { S.libCat = ${JSON.stringify(ABS)}; S.libFolder = ''; renderLibrary(); })()`);
       await panelUntil(`[...document.querySelectorAll('#libFolders .fold')].some((b) => /Stickers/.test(b.textContent))`, 'the folder in the folder bar', 10000);
       check('the folder shows in the folder bar with its clip', true, await pjs(`[...document.querySelectorAll('#libFolders .fold')].map((b) => b.textContent).join(' | ')`));
       await pjs(`document.querySelector('#libFolders .fold').click()`);
       await panelFrames(10);
       check('opening the folder shows only its clips', await pjs(`S.libFolder === 'Stickers' && document.querySelectorAll('#grid .clip').length === 1`), await pjs(`S.libFolder + ': ' + document.querySelectorAll('#grid .clip').length + ' cards'`));
       await shot('11-folder');
-      await pjs(`(() => { S.libFolder = ''; renderLibrary(); })()`);
+      // A tag: every clip with it, from every folder (the sticker moved into Abstract › Stickers, the other one still in Abstract)
+      await pjs(`(() => { S.libFolder = ''; S.libCat = 'all'; renderLibrary(); })()`);
+      await pjs(`[...document.querySelectorAll('#libCats .chip')].find((b) => b.textContent.startsWith('#sticker ') || b.textContent.startsWith('#sticker')).click()`);
+      await panelFrames(10);
+      const tagged = await pjs(`({ tag: S.libTag, n: document.querySelectorAll('#grid .clip').length, want: S.lib.clips.filter((c) => (c.tags || []).includes('sticker')).length })`);
+      check('clicking a tag shows every clip with it, from every folder', tagged.tag === 'sticker' && tagged.n === tagged.want && tagged.n >= 2, JSON.stringify(tagged));
+      await shot('12-tag');
+      await pjs(`(() => { S.libTag = ''; renderLibrary(); })()`);
     }
 
     code = checks.every((c) => c.ok) ? 0 : 1;

@@ -8,7 +8,7 @@ const MIN_LEN = 0.2;
 
 const S = {
   tab: 'get', web: {}, video: {}, jobs: [], lib: null, vision: {}, settings: { keepSound: false, maxHeight: 1080 },
-  ed: null, libCat: 'all', libFolder: '', libQuery: '', modals: 0, opened: new Set(),
+  ed: null, libCat: 'all', libFolder: '', libTag: '', libQuery: '', modals: 0, opened: new Set(),
   dragId: null,   // the library clip being dragged (onto a folder to move it, or out of the window)
 };
 
@@ -236,7 +236,7 @@ function openEditor(id) {
   if (S.tab !== 'get') setTab('get');
   const d = j.video.d;
   const [a, b] = j.range || [0, d];
-  S.ed = { id, d, fps: j.video.fps || 30, start: clamp(a, 0, d), end: clamp(b, 0, d), cat: '', catTouched: false, suggestion: undefined, looking: undefined, sugKey: '',
+  S.ed = { id, d, fps: j.video.fps || 30, start: clamp(a, 0, d), end: clamp(b, 0, d), cat: '', folder: '', tagsTouched: false, catTouched: false, suggestion: undefined, looking: undefined, sugKey: '',
     vw: j.video.w || 16, vh: j.video.h || 9, crop: null, ratio: 'free', cropping: false };
   if (S.ed.end - S.ed.start < MIN_LEN) S.ed.end = Math.min(d, S.ed.start + Math.max(MIN_LEN, d));
   $('#edTitle').textContent = j.title;
@@ -259,6 +259,9 @@ function openEditor(id) {
   syncWeb();
   layoutTimeline();
   renderCrop();
+  // The folder: the one saved to last time (or Other); the tags: the kind the recogniser sees, until you type
+  S.ed.folder = edFolderOk(S.settings.lastFolder) ? S.settings.lastFolder : 'other|';
+  $('#edTags').value = '';
   renderEdCats();
   applySuggestion(j);
   renderEdStatus(j);
@@ -385,10 +388,10 @@ $('#setEnd').addEventListener('click', () => { if (S.ed) { setEnd(vid.currentTim
 // After trimming, the suggestion looks again at the part that's left (unless a category was already picked)
 let lookTimer = null;
 function rangeChanged() {
-  if (!S.ed || S.ed.catTouched) return;
+  if (!S.ed || S.ed.tagsTouched) return;
   clearTimeout(lookTimer);
   const { id, start, end, crop } = S.ed;
-  lookTimer = setTimeout(() => { if (S.ed && S.ed.id === id && !S.ed.catTouched) api.call('job:suggest', { id, start, end, crop }); }, 900);
+  lookTimer = setTimeout(() => { if (S.ed && S.ed.id === id && !S.ed.tagsTouched) api.call('job:suggest', { id, start, end, crop }); }, 900);
 }
 
 document.addEventListener('keydown', (e) => {
@@ -535,70 +538,72 @@ cropBox.addEventListener('pointerdown', (ev) => {
   window.addEventListener('blur', up);
 });
 
-/* category chips in the trimmer */
+/* the trimmer: which folder it saves to, and its tags */
+// Folders are written "<top folder id>|<path inside it>" ("other|", "abc|Fractals/Blue")
+const splitFolder = (v) => { const i = String(v || '').indexOf('|'); return i < 0 ? { c: String(v || ''), p: '' } : { c: v.slice(0, i), p: v.slice(i + 1) }; };
+const folderLabel = (v) => { const { c, p } = splitFolder(v); return [catName(c), ...p.split('/').filter(Boolean)].join(' › '); };
+function edFolderOk(v) {
+  if (!v || !S.lib) return false;
+  const { c, p } = splitFolder(v);
+  const cat = S.lib.cats.find((x) => x.id === c);
+  return !!cat && !cat.sys && (!p || foldersOf(c).includes(p));
+}
 function renderEdCats() {
   if (!S.ed || !S.lib) return;
-  const box = $('#edCats');
-  box.textContent = '';
-  const sug = S.ed.suggestion && S.ed.suggestion.id;
-  // Grabs from the web go in the web categories (Looks is Phosphor Loop's Look library)
+  if (!edFolderOk(S.ed.folder)) S.ed.folder = 'other|';
+  const sel = $('#edFolder');
+  sel.textContent = '';
+  // Every folder (Looks is Phosphor Loop's Look library: grabs from the web don't go there)
   for (const c of S.lib.cats.filter((x) => !x.sys)) {
-    const b = el('button', 'chip' + (S.ed.cat === c.id ? ' on' : '') + (sug === c.id ? ' guess' : ''), c.n);
-    b.type = 'button';
-    b.dataset.cat = c.id;
-    b.addEventListener('click', () => {
-      S.ed.cat = c.id;
-      S.ed.catTouched = true;
-      if ($('#suggest').textContent === 'Pick one') $('#suggest').textContent = '';
-      renderEdCats();
-      updateSaveButtons();
-    });
-    box.appendChild(b);
+    const top = el('option', '', c.n);
+    top.value = c.id + '|';
+    sel.appendChild(top);
+    for (const p of foldersOf(c.id)) {
+      const o = el('option', '', '\u2003'.repeat(p.split('/').length) + p.split('/').pop());
+      o.value = c.id + '|' + p;
+      sel.appendChild(o);
+    }
   }
-  const add = el('button', 'chip add', '+ New');
-  add.type = 'button';
-  add.addEventListener('click', () => {
-    add.textContent = '';
-    const input = el('input');
-    input.placeholder = 'Category name';
-    input.maxLength = 40;
-    add.appendChild(input);
-    input.focus();
-    const done = async (keep) => {
-      const name = input.value.trim();
-      input.remove();
-      if (keep && name) {
-        const r = await call('cat:add', name);
-        if (r && r.ok && S.ed) { S.ed.cat = r.cat.id; S.ed.catTouched = true; }
-      }
-      renderEdCats();
-      updateSaveButtons();
-    };
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); done(true); } if (e.key === 'Escape') done(false); e.stopPropagation(); });
-    input.addEventListener('blur', () => done(true), { once: true });
-  }, { once: true });
-  box.appendChild(add);
+  sel.value = S.ed.folder;
+  S.ed.cat = splitFolder(S.ed.folder).c;
+  updateSaveButtons();
 }
+$('#edFolder').addEventListener('change', () => { if (!S.ed) return; S.ed.folder = $('#edFolder').value; S.ed.cat = splitFolder(S.ed.folder).c; updateSaveButtons(); });
+// A new folder: inside the folder picked (at the top of the library when Other is picked)
+$('#edNewFolder').addEventListener('click', async () => {
+  if (!S.ed) return;
+  const { c, p } = splitFolder(S.ed.folder);
+  const inside = c !== 'other' || p;
+  const name = await ask(inside ? `Name for the new folder inside “${folderLabel(S.ed.folder)}”:` : 'Name for the new folder:', { input: '', yes: 'Make it' });
+  const clean = String(name || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!clean || !S.ed) return;
+  const r = inside ? await call('folder:add', { c, p: (p ? p + '/' : '') + clean }) : await call('cat:add', clean);
+  if (!r || !r.ok || !S.ed) return;
+  S.ed.folder = inside ? r.c + '|' + r.p : r.cat.id + '|';
+  // (the library update that lists the new folder comes a moment later; it picks this one when it does)
+  setTimeout(renderEdCats, 300);
+});
+$('#edTags').addEventListener('input', () => { if (S.ed) S.ed.tagsTouched = true; });
 function applySuggestion(j) {
   S.ed.suggestion = j.suggestion;
   S.ed.looking = j.looking;
   const s = j.suggestion;
-  if (s && s.id && !S.ed.catTouched) S.ed.cat = s.id;
+  // The kind the recogniser sees goes in as a tag, until you type your own
+  if (s && s.tag && !S.ed.tagsTouched) $('#edTags').value = s.tag;
   const label = $('#suggest');
   label.classList.toggle('looking', !!j.looking && !(s && s.id));
-  if (s && s.id) {
+  if (s && s.id && s.tag) {
     const how = s.by === 'words' ? 'going by the title' : s.by === 'both' ? 'from the picture and the title' : 'from the picture';
-    label.textContent = 'Looks like ' + catName(s.id) + ' (' + how + ')' + (j.looking ? ' … still looking' : '');
-  } else label.textContent = j.looking ? 'Looking at the picture…' : S.ed.cat ? '' : 'Pick one';
-  renderEdCats();
+    label.textContent = 'Looks like ' + s.tag + ' (' + how + ')' + (j.looking ? ' … still looking' : '');
+  } else label.textContent = j.looking ? 'Looking at the picture…' : '';
   updateSaveButtons();
 }
 function updateSaveButtons() {
   if (!S.ed) return;
-  const can = !!S.ed.cat;
+  const can = edFolderOk(S.ed.folder);
   $('#edSave').disabled = !can;
   $('#edSaveMore').disabled = !can;
-  $('#edSave').textContent = can ? 'Save to ' + catName(S.ed.cat) : 'Pick a category';
+  $('#edSave').textContent = can ? 'Save to ' + folderLabel(S.ed.folder) : 'Pick a folder';
 }
 function renderEdStatus(j) {
   if (j.status === 'saving') {
@@ -613,14 +618,16 @@ function showEdProgress(on) {
 }
 async function save(another) {
   if (!S.ed) return;
-  if (!S.ed.cat) { toast('Pick a category first.', 'bad'); return; }
+  if (!edFolderOk(S.ed.folder)) { toast('Pick a folder first.', 'bad'); return; }
   const id = S.ed.id;
+  const { c: cat, p: folder } = splitFolder(S.ed.folder);
   const o = {
-    id, start: S.ed.start, end: S.ed.end, cat: S.ed.cat, name: $('#edName').value.trim(),
+    id, start: S.ed.start, end: S.ed.end, cat, p: folder, tags: $('#edTags').value, name: $('#edName').value.trim(),
     keepSound: $('#keepSound').checked, maxHeight: +$('#maxH').value, another, crop: S.ed.crop,
   };
   S.settings.keepSound = o.keepSound;
   S.settings.maxHeight = o.maxHeight;
+  S.settings.lastFolder = S.ed.folder;
   showEdProgress(true);
   $('#edBar').style.width = '2%';
   $('#edProgText').textContent = 'Saving…';
@@ -653,27 +660,36 @@ function renderLibrary() {
   $('#libCount').textContent = lib.clips.length;
   $('#libDir').textContent = lib.dir;
   $('#libDir').title = lib.dir;
-  if (S.libCat !== 'all' && !lib.cats.some((c) => c.id === S.libCat)) S.libCat = 'all';
+  if (S.libCat !== 'all' && !lib.cats.some((c) => c.id === S.libCat)) { S.libCat = 'all'; S.libFolder = ''; }
+  // Every tag in the library, most used first: click one to see every clip with it, from every folder (again to stop)
   const chips = $('#libCats');
   chips.textContent = '';
-  const chip = (id, name, n) => {
-    const b = el('button', 'chip' + (S.libCat === id ? ' on' : ''), name);
-    b.appendChild(el('span', 'n', String(n)));
-    b.addEventListener('click', () => { S.libCat = id; S.libFolder = ''; renderLibrary(); });
-    if (id !== 'all') moveTarget(b, id, '');   // a clip dropped on a category goes to its top
-    chips.appendChild(b);
-  };
-  chip('all', 'All', lib.clips.length);
-  for (const c of lib.cats) chip(c.id, c.n, c.count);
+  const counts = new Map();
+  for (const c of lib.clips) for (const t of c.tags || []) counts.set(t, (counts.get(t) || 0) + 1);
+  if (S.libTag && !counts.has(S.libTag)) S.libTag = '';
+  chips.hidden = !counts.size;
+  if (counts.size) {
+    chips.appendChild(el('span', 'row-label tagword', 'Tags'));
+    for (const [t, n] of [...counts].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))) {
+      const b = el('button', 'chip' + (S.libTag === t ? ' on' : ''), '#' + t);
+      b.appendChild(el('span', 'n', String(n)));
+      b.title = S.libTag === t ? 'Show all clips again' : 'Show every clip tagged ' + t + ', from every folder';
+      b.addEventListener('click', () => { if (S.libTag === t) S.libTag = ''; else { S.libTag = t; S.libCat = 'all'; S.libFolder = ''; } renderLibrary(); });
+      chips.appendChild(b);
+    }
+  }
   renderFolders();
   if (S.tab !== 'lib') return;
   stopHoverVideos();
   const q = S.libQuery.trim().toLowerCase();
   // Every word has to match the name, a tag, where it came from or who made it
   const words = q.split(/\s+/).filter(Boolean);
-  // In a category: the clips in the folder you're in (while searching: in it and the folders inside it)
-  const inFolder = (c) => S.libCat === 'all' || (words.length ? !S.libFolder || c.p === S.libFolder || (c.p || '').startsWith(S.libFolder + '/') : (c.p || '') === S.libFolder);
-  const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat) && inFolder(c)
+  // In a folder: its own clips (while searching, or with a tag picked: in it and every folder inside it). At All:
+  // every clip in the library.
+  const deep = words.length || S.libTag;
+  const inFolder = (c) => S.libCat === 'all' || (deep ? !S.libFolder || c.p === S.libFolder || (c.p || '').startsWith(S.libFolder + '/') : (c.p || '') === S.libFolder);
+  const tagged = (c) => !S.libTag || (c.tags || []).includes(S.libTag);
+  const shown = lib.clips.filter((c) => (S.libCat === 'all' || c.c === S.libCat) && inFolder(c) && tagged(c)
     && words.every((w) => (c.n + ' ' + (c.tags || []).join(' ') + ' ' + (c.p || '') + ' ' + (c.page || '') + ' ' + (c.by || '')).toLowerCase().includes(w)));
   S.libShown = shown.map((c) => c.id);
   $('#libCopy').disabled = !shown.length || S.copying;
@@ -696,43 +712,68 @@ function foldersOf(c) {
 function renderFolders() {
   const box = $('#libFolders');
   box.textContent = '';
-  box.hidden = S.libCat === 'all';
-  if (box.hidden) return;
-  const all = foldersOf(S.libCat);
+  box.hidden = false;
+  if (S.libCat !== 'all' && !S.lib.cats.some((c) => c.id === S.libCat)) { S.libCat = 'all'; S.libFolder = ''; }
+  const atAll = S.libCat === 'all';
+  const all = atAll ? [] : foldersOf(S.libCat);
   if (S.libFolder && !all.includes(S.libFolder)) S.libFolder = '';
-  // Where you are: the category, then each folder down to this one (click one to go back up; drop a clip on it)
+  // A tag picked (a #tag clicked on a clip): every clip with it, from every folder
+  if (S.libTag) {
+    const pill = el('span', 'tagpill', '#' + S.libTag);
+    const x = el('button', '', '×');
+    x.title = 'Show all clips again';
+    x.addEventListener('click', () => { S.libTag = ''; renderLibrary(); });
+    pill.appendChild(x);
+    box.appendChild(pill);
+    box.appendChild(el('span', 'gap'));
+  }
+  // Where you are: All, then each folder down to this one (click one to go back up; drop a clip on one to move it there)
   const parts = S.libFolder ? S.libFolder.split('/') : [];
-  const crumbs = [[catName(S.libCat), ''], ...parts.map((n, i) => [n, parts.slice(0, i + 1).join('/')])];
-  crumbs.forEach(([n, p], i) => {
+  const crumbs = [['All', 'all', ''], ...(atAll ? [] : [[catName(S.libCat), S.libCat, '']]), ...parts.map((n, i) => [n, S.libCat, parts.slice(0, i + 1).join('/')])];
+  crumbs.forEach(([n, c, p], i) => {
     if (i) box.appendChild(el('span', 'sep', '›'));
     const here = i === crumbs.length - 1;
     const b = el('button', 'crumb' + (here ? ' here' : ''), n);
-    if (!here) b.addEventListener('click', () => { S.libFolder = p; renderLibrary(); });
-    moveTarget(b, S.libCat, p);
+    if (!here) b.addEventListener('click', () => { S.libCat = c; S.libFolder = p; renderLibrary(); });
+    if (c !== 'all') moveTarget(b, c, p);
     box.appendChild(b);
   });
   box.appendChild(el('span', 'gap'));
-  // The folders just inside this one
-  const depth = parts.length;
-  for (const p of all) {
-    const ps = p.split('/');
-    if (ps.length !== depth + 1 || (S.libFolder && !p.startsWith(S.libFolder + '/'))) continue;
-    const n = S.lib.clips.filter((x) => x.c === S.libCat && (x.p === p || (x.p || '').startsWith(p + '/'))).length;
+  // The folders just inside this one (at All: the folders at the top of the library)
+  const fold = (name, n, c, p, tip) => {
     const b = el('button', 'fold');
     b.innerHTML = FOLDER_SVG;
-    b.appendChild(el('span', '', ps[ps.length - 1]));
+    b.appendChild(el('span', '', name));
     b.appendChild(el('span', 'n', String(n)));
-    b.title = 'Open this folder. Drag a clip onto it to move the clip here.';
-    b.addEventListener('click', () => { S.libFolder = p; renderLibrary(); });
-    moveTarget(b, S.libCat, p);
+    b.title = tip || 'Open this folder. Drag a clip onto it to move the clip here.';
+    b.addEventListener('click', () => { S.libCat = c; S.libFolder = p; renderLibrary(); });
+    moveTarget(b, c, p);
     box.appendChild(b);
+  };
+  if (atAll) {
+    for (const c of S.lib.cats) fold(c.n, c.count, c.id, '', c.sys ? 'Phosphor Loop’s Look library (what ✂ Save clip saves). Open it to see them.' : '');
+  } else {
+    const depth = parts.length;
+    for (const p of all) {
+      const ps = p.split('/');
+      if (ps.length !== depth + 1 || (S.libFolder && !p.startsWith(S.libFolder + '/'))) continue;
+      fold(ps[ps.length - 1], S.lib.clips.filter((x) => x.c === S.libCat && (x.p === p || (x.p || '').startsWith(p + '/'))).length, S.libCat, p);
+    }
   }
+  const sysHere = !atAll && (S.lib.cats.find((c) => c.id === S.libCat) || {}).sys;
+  if (sysHere) return;   // (folders in the Look library are made from Phosphor Loop's Save clip)
   const add = el('button', 'btn small ghost', '+ New folder');
-  add.title = S.libFolder ? 'A new folder inside this one' : 'A new folder in ' + catName(S.libCat);
+  add.title = atAll ? 'A new folder at the top of the library' : 'A new folder inside this one';
   add.addEventListener('click', async () => {
-    const name = await ask(S.libFolder ? `Name for the new folder inside “${parts[parts.length - 1]}”:` : `Name for the new folder in ${catName(S.libCat)}:`, { input: '', yes: 'Make it' });
+    const here = atAll ? '' : [catName(S.libCat), ...parts].pop();
+    const name = await ask(atAll ? 'Name for the new folder:' : `Name for the new folder inside “${here}”:`, { input: '', yes: 'Make it' });
     const clean = String(name || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
     if (!clean) return;
+    if (atAll) {
+      const r = await call('cat:add', clean);
+      if (r && r.ok) { S.libCat = r.cat.id; S.libFolder = ''; renderLibrary(); toast('Made the folder “' + clean + '”. Drag clips onto it to move them in.', 'ok', 3500); }
+      return;
+    }
     const r = await call('folder:add', { c: S.libCat, p: (S.libFolder ? S.libFolder + '/' : '') + clean });
     if (r && r.ok) { S.libFolder = r.p; renderLibrary(); toast('Made the folder “' + clean + '”. Drag clips onto it to move them in.', 'ok', 3500); }
   });
@@ -764,13 +805,26 @@ function clipCard(c) {
   const card = el('div', 'clip');
   const pic = el('div', isSticker(c) ? 'pic sticker' : 'pic');
   if (c.thumb) pic.style.backgroundImage = `url("${c.thumb}")`;
-  if (S.libCat === 'all' || c.p) pic.appendChild(el('span', 'tag', [S.libCat === 'all' ? catName(c.c) : '', ...(c.p ? c.p.split('/') : [])].filter(Boolean).join(' › ')));
+  // Which folder it's in, when that isn't the folder you're looking at
+  const where = [catName(c.c), ...(c.p ? c.p.split('/') : [])];
+  const here = S.libCat === 'all' ? [] : [catName(S.libCat), ...(S.libFolder ? S.libFolder.split('/') : [])];
+  if (where.join('/') !== here.join('/')) pic.appendChild(el('span', 'tag', where.join(' › ')));
   pic.appendChild(el('span', 'dur', fmtLen(c.d || 0)));
   card.appendChild(pic);
   const meta = el('div', 'meta');
   meta.appendChild(el('b', '', c.n));
   meta.appendChild(el('span', '', [c.w && c.h ? c.w + '×' + c.h : '', c.sound ? 'with sound' : '', c.mv ? 'recorded settings' : c.fx ? 'with effects' : ''].filter(Boolean).join(' · ')));
-  if (c.tags && c.tags.length) meta.appendChild(el('span', 'tags', c.tags.map((t) => '#' + t).join(' ')));
+  // Each tag can be clicked: every clip with it, from every folder
+  if (c.tags && c.tags.length) {
+    const tags = el('span', 'tags');
+    for (const t of c.tags) {
+      const b = el('button', '', '#' + t);
+      b.title = 'Show every clip tagged ' + t;
+      b.addEventListener('click', (e) => { e.stopPropagation(); S.libTag = t; S.libCat = 'all'; S.libFolder = ''; renderLibrary(); });
+      tags.appendChild(b);
+    }
+    meta.appendChild(tags);
+  }
   card.appendChild(meta);
   card.addEventListener('mouseenter', () => {
     if (pic.querySelector('video')) return;
@@ -938,10 +992,6 @@ $('#cmDelete').addEventListener('click', async () => {
 });
 
 /* categories */
-$('#catNew').addEventListener('click', async () => {
-  const name = await ask('Name for the new category:', { input: '', yes: 'Add' });
-  if (name) { const r = await call('cat:add', name); if (r && r.ok) { S.libCat = r.cat.id; renderLibrary(); } }
-});
 $('#catEdit').addEventListener('click', () => { renderCatList(); openModal('#catModal'); });
 $('#catClose').addEventListener('click', () => closeModal('#catModal'));
 $('#catModal').addEventListener('click', (e) => { if (e.target.id === 'catModal') closeModal('#catModal'); });
@@ -960,7 +1010,7 @@ function renderCatList() {
     li.appendChild(el('span', 'n', c.count === 1 ? '1 clip' : c.count + ' clips'));
     const del = el('button', 'ib');
     del.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>';
-    del.title = c.id === 'other' ? 'Other always stays' : 'Delete this category';
+    del.title = c.id === 'other' ? 'Other always stays' : 'Delete this folder (its clips move to Other)';
     del.disabled = c.id === 'other';
     del.addEventListener('click', async () => {
       const ok = await ask(c.count ? `Delete ${c.n}? Its ${c.count === 1 ? 'clip moves' : c.count + ' clips move'} to Other.` : `Delete ${c.n}?`, { yes: 'Delete', danger: true });
@@ -1044,7 +1094,7 @@ function renderVision() {
   const box = $('#vision');
   box.classList.toggle('ready', !!v.ready);
   box.classList.toggle('off', !!v.error && !v.ready);
-  if (v.ready) { box.hidden = false; $('#visionText').textContent = 'Category suggestions on'; box.title = 'The app looks at each clip and suggests a category.'; }
+  if (v.ready) { box.hidden = false; $('#visionText').textContent = 'Tag suggestions on'; box.title = 'The app looks at each clip and suggests a tag for what it shows (nature, water…).'; }
   else if (v.error) { box.hidden = false; $('#visionText').textContent = 'Suggestions from titles only'; box.title = 'The picture recogniser couldn’t start: ' + v.error; }
   else if (v.text) { box.hidden = false; $('#visionText').textContent = v.text + (v.pct >= 0 ? ' ' + Math.round(v.pct) + '%' : ''); box.title = 'A one-time download of about 150 MB, so the app can suggest categories by looking at clips.'; }
   else box.hidden = true;

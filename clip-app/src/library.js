@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { DEFAULT_CATEGORIES, slug } = require('./categories.js');
+const { DEFAULT_CATEGORIES, KINDS, kindTag, slug } = require('./categories.js');
 
 const VIDEO_EXT = /\.(mp4|m4v|webm|mov|mkv)$/i;
 const INDEX = 'library.json';
@@ -70,13 +70,16 @@ async function exists(p) { try { await fsp.access(p); return true; } catch (_) {
 class Library {
   // tools: { probe(file) → {duration,width,height,fps,hasAudio}, thumb(video, jpg) }, trash(file) → moves to the
   // Recycle Bin (falls back to deleting)
-  constructor(dir, { probe, thumb, trash, log } = {}) {
+  // startEmpty: a new library starts with only Other (and Looks): the folders are the ones Nick makes (the app);
+  // otherwise it starts with the kinds as folders, as before 1.13 (the tests)
+  constructor(dir, { probe, thumb, trash, log, startEmpty = false } = {}) {
     this.dir = dir;
     this.probe = probe;
     this.thumb = thumb;
     this.trash = trash || ((f) => fsp.rm(f, { force: true }));
     this.log = log || (() => {});
-    this.data = { app: 'Phosphor Clips', version: 1, cats: [...DEFAULT_CATEGORIES.map((c) => ({ ...c })), { ...LOOKS_CAT }], clips: [] };
+    const start = startEmpty ? DEFAULT_CATEGORIES.filter((c) => c.id === 'other') : DEFAULT_CATEGORIES;
+    this.data = { app: 'Phosphor Clips', version: 1, cats: [...start.map((c) => ({ ...c })), { ...LOOKS_CAT }], clips: [], ...(startEmpty ? { folders: 1 } : {}) };
     this.chain = Promise.resolve();
   }
 
@@ -409,6 +412,33 @@ class Library {
       }
       await this.write();
       return cat;
+    });
+  }
+
+  // Once, when a library from before 1.13 opens: categories became folders. A clip in one of the old kind folders
+  // (Nature, Water…) gets that kind as a tag, so it can still be found by kind; the old kind folders nobody used
+  // (no clips, no folders inside) go, so only folders in use are left. Nothing is moved.
+  toFolders() {
+    return this.serial(async () => {
+      if (this.data.folders) return 0;
+      let tagged = 0;
+      for (const c of this.data.clips) {
+        const t = kindTag(c.c);
+        if (!t || (c.tags || []).includes(t)) continue;
+        c.tags = cleanTags([...(c.tags || []), t]);
+        await this.writeSide(c).catch(() => {});
+        tagged++;
+      }
+      for (const k of KINDS) {
+        const cat = this.cat(k.id);
+        if (!cat || this.data.clips.some((x) => x.c === cat.id) || (this.data.dirs || []).some((d) => d.c === cat.id)) continue;
+        try { await rmEmptyTree(this.catFolder(cat)); } catch (_) { continue; }   // something's in it: it stays
+        this.data.cats = this.data.cats.filter((x) => x !== cat);
+      }
+      this.data.folders = 1;
+      await this.write();
+      this.log(`library: categories are folders now (${tagged} clips tagged with their kind)`);
+      return tagged;
     });
   }
 

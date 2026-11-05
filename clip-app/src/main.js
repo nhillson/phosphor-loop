@@ -11,6 +11,7 @@ const { execFile } = require('node:child_process');
 const E = require('./engine.js');
 const { Library, subOf } = require('./library.js');
 const { Vision, combine } = require('./vision.js');
+const { KINDS, kindTag } = require('./categories.js');
 const { startServer } = require('./server.js');
 const Snip = require('./snip.js');
 const { createAdblock } = require('./adblock.js');
@@ -214,9 +215,11 @@ async function openLibrary() {
     probe: (f) => E.probe(tools, f),
     thumb: (v, out, t) => E.frameAt(tools, v, t, out, { width: 480 }),
     trash: (f) => shell.trashItem(f).catch(() => fsp.rm(f, { force: true })),
-    log,
+    log, startEmpty: true,
   });
   await library.open();
+  // A library from before 1.13: categories become folders (kinds become tags, unused kind folders go)
+  await library.toFolders().catch((e) => log('library: folders: ' + e.message));
   log('library: ' + library.dir + ' (' + library.data.clips.length + ' clips)');
   sendLibrary();
 }
@@ -828,9 +831,10 @@ async function suggest(job, range, crop) {
   const r = job.result;
   if (!r) return;
   const info = { ...r.info, page: job.req.pageTitle, url: job.req.url };
-  // (never the Looks folder: that's Phosphor Loop's looks, not web clips)
-  const cats = library.data.cats.filter((c) => !c.sys);
-  if (!job.suggestion) job.suggestion = combine(null, info, cats);
+  // The kinds the recogniser tells apart (nature, water…): what it sees goes on the clip as a tag (the folder is yours)
+  const cats = KINDS;
+  const withTag = (s) => (s ? { ...s, tag: kindTag(s.id) } : s);
+  if (!job.suggestion) job.suggestion = withTag(combine(null, info, cats));
   if (process.env.CLIPS_NO_VISION === '1' || (vision.broken && !vision.proc)) { sendJobs(); return; }
   const seq = ++job.looks;
   job.looking = true;
@@ -841,7 +845,7 @@ async function suggest(job, range, crop) {
     const frames = await E.frames(tools, r.playable, E.spread(a, b, 4), path.join(job.dir, 'look'), 'l' + seq, { width: 336, crop: E.validCrop(crop) ? crop : null });
     const scores = await vision.classify(frames, cats);
     if (seq !== job.looks) return;
-    job.suggestion = combine(scores, info, cats);
+    job.suggestion = withTag(combine(scores, info, cats));
     log('grab ' + job.id + ' looks like ' + job.suggestion.id + ' (' + job.suggestion.sure + ', ' + job.suggestion.by + ')');
   } catch (e) {
     log('grab ' + job.id + ': no picture suggestion: ' + e.message);
@@ -929,7 +933,7 @@ function setupIpc() {
     panelReady = true;
     return {
       version: app.getVersion(), sharing: sharingState(), chrome: chromeState(),
-      settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows }, adblock: adblockState(),
+      settings: { keepSound: !!settings.keepSound, maxHeight: +settings.maxHeight, startWithWindows: !!settings.startWithWindows, lastFolder: settings.lastFolder || '' }, adblock: adblockState(),
       library: libraryForPanel(), jobs: [...jobs.values()].map(jobForPanel), web: webState(), video: videoState(), vision: visionState,
     };
   });
@@ -995,7 +999,7 @@ function setupIpc() {
   handle('job:save', async (o) => {
     const job = jobs.get(o.id);
     if (!job || job.status !== 'ready') return { ok: false, message: 'That video isn’t ready.' };
-    if (!library.cat(o.cat)) return { ok: false, message: 'Pick a category first.' };
+    if (!library.cat(o.cat)) return { ok: false, message: 'Pick a folder first.' };
     const r = job.result;
     const start = Math.max(0, +o.start || 0), end = Math.min(r.probe.duration, +o.end || r.probe.duration);
     if (end - start < 0.2) return { ok: false, message: 'The clip is too short.' };
@@ -1020,7 +1024,8 @@ function setupIpc() {
         lic: r.info.lic || '', site: r.info.site || '', part: [round3(start + r.offset), round3(end + r.offset)],
         guess: job.suggestion && job.suggestion.id ? job.suggestion.id : undefined, thumbAt: made.probe.duration / 2,
         crop: made.crop ? ['x', 'y', 'w', 'h'].map((k) => Math.round(made.crop[k] * 10000) / 10000) : undefined,
-        tags: made.sticker ? E.STICKER_TAG : undefined,
+        // The tags typed (the kind the recogniser saw to start with), plus "sticker" for a sticker
+        tags: [...(made.sticker ? [E.STICKER_TAG] : []), ...String(o.tags || '').split(',')].join(','), p: String(o.p || ''),
       });
       log('saved ' + clip.f + ' (' + clip.w + 'x' + clip.h + ', ' + clip.d + ' s, ' + made.encoder + (made.crop ? ', cropped' : '') + (made.sticker ? ', a sticker' : '') + ')');
       settings.keepSound = !!o.keepSound;
@@ -1033,12 +1038,14 @@ function setupIpc() {
         job.text = 'Saved “' + clip.n + '” to ' + catName(clip.c) + '. Pick another part.';
       } else {
         job.status = 'done';
-        job.text = 'Saved “' + clip.n + '” to ' + catName(clip.c);
+        job.text = 'Saved “' + clip.n + '” to ' + [catName(clip.c), ...subOf(clip.f).split('/').filter(Boolean)].join(' › ');
         fsp.rm(job.dir, { recursive: true, force: true }).catch(() => {});
         setTimeout(() => { if (jobs.get(job.id) === job && job.status === 'done') { jobs.delete(job.id); sendJobs(); } }, 45000);
       }
       sendJobs();
-      return { ok: true, clip: clipForPanel(clip), cat: catName(clip.c) };
+      settings.lastFolder = clip.c + '|' + subOf(clip.f);
+      saveSettings();
+      return { ok: true, clip: clipForPanel(clip), cat: [catName(clip.c), ...subOf(clip.f).split('/').filter(Boolean)].join(' › ') };
     } catch (e) {
       job.status = 'ready';
       job.text = 'Couldn’t save it: ' + e.message;

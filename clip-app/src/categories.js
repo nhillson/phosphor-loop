@@ -94,4 +94,9 @@ function wordsFor(cat) {
   return String(cat.n || '').toLowerCase().split(/\s*(?:&|,|\band\b|\/)\s*/).map((w) => w.trim()).filter(Boolean);
 }
 
-module.exports = { DEFAULT_CATEGORIES, slug, promptFor, wordsFor };
+// Since 1.13 the library is folders Nick makes; these kinds are what the picture recogniser tells apart, and the kind
+// it sees goes on a grab as a tag (its name in lower case: "nature", "sky & space")
+const KINDS = DEFAULT_CATEGORIES.filter((c) => c.id !== 'other');
+const kindTag = (id) => { const k = KINDS.find((c) => c.id === id); return k ? k.n.toLowerCase() : ''; };
+
+module.exports = { DEFAULT_CATEGORIES, KINDS, kindTag, slug, promptFor, wordsFor };

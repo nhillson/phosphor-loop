@@ -106,6 +106,36 @@ const job = () => { const d = path.join(work, 'job' + ++n); fs.mkdirSync(d, { re
     return `${r.probe.duration.toFixed(2)} s, ${c.probe.width}x${c.probe.height}`;
   });
 
+  await test('a library from before 1.13: clips get their kind as a tag, nothing moves, unused kind folders go', async () => {
+  const dir = job();
+  // A library from before 1.13: the kinds as folders, one clip in Nature, one in a folder inside Abstract
+  const old = new Library(dir, { probe: async () => ({ duration: 1, width: 2, height: 2, fps: 30 }) });
+  await old.open();
+  const tmp = (n) => { const f = path.join(dir, n); fs.writeFileSync(f, 'x'); return f; };
+  const a = await old.addClip(tmp('a.mp4'), { n: 'Bird', c: 'nature', d: 1, w: 2, h: 2 });
+  await old.addFolder('abstract', 'Fractals');
+  const b = await old.addClip(tmp('b.mp4'), { n: 'Zoom', c: 'abstract', p: 'Fractals', d: 1, w: 2, h: 2, tags: 'blue' });
+  const before = { a: a.f, b: b.f };
+  // Opened by 1.13
+  const lib = new Library(dir, { probe: async () => ({ duration: 1, width: 2, height: 2, fps: 30 }), startEmpty: true });
+  await lib.open();
+  const n = await lib.toFolders();
+  const A = lib.data.clips.find((c) => c.n === 'Bird'), B = lib.data.clips.find((c) => c.n === 'Zoom');
+  assert.equal(n, 2, 'both clips tagged with their kind');
+  assert.ok(A.tags.includes('nature') && B.tags.includes('abstract') && B.tags.includes('blue'), JSON.stringify([A.tags, B.tags]));
+  assert.equal(A.f, before.a); assert.equal(B.f, before.b);
+  assert.ok(fs.existsSync(path.join(dir, A.f)) && fs.existsSync(path.join(dir, B.f)), 'nothing moved');
+  const ids = lib.data.cats.map((c) => c.id);
+  assert.ok(ids.includes('nature') && ids.includes('abstract') && ids.includes('other') && ids.includes('looks'), ids.join(','));
+  assert.ok(!ids.includes('water') && !fs.existsSync(path.join(dir, 'Water')), 'unused kind folders go');
+  assert.equal(await lib.toFolders(), 0, 'only once');
+  // The tag is in the clip's settings file too, so it travels with it
+  const again = new Library(dir, { probe: async () => ({ duration: 1, width: 2, height: 2, fps: 30 }), startEmpty: true });
+  await again.open();
+  assert.ok((again.data.clips.find((c) => c.n === 'Bird').tags || []).includes('nature'), 'tag kept after the library is looked at again');
+    return ids.join(', ');
+  });
+
   await test('page with no video: a clear message', async () => {
     await assert.rejects(E.fetchVideo(tools, { url: site.url + 'blob.html' }, job(), { log }), (e) => {
       assert.equal(e.code, 'unsupported');

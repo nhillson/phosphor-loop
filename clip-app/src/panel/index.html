@@ -89,8 +89,10 @@
             </div>
           </div>
           <div class="ed-cats">
-            <div class="row-label">Category <span class="suggest" id="suggest"></span></div>
-            <div class="chips" id="edCats"></div>
+            <div class="row-label">Save to folder</div>
+            <div class="ed-folder"><select id="edFolder"></select><button class="btn small ghost" type="button" id="edNewFolder">+ New folder</button></div>
+            <div class="row-label">Tags <span class="suggest" id="suggest"></span></div>
+            <input id="edTags" placeholder="Words to find it by, with commas between: nature, slow, blue" spellcheck="false" maxlength="400">
           </div>
           <div class="ed-save">
             <label class="field name"><span>Name</span><input id="edName" maxlength="80" spellcheck="false"></label>
@@ -156,15 +158,15 @@
   <section class="view lib" id="viewLib" hidden>
     <div class="libbar">
       <div class="libnav">
-        <div class="chips" id="libCats"></div>
-        <!-- Folders inside the chosen category: where you are, the folders here, + New folder. Drag a clip onto one to move it there -->
+        <!-- Where you are (All › a folder › …), the folders here, + New folder. Drag a clip onto one to move it there -->
         <div class="folders" id="libFolders" hidden></div>
+        <!-- Every tag: click one to see every clip with it, from every folder -->
+        <div class="chips" id="libCats"></div>
       </div>
       <div class="libtools">
         <input id="libSearch" type="search" placeholder="Find a clip (name or tag)" spellcheck="false">
         <button class="btn small" id="libCopy" title="Copy the clips shown here, with their tags and effects, to a folder or drive">Copy to a drive…</button>
-        <button class="btn small" id="catNew">+ New category</button>
-        <button class="btn small ghost" id="catEdit">Edit categories</button>
+        <button class="btn small ghost" id="catEdit">Rename or remove folders</button>
       </div>
     </div>
     <div class="grid" id="grid"></div>
@@ -209,10 +211,10 @@
 <div class="modal" id="catModal" hidden>
   <div class="sheet catsheet" role="dialog" aria-modal="true" aria-labelledby="catTitle">
     <button class="ib close" id="catClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    <h3 id="catTitle">Categories</h3>
-    <p class="hint">Rename a category by typing over its name. Each category is a folder in the library; deleting one moves its clips to Other.</p>
+    <h3 id="catTitle">Folders</h3>
+    <p class="hint">The folders at the top of the library. Rename one by typing over its name; deleting one moves its clips to Other.</p>
     <ul class="catlist" id="catList"></ul>
-    <form class="linkform" id="catAddForm" autocomplete="off"><input id="catAddName" maxlength="40" placeholder="New category name"><button class="btn">Add</button></form>
+    <form class="linkform" id="catAddForm" autocomplete="off"><input id="catAddName" maxlength="40" placeholder="New folder name"><button class="btn">Add</button></form>
   </div>
 </div>
 
