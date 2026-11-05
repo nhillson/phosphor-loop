@@ -193,6 +193,6 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
 4z. **Lopsided effects** (Effects › Lopsided, `ASYM` = offc / wind / glitch in js/app.js; `asymTick`): **Off-center** moves Zoom/Spin's
    point (`uCenter`, added to Chase's) and draws the inputs there too (`uInOff`, 0.8 of it); only it follows the music (React to sound ›
    Off-center, `snd.map.asym`: hits shove it, `L.offKick`; the bass widens its wander). **Wind** (`uWind`, `windDir` 0-7 eighths from →
-   anticlockwise, 8 Turning; compass buttons `#windDir`) and **Glitch slide** (FS_FINAL `uGlitch`: strips worked out from the clock, a
-   broken-video look; final pass only, so no white-outs) don't react to sound. Check with `--shot "Leaning tunnel"`, `"Smoke on the wind"`,
+   anticlockwise, 8 Turning; compass buttons `#windDir`) and **Glitch slide** (FS_FINAL `uGlitch`: rows of uneven height cut into blocks of uneven width, worked out
+   from the clock; broken blocks slip, go chunky, smear within their edges and take a hot color; a broken-video look; final pass only, so no white-outs) don't react to sound. Check with `--shot "Leaning tunnel"`, `"Smoke on the wind"`,
    `"Rainbow glitch"`, `"Marbled|glitch=90"`.

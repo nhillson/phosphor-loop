@@ -1205,29 +1205,42 @@ void main() {
   if (uWarp > 0.0) p += uWarp * vec2(sin(p.y * 7.0 + uTime * 1.1 + sin(p.x * 3.0 + uTime * 0.5)),
                                      cos(p.x * 7.0 - uTime * 0.9 + sin(p.y * 2.0 - uTime * 0.3)));
   vec2 st = p / vec2(asp, 1.0) + 0.5;
-  // Glitch slide, like a broken video signal: the picture is cut into strips of uneven height that change many
-  // times a second. Bursts come and go (always on at the top of the slider). In a strip the picture slips
-  // sideways, its red and blue tear apart, some strips smear into long horizontal streaks, and colors are pushed
-  // to hot cyan, yellow, magenta and violet; thin bright scan lines flicker across the whole picture.
+  // Glitch slide, like a broken video signal: the picture is cut into rows of uneven height, and each row into
+  // blocks of uneven width, which change many times a second. Bursts come and go (always on near the top of the
+  // slider). A broken block slips sideways, turns chunky (big square pixels), may smear into streaks inside its
+  // own edges, its red and blue tear apart, and its colors are pushed to hot cyan, yellow, magenta or violet.
+  // Thin bright scan lines flicker across, broken into dashes of their own.
   float gk = 0.0, gsm = 0.0, gsp = 0.0, gid = 0.0, gthin = 0.0;
   if (uGlitch > 0.0) {
     float tq = floor(uTime * 12.0), tf = floor(uTime * 24.0);
     float burst = step(hash(vec2(floor(uTime * 2.5), 9.3)), 0.2 + 0.85 * uGlitch);
-    float n = 5.0 + floor(hash(vec2(tq, 3.1)) * 16.0);
+    // Rows: 6 to 22 of them, their edges shifted a little each change
+    float n = 6.0 + floor(hash(vec2(tq, 3.1)) * 16.0);
     float bi = floor(uv.y * n + hash(vec2(tq, 7.7)) * 2.0);
-    float hb = hash(vec2(bi, tq)), h2 = hash(vec2(bi + 17.0, tq)), h3 = hash(vec2(bi + 41.0, tq));
-    float on = burst * step(hb, 0.15 + 0.65 * uGlitch);
+    // Blocks along the row: 1 to 7 per row, started at a random spot so their edges never line up between rows
+    float m = 1.0 + floor(hash(vec2(bi, tq + 2.0)) * 7.0);
+    float xi = floor(uv.x * m + hash(vec2(bi + 3.0, tq)));
+    vec2 id = vec2(bi * 13.0 + xi, tq);
+    float hb = hash(id), h2 = hash(id + 17.0), h3 = hash(id + 41.0), h4 = hash(id + 59.0);
+    float on = burst * step(hb, 0.12 + 0.5 * uGlitch);
+    // Thin lines, two pixels tall, in dashes
     float fi = floor(uv.y * uSim.y / (2.0 * uPxK));
-    float hf = hash(vec2(fi, tf));
-    gthin = burst * step(hf, 0.03 + 0.12 * uGlitch);
-    float slip = on * (h2 - 0.5) * 0.45 * uGlitch + gthin * (hash(vec2(fi, tf + 3.0)) - 0.5) * 0.08;
-    gk = max(on, gthin * 0.8);
-    gsm = on * step(0.55, h3);                       // this strip smears into streaks
-    gsp = (0.012 + 0.05 * uGlitch) * (0.4 + h3);    // how far red and blue tear apart
-    gid = gthin > 0.0 && on < 0.5 ? hash(vec2(fi, tf + 7.0)) * 0.8 : hash(vec2(bi + 5.0, tq + 1.0));   // picks the strip's color
+    float dash = floor(uv.x * (2.0 + 4.0 * hash(vec2(fi, tf + 1.0))) + hash(vec2(fi, tf + 2.0)));
+    float hf = hash(vec2(fi, tf)), hd = hash(vec2(fi * 7.0 + dash, tf));
+    gthin = burst * step(hf, 0.03 + 0.1 * uGlitch) * step(hd, 0.5);
+    float slip = on * (h2 - 0.5) * 0.4 * uGlitch + gthin * (hash(vec2(fi, tf + 3.0)) - 0.5) * 0.06;
+    gk = max(on, gthin * 0.85);
+    gsm = on * step(0.7, h3);                         // this block smears into streaks
+    gsp = (0.006 + 0.03 * uGlitch) * (0.4 + h3);     // how far red and blue tear apart
+    gid = on > 0.5 ? h4 : hash(vec2(fi * 3.0 + dash, tf + 7.0)) * 0.8;   // picks the block's color
     st.x = fract(st.x + slip);
-    // A smeared strip stretches the picture out from one spot, so each row becomes a long streak of its color
-    if (gsm > 0.0) { float anchor = hash(vec2(floor(uv.y * uSim.y / (3.0 * uPxK)), tq + 9.0)); st.x = fract(anchor + (st.x - anchor) * 0.04); }
+    if (on > 0.5) {
+      // Chunky pixels: each block its own size, 4 to 20 Standard-size pixels across
+      vec2 cell = (4.0 + floor(h2 * 4.0) * 4.0) * uPxK / uSim;
+      st = (floor(st / cell) + 0.5) * cell;
+      // A smeared block stretches out from its left edge, so each of its rows becomes a streak of one color
+      if (gsm > 0.0) { float x0 = (xi - hash(vec2(bi + 3.0, tq))) / m; st.x = fract(x0 + slip + (st.x - x0 - slip) * 0.05); }
+    }
   }
   vec4 now = texture(uNow, st);
   vec3 c = uChroma > 0.0 ? chromaOnce(st, asp) : now.rgb;
@@ -1240,7 +1253,8 @@ void main() {
     vec3 punch = clamp((c - 0.5) * 1.8 + 0.5, 0.0, 1.0);
     // Each strip is flooded with its hot color, brighter where the picture is lit, so even dark parts show
     // colored blocks; the picture's own split colors show through on top
-    vec3 bow = hot * (0.3 + 1.1 * smoothstep(0.02, 0.6, lum));
+    // About half the blocks glow bright whatever's under them; the rest stay dark, lit only where the picture is
+    vec3 bow = hot * ((gid * 7.0 - floor(gid * 7.0) > 0.45 ? 0.8 : 0.22) + 1.0 * smoothstep(0.02, 0.6, lum));
     c = mix(c, clamp(max(bow, punch * 0.9) , 0.0, 1.0), gk * 0.85);
     // Thin scan lines light up in a hot color
     c = mix(c, hot, gthin * 0.75 * (1.0 - gsm));
