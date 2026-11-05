@@ -518,10 +518,17 @@ TIPS
   - Camera: a phone's back camera shows the world the right way round; a
     front camera or computer webcam works like a mirror. With more than one
     camera, a list under Camera picks which one.
+  - Fix projector shape (under the picture, while the Output window is
+    open): a crooked or wider-at-one-end projector picture is squared up by
+    dragging its four corners, on the projector or on the little map under
+    the picture, with a test grid to judge it. Kept for next time; Reset
+    puts it square.
   - Leaving full screen: move the mouse or tap the picture and an "Exit full
     screen" button shows at the top right (it fades again when you stop).
     Esc works too. The output window has the same button.
-  - Keys: Space freeze, N neutral, R surprise,
+  - Keys: Space freeze (in Cue mode Space cuts to the next look and
+    Shift+Space freezes; 1 to 5 pick a preview, its number again cuts),
+    N neutral, R surprise,
     P autopilot, L next look, C clear, F full screen, V record (press
     again to stop and save; works in full screen too), G guide.
     In Mount Ribbit: W A S D walk, Shift runs, J jumps.

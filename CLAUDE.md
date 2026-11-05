@@ -76,6 +76,13 @@ file don't rebuild the app.
    up to 5 ready looks with snapshots in `#cueStrip`; the next waits built up on the hidden loop and Next look cuts on the same frame.
    Cue looks never read the other loop (no Other loop input, push, dye or feeds). `python3 tests/cue_check.py` (about 2.5 minutes;
    feeds the eye copies for the scout, leaves out 3D worlds and fractals, which take seconds a frame here). Reaches in via `window.__plCue`.
+   **Keys for cueing:** 1 to 5 (top row or number pad, by `e.code`) pick that preview (`cueKey` → `cuePickSlot(i, byKey)`, the same as a
+   click); the picked one's number again cuts. In Cue mode Space cuts (blurring whatever has focus, so click-then-Space works) and
+   Shift+Space freezes; held keys cut once. Checked at the end of `tests/cue_check.py`.
+4h4. **Fix projector shape** (keystone, `ks`, `ksAttach`, `ksMatrix`, `ksMap` in js/app.js; button `#ksBtn` shows while the Output window
+   is open): the Output window's canvas gets a CSS `matrix3d` from four corners (parts of the window's size, clockwise from top left,
+   kept in `phosphor-keystone`); dots and a CSS test grid in the Output window, a little SVG map with arrow-key nudging in `#ksPanel`.
+   Folding shapes are refused (`ksConvex`). `python3 tests/keystone_check.py` (about 50 s; opens the real Output window).
 4l. **Autopilot's Use Type art** (switch under Autopilot, `apSet.type`, `apTypeArt` / `typeTick` in js/app.js):
    `python3 tests/ap_type_check.py` (about a minute and a half).
 4m. **The sequencer's playhead with Spotify** (`seqPos` in js/app.js: small differences caught up by speed, skips over

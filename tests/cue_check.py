@@ -4,7 +4,8 @@
 
 Cue mode (Autopilot settings): Autopilot leaves the picture alone, tries looks out of sight on the scout (loop C's
 place), keeps up to five ready looks with previews under the picture, and Next look cuts to the waiting one on the
-same frame. Clicking a preview makes it the next look. Switching Cue mode off gives Autopilot its timed looks back.
+same frame. Clicking a preview makes it the next look; then Space cuts to it, keys 1 to 5 pick and the same number again cuts.
+Switching Cue mode off gives Autopilot its timed looks back.
 Exit code 0 = passed.
 """
 import os
@@ -89,6 +90,43 @@ def run(c, base, out, problems):
     c.wait_frames(3, 'cut to the pick', ceiling=120)
     s = pg.evaluate(STATE)
     expect(target not in s['ids'] and s['pick'] is None, 'Next look cut to the picked one')
+
+    # The keyboard, for DJing: click a preview then Space cuts to it; 1 to 5 pick; the same number again cuts
+    for _ in range(60):
+        s = pg.evaluate(STATE)
+        if s['n'] >= 3:
+            break
+        pg.evaluate(FEED)
+        c.wait_frames(3, 'more looks being tried', ceiling=120)
+    expect(s['n'] >= 3, f'enough ready looks for the key checks ({s["n"]})')
+    # A click leaves the button with the keyboard in a real browser: focused here, the way a click leaves it
+    target = pg.evaluate("""() => { const b = document.querySelectorAll('#cueStrip .cue-pic')[1]; b.focus(); b.click(); b.focus(); return +b.dataset.id; }""")
+    c.wait_frames(3, 'picked by click', ceiling=120)
+    pg.keyboard.press('Space')
+    c.wait_frames(3, 'Space', ceiling=120)
+    s = pg.evaluate(STATE)
+    expect(target not in s['ids'] and s['pick'] is None, f'click a preview, then Space cuts to it (picked {target}, list {s["ids"]})')
+    shown = s['shown']
+    pg.keyboard.press('Shift+Space')
+    c.wait_frames(3, 'Shift+Space', ceiling=120)
+    s2 = pg.evaluate(STATE)
+    expect(s2['shown'] == shown, 'Shift+Space doesn’t cut')
+    pg.keyboard.press('Shift+Space')
+    c.wait_frames(3, 'unfreeze', ceiling=120)
+    want = pg.evaluate("() => window.__plCue.cue.list[0].id")
+    pg.keyboard.press('Digit1')
+    c.wait_frames(3, 'key 1', ceiling=120)
+    s = pg.evaluate(STATE)
+    expect(s['pick'] == want and s['deck']['id'] == want, f'key 1 makes the first preview the next look (wanted {want}, waiting {s["deck"]})')
+    pg.keyboard.press('Numpad1')
+    c.wait_frames(3, 'number pad 1 again', ceiling=120)
+    s = pg.evaluate(STATE)
+    expect(want not in s['ids'] and s['pick'] is None, 'pressing its number again (number pad) cuts to it')
+    n = s['n']
+    pg.keyboard.press('Digit5') if n < 5 else None
+    c.wait_frames(2, 'key 5', ceiling=120)
+    s = pg.evaluate(STATE)
+    expect(n >= 5 or s['pick'] is None, 'a number with no ready look yet does nothing')
 
     # Off again: Autopilot changes looks by itself
     pg.evaluate("() => document.querySelector('#apCue').click()")

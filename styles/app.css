@@ -1188,14 +1188,31 @@ button.seq-card { cursor: pointer; }
 .edit-bar .session-row .live { background: var(--loop-a); box-shadow: 0 0 8px rgba(176,108,255,.7); }
 
 /* Cue mode's previews: the ready looks under the picture */
-.cue-strip { display: flex; gap: 6px; align-items: stretch; flex-wrap: nowrap; overflow: hidden; }
+.cue-strip { counter-reset: cue; display: flex; gap: 6px; align-items: stretch; flex-wrap: nowrap; overflow: hidden; }
 .cue-strip[hidden] { display: none; }
 .cue-pic { flex: 1 1 0; min-width: 0; position: relative; padding: 0; border: 2px solid var(--line, #333); border-radius: 6px; background: #000; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
 .cue-pic canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; }
 .cue-pic .cue-name { font-size: 11px; line-height: 1.3; padding: 2px 4px; color: var(--muted, #aaa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; background: rgba(0,0,0,.6); }
+.cue-pic { counter-increment: cue; }
+.cue-pic::before { content: counter(cue); position: absolute; top: 3px; left: 3px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 4px; background: rgba(0,0,0,.7); color: #fff; font: 600 11px/16px system-ui, sans-serif; text-align: center; z-index: 1; }
 .cue-pic:disabled { cursor: default; opacity: .45; }
 .cue-pic.next { border-color: #8b1ab8; box-shadow: 0 0 0 1px #8b1ab8, 0 0 10px rgba(139,26,184,.6); }
 .cue-pic.next .cue-name { color: #fff; }
 .cue-pic.picked::after { content: '★'; position: absolute; top: 2px; right: 5px; color: #fff; font-size: 13px; text-shadow: 0 0 3px #000; }
 .cue-go { flex: 0 0 auto; align-self: center; }
 .cue-go kbd { font: inherit; opacity: .7; margin-left: 4px; }
+
+/* Fix projector shape (keystone): the corner map under the picture */
+.ks-panel { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--raise, var(--panel)); }
+.ks-panel[hidden] { display: none; }
+.ks-head { display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.4; color: var(--muted, #aaa); }
+.ks-head b { color: var(--ink); font-size: 14px; }
+.ks-body { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.ks-map { width: min(360px, 100%); height: auto; background: #000; border: 1px solid var(--line); border-radius: 6px; touch-action: none; overflow: visible; }
+.ks-map .ks-frame { fill: none; stroke: #555; stroke-dasharray: 3 3; stroke-width: .6; }
+.ks-map .ks-quad { fill: rgba(139,26,184,.18); stroke: #b06cff; stroke-width: .8; }
+.ks-map .ks-line { stroke: rgba(255,255,255,.35); stroke-width: .4; fill: none; }
+.ks-map .ks-dot { fill: #8b1ab8; stroke: #fff; stroke-width: .8; cursor: grab; outline: none; }
+.ks-map .ks-dot:focus, .ks-map .ks-dot.on { fill: #d39bff; }
+.ks-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+#ksBtn[aria-pressed="true"] .led { background: #b06cff; box-shadow: 0 0 8px rgba(176,108,255,.7); }

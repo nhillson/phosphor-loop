@@ -3944,17 +3944,43 @@ function cueStrip() {
     }
     const name = it ? SRC_LABEL[it.look.in1] || it.look.in1 : '';
     b.querySelector('.cue-name').textContent = it ? (next === it ? 'Next · ' : '') + name : 'Looking…';
-    b.title = it ? `${name}${next === it ? ' — this is the next look. Press Next look (L) to cut to it.' : ' — click to make this the next look'}` : 'Autopilot is still looking for a good one';
+    b.title = it ? `${i + 1}: ${name}${next === it ? ' — this is the next look. Press Space (or L, or ' + (i + 1) + ' again) to cut to it.' : ' — click or press ' + (i + 1) + ' to make this the next look, then Space to cut'}` : 'Autopilot is still looking for a good one';
   });
 }
-$$('#cueStrip .cue-pic').forEach((b) => b.addEventListener('click', () => {
-  const id = +b.dataset.id;
-  if (!id) return;
-  cue.pick = cue.pick === id ? null : id;
+// Preview i (0 to 4) becomes the next look, the same from a click or keys 1 to 5. Clicking the picked one again
+// un-picks it; pressing its number key again (byKey) cuts to it, so 3 then 3 on the hit works one-handed.
+// Returns false when there's no ready look in that place yet.
+function cuePickSlot(i, byKey) {
+  const it = cue.list[i];
+  if (!it) return false;
+  if (cue.pick === it.id) {
+    if (byKey) { nextLook(); return true; }
+    cue.pick = null;
+  } else cue.pick = it.id;
   cue.deck = null;
   cueDeck(performance.now());
   cueStrip();
+  return true;
+}
+$$('#cueStrip .cue-pic').forEach((b, i) => b.addEventListener('click', () => {
+  cuePickSlot(i, false);
+  // Leaves the keyboard free, so Space straight after the click cuts instead of pressing this preview again
+  b.blur();
 }));
+// Keys 1 to 5 (top row or number pad, so a number pad or foot pedal works) pick that preview
+function cueKey(e) {
+  const m = /^(?:Digit|Numpad)([1-5])$/.exec(e.code || '');
+  if (!m) return false;
+  if (e.repeat) return true;
+  if (!cueActive()) {
+    toast(cueWhy() || 'Keys 1 to 5 pick the next look in Cue mode. Turn it on under Autopilot › Cue mode.');
+    return true;
+  }
+  const i = +m[1] - 1;
+  if (cuePickSlot(i, true)) { if (cue.pick) showOSD('CUE', `LOOK ${i + 1} IS NEXT`); }
+  else showOSD('CUE', `LOOK ${i + 1} ISN’T READY YET`);
+  return true;
+}
 $('#cueStrip')?.addEventListener('pointerenter', () => { cue.hover = true; });
 $('#cueStrip')?.addEventListener('pointerleave', () => { cue.hover = false; });
 $('#cueGo')?.addEventListener('click', () => nextLook());
@@ -3971,7 +3997,7 @@ $('#apCue')?.addEventListener('click', () => {
   if (apSet.cue) {
     if (!ap.on) setAutopilot(true, true);
     const why = cueWhy();
-    toast(why || 'Cue mode is on. Autopilot leaves the picture alone and gets new looks ready out of sight. Press Next look (L) to cut to the next one on the hit.', 9000);
+    toast(why || 'Cue mode is on. Autopilot leaves the picture alone and gets new looks ready out of sight. Press Space (or L) to cut to the next one on the hit. Keys 1 to 5 pick a preview to be next.', 9000);
   } else {
     cueSleep();
     ap.next = performance.now() + Math.min(7000, apEverySec() * 1000);
@@ -3986,7 +4012,7 @@ $('#apCuePrev')?.addEventListener('click', () => {
   saveAp();
   syncCueUI();
 });
-window.__plCue = { cue, cueActive, cueGo, cueWhy };
+window.__plCue = { cue, cueActive, cueGo, cueWhy, cuePickSlot };
 // For tests/ap_loops_check.py: a way in to Autopilot's loops
 window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 0; apStep(performance.now(), false); } };
 
@@ -5157,8 +5183,8 @@ function apStatus() {
     const n = cue.list.length, d = cue.deck;
     html = '<span class="live"></span><b>Cue mode.</b> Autopilot leaves the picture alone. ' +
       (n ? `${n} new look${n === 1 ? '' : 's'} ready. ` : 'Looking for good new looks… ') +
-      (d && d.id != null && performance.now() - d.at > CUE.built * 1000 ? 'Press <b>Next look</b> (L) to cut to the next one.'
-        : d && d.id != null ? 'The next look is building up…' : 'Next look (L) still cuts to a new look, not yet checked.');
+      (d && d.id != null && performance.now() - d.at > CUE.built * 1000 ? 'Press <b>Space</b> (or L) to cut to the next one; 1 to 5 pick a preview.'
+        : d && d.id != null ? 'The next look is building up…' : 'Space (or L) still cuts to a new look, not yet checked.');
     if (ap.pins.size) html += ` ${ap.pins.size} pinned.`;
   } else {
     const cw = cueWhy();
@@ -8939,10 +8965,21 @@ function onKey(e) {
   if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return;
   const onControl = tag === 'BUTTON' || tag === 'INPUT';
   if (ribKey(e, true)) return;
+  if (cueKey(e)) { e.preventDefault(); return; }
+  // In Cue mode Space cuts to the next look, even straight after clicking a preview or moving a fader
+  // (Shift+Space freezes instead). Holding it down cuts only once.
+  if (e.key === ' ' && cueActive()) {
+    e.preventDefault();
+    const a = e.target && e.target.ownerDocument && e.target.ownerDocument.activeElement;
+    if (a && a.blur && a !== a.ownerDocument.body) a.blur();
+    if (e.repeat) return;
+    if (e.shiftKey) toggleFreeze(); else nextLook();
+    return;
+  }
   if (e.key === ' ' && !onControl) { toggleFreeze(); e.preventDefault(); }
   else if (e.key === 'r' || e.key === 'R') surprise();
   else if (e.key === 'p' || e.key === 'P') setAutopilot(!ap.on);
-  else if (e.key === 'l' || e.key === 'L') nextLook();
+  else if ((e.key === 'l' || e.key === 'L') && !(e.repeat && cueActive())) nextLook();
   else if ((e.key === 'y' || e.key === 'Y') && !e.repeat) rate(1);
   else if ((e.key === 'x' || e.key === 'X') && !e.repeat) rate(-1);
   else if (e.key === 'n' || e.key === 'N') neutral();
@@ -10202,6 +10239,7 @@ function openOutput() {
     });
   }
   w.addEventListener('resize', fit);
+  ksAttach(w, doc);
   outBtn.textContent = 'Close output window';
   outBtn.setAttribute('aria-pressed', 'true');
   $$('#shape button').forEach((b) => { b.disabled = true; });
@@ -10215,6 +10253,7 @@ function openOutput() {
 function closeOutput(alreadyClosed) {
   if (outWin && !alreadyClosed) { try { outWin.close(); } catch (_) {} }
   outWin = null; outCanvas = null; outCtx = null;
+  ksDetach();
   outBtn.textContent = 'Output window';
   outBtn.setAttribute('aria-pressed', 'false');
   $$('#shape button').forEach((b) => { b.disabled = false; });
@@ -10222,6 +10261,224 @@ function closeOutput(alreadyClosed) {
   syncWide();
 }
 outBtn.addEventListener('click', () => (outputOpen() ? closeOutput() : openOutput()));
+/* ================= fix projector shape (keystone) ================= */
+// A projector that isn't straight in front of the wall throws a picture wider at one end, or tilted. Fix projector
+// shape (under the picture, while the Output window is open) puts four purple dots on the picture's corners: drag
+// each one to where that corner should be on the wall, on the projector itself or on the little map here, with the
+// test grid to judge it square. The Output window's picture is bent to fit with a CSS perspective transform
+// (matrix3d, from the four corners), so nothing about drawing it changes and it costs the computer nothing. The
+// corners are kept (phosphor-keystone) as parts of the window's width and height, so they hold in full screen and
+// come back the next time the Output window opens. Corners go clockwise from the top left.
+const KS_KEY = 'phosphor-keystone';
+const KS_SQUARE = [[0, 0], [1, 0], [1, 1], [0, 1]];
+const ks = { pts: null, editing: false, grid: true, sel: -1, doc: null, win: null, dots: [], gridEl: null };
+function ksLoad() {
+  try {
+    const v = JSON.parse(lsGet(KS_KEY) || 'null');
+    if (Array.isArray(v) && v.length === 4 && v.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))) return v;
+  } catch (_) {}
+  return KS_SQUARE.map((p) => p.slice());
+}
+ks.pts = ksLoad();
+const ksIsSquare = () => ks.pts.every((p, i) => Math.abs(p[0] - KS_SQUARE[i][0]) < 1e-4 && Math.abs(p[1] - KS_SQUARE[i][1]) < 1e-4);
+function ksSave() { if (ksIsSquare()) { try { localStorage.removeItem(KS_KEY); } catch (_) {} } else lsSet(KS_KEY, JSON.stringify(ks.pts)); }
+// The four corners have to stay a shape with no dents or crossings, or the picture would turn inside out
+function ksConvex(P) {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = P[i], b = P[(i + 1) % 4], c = P[(i + 2) % 4];
+    const z = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    if (Math.abs(z) < 1e-6) return false;
+    if (!sign) sign = Math.sign(z); else if (Math.sign(z) !== sign) return false;
+  }
+  return true;
+}
+// The CSS matrix3d that takes a W x H box onto the four corners (given as parts of W and H)
+function ksMatrix(P, W, H) {
+  const [x0, y0] = [P[0][0] * W, P[0][1] * H], [x1, y1] = [P[1][0] * W, P[1][1] * H];
+  const [x2, y2] = [P[2][0] * W, P[2][1] * H], [x3, y3] = [P[3][0] * W, P[3][1] * H];
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  let a, b, d, e, g = 0, h = 0;
+  if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9) { a = x1 - x0; b = x2 - x1; d = y1 - y0; e = y2 - y1; }
+  else {
+    const den = dx1 * dy2 - dx2 * dy1;
+    g = (dx3 * dy2 - dx2 * dy3) / den;
+    h = (dx1 * dy3 - dx3 * dy1) / den;
+    a = x1 - x0 + g * x1; b = x3 - x0 + h * x3;
+    d = y1 - y0 + g * y1; e = y3 - y0 + h * y3;
+  }
+  const m = [a / W, d / W, 0, g / W, b / H, e / H, 0, h / H, 0, 0, 1, 0, x0, y0, 0, 1];
+  return `matrix3d(${m.map((v) => +v.toFixed(9)).join(',')})`;
+}
+// Bends the Output window's picture (and the test grid) to the corners, and moves the dots there
+function ksApply() {
+  if (!outputOpen() || !ks.doc) return;
+  const W = ks.win.innerWidth || 1, H = ks.win.innerHeight || 1;
+  const t = ksIsSquare() ? '' : ksMatrix(ks.pts, W, H);
+  outCanvas.style.transform = t;
+  if (ks.gridEl) { ks.gridEl.style.transform = t; ks.gridEl.hidden = !(ks.editing && ks.grid); }
+  ks.dots.forEach((el, i) => {
+    el.hidden = !ks.editing;
+    // Kept whole on the screen, so a dot in a corner can still be grabbed (a drag moves its corner by as much as the pointer moves)
+    el.style.left = Math.min(W - 24, Math.max(24, ks.pts[i][0] * W)) + 'px';
+    el.style.top = Math.min(H - 24, Math.max(24, ks.pts[i][1] * H)) + 'px';
+    el.classList.toggle('on', ks.sel === i);
+  });
+  ksMap();
+}
+// Moves corner i to (x, y), parts of the window; refused if the shape would fold over
+function ksMove(i, x, y) {
+  const P = ks.pts.map((p) => p.slice());
+  P[i] = [Math.min(1.25, Math.max(-0.25, x)), Math.min(1.25, Math.max(-0.25, y))];
+  if (!ksConvex(P)) return false;
+  ks.pts = P;
+  ksApply();
+  ksSave();
+  return true;
+}
+// Dragging a dot: pos(e) gives the pointer as parts of the window (or of the map)
+function ksDrag(el, i, pos) {
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    ks.sel = i;
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    const start = pos(e), from = ks.pts[i].slice();
+    const move = (ev) => { const p = pos(ev); ksMove(i, from[0] + p[0] - start[0], from[1] + p[1] - start[1]); };
+    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    ksApply();
+  });
+}
+// The Output window's dots and test grid, made when it opens
+function ksAttach(w, doc) {
+  ks.win = w; ks.doc = doc; ks.dots = [];
+  const st = doc.createElement('style');
+  st.textContent = `canvas#out{transform-origin:0 0}
+.ksgrid{position:fixed;left:0;top:0;width:100vw;height:100vh;transform-origin:0 0;pointer-events:none;box-sizing:border-box;border:4px solid #fff;
+  background-image:radial-gradient(circle at 50% 50%,transparent 0 calc(min(100vw,100vh)*.2 - 2px),#fff calc(min(100vw,100vh)*.2 - 2px) calc(min(100vw,100vh)*.2 + 1px),transparent calc(min(100vw,100vh)*.2 + 1px)),
+  linear-gradient(#fff,#fff),linear-gradient(#fff,#fff),
+  linear-gradient(to right,rgba(255,255,255,.55) 2px,transparent 2px),linear-gradient(to bottom,rgba(255,255,255,.55) 2px,transparent 2px);
+  background-size:100% 100%,2px 100%,100% 2px,12.5% 100%,100% 12.5%;background-position:0 0,50% 0,0 50%,0 0,0 0;background-repeat:no-repeat,no-repeat,no-repeat,repeat,repeat;background-color:rgba(139,26,184,.25)}
+.ksgrid[hidden]{display:none}
+.ksdot{position:fixed;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(139,26,184,.85);border:3px solid #fff;box-sizing:border-box;
+  box-shadow:0 0 0 3px rgba(0,0,0,.5),0 0 18px rgba(176,108,255,.9);cursor:grab;touch-action:none;z-index:5}
+.ksdot.on{background:#d39bff}
+.ksdot[hidden]{display:none}`;
+  doc.head.appendChild(st);
+  ks.gridEl = doc.createElement('div');
+  ks.gridEl.className = 'ksgrid';
+  ks.gridEl.hidden = true;
+  doc.body.appendChild(ks.gridEl);
+  for (let i = 0; i < 4; i++) {
+    const d = doc.createElement('div');
+    d.className = 'ksdot';
+    d.hidden = true;
+    d.title = 'Drag this corner to where the picture’s corner should be';
+    doc.body.appendChild(d);
+    ksDrag(d, i, (e) => [e.clientX / (w.innerWidth || 1), e.clientY / (w.innerHeight || 1)]);
+    ks.dots.push(d);
+  }
+  w.addEventListener('resize', ksApply);
+  doc.addEventListener('fullscreenchange', () => setTimeout(ksApply, 80));
+  $('#ksBtn').hidden = false;
+  ksApply();
+  if (!ksIsSquare()) toast('The projector shape you fixed last time is back on. Fix projector shape (under the picture) changes it.', 6000);
+}
+function ksDetach() {
+  ks.doc = null; ks.win = null; ks.dots = []; ks.gridEl = null;
+  ksEdit(false);
+  $('#ksBtn').hidden = true;
+}
+// The little map under the picture: the window's frame, the bent picture with its grid, and the four dots
+const ksMapEl = $('#ksMap');
+function ksMapSize() {
+  const W = ks.win ? ks.win.innerWidth : 16, H = ks.win ? ks.win.innerHeight : 9;
+  const mw = 160, mh = Math.max(40, Math.min(160, Math.round(mw * H / Math.max(1, W))));
+  return { mw, mh, pad: 14 };
+}
+function ksMap() {
+  if (!ksMapEl || !ks.editing) return;
+  const { mw, mh, pad } = ksMapSize();
+  ksMapEl.setAttribute('viewBox', `${-pad} ${-pad} ${mw + pad * 2} ${mh + pad * 2}`);
+  const P = ks.pts.map(([x, y]) => [x * mw, y * mh]);
+  const at = (u, v) => { // a point inside the bent picture, by straight blending (close enough for a little map)
+    const top = [P[0][0] + (P[1][0] - P[0][0]) * u, P[0][1] + (P[1][1] - P[0][1]) * u];
+    const bot = [P[3][0] + (P[2][0] - P[3][0]) * u, P[3][1] + (P[2][1] - P[3][1]) * u];
+    return [top[0] + (bot[0] - top[0]) * v, top[1] + (bot[1] - top[1]) * v];
+  };
+  let lines = '';
+  for (let s = 1; s < 4; s++) {
+    const a = at(s / 4, 0), b = at(s / 4, 1), c = at(0, s / 4), d = at(1, s / 4);
+    lines += `M${a[0]},${a[1]}L${b[0]},${b[1]}M${c[0]},${c[1]}L${d[0]},${d[1]}`;
+  }
+  // Made once and then only moved, so a dot picked with the keyboard keeps its focus while it's nudged
+  if (!ksMapEl.querySelector('.ks-quad')) {
+    ksMapEl.innerHTML = '<rect class="ks-frame" x="0" y="0"/><polygon class="ks-quad"/><path class="ks-line"/>' +
+      [0, 1, 2, 3].map((i) => `<circle class="ks-dot" data-i="${i}" tabindex="0" r="6"><title>Drag this corner (arrow keys nudge it)</title></circle>`).join('');
+  }
+  const fr = ksMapEl.querySelector('.ks-frame');
+  fr.setAttribute('width', mw); fr.setAttribute('height', mh);
+  ksMapEl.querySelector('.ks-quad').setAttribute('points', P.map((p) => p.join(',')).join(' '));
+  ksMapEl.querySelector('.ks-line').setAttribute('d', lines);
+  ksMapEl.querySelectorAll('.ks-dot').forEach((c, i) => {
+    c.setAttribute('cx', P[i][0]); c.setAttribute('cy', P[i][1]);
+    c.classList.toggle('on', ks.sel === i);
+  });
+}
+// Map dots: dragged by the map's own measure (the map is redrawn while dragging, so the drag is caught on the map)
+if (ksMapEl) {
+  const mapPos = (e) => {
+    const r = ksMapEl.getBoundingClientRect(), { mw, mh, pad } = ksMapSize();
+    const sx = (mw + pad * 2) / r.width, sy = (mh + pad * 2) / r.height;
+    return [((e.clientX - r.left) * sx - pad) / mw, ((e.clientY - r.top) * sy - pad) / mh];
+  };
+  let drag = null;
+  ksMapEl.addEventListener('pointerdown', (e) => {
+    const dot = e.target.closest && e.target.closest('.ks-dot');
+    if (!dot) return;
+    e.preventDefault();
+    const i = +dot.dataset.i;
+    ks.sel = i;
+    drag = { i, start: mapPos(e), from: ks.pts[i].slice(), id: e.pointerId };
+    try { ksMapEl.setPointerCapture(e.pointerId); } catch (_) {}
+    ksApply();
+    ksMapEl.querySelector(`.ks-dot[data-i="${i}"]`)?.focus({ preventScroll: true });
+  });
+  ksMapEl.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const p = mapPos(e);
+    ksMove(drag.i, drag.from[0] + p[0] - drag.start[0], drag.from[1] + p[1] - drag.start[1]);
+  });
+  const end = () => { drag = null; };
+  ksMapEl.addEventListener('pointerup', end);
+  ksMapEl.addEventListener('pointercancel', end);
+  // Arrow keys nudge the picked corner: one pixel of the projector at a time, ten with Shift
+  ksMapEl.addEventListener('keydown', (e) => {
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d || ks.sel < 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const step = e.shiftKey ? 10 : 1, W = ks.win ? ks.win.innerWidth : 1600, H = ks.win ? ks.win.innerHeight : 900;
+    const p = ks.pts[ks.sel];
+    ksMove(ks.sel, p[0] + d[0] * step / W, p[1] + d[1] * step / H);
+  });
+  ksMapEl.addEventListener('focusin', (e) => { const dot = e.target.closest && e.target.closest('.ks-dot'); if (dot && ks.sel !== +dot.dataset.i) { ks.sel = +dot.dataset.i; ksApply(); } });
+}
+function ksEdit(on) {
+  ks.editing = !!on && outputOpen();
+  if (!ks.editing) ks.sel = -1;
+  $('#ksPanel').hidden = !ks.editing;
+  $('#ksBtn').setAttribute('aria-pressed', String(ks.editing));
+  $('#ksGrid').setAttribute('aria-pressed', String(ks.grid));
+  ksApply();
+}
+$('#ksBtn').addEventListener('click', () => ksEdit(!ks.editing));
+$('#ksDone').addEventListener('click', () => ksEdit(false));
+$('#ksGrid').addEventListener('click', () => { ks.grid = !ks.grid; $('#ksGrid').setAttribute('aria-pressed', String(ks.grid)); ksApply(); });
+$('#ksReset').addEventListener('click', () => { ks.pts = KS_SQUARE.map((p) => p.slice()); ksSave(); ksApply(); });
+window.__plKs = { ks, ksMove, ksMatrix, ksEdit, ksConvex };
 // Android app: plugging in a projector or TV puts the picture there by itself; unplugging brings it back
 onApp('display', (d) => {
   appInfo.display = !!d.connected;
