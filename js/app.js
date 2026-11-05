@@ -171,7 +171,7 @@ function loopDefaults() {
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
-           offc: 0, wind: 0, windDir: 0, glitch: 0 };
+           offc: 0, wind: 0, windDir: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
 const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
@@ -179,8 +179,8 @@ const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
 const halftoneCell = (v) => 3 + 21 * clamp(v, 0, 100) / 100;
 // The sliders under Effects › Feeds on itself
 const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
-// The sliders under Effects › Lopsided: Off-center, Wind and Glitch slide, which break the picture's symmetry
-const ASYM = ['offc', 'wind', 'glitch'];
+// The sliders under Effects › Lopsided: Off-center and Wind, which break the picture's symmetry
+const ASYM = ['offc', 'wind'];
 const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM];
 const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
@@ -965,7 +965,7 @@ function sliderText(k, v) {
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
     case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
     case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal':
-    case 'offc': case 'wind': case 'glitch': return v === 0 ? 'OFF' : String(v);
+    case 'offc': case 'wind': return v === 0 ? 'OFF' : String(v);
     case 'poster': return v === 0 ? 'OFF' : `${Math.round(posterSteps(v))} STEPS`;
     case 'halftone': return v === 0 ? 'OFF' : `${Math.round(halftoneCell(v))} PX`;
     // How far back the far edge reaches
@@ -1556,7 +1556,6 @@ function randomLoop() {
     ...surpriseSelf(),
     offc: Math.random() < 0.15 ? Math.round(rnd(35, 80)) : 0,
     wind: Math.random() < 0.15 ? Math.round(rnd(25, 70)) : 0, windDir: Math.floor(Math.random() * 9),
-    glitch: Math.random() < 0.12 ? Math.round(rnd(30, 75)) : 0,
     mirror: pick([0, 0, 2, 4, 6, 8]),
     blur: +rnd(-0.1, 0.35).toFixed(2),
     edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
@@ -2368,7 +2367,6 @@ const PINS = {
   crystal: { name: 'Crystal', fields: ['crystal'] },
   offc: { name: 'Off-center', fields: ['offc'] },
   wind: { name: 'Wind', fields: ['wind', 'windDir'] },
-  glitch: { name: 'Glitch slide', fields: ['glitch'] },
   // The Show A and Show B faders together (one pin, on either fader, holds both)
   view: { name: 'Show A and B', fields: ['showA', 'showB'], mix: true },
   xab: { name: 'Feed A into B', fields: ['xab'], mix: true },
@@ -3327,7 +3325,6 @@ const AP_FX = {
   time: (w) => rnd(30, 30 + 70 * w),
   offc: (w) => rnd(30, 30 + 60 * w),
   wind: (w) => rnd(20, 20 + 60 * w),
-  glitch: (w) => rnd(25, 25 + 65 * w),
 };
 function apFx(sc, w) {
   for (const [key, val] of Object.entries(AP_FX)) {
@@ -4116,7 +4113,7 @@ window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 
 //   4. how the loops are shown and fed into each other is picked the same way, as a whole picture
 const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
 const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM];
-const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], offc: [30, 90], wind: [20, 80], glitch: [25, 90], ...SELF_RANGE };
+const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], offc: [30, 90], wind: [20, 80], ...SELF_RANGE };
 const TASTE_DEF = loopDefaults();
 const TASTE_LOOK = Object.keys(TASTE_DEF).filter((f) => f !== 'mirrorFx' && f !== 'mirrorSpin');
 const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
@@ -8380,11 +8377,6 @@ const RECIPES = [
     how: 'WAVE · WIND 65 TO THE RIGHT · TRAILS 93 · BLUR',
     sw: 'linear-gradient(90deg,#0b0614 0 20%,#4a2a6a 40%,#c7a3ff 55%,#2a1450 75%,#0b0614)',
     patch: { A: { in1: 'wave', form: 3, zoom: 0, spin: 0, trails: 93, color: 18, blur: 0.12, wind: 65, windDir: 0 } } },
-  { name: 'Rainbow glitch', after: 'Slide Glitch slide up for more strips, more often.',
-    text: 'Strips of the picture tear, slip and smear into hot cyan, yellow and magenta streaks, like a broken video signal.',
-    how: 'BARS · GLITCH SLIDE 85 · ZOOM IN 15 · TRAILS 88',
-    sw: 'linear-gradient(0deg,#0b0614 0 30%,#ff3b3b 30% 33%,#ffd23b 33% 36%,#3bff9a 36% 39%,#3b8bff 39% 42%,#0b0614 42% 70%,#c43bff 70% 72%,#0b0614 72%)',
-    patch: { A: { in1: 'bars', zoom: 15, spin: 0, trails: 88, color: 20, glitch: 85 } } },
   { name: 'Name in lights', after: 'Type your own words in the Your text box under Inputs.',
     text: 'Your band’s name, a title or the venue, flying down a tunnel of its own echoes. Type your own words and they change straight away.',
     how: 'TEXT · ZOOM IN 32 · TRAILS 88 · COLOR 16',
@@ -11230,8 +11222,7 @@ function finalPass(k) {
   const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
   const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
   const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
-  const glitch = calmCap(clamp(c.glitch, 0, 100), 40) / 100;
-  const on = L.rt && loopOn(k) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005 || glitch > 0.005);
+  const on = L.rt && loopOn(k) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
   if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
@@ -11252,7 +11243,6 @@ function finalPass(k) {
   set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   set1f(finalProg, 'uN', steps);
   set1f(finalProg, 'uHalftone', dots);
-  set1f(finalProg, 'uGlitch', glitch > 0.005 ? glitch : 0);
   // Posterize has no steps of its own to remember on its first frame
   set1f(finalProg, 'uFresh', pz.stepped ? 0 : 1);
   pz.stepped = steps > 0;
@@ -11645,13 +11635,13 @@ function lifeTick(k, dt) {
   for (let i = 0; i < steps; i++) { pass(1, S.drop); S.drop = null; }
   return S.rt[S.front].tex;
 }
-/* ================= lopsided effects: Off-center, Wind and Glitch slide ================= */
+/* ================= lopsided effects: Off-center and Wind ================= */
 const WIND_K = 0.0055;   // how far Wind at 100 carries the picture in one frame (screen heights)
 // Once a frame for loop k: Off-center's turning point wanders along a slow uneven path, up to well over a third of
 // the way to the edges (each loop its own way), and the input is drawn there too, so the whole tunnel sits off to
 // one side. With React to sound, each hit of the music shoves the point somewhere new, from where it drifts back,
 // and the bass pushes it further out. Wind's direction comes round to the one picked (or keeps turning). Only
-// Off-center follows the music; Wind and Glitch slide don't.
+// Off-center follows the music; Wind doesn't.
 function asymTick(k, dt, hitK, newHit) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const oc = clamp(c.offc, 0, 100) / 100;
@@ -11693,7 +11683,7 @@ function runLoop(k, xf, brush, f) {
     // With Sound on lines the lines already move with the bass, so they swell half as much
     if (m.lines && sndLineOn && usesLines(t)) sizeBoost *= 0.5;
   }
-  // Lopsided effects (Off-center, Wind, Glitch slide): the music's hits jolt them, with React to sound's switch
+  // Lopsided effects (Off-center, Wind): the music's hits jolt them, with React to sound's switch
   const hitK = reacts(k) && snd.map.asym ? sndPower() : 0;
   const newHit = snd.beats !== L.offBeats;
   L.offBeats = snd.beats;
@@ -12002,7 +11992,7 @@ const SEQ_SLIDERS = [
   ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'],
-    ['offc', 'Off-center'], ['wind', 'Wind'], ['glitch', 'Glitch slide'], ['mirror', 'Mirror']]],
+    ['offc', 'Off-center'], ['wind', 'Wind'], ['mirror', 'Mirror']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
     ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
   // 3D lighting is one for the whole picture: when blocks on several tracks set it, it's a mix of them, each counted
