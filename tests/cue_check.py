@@ -128,6 +128,63 @@ def run(c, base, out, problems):
     s = pg.evaluate(STATE)
     expect(n >= 5 or s['pick'] is None, 'a number with no ready look yet does nothing')
 
+    # Clearing single looks: the small ✕ on a preview, or Shift + its number
+    for _ in range(60):
+        s = pg.evaluate(STATE)
+        if s['n'] >= 3:
+            break
+        pg.evaluate(FEED)
+        c.wait_frames(3, 'more looks being tried', ceiling=120)
+    xs = pg.evaluate("() => [...document.querySelectorAll('#cueStrip .cue-x')].map((x) => !x.hidden)")
+    expect(xs[:s['n']] == [True] * s['n'] and not any(xs[s['n']:]), f'each ready look has a ✕, empty places don’t ({xs})')
+    gone = pg.evaluate("""() => { const c = window.__plCue.cue, id = c.list[1].id; document.querySelectorAll('#cueStrip .cue-x')[1].click();
+      return { id, ids: c.list.map((i) => i.id) }; }""")
+    expect(gone['id'] not in gone['ids'] and len(gone['ids']) == s['n'] - 1, f'the ✕ clears just that look ({s["ids"]} → {gone["ids"]})')
+    s = pg.evaluate(STATE)
+    waiting = s['deck']['id']
+    slot = s['ids'].index(waiting) if waiting in s['ids'] else None
+    if slot is not None:
+        pg.keyboard.press(f'Shift+Digit{slot + 1}')
+        c.wait_frames(3, 'Shift + number', ceiling=120)
+        s2 = pg.evaluate(STATE)
+        expect(waiting not in s2['ids'] and s2['deck'] and s2['deck']['id'] != waiting,
+               f'Shift + its number clears the look that was next, and another takes its place ({waiting} → {s2["deck"]})')
+    else:
+        expect(False, f'the waiting look is on the list ({waiting}, {s["ids"]})')
+
+    # Fade between looks: the Cut/Fade button beside Cut; What you see slides over the fade time, nothing new loads meanwhile
+    pg.evaluate("() => { window.__plCue.apSet.cueFadeSecs = 8; document.querySelector('#cueFadeBar').click(); }")
+    lbl = pg.evaluate("() => [document.querySelector('#cueFadeBarLabel').textContent, document.querySelector('#apCueFade').getAttribute('aria-pressed')]")
+    expect(lbl == ['Fade 8 s', 'true'], f'the Cut/Fade button switches fading on, and the switch under Cue mode follows ({lbl})')
+    c.wait_frames(20, 'next look building up', ceiling=120)
+    r = pg.evaluate("""() => { const P = window.__plAp, C = window.__plCue.cue, k = C.deck.k; window.__plCue.cueGo();
+      return { k, view: P.mix.cur.view, fading: !!C.fade, deck: C.deck }; }""")
+    target = 100 if r['k'] == 'B' else 0
+    expect(r['fading'] and r['view'] != target and r['deck'] is None, f'pressed: a fade starts instead of a cut (What you see {r["view"]:.0f}, going to {target})')
+    mids = []
+    # 8 s here, since this workspace draws only a few frames a second
+    for _ in range(120):
+        c.wait_frames(1, 'fading', ceiling=60)
+        v = pg.evaluate("() => [window.__plAp.mix.cur.view, !!window.__plCue.cue.fade]")
+        mids.append(round(v[0]))
+        if not v[1]:
+            break
+    between = [m for m in mids if 3 < m < 97]
+    s = pg.evaluate(STATE)
+    expect(len(between) >= 2 and s['view'] == target, f'What you see slides across and lands on the new look ({mids})')
+    expect(s['deck'] and s['deck']['k'] != r['k'], 'once it has faded, the next look goes on the other loop')
+    # Pressed again in the middle of a fade: it finishes at once and the next fade starts
+    c.wait_frames(10, 'next look building up', ceiling=120)
+    r1 = pg.evaluate("() => { const C = window.__plCue.cue, k = C.deck.k; window.__plCue.cueGo(); return k; }")
+    c.wait_frames(1, 'part way', ceiling=60)
+    r2 = pg.evaluate("""() => { const C = window.__plCue.cue; C.deck = null; window.__plCue.cueGo();
+      return { fading: !!C.fade, to: C.fade && C.fade.to }; }""")
+    expect(r2['fading'] and r2['to'] == (0 if r1 == 'B' else 100), f'pressing again mid-fade finishes it and fades back the other way ({r2})')
+    pg.evaluate("() => { document.querySelector('#cueFadeBar').click(); window.__plCue.cue.fade && (window.__plCue.cue.fade.ms = 1); }")
+    c.wait_frames(3, 'fade off', ceiling=120)
+    lbl = pg.evaluate("() => document.querySelector('#cueFadeBarLabel').textContent")
+    expect(lbl == 'Cut', f'switched off, it says Cut again ({lbl})')
+
     # Off again: Autopilot changes looks by itself
     pg.evaluate("() => document.querySelector('#apCue').click()")
     c.wait_frames(5, 'Cue mode off', ceiling=120)

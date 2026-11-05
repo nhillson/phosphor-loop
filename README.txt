@@ -535,7 +535,9 @@ TIPS
     screen" button shows at the top right (it fades again when you stop).
     Esc works too. The output window has the same button.
   - Keys: Space freeze (in Cue mode Space cuts to the next look and
-    Shift+Space freezes; 1 to 5 pick a preview, its number again cuts),
+    Shift+Space freezes; 1 to 5 pick a preview, its number again cuts;
+    a preview's small X, or Shift + its number, clears that look; Fade
+    between looks, or the Cut/Fade button beside Cut, fades instead of cutting),
     N neutral, R surprise,
     P autopilot, L next look, C clear, F full screen, V record (press
     again to stop and save; works in full screen too), G guide.

@@ -78,7 +78,10 @@ file don't rebuild the app.
    feeds the eye copies for the scout, leaves out 3D worlds and fractals, which take seconds a frame here). Reaches in via `window.__plCue`.
    **Keys for cueing:** 1 to 5 (top row or number pad, by `e.code`) pick that preview (`cueKey` → `cuePickSlot(i, byKey)`, the same as a
    click); the picked one's number again cuts. In Cue mode Space cuts (blurring whatever has focus, so click-then-Space works) and
-   Shift+Space freezes; held keys cut once. Checked at the end of `tests/cue_check.py`.
+   Shift+Space freezes; held keys cut once. A preview's ✕ (`.cue-x`, in a `.cue-slot` beside it) or Shift + its number clears that
+   look (`cueDrop(i)`; if it was waiting on the hidden loop the next best takes its place). **Fade between looks** (`apSet.cueFade`,
+   `cueFadeSecs` ½–8 s; also `#cueFadeBar` beside Cut): `cueGo` starts `cue.fade` and `cueFadeTick` eases What you see across; no new look is
+   loaded (`cueDeck` waits) until it's done; pressing again finishes it and goes on. Checked at the end of `tests/cue_check.py`.
 4h4. **Fix projector shape** (keystone, `ks`, `ksAttach`, `ksMatrix`, `ksMap` in js/app.js; button `#ksBtn` shows while the Output window
    is open): the Output window's canvas gets a CSS `matrix3d` from four corners (parts of the window's size, clockwise from top left,
    kept in `phosphor-keystone`); dots and a CSS test grid in the Output window, a little SVG map with arrow-key nudging in `#ksPanel`.

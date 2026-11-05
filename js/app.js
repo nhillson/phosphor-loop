@@ -2428,7 +2428,7 @@ const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['spa
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true,
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true, cueFade: false, cueFadeSecs: 2,
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
 // Autopilot never changes them, and moving their controls neither pins anything nor stops it.
@@ -3848,6 +3848,8 @@ function cueNextItem() {
     cue.list.slice().sort((a, b) => b.v.score - a.v.score)[0] || null;
 }
 function cueDeck(now) {
+  // While a fade is going both loops are on screen: the next look goes on the hidden loop once it's done
+  if (cue.fade) return;
   const k = cueHidden(), want = cueNextItem(), d = cue.deck;
   // A look already waiting stays (unless you picked another), so the next cut is never one still building up
   if (d && d.k === k && (cue.pick ? d.id === cue.pick : !want || (d.id != null && cue.list.some((it) => it.id === d.id)))) return;
@@ -3867,8 +3869,9 @@ function cueTick(now) {
   if (!cueActive()) { if (cue.scout || cue.deck) cueSleep(); return false; }
   ap.prep = null; ap.glide = null;
   for (const k of ['A', 'B']) loops[k].ramp = null;
-  // One loop on screen at a time (the other one waits, hidden)
-  if (mix.tgt.view !== 0 && mix.tgt.view !== 100) mix.tgt.view = mix.tgt.view >= 50 ? 100 : 0;
+  // One loop on screen at a time (the other one waits, hidden), except while fading from one look to the next
+  if (cue.fade) cueFadeTick(now);
+  else if (mix.tgt.view !== 0 && mix.tgt.view !== 100) mix.tgt.view = mix.tgt.view >= 50 ? 100 : 0;
   cueStartScout();
   cueDeck(now);
   const T = cue.trial, k = cueHidden();
@@ -3900,12 +3903,25 @@ function cueTick(now) {
   apStatus();
   return true;
 }
-// Next look in Cue mode: cuts to the hidden loop on this very frame
+// Fade between looks (Cue mode switch, apSet.cueFade): instead of cutting, What you see slides from the look on
+// screen to the next one over apSet.cueFadeSecs, eased in and out, starting on the frame you press. Pressing again
+// while a fade is going finishes it at once and starts the next one.
+const CUE_FADES = [0.5, 1, 2, 4, 8];
+function cueFadeTick(now) {
+  const F = cue.fade;
+  if (!F) return;
+  const t = Math.min(1, (now - F.t0) / F.ms), e = t * t * (3 - 2 * t);
+  mix.tgt.view = mix.cur.view = F.from + (F.to - F.from) * e;
+  if (t >= 1) { cue.fade = null; cueDeck(now); cueStrip(); apStatus(); }
+}
+// Next look in Cue mode: cuts (or starts fading) to the hidden loop on this very frame
 function cueGo() {
   const now = performance.now();
+  if (cue.fade) { mix.tgt.view = mix.cur.view = cue.fade.to; cue.fade = null; }
   if (!cue.deck || cue.deck.k !== cueHidden()) cueDeck(now);
-  const k = cue.deck.k, id = cue.deck.id;
-  mix.tgt.view = mix.cur.view = k === 'B' ? 100 : 0;
+  const k = cue.deck.k, id = cue.deck.id, to = k === 'B' ? 100 : 0;
+  if (apSet.cueFade) { cue.fade = { from: mix.cur.view, to, t0: now, ms: Math.max(100, apSet.cueFadeSecs * 1000) }; }
+  else mix.tgt.view = mix.cur.view = to;
   for (const f of ['xab', 'xba']) if (!ap.pins.has(f) && apOwnsMix(f)) mix.tgt[f] = mix.cur[f] = 0;
   if (id != null) cue.list = cue.list.filter((it) => it.id !== id);
   if (cue.pick === id) cue.pick = null;
@@ -3932,6 +3948,8 @@ function cueStrip() {
     const cv = b.querySelector('canvas');
     b.disabled = !it;
     b.dataset.id = it ? String(it.id) : '';
+    const x = b.parentElement && b.parentElement.querySelector('.cue-x');
+    if (x) x.hidden = !it;
     b.classList.toggle('next', !!it && next === it);
     b.classList.toggle('picked', !!it && cue.pick === it.id);
     if (it && b.dataset.drawn !== String(it.id) && it.pic) {
@@ -3944,7 +3962,7 @@ function cueStrip() {
     }
     const name = it ? SRC_LABEL[it.look.in1] || it.look.in1 : '';
     b.querySelector('.cue-name').textContent = it ? (next === it ? 'Next · ' : '') + name : 'Looking…';
-    b.title = it ? `${i + 1}: ${name}${next === it ? ' — this is the next look. Press Space (or L, or ' + (i + 1) + ' again) to cut to it.' : ' — click or press ' + (i + 1) + ' to make this the next look, then Space to cut'}` : 'Autopilot is still looking for a good one';
+    b.title = it ? `${i + 1}: ${name}${next === it ? ' — this is the next look. Press Space (or L, or ' + (i + 1) + ' again) to cut to it.' : ' — click or press ' + (i + 1) + ' to make this the next look, then Space to cut'}. The ✕ (or Shift+${i + 1}) clears it.` : 'Autopilot is still looking for a good one';
   });
 }
 // Preview i (0 to 4) becomes the next look, the same from a click or keys 1 to 5. Clicking the picked one again
@@ -3967,6 +3985,23 @@ $$('#cueStrip .cue-pic').forEach((b, i) => b.addEventListener('click', () => {
   // Leaves the keyboard free, so Space straight after the click cuts instead of pressing this preview again
   b.blur();
 }));
+// The ✕ on a preview (or Shift + its number) clears that look off the list; Autopilot finds another to fill its place.
+// If it was the next look, the next best one takes its place on the hidden loop.
+function cueDrop(i) {
+  const it = cue.list[i];
+  if (!it) return false;
+  cue.list.splice(i, 1);
+  if (cue.pick === it.id) cue.pick = null;
+  if (cue.deck && cue.deck.id === it.id) { cue.deck = null; if (cueActive()) cueDeck(performance.now()); }
+  cueStrip();
+  apStatus();
+  return true;
+}
+$$('#cueStrip .cue-x').forEach((x, i) => x.addEventListener('click', (e) => {
+  e.stopPropagation();
+  cueDrop(i);
+  x.blur();
+}));
 // Keys 1 to 5 (top row or number pad, so a number pad or foot pedal works) pick that preview
 function cueKey(e) {
   const m = /^(?:Digit|Numpad)([1-5])$/.exec(e.code || '');
@@ -3977,6 +4012,7 @@ function cueKey(e) {
     return true;
   }
   const i = +m[1] - 1;
+  if (e.shiftKey) { showOSD('CUE', cueDrop(i) ? `LOOK ${i + 1} CLEARED` : `NO LOOK ${i + 1} TO CLEAR`); return true; }
   if (cuePickSlot(i, true)) { if (cue.pick) showOSD('CUE', `LOOK ${i + 1} IS NEXT`); }
   else showOSD('CUE', `LOOK ${i + 1} ISN’T READY YET`);
   return true;
@@ -3986,6 +4022,15 @@ $('#cueStrip')?.addEventListener('pointerleave', () => { cue.hover = false; });
 $('#cueGo')?.addEventListener('click', () => nextLook());
 function syncCueUI() {
   $('#apCue')?.setAttribute('aria-pressed', String(apSet.cue));
+  $('#apCueFade')?.setAttribute('aria-pressed', String(apSet.cueFade));
+  $('#cueFadeBar')?.setAttribute('aria-pressed', String(apSet.cueFade));
+  const fl = $('#cueFadeBarLabel');
+  if (fl) fl.textContent = apSet.cueFade ? `Fade ${apSet.cueFadeSecs < 1 ? '½' : apSet.cueFadeSecs} s` : 'Cut';
+  $$('#apCueFadeSecs button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.s === apSet.cueFadeSecs)));
+  const fs = $('#apCueFadeSecs');
+  if (fs) fs.hidden = !apSet.cueFade;
+  const fc = $('#apCueFadeCtl');
+  if (fc) fc.hidden = !apSet.cue;
   $('#apCuePrev')?.setAttribute('aria-pressed', String(apSet.cuePreviews));
   const p = $('#apCuePrevCtl');
   if (p) p.hidden = !apSet.cue;
@@ -4007,12 +4052,22 @@ $('#apCue')?.addEventListener('click', () => {
   syncCueUI();
   apStatus();
 });
+// Fade between looks: the switch under Cue mode, and the same switch beside Cut under the picture (for flipping it mid-set)
+function cueSetFade(on) {
+  apSet.cueFade = on;
+  saveAp();
+  syncCueUI();
+  showOSD('CUE', on ? `FADE ${apSet.cueFadeSecs < 1 ? '½' : apSet.cueFadeSecs} S` : 'CUT');
+}
+$('#apCueFade')?.addEventListener('click', () => cueSetFade(!apSet.cueFade));
+$('#cueFadeBar')?.addEventListener('click', (e) => { cueSetFade(!apSet.cueFade); e.currentTarget.blur(); });
+$$('#apCueFadeSecs button').forEach((b) => b.addEventListener('click', () => { apSet.cueFadeSecs = +b.dataset.s; saveAp(); syncCueUI(); }));
 $('#apCuePrev')?.addEventListener('click', () => {
   apSet.cuePreviews = !apSet.cuePreviews;
   saveAp();
   syncCueUI();
 });
-window.__plCue = { cue, cueActive, cueGo, cueWhy, cuePickSlot };
+window.__plCue = { cue, cueActive, cueGo, cueWhy, cuePickSlot, cueDrop, cueSetFade, apSet };
 // For tests/ap_loops_check.py: a way in to Autopilot's loops
 window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 0; apStep(performance.now(), false); } };
 
