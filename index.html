@@ -784,7 +784,7 @@
             <div class="ctl-head"><label for="offc">Off-center</label><output id="offcOut" for="offc"></output></div>
             <input type="range" id="offc" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Far off</span></div>
-            <span class="hint">Zoom and Spin turn around a point that slowly wanders away from the middle, so the tunnel leans toward one side and drifts around. With React to sound on, each hit shoves the point somewhere new.</span>
+            <span class="hint">The whole tunnel moves off to one side and wanders around the screen. With React to sound on, the music drives it: every hit shoves it somewhere new and the bass pushes it further out.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="wind">Wind</label><output id="windOut" for="wind"></output></div>
@@ -801,13 +801,13 @@
               <button data-wdir="6" aria-pressed="false" title="Down">↓</button>
               <button data-wdir="7" aria-pressed="false" title="Down and right">↘</button>
             </div>
-            <span class="hint">The picture streams off one way like smoke in a breeze, in uneven gusts. Pick the way it blows; the middle button keeps it slowly turning. With React to sound on, it gusts harder on the bass and the beats.</span>
+            <span class="hint">The picture streams off one way like smoke in a breeze, in uneven gusts. Pick the way it blows; the middle button keeps it slowly turning.</span>
           </div>
           <div class="ctl">
             <div class="ctl-head"><label for="glitch">Glitch slide</label><output id="glitchOut" for="glitch"></output></div>
             <input type="range" id="glitch" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Broken</span></div>
-            <span class="hint">Strips of the picture slip sideways in a flash of rainbow, then jerk back into place. Higher slips more often and further. With React to sound on, every hit of the music sets some off, so it lands on the song’s hits.</span>
+            <span class="hint">Like a broken video signal: strips of the picture tear sideways, split into red and blue, smear into long streaks and flash hot cyan, yellow and magenta, changing many times a second. Higher means more strips, more often.</span>
           </div>
           <h3 class="subhead">Feeds on itself</h3>
           <p class="hint">Each of these lets the picture decide what happens to it next.</p>
@@ -981,7 +981,7 @@
               <button class="chip" data-map="warp" aria-pressed="true" title="The picture jolts and splits its colors on beats"><span class="led"></span>Warp</button>
               <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
               <button class="chip" data-map="lines" aria-pressed="true" title="The lines of Wave, Shape, Bars and Topo map carry the music’s own sound wave, like an oscilloscope"><span class="led"></span>Sound on lines</button>
-              <button class="chip" data-map="asym" aria-pressed="true" title="Hits shove Off-center's point, Wind gusts on the bass, and Glitch slide fires on every hit"><span class="led"></span>Off-center, Wind, Glitch</button>
+              <button class="chip" data-map="asym" aria-pressed="true" title="Every hit shoves Off-center's tunnel somewhere new, and the bass pushes it further out"><span class="led"></span>Off-center</button>
             </div>
           </div>
           <div class="ctl" id="sndDetailRow">
@@ -1528,9 +1528,9 @@
             <dt>Color chase</dt><dd>Red is pushed around by the green parts of the picture, green by the blue and blue by the red. Each color slides along the outlines of the one pushing it, so the three chase each other round and split into rainbow fringes and braids.</dd>
             <dt>Restless</dt><dd>Only what's changing gets to stay. Each frame the picture is compared with the one before, and the parts that held still fade away, leaving a shimmer of moving outlines. Lovely with the camera.</dd>
             <dt>Fractal fold</dt><dd>Instead of a plain zoom, every frame folds the picture through the formula behind the Mandelbrot set, so anything that comes in grows into fractal flowers, spirals and lace. The fractal slowly changes shape by itself; Zoom and Spin reshape it too. Low mixes a little of it into the usual tunnel.</dd>
-            <dt>Off-center</dt><dd>Zoom and Spin normally turn around the middle, so the picture is balanced. With Off-center they turn around a point that slowly wanders off to one side and back, so the tunnel leans and drifts. Higher goes further from the middle. If there's no Zoom or Spin, it pulls in gently by itself. With React to sound, every hit shoves the point somewhere new and it drifts back.</dd>
-            <dt>Wind</dt><dd>The picture is carried one way, in uneven gusts with a little curl, so it streams off like smoke in a breeze. Pick the way it blows with the arrows; the middle button makes the wind slowly turn round. With React to sound it gusts harder on the bass and the beats.</dd>
-            <dt>Glitch slide</dt><dd>Strips of the picture slip sideways with a flash of rainbow (the colors split apart and a rainbow sweeps across the strip, with bright rainbow seams along its edges), then jerk back into place in a few small steps. Higher slips more often, further and in wider strips. It's laid over the loop's finished picture, so it never builds up or whites out. With React to sound, every hit of the music sets some off: great for marking the song's hits.</dd>
+            <dt>Off-center</dt><dd>Zoom and Spin normally turn around the middle, so the picture is balanced. With Off-center they turn around a point that wanders around the screen, and the input is drawn there too, so the whole tunnel sits off to one side and drifts. Higher goes further from the middle. If there's no Zoom or Spin, it pulls in gently by itself. With React to sound, the music drives it: every hit shoves it somewhere new (it drifts back), and the bass pushes it further out.</dd>
+            <dt>Wind</dt><dd>The picture is carried one way, in uneven gusts with a little curl, so it streams off like smoke in a breeze. Pick the way it blows with the arrows; the middle button makes the wind slowly turn round.</dd>
+            <dt>Glitch slide</dt><dd>Like a broken video signal. The picture is cut into strips of uneven height that change many times a second: strips slip sideways, their red and blue tear apart, some smear into long horizontal streaks, and colors are pushed to hot cyan, yellow, magenta and deep violet, with thin bright scan lines flickering across. It comes in bursts; at the top of the slider it never stops. It's laid over the loop's finished picture, so it never builds up or whites out. It doesn't follow the music.</dd>
             <dt>Crystal</dt><dd>The picture cracks into ten pieces centred on its brightest spots. Each piece turns and zooms in its own way, like a broken mirror, and the cracks move as the light does.</dd>
           </dl></div>
           <div class="g-card"><h3>Shapes</h3><dl>

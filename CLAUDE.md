@@ -190,3 +190,9 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    and packs 96 steps into `uSnd` (vec4[24]); `sndLineAmp(k)` → `uSndAmp`. Wave (per-stretch thirds pushed along the curve's
    normals, `reach` grows its boxes), Shape (one wave all the way round), Bars (a wave through the bar, sharp core) and Topo map
    (`topoHum`, the land ripples). Input size swells half as much meanwhile. `python3 tests/sound_lines_check.py` (about 2 minutes).
+4z. **Lopsided effects** (Effects › Lopsided, `ASYM` = offc / wind / glitch in js/app.js; `asymTick`): **Off-center** moves Zoom/Spin's
+   point (`uCenter`, added to Chase's) and draws the inputs there too (`uInOff`, 0.8 of it); only it follows the music (React to sound ›
+   Off-center, `snd.map.asym`: hits shove it, `L.offKick`; the bass widens its wander). **Wind** (`uWind`, `windDir` 0-7 eighths from →
+   anticlockwise, 8 Turning; compass buttons `#windDir`) and **Glitch slide** (FS_FINAL `uGlitch`: strips worked out from the clock, a
+   broken-video look; final pass only, so no white-outs) don't react to sound. Check with `--shot "Leaning tunnel"`, `"Smoke on the wind"`,
+   `"Rainbow glitch"`, `"Marbled|glitch=90"`.

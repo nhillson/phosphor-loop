@@ -141,6 +141,7 @@ uniform float uPush, uPushTurn;   // Pushed by the other loop: the same idea, bu
 uniform float uDye, uDyeTurn;     // Dyed by the other loop: how far its bright parts turn this loop's colors this frame
 uniform float uLook;              // Look-up: how far each spot moves towards the place its own color points at, this frame
 uniform vec2 uCenter;             // Chase: the point Zoom and Spin turn around (the middle unless Chase moves it)
+uniform vec2 uInOff;              // Off-center: how far the inputs are drawn from the middle, following its point
 uniform vec3 uWind;               // Wind: which way it blows (x, y) and how far it carries the picture this frame (z)
 uniform float uChroma, uChromaTurn;   // Color chase: how far each color is pushed by another this frame, and a slow turn
 uniform float uRestless;          // Restless: how much of what holds still fades this frame
@@ -1028,7 +1029,7 @@ void main() {
   // The inputs. Topo map's small pass (see topoPre in js/app.js) runs only this far: the brightness of the
   // input it traces, unfolded and unsplit, on a picture a quarter the size
   bool pre = uTopoPre > 0;
-  vec2 ps = pre ? p : pf + vec2(uSplitOff * side, 0.0);
+  vec2 ps = pre ? p : pf + vec2(uSplitOff * side, 0.0) - uInOff;
   gSpecA = 0.0; gCutA = -1.0;
   vec3 s;
   if (uTopoSrc >= 0 && !pre) s = topoTraced(ps);
@@ -1173,10 +1174,8 @@ uniform float uPxK, uTime;
 uniform float uMirror, uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;   // Mirror (uMirror 0 and uMirrorT 1: none)
 uniform float uSplit, uWarp, uChroma, uChromaTurn;
 uniform float uN, uFresh, uHalftone;
-// Glitch slide: up to 6 bands of the picture slipped sideways, each its middle (0 bottom to 1 top), half its
-// height, how far it slips (a part of the width) and how strong it still is (1 just hit, 0 settled back)
-uniform vec4 uGlB[6];
-uniform float uGlN;
+// Glitch slide: how strong (0 off, 1 full); it's worked out here from the clock, so it never stops moving
+uniform float uGlitch;
 out vec4 o;
 ${COMMON}
 ${MIRROR}
@@ -1206,28 +1205,46 @@ void main() {
   if (uWarp > 0.0) p += uWarp * vec2(sin(p.y * 7.0 + uTime * 1.1 + sin(p.x * 3.0 + uTime * 0.5)),
                                      cos(p.x * 7.0 - uTime * 0.9 + sin(p.y * 2.0 - uTime * 0.3)));
   vec2 st = p / vec2(asp, 1.0) + 0.5;
-  // Glitch slide: which bands this spot is in, how far they slip it, and how near it is to a band's edge
-  float gs = 0.0, gk = 0.0, ge = 0.0;
-  for (int i = 0; i < 6; i++) {
-    if (float(i) >= uGlN) break;
-    vec4 b = uGlB[i];
-    float d = abs(uv.y - b.x);
-    if (d < b.y) {
-      gs += b.z; gk = max(gk, b.w);
-      ge = max(ge, b.w * smoothstep(b.y - 3.0 * px.y * uPxK, b.y, d));
-    }
+  // Glitch slide, like a broken video signal: the picture is cut into strips of uneven height that change many
+  // times a second. Bursts come and go (always on at the top of the slider). In a strip the picture slips
+  // sideways, its red and blue tear apart, some strips smear into long horizontal streaks, and colors are pushed
+  // to hot cyan, yellow, magenta and violet; thin bright scan lines flicker across the whole picture.
+  float gk = 0.0, gsm = 0.0, gsp = 0.0, gid = 0.0, gthin = 0.0;
+  if (uGlitch > 0.0) {
+    float tq = floor(uTime * 12.0), tf = floor(uTime * 24.0);
+    float burst = step(hash(vec2(floor(uTime * 2.5), 9.3)), 0.2 + 0.85 * uGlitch);
+    float n = 5.0 + floor(hash(vec2(tq, 3.1)) * 16.0);
+    float bi = floor(uv.y * n + hash(vec2(tq, 7.7)) * 2.0);
+    float hb = hash(vec2(bi, tq)), h2 = hash(vec2(bi + 17.0, tq)), h3 = hash(vec2(bi + 41.0, tq));
+    float on = burst * step(hb, 0.15 + 0.65 * uGlitch);
+    float fi = floor(uv.y * uSim.y / (2.0 * uPxK));
+    float hf = hash(vec2(fi, tf));
+    gthin = burst * step(hf, 0.03 + 0.12 * uGlitch);
+    float slip = on * (h2 - 0.5) * 0.45 * uGlitch + gthin * (hash(vec2(fi, tf + 3.0)) - 0.5) * 0.08;
+    gk = max(on, gthin * 0.8);
+    gsm = on * step(0.55, h3);                       // this strip smears into streaks
+    gsp = (0.012 + 0.05 * uGlitch) * (0.4 + h3);    // how far red and blue tear apart
+    gid = gthin > 0.0 && on < 0.5 ? hash(vec2(fi, tf + 7.0)) * 0.8 : hash(vec2(bi + 5.0, tq + 1.0));   // picks the strip's color
+    st.x = fract(st.x + slip);
+    // A smeared strip stretches the picture out from one spot, so each row becomes a long streak of its color
+    if (gsm > 0.0) { float anchor = hash(vec2(floor(uv.y * uSim.y / (3.0 * uPxK)), tq + 9.0)); st.x = fract(anchor + (st.x - anchor) * 0.04); }
   }
-  if (gk > 0.0) st.x = fract(st.x + gs);
   vec4 now = texture(uNow, st);
   vec3 c = uChroma > 0.0 ? chromaOnce(st, asp) : now.rgb;
   if (gk > 0.0) {
-    // Inside a band: red and blue slip further apart, then a rainbow sweeps across it (keeping its light and
-    // dark), with bright rainbow seams along its edges
-    c = vec3(texture(uNow, vec2(fract(st.x + gs * 0.4), st.y)).r, c.g, texture(uNow, vec2(fract(st.x - gs * 0.4), st.y)).b);
-    vec3 bow = hsv(fract(uv.x * 1.3 + uv.y * 0.6 - uTime * 0.5 + gs * 3.0), 0.9, 1.0);
+    c = vec3(texture(uNow, vec2(fract(st.x + gsp), st.y)).r, c.g, texture(uNow, vec2(fract(st.x - gsp), st.y)).b);
+    // The hot colors of a broken signal: cyan, yellow, magenta, violet, white
+    vec3 hot = gid < 0.25 ? vec3(0.1, 1.0, 1.0) : gid < 0.45 ? vec3(1.0, 1.0, 0.15) : gid < 0.65 ? vec3(1.0, 0.15, 0.9)
+             : gid < 0.85 ? vec3(0.35, 0.1, 0.75) : vec3(1.0);
     float lum = dot(c, vec3(0.299, 0.587, 0.114));
-    c = mix(c, bow * (0.25 + 1.1 * lum), 0.6 * gk);
-    c = clamp(c + bow * ge * 0.7, 0.0, 1.0);
+    vec3 punch = clamp((c - 0.5) * 1.8 + 0.5, 0.0, 1.0);
+    // Each strip is flooded with its hot color, brighter where the picture is lit, so even dark parts show
+    // colored blocks; the picture's own split colors show through on top
+    vec3 bow = hot * (0.3 + 1.1 * smoothstep(0.02, 0.6, lum));
+    c = mix(c, clamp(max(bow, punch * 0.9) , 0.0, 1.0), gk * 0.85);
+    // Thin scan lines light up in a hot color
+    c = mix(c, hot, gthin * 0.75 * (1.0 - gsm));
+    c = clamp(c, 0.0, 1.0);
   }
   if (uN > 0.0) {
     c = 0.5 * c + 0.125 * (texture(uNow, st + vec2(px.x, 0.0)).rgb + texture(uNow, st - vec2(px.x, 0.0)).rgb +

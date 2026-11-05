@@ -256,7 +256,7 @@ function crystalStart() {
 function mkLoop() {
   const d = loopDefaults();
   return { tgt: { ...d }, cur: { ...d }, base: { ...d }, rt: null, front: 0, tw: null,
-           probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], offAt: [0, 0], offKick: [0, 0], offPh: Math.random() * 100, glB: [], offBeats: 0, windAng: Math.random() * 6.28, cells: crystalStart(), breath: { z: 0, s: 1 } };
+           probe: null, chaseAt: [0, 0], chaseGoal: [0, 0], offAt: [0, 0], offKick: [0, 0], offPh: Math.random() * 100, offBeats: 0, windAng: Math.random() * 6.28, cells: crystalStart(), breath: { z: 0, s: 1 } };
 }
 const loops = { A: mkLoop(), B: mkLoop(), C: mkLoop(), D: mkLoop() };
 // Mirror transitions: a new mirror (from its buttons, Autopilot, Surprise or a recipe) glides in over MIRROR_SECS
@@ -8380,8 +8380,8 @@ const RECIPES = [
     how: 'WAVE · WIND 65 TO THE RIGHT · TRAILS 93 · BLUR',
     sw: 'linear-gradient(90deg,#0b0614 0 20%,#4a2a6a 40%,#c7a3ff 55%,#2a1450 75%,#0b0614)',
     patch: { A: { in1: 'wave', form: 3, zoom: 0, spin: 0, trails: 93, color: 18, blur: 0.12, wind: 65, windDir: 0 } } },
-  { name: 'Rainbow glitch', after: 'Turn on React to sound and play some music: strips slip on every hit.',
-    text: 'Strips of the picture slip sideways in a flash of rainbow and jerk back into place, like a screen losing its sync.',
+  { name: 'Rainbow glitch', after: 'Slide Glitch slide up for more strips, more often.',
+    text: 'Strips of the picture tear, slip and smear into hot cyan, yellow and magenta streaks, like a broken video signal.',
     how: 'BARS · GLITCH SLIDE 85 · ZOOM IN 15 · TRAILS 88',
     sw: 'linear-gradient(0deg,#0b0614 0 30%,#ff3b3b 30% 33%,#ffd23b 33% 36%,#3bff9a 36% 39%,#3b8bff 39% 42%,#0b0614 42% 70%,#c43bff 70% 72%,#0b0614 72%)',
     patch: { A: { in1: 'bars', zoom: 15, spin: 0, trails: 88, color: 20, glitch: 85 } } },
@@ -11230,8 +11230,8 @@ function finalPass(k) {
   const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
   const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
   const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
-  const glN = c.glitch > 0.5 || L.glB.length ? glitchBands(L) : 0;
-  const on = L.rt && loopOn(k) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005 || glN > 0);
+  const glitch = calmCap(clamp(c.glitch, 0, 100), 40) / 100;
+  const on = L.rt && loopOn(k) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005 || glitch > 0.005);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
   if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
@@ -11252,8 +11252,7 @@ function finalPass(k) {
   set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   set1f(finalProg, 'uN', steps);
   set1f(finalProg, 'uHalftone', dots);
-  set1f(finalProg, 'uGlN', glN);
-  if (glN) { const lg = U(finalProg, 'uGlB[0]'); if (lg) gl.uniform4fv(lg, glData); }
+  set1f(finalProg, 'uGlitch', glitch > 0.005 ? glitch : 0);
   // Posterize has no steps of its own to remember on its first frame
   set1f(finalProg, 'uFresh', pz.stepped ? 0 : 1);
   pz.stepped = steps > 0;
@@ -11648,28 +11647,27 @@ function lifeTick(k, dt) {
 }
 /* ================= lopsided effects: Off-center, Wind and Glitch slide ================= */
 const WIND_K = 0.0055;   // how far Wind at 100 carries the picture in one frame (screen heights)
-const GLITCH_MAX = 6;    // bands slipped at once (FS_FINAL's uGlB)
-// Once a frame for loop k: Off-center's turning point wanders along a slow uneven path, up to about a fifth of
-// the screen from the middle (each loop its own way), and a hit of the music shoves it somewhere new, from where
-// it drifts back. Wind's direction comes round to the one picked (or keeps turning). Glitch slide's bands slip
-// sideways at random, more often higher up the slider, and on hits; each snaps out and eases back in under a second.
+// Once a frame for loop k: Off-center's turning point wanders along a slow uneven path, up to well over a third of
+// the way to the edges (each loop its own way), and the input is drawn there too, so the whole tunnel sits off to
+// one side. With React to sound, each hit of the music shoves the point somewhere new, from where it drifts back,
+// and the bass pushes it further out. Wind's direction comes round to the one picked (or keeps turning). Only
+// Off-center follows the music; Wind and Glitch slide don't.
 function asymTick(k, dt, hitK, newHit) {
   const L = loops[k], c = L.cur, t = L.tgt;
   const oc = clamp(c.offc, 0, 100) / 100;
-  L.offPh += dt * (0.1 + 0.22 * oc);
-  const ph = L.offPh, R = 0.42 * oc;
+  L.offPh += dt * (0.18 + 0.45 * oc);
+  const ph = L.offPh, R = 0.85 * oc * (1 + hitK * snd.env.low * 0.6);
   const gx = R * simAspect * 0.5 * (0.7 * Math.sin(ph) + 0.3 * Math.sin(ph * 2.31 + 1)),
         gy = R * 0.5 * (0.7 * Math.sin(ph * 1.37 + 1.3) + 0.3 * Math.sin(ph * 2.9 + 4));
   const e = 1 - Math.exp(-dt * 2);
   L.offAt[0] += (gx - L.offAt[0]) * e;
   L.offAt[1] += (gy - L.offAt[1]) * e;
   if (newHit && hitK > 0 && oc > 0.005) {
-    const a = Math.random() * Math.PI * 2, m = R * (0.5 + 0.5 * Math.random()) * Math.min(1.5, hitK);
-    L.offKick = [Math.cos(a) * m * simAspect * 0.6, Math.sin(a) * m * 0.6];
+    const a = Math.random() * Math.PI * 2, m = 0.6 * oc * (0.6 + 0.4 * Math.random()) * Math.min(1.5, hitK);
+    L.offKick = [Math.cos(a) * m * simAspect * 0.5, Math.sin(a) * m * 0.5];
   }
-  const kd = Math.exp(-dt * 2.5);
+  const kd = Math.exp(-dt * 2.2);
   L.offKick[0] *= kd; L.offKick[1] *= kd;
-  // Wind's direction, the short way round
   const dir = t.windDir ?? 0;
   if (dir >= 8) L.windAng += dt * 0.15;
   else {
@@ -11677,29 +11675,6 @@ function asymTick(k, dt, hitK, newHit) {
     d = Math.atan2(Math.sin(d), Math.cos(d));
     L.windAng += d * (1 - Math.exp(-dt * 3));
   }
-  // Glitch slide's bands
-  const gk = calmCap(clamp(c.glitch, 0, 100), 40) / 100;
-  for (const b of L.glB) b.age += dt;
-  L.glB = L.glB.filter((b) => b.age < b.life);
-  if (gk > 0.005) {
-    let n = Math.random() < dt * (0.3 + 3.5 * Math.pow(gk, 1.4)) ? 1 : 0;
-    if (newHit && hitK > 0) n += 1 + Math.floor(Math.random() * (1 + 2 * gk));
-    while (n-- > 0 && L.glB.length < GLITCH_MAX) {
-      L.glB.push({ y: Math.random(), h: 0.006 + Math.pow(Math.random(), 2) * (0.03 + 0.09 * gk),
-                   off: (Math.random() < 0.5 ? -1 : 1) * (0.02 + Math.random() * 0.22 * gk), age: 0, life: 0.25 + Math.random() * 0.65 });
-    }
-  }
-}
-// Glitch slide's bands as FS_FINAL reads them: each band holds its slip for a moment, then eases back in a few
-// small jerky steps rather than a smooth slide, like a picture losing and finding its sync
-const glData = new Float32Array(GLITCH_MAX * 4);
-function glitchBands(L) {
-  glData.fill(0);
-  L.glB.forEach((b, i) => {
-    const u = clamp(b.age / b.life, 0, 1), back = u < 0.3 ? 0 : Math.floor(((u - 0.3) / 0.7) * 5) / 5;
-    glData.set([b.y, b.h, b.off * (1 - back), 1 - u * u], i * 4);
-  });
-  return L.glB.length;
 }
 function runLoop(k, xf, brush, f) {
   const L = loops[k], c = L.cur, t = L.tgt;
@@ -11800,10 +11775,12 @@ function runLoop(k, xf, brush, f) {
   const goal = ch > 0.005 ? L.chaseGoal : [0, 0], ce = 1 - Math.exp(-(f / 60) * (ch > 0.005 ? 0.25 + 1.6 * ch : 1.5));
   L.chaseAt[0] += (goal[0] - L.chaseAt[0]) * ce;
   L.chaseAt[1] += (goal[1] - L.chaseAt[1]) * ce;
-  set2f(fbProg, 'uCenter', L.chaseAt[0] + L.offAt[0] + L.offKick[0], L.chaseAt[1] + L.offAt[1] + L.offKick[1]);
+  const ox = L.offAt[0] + L.offKick[0], oy = L.offAt[1] + L.offKick[1];
+  set2f(fbProg, 'uCenter', L.chaseAt[0] + ox, L.chaseAt[1] + oy);
+  set2f(fbProg, 'uInOff', ox * 0.8, oy * 0.8);
   // Wind: how far it carries the picture this frame, in gusts with the bass and beats
   const wn = calmCap(clamp(c.wind, 0, 100), 50) / 100;
-  const wk = wn > 0.005 ? Math.pow(wn, 1.2) * WIND_K * f * (1 + hitK * (snd.env.low * 1.0 + snd.env.beat * 2.0)) : 0;
+  const wk = wn > 0.005 ? Math.pow(wn, 1.2) * WIND_K * f : 0;
   set3f(fbProg, 'uWind', Math.cos(L.windAng), Math.sin(L.windAng), wk);
   set1f(fbProg, 'uChroma', t.chromaFinal ? 0 : Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
   set1f(fbProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
