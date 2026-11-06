@@ -425,6 +425,7 @@
             <button data-src="topo" aria-pressed="false" title="Glowing contour lines, like a hiking map, over land that reshapes itself as the view drifts">Topo map</button>
             <button data-src="life" aria-pressed="false" title="Conway’s Game of Life: glowing cells that are born, live and die by a few simple rules">Life</button>
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
+            <button data-src="texture" aria-pressed="false" title="Moving patterns made fresh every frame: marble, cells, ripples, moiré, maze, silk, honeycomb and spiral, in slowly turning colors">Textures</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -515,6 +516,23 @@
               </div>
             </div>
             <span class="hint">The beam goes round every 4 seconds and the storms drift and change as it sweeps. Input size shrinks the circle to show more of the map.</span>
+          </div>
+
+          <div class="dev" id="row-texture" hidden>
+            <div class="ctl">
+              <span class="lbl" id="texStyleLbl" title="Which pattern Textures draws. Autopilot picks one at random each time it brings Textures in.">Style</span>
+              <div class="seg seg-4" id="texStyle" role="group" aria-labelledby="texStyleLbl">
+                <button data-v="0" aria-pressed="true" title="Veins of light through slowly stirred marble">Marble</button>
+                <button data-v="1" aria-pressed="false" title="Glowing cell walls that wander and reshape">Cells</button>
+                <button data-v="2" aria-pressed="false" title="Rings from drifting drops, crossing each other">Ripples</button>
+                <button data-v="3" aria-pressed="false" title="Two fine screens turning against each other, beating into big shapes">Moiré</button>
+                <button data-v="4" aria-pressed="false" title="A maze of arcs that flip now and then, with light running along them">Maze</button>
+                <button data-v="5" aria-pressed="false" title="Bands of color following a slow current">Silk</button>
+                <button data-v="6" aria-pressed="false" title="Honeycomb lights pulsing out from the middle">Hex</button>
+                <button data-v="7" aria-pressed="false" title="A spiral winding forever inwards">Spiral</button>
+              </div>
+            </div>
+            <span class="hint">Input size zooms the pattern in and out. With React to sound › Sound on lines, the music's wave ripples through it.</span>
           </div>
 
           <div class="dev" id="row-text" hidden>

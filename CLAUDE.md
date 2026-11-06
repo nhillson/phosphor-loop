@@ -211,3 +211,9 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    how each was made in `genart/CREDITS.txt`; `gen`, `gens` (a LiveSource video player per loop), `genPick`, `genTick` in js/app.js).
    It has no picture slot of its own (16-texture limit): its frames go through the Picture's slot (`loopUsesGen`, `SRC_ID.genart = 4`).
    The service worker leaves the .webm files to the network (Range requests). `python3 tests/genart_check.py` (about 2.5 minutes).
+4z4. **Textures** (Inputs › Textures, Auragen-style patterns made on the graphics card each frame: `seedTexture` in js/shaders.js,
+   `SRC_ID.texture = 36`, `uTexStyle` from the loop's `texStyle` 0-7 = Marble, Cells, Ripples, Moiré, Maze, Silk, Hex, Spiral,
+   `TEX_STYLES` / `texLook` in js/app.js; in SOFT_SRC and LINE_INPUTS, so Soft trails and Sound on lines work on it; Autopilot
+   picks a random style). Check with `--shot "Liquid marble|click=#texStyle [data-v='N']"`. In this workspace check.py's
+   Playwright clicks (Surprise, Autopilot...) can time out on the page as it was before Textures too; pressing them from a page
+   script (`element.click()`) passes.

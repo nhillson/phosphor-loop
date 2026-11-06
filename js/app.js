@@ -159,16 +159,16 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, texture: 36 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', texture: 'Textures',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
-const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
+const SOFT_SRC = [...LIVE, 'genart', 'texture'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false,
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, texStyle: 0,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
@@ -1071,7 +1071,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['texture', 'Textures'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1187,6 +1187,15 @@ $$('#radarShows button').forEach((b) => b.addEventListener('click', () => {
   loops[edit].tgt.radarWind = b.dataset.v === '1';
   syncUI();
   showOSD('DOPPLER RADAR', b.dataset.v === '1' ? 'WIND' : 'RAIN');
+}));
+// Textures: which of its eight patterns
+const TEX_STYLES = ['Marble', 'Cells', 'Ripples', 'Moiré', 'Maze', 'Silk', 'Hex', 'Spiral'];
+const texLook = () => Math.floor(Math.random() * TEX_STYLES.length);
+$$('#texStyle button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.texStyle = +b.dataset.v;
+  syncUI();
+  showOSD('TEXTURES', TEX_STYLES[+b.dataset.v].toUpperCase());
 }));
 // A random Life look for Surprise and Autopilot: mostly medium, now and then big or small cells, slow or fast
 function lifeLook() {
@@ -1468,11 +1477,12 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'texture']) $('#row-' + s).hidden = !usesHere(s);
   if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
   syncTopoUI(t);
   syncLifeUI(t);
   $$('#radarShows button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.radarWind)));
+  $$('#texStyle button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.texStyle ?? 0))));
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
@@ -1549,7 +1559,7 @@ function patchLoop(k, p, force) {
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
-    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind']) n[q] = p[q] ?? L.tgt[q]; }
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'texStyle']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
@@ -1582,10 +1592,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'texture', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3,
+    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, texStyle: texLook(),
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2303,7 +2313,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'texture' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -2354,7 +2364,7 @@ function neutralLoop(k) {
   const L = loops[k], src = L.tgt.in1;
   patchLoop(k, {
     in1: src, in2: 'none', blend: 50, motion: false,
-    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'loop'].includes(src) ? 100 : 50,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'texture', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic,
   }, true);
@@ -2388,7 +2398,7 @@ window.__plNeutralLoop = neutralLoop;   // for tests/neutral_loop_check.py
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'texStyle', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2493,7 +2503,7 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['texture', 'Textures'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -3263,7 +3273,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'texture', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3457,6 +3467,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'topo') sc.size = Math.round(rnd(55, 100));
     if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (sc.in1 === 'radar') sc.size = Math.round(rnd(75, 100));
+    if (sc.in1 === 'texture') sc.size = Math.round(rnd(55, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
@@ -3464,6 +3475,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'topo' || sc.in2 === 'topo') && !isPinned('in1', k)) sc.topoPic = Math.random() < 0.35;
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
+    if ((sc.in1 === 'texture' || sc.in2 === 'texture') && !isPinned('in1', k)) sc.texStyle = texLook();
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
       if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
@@ -3522,7 +3534,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'texStyle', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -4488,6 +4500,7 @@ function tasteFeats(L) {
   if (L.in1 === 'topo' || L.in2 === 'topo') f.push('topo:' + (L.topoPic ? 'picture' : 'land'));
   if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
+  if (L.in1 === 'texture' || L.in2 === 'texture') f.push('tex:' + (L.texStyle ?? 0));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -8955,6 +8968,11 @@ const RECIPES = [
     how: 'DOPPLER RADAR · TRAILS 60',
     sw: 'conic-gradient(from 20deg,#06210f 0 70%,#3dff70 72%,#02060a 73%),radial-gradient(circle at 60% 40%,#fd0000 0 6%,#fdf802 7% 13%,#01c501 14% 24%,transparent 25%)',
     patch: { A: { in1: 'radar', radarWind: false, size: 100, zoom: 0, spin: 0, trails: 60, color: 0, blur: 0 } } },
+  { name: 'Liquid marble', after: 'Under Textures, try the other seven styles: Cells, Ripples, Moiré, Maze, Silk, Hex and Spiral.',
+    text: 'Veins of light running through slowly stirred marble, its colors turning, with soft echoes spinning out of it.',
+    how: 'TEXTURES · MARBLE · ZOOM 12 · SPIN 8 · TRAILS 82',
+    sw: 'radial-gradient(ellipse at 30% 40%,#c04dff 0 6%,transparent 18%),repeating-linear-gradient(115deg,#07040c 0 9px,#2fd0ff 9px 10px,#07040c 10px 17px,#ff9a3d 17px 18px)',
+    patch: { A: { in1: 'texture', texStyle: 0, size: 100, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0 } } },
   { name: 'Terrain flight', after: 'It wanders from canyon to ridges to plains about once a minute.',
     text: 'A flight over land made of triangles, every edge a glowing wire: teal valleys, gold peaks and a low sun under a starry nebula.',
     how: 'TERRAIN · EVERYTHING ELSE OFF',
@@ -11516,7 +11534,7 @@ function computeWave(t, form, reach = 0) {
 // reacts gets it at its own strength (uSndAmp, 0: plain lines).
 const SND_N = 96;
 const sndLine = new Float32Array(SND_N);
-const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo'];
+const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo', 'texture'];
 const usesLines = (t) => LINE_INPUTS.includes(t.in1) || LINE_INPUTS.includes(t.in2);
 let sndTD = null, sndLP = null, sndAgc = 0.05, sndLineOn = false;
 function sndLinesTick(dt) {
@@ -12383,6 +12401,7 @@ function runLoop(k, xf, brush, f) {
   // Topo map tracing another input draws only its lines: the input it traces isn't shown as itself
   set1f(fbProg, 'uLifeT', lifeTex ? L.life.acc : 0);
   set1f(fbProg, 'uRadarWind', t.radarWind ? 1 : 0);
+  set1i(fbProg, 'uTexStyle', (t.texStyle ?? 0) | 0);
   if (traced) {
     const slot = t.in1 === 'topo' ? 2 : 1, fly = slot === 1 ? flyTex1 : flyTex2;
     set1i(fbProg, 'uIn1', SRC_ID.topo);
