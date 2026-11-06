@@ -104,6 +104,17 @@ def main():
             _, lit = c.picture('genart-plain')
             if lit < 3:
                 problems.append(f'Generative art is black (brightness {lit:.1f})')
+            # Soft trails sits under Trails for Generative art, and switches
+            if pg.evaluate("document.querySelector('#softCtl').hidden"):
+                problems.append('Soft trails is hidden with Generative art')
+            was = pg.evaluate("document.querySelector('#soft').getAttribute('aria-pressed')")
+            pg.evaluate(CLICK, '#soft')
+            c.wait_frames(3, 'Soft trails')
+            now = pg.evaluate("document.querySelector('#soft').getAttribute('aria-pressed')")
+            pg.evaluate(CLICK, '#soft')
+            print(f'  Soft trails {was} -> {now}')
+            if was == now:
+                problems.append('Soft trails did not switch')
             # ◀ ▶ and Shuffle
             first = st()['loops']['A']['at']
             pg.evaluate(CLICK, '#genNext')
@@ -155,6 +166,8 @@ def main():
             c.wait_frames(5, 'loop B on Wave')
             if st()['loops']['B']['playing']:
                 problems.append("loop B's player kept playing after it switched to Wave")
+            if not pg.evaluate("document.querySelector('#softCtl').hidden"):
+                problems.append('Soft trails shows on Wave, where it does nothing')
             pg.evaluate(CLICK, '#tabA')
             c.wait_frames(3, 'tab A')
             # Picture on the same loop takes the slot back (the nature picture, not the generative art)

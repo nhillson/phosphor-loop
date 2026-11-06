@@ -164,6 +164,7 @@ const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks'
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
+const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
@@ -1505,6 +1506,7 @@ function syncUI() {
   $('#dyeHint').textContent = `Loop ${otherK}’s picture soaks color into this one: wherever loop ${otherK} is bright, this loop’s colors keep turning, so loop ${otherK}’s shapes show up as rainbow bands.`;
   $('#motionCtl').hidden = !LIVE.some(usesHere);
   $('#motion').setAttribute('aria-pressed', String(!!t.motion));
+  $('#softCtl').hidden = !SOFT_SRC.some(usesHere);
   $('#soft').setAttribute('aria-pressed', String(t.soft !== false));
   $('#subjectCtl').hidden = !SUBJECT_SRC.some(usesHere);
   $$('#subject button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.subject === (t.subject || 'off'))));
@@ -12405,7 +12407,7 @@ function runLoop(k, xf, brush, f) {
     if (lc) gl.uniform3fv(lc, inkCol);
   }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
-  set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
+  set1f(fbProg, 'uSoft', t.soft !== false && (SOFT_SRC.includes(t.in1) || SOFT_SRC.includes(t.in2)) ? 1 : 0);
   set1f(fbProg, 'uAspPic', kPic.aspect);
   set1f(fbProg, 'uAspVid', kVid.aspect);
   set1f(fbProg, 'uVidCut', kVid.sticker ? 1 : 0);
