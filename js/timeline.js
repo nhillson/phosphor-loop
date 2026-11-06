@@ -31,7 +31,9 @@
       return o;
     };
     const pic = one(m.pic, ['nature', 'own', 'card']), vid = one(m.vid, ['own', 'clip']);
-    return pic || vid ? { ...(pic ? { pic } : {}), ...(vid ? { vid } : {}) } : null;
+    // Which generative art the block had (by its file name in the genart folder)
+    const gen = m.gen && typeof m.gen.f === 'string' && /^[a-z0-9-]{1,80}$/.test(m.gen.f) ? { f: m.gen.f, name: String(m.gen.name || m.gen.f).slice(0, 120) } : null;
+    return pic || vid || gen ? { ...(pic ? { pic } : {}), ...(vid ? { vid } : {}), ...(gen ? { gen } : {}) } : null;
   }
   function cleanGrade(g) {
     if (!g || typeof g !== 'object') return null;

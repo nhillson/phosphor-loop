@@ -1,0 +1,31 @@
+Moving generative art for Phosphor Loop's Generative art input.
+
+Every piece here was drawn by the genart command-line tool (cmd/genart) from
+jdxyw/generativeart, https://github.com/jdxyw/generativeart
+Copyright (c) 2021 jdxyw, MIT License.
+
+Each is 1024 x 1024, one full cycle of the generator's animation (240 frames), so it loops without a seam; for the
+three whose cycle doesn't quite close (Droste spiral, Kleinian circles, Bismuth crystal) the last 2 seconds are blended into
+the first (180 frames).
+The frames were made with the command below, then put together at 30 frames a second (8 seconds) as VP9 WebM:
+  ffmpeg -i x.apng -vf "setpts=N/30/TB,format=yuv420p" -r 30 -c:v libvpx-vp9 -crf 42 -b:v 0 x.webm
+
+lissajousribbon-1.webm  genart render -art lissajousribbon -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+lissajousribbon-2.webm  genart render -art lissajousribbon -random -seed 37 -w 1024 -h 1024 -frames 240 -out x.apng
+analyticalcurlsilk-1.webm  genart render -art analyticalcurlsilk -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+gyroidsurface-1.webm  genart render -art gyroidsurface -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+gyroidsurface-2.webm  genart render -art gyroidsurface -random -seed 37 -set scaleFreq=6.5,thickness=0.06 -w 1024 -h 1024 -frames 240 -out x.apng
+schottkykleinian-1.webm  genart render -art schottkykleinian -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+gaborwaveinterference-1.webm  genart render -art gaborwaveinterference -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+gaborwaveinterference-2.webm  genart render -art gaborwaveinterference -random -seed 37 -set vortexPoles=4,gaborFreq=4.5 -w 1024 -h 1024 -frames 240 -out x.apng
+stainedrosewindow-1.webm  genart render -art stainedrosewindow -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+stainedrosewindow-2.webm  genart render -art stainedrosewindow -random -seed 37 -set petals=8,rings=4 -w 1024 -h 1024 -frames 240 -out x.apng
+newtonbasin-1.webm  genart render -art newtonbasin -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+newtonbasin-2.webm  genart render -art newtonbasin -random -seed 37 -set degree=4 -w 1024 -h 1024 -frames 240 -out x.apng
+dunhuangapsara-1.webm  genart render -art dunhuangapsara -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+escherdrostegallery-1.webm  genart render -art escherdrostegallery -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+bismuthhopper-1.webm  genart render -art bismuthhopper -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+cyclicautomata-1.webm  genart render -art cyclicautomata -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+abyssalcurrents-1.webm  genart render -art abyssalcurrents -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+basaltcolumns-1.webm  genart render -art basaltcolumns -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng
+wireframeterrain-1.webm  genart render -art wireframeterrain -random -seed 11 -w 1024 -h 1024 -frames 240 -out x.apng

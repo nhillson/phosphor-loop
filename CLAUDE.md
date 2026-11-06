@@ -206,3 +206,8 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    corridor's surfaces, newest at the far point (which follows Off-center's `offAt`), slit drifting across. Autopilot brings them in less
    often (`apFx`). Time warp's shapes (`TIME_SHAPES` = 7): + Diagonal, Rings, Sweep (needs `uTime`), By brightness. Check with
    `--shot "Light corridor"`, `--shot "Photo finish"`, `--shot "Prism|time=90|click=#timeShape [data-tshape='4']"`.
+4z3. **Generative art** (Inputs › Generative art: moving pieces made with jdxyw/generativeart's `genart` tool, in `genart/` as
+   `<f>.webm` 1024 square seamless loops, `<f>-t.jpg` still and `<f>-p.webm` 240 px gallery preview, listed in `genart/pictures.json`,
+   how each was made in `genart/CREDITS.txt`; `gen`, `gens` (a LiveSource video player per loop), `genPick`, `genTick` in js/app.js).
+   It has no picture slot of its own (16-texture limit): its frames go through the Picture's slot (`loopUsesGen`, `SRC_ID.genart = 4`).
+   The service worker leaves the .webm files to the network (Range requests). `python3 tests/genart_check.py` (about 2.5 minutes).

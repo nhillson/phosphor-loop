@@ -431,6 +431,7 @@
             <button data-src="fractal" aria-pressed="false" title="Fly and zoom through six 3D fractals">Fractals</button>
             <button data-src="none" aria-pressed="false">Nothing</button>
             <button data-src="picture" aria-pressed="false">Picture</button>
+            <button data-src="genart" aria-pressed="false" title="Moving generative art: turning ribbons and solids, mandalas whose colours wheel round, and flowing fields, each a seamless loop">Generative art</button>
             <button data-src="video" aria-pressed="false">Video</button>
             <button data-src="camera" aria-pressed="false" data-device>Camera</button>
             <button data-src="screen" aria-pressed="false" data-device>Screen</button>
@@ -549,6 +550,17 @@
               <button class="btn small" id="pickPic">Your own picture…</button>
               <button class="btn small" id="useCard" hidden>Back to test card</button>
             </div>
+          </div>
+
+          <div class="dev" id="row-genart" hidden>
+            <span class="dev-status">Generative art: <b id="genName">one is on its way</b></span>
+            <div class="dev-actions">
+              <button class="btn small" id="genOpen" title="See them all, by kind: Glow, Mandalas, Fields">Gallery…</button>
+              <button class="btn small" id="genShuffle" title="Another piece at random">Shuffle</button>
+              <button class="btn small nat-step" id="genPrev" title="Previous one" aria-label="Previous generative art">◀</button>
+              <button class="btn small nat-step" id="genNext" title="Next one" aria-label="Next generative art">▶</button>
+            </div>
+            <span class="hint">Each piece moves by itself in an endless loop. Zoom, Spin and Mirror build on that movement; Input size 50 fits the whole piece on screen.</span>
           </div>
 
           <div class="dev" id="row-video" hidden>
@@ -1529,6 +1541,7 @@
             <dt>Spectrograph</dt><dd>A picture of the sound itself: low sounds at the bottom, high sounds at the top, and the louder, the brighter. Pick Computer sound or Microphone right under it (it uses the same listening as React to sound). Scrolling slides to the left like a heart monitor; Round ripples out from the middle and makes great tunnels with Zoom. It sets its own brightness, so quiet rooms and loud music both show up. To see only the spectrograph without the picture pumping to the beat, set Amount under React to sound to 0.</dd>
             <dt>Text</dt><dd>Your own words: a name, a title, the venue. Type them in the Your text box that opens under the inputs and they change as you type. Bold, Outline, Classic and Typewriter change the lettering. Long text wraps onto two or three lines by itself. Presets keep the words they were saved with.</dd>
             <dt>Picture</dt><dd>Nature pictures… opens a gallery of about 500 photos: sea life, birds, bugs, frogs, flowers, mushrooms and more. Tap one to feed it in. ◀ ▶ and Shuffle flip through the kind you chose without opening the gallery. Your own picture… loads a file of yours.</dd>
+            <dt>Generative art</dt><dd>Moving pieces made with the genart tool, each an endless 8-second loop, in three kinds: Glow (ribbons, silk and solids turning on dark), Mandalas (round patterns whose colours wheel round) and Fields (moving patterns that fill the whole screen). Gallery… shows them all moving; ◀ ▶ and Shuffle flip through the kind you chose. Each loop plays its own, and Autopilot brings in a different one every few looks.</dd>
             <dt>Video</dt><dd>Your own file, or a clip from your clip library. Video gets a tape deck: scrub, skip 5 seconds, change speed, and repeat a section. <b>✂ Save clip…</b> (under the picture, while a video is in) opens a trim strip: drag the handles, or Start here / End here as it plays, then save that part into your clip library (Phosphor Clips 1.7 or later, running on the same computer), into any folder, with tags and the whole look on screen. <b>Clip library…</b> (and the sequencer’s <b>+ Add clip…</b>) opens the explorer: folders on the left, search names and tags, click a clip to tag, rename, move or save effects to it, and use it <b>with its effects</b> or as <b>just the clip</b>. From the sequencer, <b>Add with its whole look</b> puts a block on every loop the look used, with its mixing and Color grading. <b>Copy to a drive…</b> takes clips with their tags and effects to another computer: drop the folders into its library folder.</dd>
             <dt>Camera, Screen, Phone</dt><dd>Live pictures. Screen shares this tab so the screen films itself. Phone shows a QR code to scan.</dd>
             <dt>Loop A’s or Loop B’s picture</dt><dd>Feed the other loop straight in as an input. At Input size 50 it lines up with the screen.</dd>
@@ -1674,6 +1687,22 @@
       <p class="hint" id="natHint">Tap a picture to feed it into loop A.</p>
       <div class="nat-grid" id="natGrid"></div>
       <p class="hint nat-foot">Photos from Wikimedia Commons’ Featured Pictures, free to use. Each one names its photographer when you pick it; the full list is in <a href="nature/CREDITS.txt" target="_blank" rel="noopener">nature/CREDITS.txt</a>.</p>
+    </div>
+  </div>
+
+  <div class="guide nat" id="gen" role="dialog" aria-modal="true" aria-labelledby="genTitle" hidden>
+    <div class="guide-bar nat-bar">
+      <span class="wordmark" id="genTitle">Generative art</span>
+      <span class="nat-count" id="genCount"></span>
+      <span class="spacer"></span>
+      <button class="btn small" id="genShuffle2">Shuffle</button>
+      <button class="btn small" id="genClose">Close</button>
+      <div class="chips nat-tabs" id="genTabs" role="group" aria-label="Kinds of generative art"></div>
+    </div>
+    <div class="nat-inner">
+      <p class="hint" id="genHint">Tap a piece to feed it into loop A.</p>
+      <div class="nat-grid" id="genGrid"></div>
+      <p class="hint nat-foot">Made with <a href="https://github.com/jdxyw/generativeart" target="_blank" rel="noopener">jdxyw/generativeart</a> (MIT license). Each one is named after the generator that drew it; how each was made is in <a href="genart/CREDITS.txt" target="_blank" rel="noopener">genart/CREDITS.txt</a>.</p>
     </div>
   </div>
 

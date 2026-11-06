@@ -157,12 +157,12 @@ const swOK = !inArtifact && 'serviceWorker' in navigator &&
   (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
+const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
                  sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar',
-                    sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
+                    sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const DEVICE = ['camera', 'screen', 'phone'];
 
@@ -804,6 +804,11 @@ const pics = Object.fromEntries(KEYS.map((k) => [k, {
   key: k, tex: makeSourceTex(), aspect: 4 / 3, media: { ...CARD }, handle: null, own: false, ask: 0, seqAsk: 0, cur: -1, credit: '',
 }]));
 let pic = pics.A;
+// The Generative art input's moving piece: a looping video player per loop (at: which piece, f: its file name). It has
+// no picture slot of its own in the drawing program (see UNITS): its frames are handed to the program in the Picture's
+// slot, for loops that use Generative art and not Picture
+const gens = Object.fromEntries(KEYS.map((k) => [k, Object.assign(new LiveSource(false), { key: k, aspect: 1, at: -1, f: '', ask: 0, want: '' })]));
+const loopUsesGen = (t) => (t.in1 === 'genart' || t.in2 === 'genart') && t.in1 !== 'picture' && t.in2 !== 'picture';
 const loopUsesPic = (k) => { const t = loops[k].tgt; return t.in1 === 'picture' || t.in2 === 'picture'; };
 function makeTestCard() {
   const c = document.createElement('canvas');
@@ -1066,7 +1071,7 @@ const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
   const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
-                ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
+                ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
     const o = document.createElement('option');
@@ -1307,7 +1312,8 @@ function chooseSource(slot, src) {
   if (src === 'video' && !anyVid()) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
-  if (src !== 'none' && src !== 'picture' && src !== 'video') hideTip();
+  if (src === 'genart') genEnsure(gens[edit]);
+  if (src !== 'none' && src !== 'picture' && src !== 'genart' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
   if (src !== 'none') showOSD(`INPUT ${edit}`, src === 'loop' ? `LOOP ${otherLoop(edit)}` : SRC_LABEL[src].toUpperCase());
@@ -1461,7 +1467,8 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar']) $('#row-' + s).hidden = !usesHere(s);
+  if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
   syncTopoUI(t);
   syncLifeUI(t);
   $$('#radarShows button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.radarWind)));
@@ -1573,10 +1580,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'picture', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3,
+    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3,
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2284,7 +2291,7 @@ function writeSpec(dt) {
 
 /* ================= neutral ================= */
 // Back to a plain monitor: loop A shows its current input filling the screen, with every effect off
-const IMAGE_INPUTS = ['picture', 'video', 'camera', 'screen', 'phone'];
+const IMAGE_INPUTS = ['picture', 'genart', 'video', 'camera', 'screen', 'phone'];
 function neutral() {
   if (MV.play && !MV.applying) movesStop(true);
   if (ap.on) setAutopilot(false, true);
@@ -2485,7 +2492,7 @@ const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
 const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['text', 'Text'], ['spectro', 'Spectrograph'],
-  ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
+  ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
 const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true, cueLive: false, cueFade: false, cueFadeSecs: 2,
@@ -3254,7 +3261,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'picture', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3442,7 +3449,7 @@ function apFinish(sc, k, keep) {
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
   if (!keep || keep !== sc.in1) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
-    if ((sc.in1 === 'bars' || sc.in1 === 'picture') && sc.size == null) sc.size = 50;
+    if ((sc.in1 === 'bars' || sc.in1 === 'picture' || sc.in1 === 'genart') && sc.size == null) sc.size = 50;
     if (sc.in1 === 'text') sc.size = Math.round(rnd(70, 100));
     if (sc.in1 === 'patchwork') sc.size = Math.round(rnd(55, 100));
     if (sc.in1 === 'topo') sc.size = Math.round(rnd(55, 100));
@@ -3715,6 +3722,7 @@ function apStep(now, onBeat) {
   }
   vidsPlay();
   apPicture(came);
+  apGenart(came);
   apClip(came);
   apTypeArt(came, now);
   syncUI();
@@ -3918,6 +3926,8 @@ const extraKeys = () => [...activeKeys(), ...(cue.scout ? ['C'] : []), ...cue.mi
 const extraUses = (name) => (cue.scout ? ['C', ...cue.mini.values()] : []).some((k) => loops[k].tgt.in1 === name || loops[k].tgt.in2 === name);
 // The looks tried out of sight use the picture of the loop they'll go on
 function picOf(k) { return extraLoop(k) ? pics[cue.deck ? cue.deck.k : cueHidden()] : pics[k]; }
+const genTarget = (k) => (extraLoop(k) ? gens[cue.deck ? cue.deck.k : cueHidden()] : gens[k]);
+function genOf(k) { const g = genTarget(k); genEnsure(g); return g; }
 // A small copy of one picture into a box of a target (any box of it, unlike copyInto)
 const tileProg = program(`#version 300 es
 precision highp float;
@@ -6232,7 +6242,7 @@ function openNat() {
     natBuild();
     natFilter();
     natMark();
-    $('#natHint').textContent = `Tap a picture to feed it into loop ${edit}. ◀ ▶ and Shuffle beside Picture flip through this kind without opening the gallery.`;
+    $('#natHint').textContent = `Tap a piece to feed it into loop ${edit}. ◀ ▶ and Shuffle beside Picture flip through this kind without opening the gallery.`;
     natReturn = document.activeElement;
     natDlg.hidden = false;
     document.documentElement.style.overflow = 'hidden';
@@ -6267,6 +6277,223 @@ natDlg.addEventListener('keydown', (e) => {
     if (last) natList().then((all) => { const i = all.findIndex((p) => p.f === last); if (i >= 0 && to.cur < 0 && !to.own) natPick(i, true, to); }).catch(() => {});
   }
 })();
+
+/* ================= generative art ================= */
+// The Generative art input: moving pieces made with jdxyw/generativeart's genart tool (its animated generators:
+// turning ribbons and solids, mandalas whose colours wheel round, flowing fields), each an 8-second seamless loop,
+// 1024 square, as WebM (<f>.webm, a still <f>-t.jpg and a small moving preview <f>-p.webm for the gallery).
+// Listed in genart/pictures.json, loaded like the nature pictures: the list when first needed, previews when the
+// gallery opens, the full video when it's picked. Each loop plays its own (gens), kept for next time; a loop
+// switched to Generative art with none yet gets its last one, or one at random.
+const gen = { pics: null, cats: [], cat: 'all', req: null, built: false };
+const GEN_TAB_KEY = 'phosphor-genart-tab', GEN_LAST_KEY = 'phosphor-genart-last-';
+try { gen.cat = localStorage.getItem(GEN_TAB_KEY) || 'all'; } catch (_) { /* fine, start on All */ }
+const genDlg = $('#gen'), genGrid = $('#genGrid'), genTabs = $('#genTabs');
+function genList() {
+  if (!gen.req) {
+    gen.req = fetch('genart/pictures.json')
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => {
+        gen.pics = d.pics || [];
+        gen.cats = d.cats || [];
+        if (gen.cat !== 'all' && !gen.cats.some((c) => c.id === gen.cat)) gen.cat = 'all';
+        return gen.pics;
+      })
+      .catch((e) => { gen.req = null; throw e; });
+  }
+  return gen.req;
+}
+function genNoList() { toast('The generative art couldn’t be loaded. It needs internet.'); }
+function genKind() {
+  const all = gen.pics.map((_, i) => i);
+  return gen.cat === 'all' ? all : all.filter((i) => gen.pics[i].c === gen.cat);
+}
+// A loop that shows Generative art with no picture yet gets its last one, or one at random from the kind chosen
+function genEnsure(g) {
+  if (g.at >= 0 || g.want) return;
+  g.want = '…';
+  genList().then(() => {
+    if (g.at >= 0) return;
+    let last = null;
+    try { last = localStorage.getItem(GEN_LAST_KEY + g.key); } catch (_) { /* fine */ }
+    const at = gen.pics.findIndex((p) => p.f === last);
+    const shown = genKind();
+    genPick(at >= 0 ? at : pick(shown.length ? shown : gen.pics.map((_, i) => i)), true, g);
+  }).catch(() => { g.want = ''; });
+}
+function genMark() {
+  const g = gens[edit];
+  for (const t of genGrid.children) t.setAttribute('aria-current', String(+t.dataset.i === g.at));
+}
+function genPanelSync() {
+  const g = gens[edit], p = gen.pics && gen.pics[g.at];
+  $('#genName').textContent = p ? p.n : 'one is on its way';
+  genMark();
+}
+// quiet: put the piece in place without switching the loop to it. to: the loop's own player (the edited loop's unless
+// said). The new video takes over once its first frame is in, so the old one plays until then (never a black gap).
+function genPick(i, quiet, to = gens[edit]) {
+  const p = gen.pics && gen.pics[i];
+  if (!p) return;
+  const ask = ++to.ask;
+  to.want = p.f;
+  const v = mkVideo();
+  v.loop = true;
+  v.preload = 'auto';
+  v.addEventListener('loadeddata', () => {
+    if (ask !== to.ask) { v.removeAttribute('src'); v.load(); return; }   // a later pick overtook this one
+    to.attach(v);
+    to.aspect = v.videoWidth / v.videoHeight || 1;
+    to.at = i; to.f = p.f;
+    try { localStorage.setItem(GEN_LAST_KEY + to.key, p.f); } catch (_) { /* fine */ }
+    if (to === gens[edit]) genPanelSync();
+    genPlay();
+    if (quiet) return;
+    const t = loops[to.key].tgt, was = t.in1 === 'genart' || t.in2 === 'genart';
+    feedInto('genart', to.key);
+    if (was) showOSD('GENERATIVE ART', p.n.toUpperCase());
+  }, { once: true });
+  v.addEventListener('error', () => {
+    if (ask !== to.ask) return;
+    to.want = to.f;
+    if (!quiet) toast('That piece couldn’t be loaded. It needs internet.');
+  }, { once: true });
+  v.src = `genart/${p.f}.webm`;
+}
+// A player plays only while a loop shows it (on screen, or Cue mode's scout and previews); the others wait paused
+function genShown(g) { return extraKeys().some((k) => loopUsesGen(loops[k].tgt) && genTarget(k) === g); }
+function genPlay() {
+  for (const g of Object.values(gens)) {
+    if (!g.video) continue;
+    const used = genShown(g);
+    if (used && g.video.paused) g.video.play().catch(() => {});
+    if (!used && !g.video.paused) g.video.pause();
+  }
+}
+function genTick() {
+  genPlay();
+  for (const g of Object.values(gens)) if (g.video && !g.video.paused) g.update();
+}
+// By name (the sequencer's blocks keep which one they had)
+function genPickF(f, K) {
+  const to = gens[K];
+  if (!to || to.f === f) return;
+  genList().then(() => { const i = gen.pics.findIndex((p) => p.f === f); if (i >= 0) genPick(i, true, to); }).catch(() => {});
+}
+function genStep(dir) {
+  genList().then(() => {
+    const shown = genKind();
+    if (!shown.length) return;
+    const at = shown.indexOf(gens[edit].at);
+    const next = at < 0 ? (dir > 0 ? 0 : shown.length - 1) : (at + dir + shown.length) % shown.length;
+    genPick(shown[next]);
+  }).catch(genNoList);
+}
+function genShuffle() {
+  genList().then(() => {
+    const shown = genKind().filter((i) => i !== gens[edit].at);
+    if (shown.length) genPick(pick(shown));
+  }).catch(genNoList);
+}
+function genBuild() {
+  if (gen.built) return;
+  gen.built = true;
+  const count = (id) => (id === 'all' ? gen.pics.length : gen.pics.filter((p) => p.c === id).length);
+  for (const c of [{ id: 'all', n: 'All' }, ...gen.cats]) {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.cat = c.id;
+    if (c.d) b.title = c.d;
+    b.innerHTML = `${escapeHTML(c.n)} <b>${count(c.id)}</b>`;
+    b.addEventListener('click', () => {
+      gen.cat = c.id;
+      try { localStorage.setItem(GEN_TAB_KEY, c.id); } catch (_) { /* fine */ }
+      genFilter();
+      genDlg.scrollTop = 0;
+    });
+    genTabs.appendChild(b);
+  }
+  const frag = document.createDocumentFragment();
+  gen.pics.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.className = 'nat-tile';
+    b.dataset.i = i;
+    b.title = p.n;
+    b.innerHTML = `<video muted loop playsinline preload="none" poster="genart/${escapeHTML(p.f)}-t.jpg" src="genart/${escapeHTML(p.f)}-p.webm"></video><span>${escapeHTML(p.n)}</span>`;
+    frag.appendChild(b);
+  });
+  genGrid.appendChild(frag);
+  genGrid.addEventListener('click', (e) => {
+    const t = e.target.closest('.nat-tile');
+    if (!t) return;
+    genPick(+t.dataset.i);
+    closeGen();
+  });
+}
+function genFilter() {
+  for (const b of genTabs.children) b.setAttribute('aria-pressed', String(b.dataset.cat === gen.cat));
+  for (const t of genGrid.children) t.hidden = gen.cat !== 'all' && gen.pics[+t.dataset.i].c !== gen.cat;
+  genTiles();
+  $('#genCount').textContent = `${genKind().length} PIECES`;
+}
+// The gallery's small previews move while it's open (only the kind shown)
+function genTiles() {
+  for (const t of genGrid.children) {
+    const v = t.querySelector('video');
+    if (!v) continue;
+    if (!genDlg.hidden && !t.hidden) v.play().catch(() => {}); else v.pause();
+  }
+}
+let genReturn = null;
+function openGen() {
+  genList().then(() => {
+    if (!genDlg.hidden) return;
+    genBuild();
+    genFilter();
+    genMark();
+    $('#genHint').textContent = `Tap a piece to feed it into loop ${edit}. ◀ ▶ and Shuffle beside Generative art flip through this kind without opening the gallery.`;
+    genReturn = document.activeElement;
+    genDlg.hidden = false;
+    genTiles();
+    document.documentElement.style.overflow = 'hidden';
+    const cur = genGrid.querySelector('[aria-current="true"]:not([hidden])');
+    if (cur) cur.scrollIntoView({ block: 'center' }); else genDlg.scrollTop = 0;
+    (cur || $('#genClose')).focus({ preventScroll: true });
+  }).catch(genNoList);
+}
+function closeGen() {
+  if (genDlg.hidden) return;
+  genDlg.hidden = true;
+  genTiles();
+  document.documentElement.style.overflow = '';
+  if (genReturn && genReturn.focus) genReturn.focus();
+}
+$('#genOpen').addEventListener('click', openGen);
+$('#genClose').addEventListener('click', closeGen);
+$('#genShuffle').addEventListener('click', genShuffle);
+$('#genShuffle2').addEventListener('click', () => { genShuffle(); closeGen(); });
+$('#genPrev').addEventListener('click', () => genStep(-1));
+$('#genNext').addEventListener('click', () => genStep(1));
+genDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeGen(); }
+  else e.stopPropagation(); // keep the keys from firing while browsing
+});
+// For tests/genart_check.py
+window.__plGen = () => ({ count: gen.pics ? gen.pics.length : 0, edit,
+  loops: Object.fromEntries(KEYS.map((k) => [k, { f: gens[k].f, at: gens[k].at, frames: gens[k].frames, playing: !!gens[k].video && !gens[k].video.paused, t: gens[k].video ? gens[k].video.currentTime : null, aspect: gens[k].aspect, in1: loops[k].tgt.in1, in2: loops[k].tgt.in2 }])) });
+// Autopilot: every 1 to 3 new looks that use Generative art, a different one (from the kind chosen in the gallery)
+function apGenart(k) {
+  const to = k && gens[k];
+  if (!to || !apAllowed('genart')) return;
+  const t = loops[k].tgt;
+  if (t.in1 !== 'genart' && t.in2 !== 'genart') return;
+  if (to.apIn > 1) { to.apIn--; return; }
+  to.apIn = apPicGap();
+  genList().then(() => {
+    const shown = genKind().filter((i) => i !== to.at);
+    if (shown.length) genPick(pick(shown), true, to);
+  }).catch(() => { /* keep the one there is */ });
+}
 
 /* ================= clip library (Phosphor Clips) ================= */
 // Phosphor Clips (the Windows app in clip-app/ on the clip-app branch) grabs videos and GIFs from the web, trims them
@@ -8608,6 +8835,16 @@ const RECIPES = [
     how: 'PICTURE · CORRIDOR 100 TUNNEL · TRAILS 60',
     sw: 'conic-gradient(from 0deg at 50% 50%,#ff3b8b,#3bd1ff,#ffd23b,#8b1ab8,#3bff9a,#ff3b8b)',
     patch: { A: { in1: 'picture', size: 100, zoom: 6, spin: 0, trails: 60, color: 8, corr: 100, corrShape: 0, scanSpeed: 1 } } },
+  { name: 'Glow tunnel', after: 'Press ◀ ▶ or Shuffle under Generative art: every piece makes a different tunnel.',
+    text: 'A moving piece of generative art pulled into an endless tunnel of light, turning slowly as it rushes towards you.',
+    how: 'GENERATIVE ART · ZOOM IN 28 · SPIN 12 · TRAILS 90',
+    sw: 'radial-gradient(circle,#fff6e0 0 4%,#ff5fc8 10%,#7a2cff 22%,#1b0b3a 40%,#05030c 70%)',
+    patch: { A: { in1: 'genart', size: 50, zoom: 28, spin: 12, trails: 90, color: 8, blur: 0 } } },
+  { name: 'Mandala bloom', after: 'Pick something from the Mandalas kind in the Generative art gallery, or try a 4-way or 8-way mirror.',
+    text: 'A moving piece of generative art folded into a six-way kaleidoscope that blooms towards you and turns.',
+    how: 'GENERATIVE ART · MIRROR 6 WAY · ZOOM IN 10 · SPIN 18 · TRAILS 86',
+    sw: 'conic-gradient(from 0deg,#ffb347,#2ec4b6,#e71d73,#ffb347,#2ec4b6,#e71d73,#ffb347)',
+    patch: { A: { in1: 'genart', size: 85, zoom: 10, spin: 18, trails: 86, color: 12, mirror: 6, blur: 0 } } },
   { name: 'Photo finish', after: 'Try it with the camera and wave your arms through the line.',
     text: 'One line of the picture is recorded over and over and spread out to the left, so anything moving through it is drawn out across the screen.',
     how: 'WAVE · PHOTO FINISH 100 · TRAILS 80',
@@ -12057,7 +12294,8 @@ function runLoop(k, xf, brush, f) {
   const [V, C, S, P] = [kVid, cam, scr, pho].map((s) => s.texFor(t.subject));
   // The see-through surround only once every live input here has its outlines; until then the plain picture
   set1f(fbProg, 'uCutout', subjectOn(t) && [t.in1, t.in2].every((n) => !liveFor(k, n) || liveFor(k, n).texFor(t.subject) !== liveFor(k, n)) ? 1 : 0);
-  const texs = [src.tex, otherTex, picOf(k).tex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
+  const kGen = loopUsesGen(t), kPic = kGen ? genOf(k) : picOf(k);
+  const texs = [src.tex, otherTex, kGen ? kPic.cur : kPic.tex, V.cur, V.prev, C.cur, C.prev, S.cur, S.prev, P.cur, P.prev, otherPrev,
                 (lifeIn1 && lifeTex) || flyTex1 || src.tex, (lifeIn2 && lifeTex) || flyTex2 || src.tex, specTex, textTex];
   texs.forEach((tx, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, tx); });
   if (t.in1 === 'spectro' || t.in2 === 'spectro') {
@@ -12168,7 +12406,7 @@ function runLoop(k, xf, brush, f) {
   }
   set1f(fbProg, 'uMotion', t.motion ? 1 : 0);
   set1f(fbProg, 'uSoft', t.soft !== false && (LIVE.includes(t.in1) || LIVE.includes(t.in2)) ? 1 : 0);
-  set1f(fbProg, 'uAspPic', picOf(k).aspect);
+  set1f(fbProg, 'uAspPic', kPic.aspect);
   set1f(fbProg, 'uAspVid', kVid.aspect);
   set1f(fbProg, 'uVidCut', kVid.sticker ? 1 : 0);
   set1f(fbProg, 'uAspCam', cam.aspect);
@@ -13235,9 +13473,11 @@ function seqCaptureMedia(look, K = edit) {
     m.vid = { ...sv.media, at: r1(sv.video?.currentTime || 0) };
     if (m.vid.kind === 'own') seqKeepPointer(m.vid.name, sv.handle);
   }
-  return m.pic || m.vid ? m : null;
+  if (usesIn(look, 'genart') && gens[K]?.f) m.gen = { f: gens[K].f, name: gen.pics?.[gens[K].at]?.n || gens[K].f };
+  return m.pic || m.vid || m.gen ? m : null;
 }
-const seqMediaSig = (look, K = edit) => JSON.stringify([usesIn(look, 'picture') ? (pics[K] || pic).media : null, usesIn(look, 'video') ? vidFor(K).media : null]);
+const seqMediaSig = (look, K = edit) => JSON.stringify([usesIn(look, 'picture') ? (pics[K] || pic).media : null, usesIn(look, 'video') ? vidFor(K).media : null,
+  ...(usesIn(look, 'genart') ? [gens[K]?.f || null] : [])]);
 // Opens a file of your own for a block: through its pointer where there is one (and you've let the page open it this
 // visit), or else the file of that name you picked this visit. Throws with what to do when neither works.
 async function seqOwnFile(name, what) {
@@ -13396,6 +13636,7 @@ function seqShowMedia(bl, K) {
   const m = bl?.media;
   if (!m) return;
   if (m.pic && !sameMedia(m.pic, pics[K].media)) seqLoadPic(m.pic, K);
+  if (m.gen?.f) genPickF(m.gen.f, K);
   if (m.vid) {
     const to = vids[K];
     seq.ownsVideo = true;
@@ -13781,7 +14022,7 @@ function seqInspector() {
   const bl = seq.rec.blocks.find((b) => b.id === seq.selId), el = $('#seqInsp');
   if (!bl) { el.textContent = 'Click a block to select it. Right-click a block or an empty spot for copy, paste, change over time and delete.'; return; }
   el.innerHTML = `<b>${escapeHTML(seqName(bl))}</b><button type="button" class="chip" data-editlook="1" title="Put this block's look on its loop to change it with the ordinary controls, then Save to block">Edit this look…</button><span>Track ${bl.track + 1} · loop ${KEYS[bl.track]} · ${escapeHTML(inputName(bl.look.in1))}</span><span>${fmtSeq(bl.a, true)} – ${fmtSeq(bl.b, true)} (${r1(bl.b - bl.a)} s)</span><span>Fade in ${r1(bl.fin)} s · fade out ${r1(bl.fout)} s</span>` +
-    (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
+    (bl.media ? `<span>${[bl.media.pic && `Picture: ${escapeHTML(bl.media.pic.name)}`, bl.media.vid && `Video: ${escapeHTML(bl.media.vid.name)}`, bl.media.gen && `Generative art: ${escapeHTML(bl.media.gen.name)}`].filter(Boolean).join(' · ')}</span>` : '') +
     (bl.autos.length ? `<span class="seq-lines">Editing ${bl.autos.map((au, i) => `<button type="button" class="chip" data-line="${i}" aria-pressed="${i === seqLineAct(bl)}" title="Bring ${SEQ_NAME[au.key] || au.key}’s line to the front to edit it"><span class="led" style="background:${seqLineColor(i)}"></span>${SEQ_NAME[au.key] || au.key}</button>`).join('')}</span>` : '<span>No changes over time · right-click to add one</span>');
   // Its Color grading
   {
@@ -14512,6 +14753,7 @@ function frame() {
   calmK += ((streamCalm ? 1 : 0) - calmK) * (1 - Math.exp(-dt * 0.8));
 
   for (const name of ['camera', 'screen', 'phone']) { const s = LIVE_SRC[name]; if (s.video && uses(name)) s.update(subjectModes(name)); }
+  genTick();
   // Each video player that a loop on screen shows, with the Subject silhouette looks of the loops showing it
   for (const s of Object.values(vids)) {
     if (!s.video) continue;
