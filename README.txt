@@ -261,6 +261,23 @@ TIPS
     bright were high ground (pick that input under Second input; with none,
     it traces the other loop's picture). The traced input isn't shown
     itself, only its contour lines. Guide recipe: "Contour drift".
+  - Patch: build your own moving picture from layers, like Auragen. Pick
+    Patch under Inputs and a stack of layers appears, read top to bottom:
+      Patterns  draw (Noise, Stripes, Rings, Checker, Dots, Shape, Gradient,
+                Cells, Marble, Ripples, Moire, Maze, Silk, Hex, Spiral) and lie
+                over the layers above by their Blend (Add, Screen, Multiply,
+                Difference, Lighten, Darken, Replace, Mask) and Opacity
+      Effects   bend and fold everything above (Zoom & turn, Kaleido, Mirror,
+                Tile, Warp, Swirl, Ripple, Wrap round, Pixelate, Blur, Edges)
+      Colors    recolor it (Gradient colors, Hue shift, Brightness & contrast,
+                Posterize, Invert)
+    Click a layer's name to open it; arrows move it, the dot switches it off,
+    the cross removes it. "+ Add a layer" puts a new one above the colors.
+    Each fader's little menu hands it to a mover (Slow wave, Fast wave, Music,
+    Bass, Beat hits) with How far it may move. Load a patch offers 10
+    ready-made ones; type a name and press Save to keep yours (in this
+    browser). Input size zooms the patterns. Autopilot and Surprise bring in
+    ready-made and saved patches, nudged a little. Guide recipe: "Liquid marble".
   - Text: press Text under "What feeds the loop" and type your own words in
     the Your text box (a band name, a title, the venue). They change as you
     type. Bold, Outline, Classic and Typewriter change the lettering, and long

@@ -159,16 +159,16 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, texture: 36 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, patch: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', texture: 'Textures',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', patch: 'Patch',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
-const SOFT_SRC = [...LIVE, 'genart', 'texture'];   // inputs Soft trails works on (moving pictures that would pile up into white)
+const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, texStyle: 0,
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null,
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
@@ -1071,7 +1071,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['texture', 'Textures'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patch (your layers)'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1187,15 +1187,6 @@ $$('#radarShows button').forEach((b) => b.addEventListener('click', () => {
   loops[edit].tgt.radarWind = b.dataset.v === '1';
   syncUI();
   showOSD('DOPPLER RADAR', b.dataset.v === '1' ? 'WIND' : 'RAIN');
-}));
-// Textures: which of its eight patterns
-const TEX_STYLES = ['Marble', 'Cells', 'Ripples', 'Moiré', 'Maze', 'Silk', 'Hex', 'Spiral'];
-const texLook = () => Math.floor(Math.random() * TEX_STYLES.length);
-$$('#texStyle button').forEach((b) => b.addEventListener('click', () => {
-  takeOver('in1');
-  loops[edit].tgt.texStyle = +b.dataset.v;
-  syncUI();
-  showOSD('TEXTURES', TEX_STYLES[+b.dataset.v].toUpperCase());
 }));
 // A random Life look for Surprise and Autopilot: mostly medium, now and then big or small cells, slow or fast
 function lifeLook() {
@@ -1323,6 +1314,7 @@ function chooseSource(slot, src) {
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src === 'genart') genEnsure(gens[edit]);
+  if (src === 'patch' && !PhosphorPatch.clean(loops[edit].tgt.patch)) loops[edit].tgt.patch = PhosphorPatch.copy(PhosphorPatch.STARTERS[0]);
   if (src !== 'none' && src !== 'picture' && src !== 'genart' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
@@ -1477,12 +1469,12 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'texture']) $('#row-' + s).hidden = !usesHere(s);
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'patch']) $('#row-' + s).hidden = !usesHere(s);
   if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
   syncTopoUI(t);
   syncLifeUI(t);
   $$('#radarShows button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.radarWind)));
-  $$('#texStyle button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.texStyle ?? 0))));
+  if (usesHere('patch') && patchUIReady) patchSync();
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
@@ -1559,7 +1551,7 @@ function patchLoop(k, p, force) {
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
-    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'texStyle']) n[q] = p[q] ?? L.tgt[q]; }
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
@@ -1592,10 +1584,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'texture', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, texStyle: texLook(),
+    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, patch: randomPatch(),
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2313,7 +2305,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'texture' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -2364,7 +2356,7 @@ function neutralLoop(k) {
   const L = loops[k], src = L.tgt.in1;
   patchLoop(k, {
     in1: src, in2: 'none', blend: 50, motion: false,
-    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'texture', 'loop'].includes(src) ? 100 : 50,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic,
   }, true);
@@ -2398,7 +2390,7 @@ window.__plNeutralLoop = neutralLoop;   // for tests/neutral_loop_check.py
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'texStyle', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2503,7 +2495,7 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['texture', 'Textures'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patches'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -3273,7 +3265,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'texture', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3467,7 +3459,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'topo') sc.size = Math.round(rnd(55, 100));
     if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (sc.in1 === 'radar') sc.size = Math.round(rnd(75, 100));
-    if (sc.in1 === 'texture') sc.size = Math.round(rnd(55, 100));
+    if (sc.in1 === 'patch') sc.size = Math.round(rnd(70, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
@@ -3475,7 +3467,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'topo' || sc.in2 === 'topo') && !isPinned('in1', k)) sc.topoPic = Math.random() < 0.35;
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
-    if ((sc.in1 === 'texture' || sc.in2 === 'texture') && !isPinned('in1', k)) sc.texStyle = texLook();
+    if ((sc.in1 === 'patch' || sc.in2 === 'patch') && !isPinned('in1', k)) sc.patch = randomPatch();
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
       if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
@@ -3534,7 +3526,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'texStyle', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -4500,7 +4492,7 @@ function tasteFeats(L) {
   if (L.in1 === 'topo' || L.in2 === 'topo') f.push('topo:' + (L.topoPic ? 'picture' : 'land'));
   if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
-  if (L.in1 === 'texture' || L.in2 === 'texture') f.push('tex:' + (L.texStyle ?? 0));
+  if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -8968,11 +8960,11 @@ const RECIPES = [
     how: 'DOPPLER RADAR · TRAILS 60',
     sw: 'conic-gradient(from 20deg,#06210f 0 70%,#3dff70 72%,#02060a 73%),radial-gradient(circle at 60% 40%,#fd0000 0 6%,#fdf802 7% 13%,#01c501 14% 24%,transparent 25%)',
     patch: { A: { in1: 'radar', radarWind: false, size: 100, zoom: 0, spin: 0, trails: 60, color: 0, blur: 0 } } },
-  { name: 'Liquid marble', after: 'Under Textures, try the other seven styles: Cells, Ripples, Moiré, Maze, Silk, Hex and Spiral.',
-    text: 'Veins of light running through slowly stirred marble, its colors turning, with soft echoes spinning out of it.',
-    how: 'TEXTURES · MARBLE · ZOOM 12 · SPIN 8 · TRAILS 82',
+  { name: 'Liquid marble', after: 'Under Patch, open a layer to change it, give any fader a mover (a wave, the music, the bass), or add layers of your own.',
+    text: 'A Patch of three layers: Marble veins, a Swirl that slowly tightens and loosens, and Gradient colors, with soft echoes spinning out of it.',
+    how: 'PATCH · LIQUID MARBLE · ZOOM 12 · SPIN 8 · TRAILS 82',
     sw: 'radial-gradient(ellipse at 30% 40%,#c04dff 0 6%,transparent 18%),repeating-linear-gradient(115deg,#07040c 0 9px,#2fd0ff 9px 10px,#07040c 10px 17px,#ff9a3d 17px 18px)',
-    patch: { A: { in1: 'texture', texStyle: 0, size: 100, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0 } } },
+    patch: { A: { in1: 'patch', patch: PhosphorPatch.copy(PhosphorPatch.STARTERS[0]), size: 100, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0 } } },
   { name: 'Terrain flight', after: 'It wanders from canyon to ridges to plains about once a minute.',
     text: 'A flight over land made of triangles, every edge a glowing wire: teal valleys, gold peaks and a low sun under a starry nebula.',
     how: 'TERRAIN · EVERYTHING ELSE OFF',
@@ -11534,7 +11526,7 @@ function computeWave(t, form, reach = 0) {
 // reacts gets it at its own strength (uSndAmp, 0: plain lines).
 const SND_N = 96;
 const sndLine = new Float32Array(SND_N);
-const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo', 'texture'];
+const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo'];
 const usesLines = (t) => LINE_INPUTS.includes(t.in1) || LINE_INPUTS.includes(t.in2);
 let sndTD = null, sndLP = null, sndAgc = 0.05, sndLineOn = false;
 function sndLinesTick(dt) {
@@ -11957,6 +11949,265 @@ function drawExt(k, sc, scale) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip);
   return extTex[k];
 }
+/* ================= Patch: a stack of layers (the Patch input; layers and shader in js/patch.js) ================= */
+// Each loop's patch lives in its settings (tgt.patch) and is drawn, one pass a layer, into a pair of pictures of
+// its own, read by the loop through the slot a 3D world would use. A patch is never changed in place: every edit
+// makes a fresh copy (patchSet), so copies of a loop's settings (presets, Autopilot's base, the sequencer) stay as they were.
+var PATCH = window.PhosphorPatch;
+let patchProg = null;
+try { patchProg = program(PATCH.FS); } catch (e) { console.error('Patch layers could not start', e); patchProg = null; }
+const patchRT = {}, patchClock = {};
+const patchUP = new Float32Array(8);
+function patchTargets(k) {
+  let r = patchRT[k];
+  if (!r || r.w !== simW || r.h !== simH) {
+    if (r) r.t.forEach(dropTarget);
+    r = patchRT[k] = { w: simW, h: simH, t: [makeTarget(), makeTarget()] };
+  }
+  return r.t;
+}
+// What the movers set to Music, Bass or Beat hits hear (nothing while this loop doesn't react to sound)
+function patchEnv(k) {
+  if (!snd.analyser || (KEYS.includes(k) && !reacts(k))) return null;
+  const a = sndPower() * 0.8, E = snd.env;
+  return { low: E.low * a, mid: E.mid * a, high: E.high * a, beat: E.beat * a };
+}
+const patchOk = (pt) => !!(pt && Array.isArray(pt.layers));
+function drawPatch(k, t, scale, dt) {
+  if (!patchProg) return null;
+  const pt = patchOk(t.patch) ? t.patch : PATCH.STARTERS[0];
+  const [A, B] = patchTargets(k);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, A.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(patchProg.p);
+  set2f(patchProg, 'uSim', simW, simH);
+  set1f(patchProg, 'uPxK', simH / SIM_H);
+  set1f(patchProg, 'uZoom', 2.5 / scale);   // Input size 100 draws the patterns at their own size; smaller fits more in
+  set1i(patchProg, 'uPrev', 0);
+  const env = patchEnv(k), now = simT + 11 * (LOOP_OFF[k] || 0), uP = U(patchProg, 'uP[0]');
+  let src = A, dst = B;
+  for (const ly of pt.layers) {
+    const K = PATCH.KINDS[ly.kind];
+    if (!K || ly.on === false) continue;
+    const vals = K.p.map((q) => PATCH.value(ly, q, now, env));
+    const si = K.p.findIndex((q) => q.k === 'speed');
+    const ck = k + ':' + ly.id;
+    patchClock[ck] = ((patchClock[ck] ?? 11 * (LOOP_OFF[k] || 0)) + dt * (si >= 0 ? PATCH.speedRate(vals[si]) : 1)) % 20000;
+    patchUP.fill(0);
+    K.p.forEach((q, i) => { patchUP[i] = q.opts ? vals[i] : vals[i] / 100; });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, src.tex);
+    set1i(patchProg, 'uKind', K.id);
+    set1i(patchProg, 'uMode', ly.blend || 0);
+    set1f(patchProg, 'uOpac', (ly.opacity ?? 100) / 100);
+    set1f(patchProg, 'uT', patchClock[ck]);
+    if (uP) gl.uniform1fv(uP, patchUP);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    [src, dst] = [dst, src];
+  }
+  return src.tex;
+}
+// Patches you've saved (in this browser), beside the ready-made ones
+var PATCH_KEY = 'phosphor-patches-v1';
+function patchLib() {
+  try { const v = JSON.parse(localStorage.getItem('phosphor-patches-v1') || '[]'); return Array.isArray(v) ? v.map(window.PhosphorPatch.clean).filter(Boolean) : []; } catch (_) { return []; }
+}
+function patchLibSave(list) { try { localStorage.setItem(PATCH_KEY, JSON.stringify(list)); return true; } catch (_) { return false; } }
+// For Surprise and Autopilot: a ready-made or saved patch, its faders nudged (more as How wild rises) and, often,
+// another palette
+function randomPatch() {
+  let w = 0.5;
+  try { w = apSet.wild / 100; } catch (_) {}
+  const PP = window.PhosphorPatch;
+  const pt = PP.copy(pick([...PP.STARTERS, ...patchLib()]));
+  for (const ly of pt.layers) {
+    for (const q of PP.KINDS[ly.kind].p) {
+      if (q.opts) { if (q.k === 'pal' && Math.random() < 0.4 + 0.5 * w) ly.p.pal = Math.floor(Math.random() * q.opts.length); continue; }
+      ly.p[q.k] = clamp(ly.p[q.k] + (Math.random() - 0.5) * 50 * w, 0, 100);
+    }
+  }
+  return pt;
+}
+
+// ---- The stack's controls (Inputs › Patch)
+const patchStack = $('#patchStack'), patchAddSel = $('#patchAdd'), patchPickSel = $('#patchPick'), patchNameIn = $('#patchName');
+const patchOpen = new Set();
+let patchSig = '';
+const PATCH_G = { pattern: 'Pattern', effect: 'Effect', color: 'Color' };
+function patchNow() { const t = loops[edit].tgt; return patchOk(t.patch) ? t.patch : null; }
+function patchSet(fn, rebuild) {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  const pt = PATCH.copy(patchNow() || PATCH.STARTERS[0]);
+  fn(pt);
+  t.patch = pt;
+  if (rebuild) patchSig = '';
+  patchSync();
+}
+function patchFader(label, act, k, v, title) {
+  return `<input type="range" min="0" max="100" step="1" value="${Math.round(v)}" style="--b: ${Math.round(v)}%" data-act="${act}"${k ? ` data-k="${k}"` : ''} aria-label="${escapeHTML(label)}"${title ? ` title="${escapeHTML(title)}"` : ''}>`;
+}
+function patchHTML(pt) {
+  const n = pt.layers.length;
+  return pt.layers.map((ly, i) => {
+    const K = PATCH.KINDS[ly.kind], open = patchOpen.has(ly.id);
+    let body = '';
+    if (open) {
+      if (K.g === 'pattern') {
+        body += `<div class="pl-c"><span>Blend</span><select data-act="blend" title="How this pattern lies over the layers above it">${PATCH.BLENDS.map((b, j) => `<option value="${j}"${j === (ly.blend || 0) ? ' selected' : ''}>${b}</option>`).join('')}</select></div>`;
+        body += `<div class="pl-f"><div class="pl-fh"><span>Opacity</span></div>${patchFader('Opacity', 'opacity', '', ly.opacity ?? 100)}</div>`;
+      }
+      for (const q of K.p) {
+        if (q.opts) {
+          body += `<div class="pl-c"><span>${escapeHTML(q.label)}</span><select data-act="opt" data-k="${q.k}">${q.opts.map((o, j) => `<option value="${j}"${j === ly.p[q.k] ? ' selected' : ''}>${escapeHTML(o)}</option>`).join('')}</select></div>`;
+          continue;
+        }
+        const m = ly.mv[q.k];
+        body += `<div class="pl-f${m ? ' moving' : ''}"><div class="pl-fh"><span>${escapeHTML(q.label)}</span>` +
+          `<select class="pl-mv" data-act="mvm" data-k="${q.k}" aria-label="${escapeHTML(q.label)}: what moves it" title="What moves this fader by itself">` +
+          PATCH.MOVERS.map(([v, l]) => `<option value="${v}"${(m ? m.m : '') === v ? ' selected' : ''}>${v ? '∿ ' : ''}${l}</option>`).join('') + `</select></div>` +
+          patchFader(q.label, 'p', q.k, ly.p[q.k]) +
+          (m ? `<div class="pl-amt"><span>How far</span>${patchFader(q.label + ': how far it moves', 'mva', q.k, m.a, 'How far the mover takes this fader from where you set it')}</div>` : '') + `</div>`;
+      }
+    }
+    return `<div class="pl-layer pl-${K.g}${ly.on === false ? ' off' : ''}" data-i="${i}">` +
+      `<div class="pl-head"><button class="btn small pl-on" data-act="on" aria-pressed="${ly.on !== false}" title="Switch this layer on or off"><span class="led"></span></button>` +
+      `<button class="pl-name" data-act="fold" aria-expanded="${open}" title="${open ? 'Fold this layer away' : 'Open this layer’s controls'}"><span class="pl-g">${PATCH_G[K.g]}</span>${escapeHTML(K.label)}<span class="pl-caret">${open ? '▾' : '▸'}</span></button>` +
+      `<button class="pl-ic" data-act="up" title="Move up"${i === 0 ? ' aria-disabled="true"' : ''}>↑</button>` +
+      `<button class="pl-ic" data-act="down" title="Move down"${i === n - 1 ? ' aria-disabled="true"' : ''}>↓</button>` +
+      `<button class="pl-ic" data-act="del" title="Remove this layer">✕</button></div>` +
+      (open ? `<div class="pl-body">${body}</div>` : '') + `</div>`;
+  }).join('');
+}
+function buildPatchAdd() {
+  patchAddSel.innerHTML = '<option value="">+ Add a layer…</option>' + PATCH.GROUPS.map(([g, label]) => `<optgroup label="${label}">` +
+    Object.entries(PATCH.KINDS).filter(([, K]) => K.g === g).map(([k, K]) => `<option value="${k}">${escapeHTML(K.label)}</option>`).join('') + '</optgroup>').join('');
+}
+function buildPatchPick() {
+  const lib = patchLib();
+  patchPickSel.innerHTML = '<option value="">Load a patch…</option><optgroup label="Ready-made">' +
+    PATCH.STARTERS.map((p, i) => `<option value="s${i}">${escapeHTML(p.name)}</option>`).join('') + '</optgroup>' +
+    (lib.length ? '<optgroup label="Your patches">' + lib.map((p, i) => `<option value="u${i}">${escapeHTML(p.name)}</option>`).join('') + '</optgroup>' : '') +
+    '<optgroup label="Start over"><option value="new">Empty patch</option></optgroup>';
+}
+buildPatchAdd();
+buildPatchPick();
+function patchSync() {
+  const pt = patchNow();
+  if (!pt) return;
+  const struct = edit + '|' + JSON.stringify(pt.layers.map((l) => [l.id, l.kind, l.on, patchOpen.has(l.id), l.blend,
+    Object.entries(l.mv).map(([k, m]) => k + m.m).join(), PATCH.KINDS[l.kind].p.filter((q) => q.opts).map((q) => l.p[q.k]).join()]));
+  if (struct !== patchSig) {
+    patchSig = struct;
+    patchStack.innerHTML = patchHTML(pt) || '<p class="pl-empty">No layers yet. Add one below: start with a Pattern, then Effects and Colors.</p>';
+  } else {
+    for (const el of patchStack.querySelectorAll('input[type="range"]')) {
+      if (el === document.activeElement) continue;
+      const ly = pt.layers[+el.closest('.pl-layer').dataset.i], a = el.dataset.act, k = el.dataset.k;
+      const v = a === 'p' ? ly.p[k] : a === 'mva' ? ly.mv[k] && ly.mv[k].a : a === 'opacity' ? ly.opacity : null;
+      if (v != null && el.value !== String(Math.round(v))) { el.value = String(Math.round(v)); el.style.setProperty('--b', el.value + '%'); }
+    }
+  }
+  if (patchNameIn !== document.activeElement && patchNameIn.value !== pt.name) patchNameIn.value = pt.name;
+}
+const patchLayerOf = (el) => { const c = el.closest('.pl-layer'); return c ? +c.dataset.i : -1; };
+patchStack.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const i = patchLayerOf(b), act = b.dataset.act, pt = patchNow();
+  if (i < 0 || !pt || !pt.layers[i]) return;
+  if (act === 'fold') {
+    const id = pt.layers[i].id;
+    if (patchOpen.has(id)) patchOpen.delete(id); else patchOpen.add(id);
+    patchSig = '';
+    patchSync();
+    return;
+  }
+  patchSet((p) => {
+    const L = p.layers;
+    if (act === 'on') L[i].on = L[i].on === false;
+    else if (act === 'up' && i > 0) [L[i - 1], L[i]] = [L[i], L[i - 1]];
+    else if (act === 'down' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
+    else if (act === 'del') L.splice(i, 1);
+  }, true);
+});
+patchStack.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.tagName !== 'INPUT') return;
+  const i = patchLayerOf(el), act = el.dataset.act, k = el.dataset.k, v = +el.value;
+  if (i < 0) return;
+  el.style.setProperty('--b', el.value + '%');
+  patchSet((p) => {
+    const L = p.layers[i];
+    if (!L) return;
+    if (act === 'p') L.p[k] = v;
+    else if (act === 'mva' && L.mv[k]) L.mv[k].a = v;
+    else if (act === 'opacity') L.opacity = v;
+  }, false);
+});
+patchStack.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.tagName !== 'SELECT') return;
+  const i = patchLayerOf(el), act = el.dataset.act, k = el.dataset.k, v = el.value;
+  if (i < 0) return;
+  patchSet((p) => {
+    const L = p.layers[i];
+    if (!L) return;
+    if (act === 'blend') L.blend = +v;
+    else if (act === 'opt') L.p[k] = +v;
+    else if (act === 'mvm') { if (v) L.mv[k] = { m: v, a: L.mv[k] ? L.mv[k].a : 25 }; else delete L.mv[k]; }
+  }, true);
+});
+patchAddSel.addEventListener('change', () => {
+  const kind = patchAddSel.value;
+  patchAddSel.value = '';
+  if (!kind) return;
+  const pt = patchNow();
+  if (pt && pt.layers.length >= PATCH.MAX_LAYERS) { toast(`A patch can have up to ${PATCH.MAX_LAYERS} layers.`); return; }
+  const n = PATCH.newLayer(kind);
+  patchOpen.add(n.id);
+  patchSet((p) => {
+    // A new pattern or effect goes in above the Colors at the bottom, so they still color it; new Colors go last
+    let at = p.layers.length;
+    if (PATCH.KINDS[kind].g !== 'color') while (at > 0 && PATCH.KINDS[p.layers[at - 1].kind].g === 'color') at--;
+    p.layers.splice(at, 0, n);
+  }, true);
+  showOSD('PATCH', '+ ' + PATCH.KINDS[kind].label.toUpperCase());
+});
+patchPickSel.addEventListener('change', () => {
+  const v = patchPickSel.value;
+  patchPickSel.value = '';
+  if (!v) return;
+  const lib = patchLib();
+  const src = v === 'new' ? { name: 'New patch', layers: [] } : v[0] === 's' ? PATCH.STARTERS[+v.slice(1)] : lib[+v.slice(1)];
+  if (!src) return;
+  patchSet((p) => { p.name = src.name; p.layers = PATCH.copy(src).layers; }, true);
+  showOSD('PATCH', src.name.toUpperCase().slice(0, 18));
+});
+$('#patchSave').addEventListener('click', () => {
+  const pt = patchNow();
+  if (!pt) return;
+  const name = (patchNameIn.value.trim() || pt.name || 'My patch').slice(0, 40);
+  patchSet((p) => { p.name = name; }, false);
+  const lib = patchLib().filter((p) => p.name !== name);
+  lib.push(PATCH.copy({ ...patchNow(), name }));
+  if (!patchLibSave(lib)) { toast('The patch couldn’t be saved: this browser’s storage is full.'); return; }
+  buildPatchPick();
+  toast(`Saved the patch “${name}”. Autopilot can use it too.`);
+});
+$('#patchDel').addEventListener('click', () => {
+  const pt = patchNow(), lib = patchLib();
+  const name = pt && pt.name;
+  if (!name || !lib.some((p) => p.name === name)) { toast('Only patches you’ve saved can be deleted. Load one of yours first.'); return; }
+  patchLibSave(lib.filter((p) => p.name !== name));
+  buildPatchPick();
+  toast(`Deleted the saved patch “${name}”. It stays on this loop until you load another.`);
+});
+var patchUIReady = true;
+window.__plPatch = { loops, PATCH, patchLib, randomPatch, get edit() { return edit; } };   // for tests/patch_check.py
 // The keys that walk Mount Ribbit's hiker (W A S D, Shift to run, J to jump). They steer the loop being edited if it
 // shows Mount Ribbit, otherwise the other loop. Walk by itself (on unless switched off) takes over 10 seconds after.
 const RIB_KEYS = { KeyW: 'fwd', KeyS: 'back', KeyA: 'left', KeyD: 'right', ShiftLeft: 'run', ShiftRight: 'run' };
@@ -12297,14 +12548,18 @@ function runLoop(k, xf, brush, f) {
   const scale = Math.pow(2.5, (Math.min(clamp(c.size, 0, 100) + sizeBoost, 140) / 100 - 0.5) * 2);
   const fly1 = is3D(t.in1) ? t.in1 : null;
   const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
-  const flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
-  const flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
+  let flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
+  let flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
+  // A Patch's layers are drawn into a picture of their own, read through the same slot a 3D world would use
+  const patchTex = t.in1 === 'patch' || t.in2 === 'patch' ? drawPatch(k, t, scale, f / 60) : null;
+  if (t.in1 === 'patch') flyTex1 = patchTex;
+  if (t.in2 === 'patch') flyTex2 = patchTex;
   // Life's board is read through the picture slot its input would use for a 3D world (it has no slot of its own:
   // see UNITS). Traced by Topo map, it's read from the first, as a traced 3D world is.
   const traced = topoTrace(t);
   const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
   const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
-  const srcOf = (n) => (n === 'life' && !lifeTex ? SRC_ID.none : resolveSrc(n, t.motion, k));
+  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'patch' && !patchTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -12401,7 +12656,6 @@ function runLoop(k, xf, brush, f) {
   // Topo map tracing another input draws only its lines: the input it traces isn't shown as itself
   set1f(fbProg, 'uLifeT', lifeTex ? L.life.acc : 0);
   set1f(fbProg, 'uRadarWind', t.radarWind ? 1 : 0);
-  set1i(fbProg, 'uTexStyle', (t.texStyle ?? 0) | 0);
   if (traced) {
     const slot = t.in1 === 'topo' ? 2 : 1, fly = slot === 1 ? flyTex1 : flyTex2;
     set1i(fbProg, 'uIn1', SRC_ID.topo);

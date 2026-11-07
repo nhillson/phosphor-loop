@@ -1241,3 +1241,30 @@ button.seq-card { cursor: pointer; }
 #cueFadeBar[aria-pressed="true"] .led { background: #b06cff; box-shadow: 0 0 8px rgba(176,108,255,.7); }
 /* Soft trails, under the Trails fader (only for the inputs it works on) */
 #softCtl:not([hidden]) { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 10px; }
+
+/* ---------- Patch: the layer stack (Inputs › Patch) ---------- */
+.pl-top { display: flex; gap: 6px; align-items: center; }
+.pl-top input { flex: 1; min-width: 0; }
+#row-patch > .ctl { display: grid; gap: 6px; }
+.pl-stack { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.pl-layer { border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 6px; background: var(--well); }
+.pl-layer.pl-effect { border-left-color: var(--loop-b); }
+.pl-layer.pl-color { border-left-color: var(--loop-c); }
+.pl-layer.off { opacity: .5; }
+.pl-head { display: flex; align-items: center; gap: 4px; padding: 3px 4px; }
+.pl-head .pl-on { min-height: 28px; padding: 4px 8px; }
+.pl-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 4px; text-align: left; cursor: pointer; font-weight: 500; }
+.pl-g { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.pl-caret { margin-left: auto; color: var(--dim); }
+.pl-ic { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 5px; background: var(--raise); cursor: pointer; padding: 0; font-size: 13px; }
+.pl-ic[aria-disabled="true"] { opacity: .35; }
+.pl-ic:hover { background: var(--raise-2); }
+.pl-body { display: grid; gap: 4px; padding: 2px 10px 8px; }
+.pl-c, .pl-fh { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--dim); }
+.pl-c select { width: auto; min-height: 28px; padding: 3px 8px; font-size: 13px; }
+.pl-fh select.pl-mv { width: auto; min-height: 24px; padding: 1px 6px; font-size: 12px; background: transparent; }
+.pl-f.moving .pl-mv { color: var(--amber-ink); border-color: var(--amber); }
+.pl-f input[type="range"] { height: 24px; }
+.pl-amt { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faint); padding-left: 12px; }
+.pl-amt input[type="range"] { flex: 1; height: 20px; }
+.pl-empty { margin: 0; padding: 10px; font-size: 13px; color: var(--dim); border: 1px dashed var(--line); border-radius: 6px; }

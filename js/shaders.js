@@ -156,7 +156,6 @@ uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter si
 // That small softened brightness is read from uScene2 (see topoPre): this program already reads 16 pictures, the
 // most Windows graphics (Chrome and Edge there) allow in one program, so it can't have a 17th of its own
 uniform float uRadarWind;   // Doppler radar: 1 shows the wind (towards and away from the radar), 0 the rain
-uniform int uTexStyle;      // Textures: which of its eight patterns (Marble, Cells, Ripples, Moire, Maze, Silk, Hex, Spiral)
 uniform float uLifeT;    // Life: how far it is from one generation to the next (0 to 1), so cells glide in and out
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
 uniform float uAspPic, uAspVid, uAspCam, uAspScr, uAspPho, uFlipCam, uFlipPho;
@@ -979,96 +978,6 @@ vec3 seedRadar(vec2 p, float t) {
   gSpecA = echo ? 0.85 : min(dot(c, vec3(0.3, 0.6, 0.1)) * 2.5, 0.85);
   return c;
 }
-// Textures: Auragen-style procedural patterns made fresh on the graphics card every frame, each in slowly turning
-// colors on black (the dark gaps let the loop's echoes show through). Eight styles (uTexStyle): Marble (veins in
-// stirred noise), Cells (glowing cell walls that wander), Ripples (rings from drifting drops crossing each other),
-// Moire (two turning screens beating against each other), Maze (Truchet arcs with light running along them), Silk
-// (bands following a slow current), Hex (honeycomb lights pulsing out from the middle) and Spiral (a log spiral
-// winding inwards). Input size zooms in and out; with React to sound › Sound on lines, the music's wave ripples it.
-vec3 texPal(float x, vec3 d) { return 0.5 + 0.5 * cos(TAU * (x + d)); }
-vec2 texHash2(vec2 i) { return vec2(hash(i), hash(i + 17.31)); }
-float texLine(float d, float w) {   // d: distance from a line, in pixels; a sharp core and a soft glow
-  return clamp(w - d + 0.5, 0.0, 1.0) + 0.35 * exp(-d / (3.0 * w));
-}
-vec3 seedTexture(vec2 p, float t) {
-  p = topoHum(p);
-  float fill = max(uScale / 2.5, 0.05);
-  vec2 q = p / fill;
-  float px = 1.0 / (fill * uSim.y), w = 0.9 * uPxK;   // px: one pixel, in q's units
-  float hue = t * 0.012;
-  vec3 c = vec3(0.0);
-  if (uTexStyle == 0) {          // Marble
-    vec2 m = q * 1.6;
-    vec2 a = vec2(rdFbm(m + vec2(0.0, t * 0.05)), rdFbm(m + vec2(5.2, 1.3) - t * 0.04));
-    vec2 b = vec2(rdFbm(m + 2.4 * a + vec2(1.7, 9.2) + t * 0.03), rdFbm(m + 2.4 * a + vec2(8.3, 2.8)));
-    float f = rdFbm(m + 2.6 * b);
-    float v = abs(fract(f * 5.0 + a.x) - 0.5) * 2.0;     // 0 on a vein
-    float vein = pow(1.0 - v, 9.0);
-    c = texPal(f * 0.8 + b.y * 0.5 + hue, vec3(0.0, 0.15, 0.3)) * (0.06 + 0.25 * f * f + 0.95 * vein);
-  } else if (uTexStyle == 1) {   // Cells
-    vec2 g = q * 4.0, i = floor(g), f = fract(g);
-    float d1 = 9.0, d2 = 9.0; vec2 id1 = vec2(0.0);
-    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-      vec2 o = vec2(float(x), float(y)), h = texHash2(i + o);
-      vec2 pt = o + 0.5 + 0.42 * sin(t * (0.35 + 0.3 * h) + TAU * h);
-      float d = length(pt - f);
-      if (d < d1) { d2 = d1; d1 = d; id1 = i + o; } else if (d < d2) d2 = d;
-    }
-    float edge = (d2 - d1) * 0.5 / (4.0 * px);       // pixels from the wall
-    float k = hash(id1);
-    c = texPal(k * 0.35 + hue, vec3(0.6, 0.7, 0.85)) * (0.12 * (1.0 - d1)) + texPal(k * 0.2 + hue + 0.5, vec3(0.0, 0.1, 0.2)) * 0.8 * texLine(edge, w);
-  } else if (uTexStyle == 2) {   // Ripples
-    float s = 0.0;
-    for (int j = 0; j < 4; j++) {
-      float fj = float(j);
-      vec2 cj = 0.55 * vec2(sin(t * (0.11 + 0.03 * fj) + fj * 1.7), cos(t * (0.09 + 0.02 * fj) + fj * 2.9));
-      s += sin(length(q - cj) * 26.0 - t * (1.6 + 0.2 * fj));
-    }
-    s *= 0.25;
-    float band = pow(0.5 + 0.5 * cos(s * 9.0), 6.0);
-    c = texPal(s * 0.4 + hue, vec3(0.5, 0.2, 0.0)) * (0.05 + 0.85 * band);
-  } else if (uTexStyle == 3) {   // Moire
-    vec2 c1 = 0.25 * vec2(sin(t * 0.07), cos(t * 0.05)), c2 = -c1;
-    float g1 = 0.5 + 0.5 * cos(length(q - c1) * 95.0);
-    float g2 = 0.5 + 0.5 * cos(dot(rot(t * 0.04) * (q - c2), vec2(1.0, 0.0)) * 95.0);
-    // Fine screens fade where they'd be finer than a few pixels, so they never fizz
-    float fine = smoothstep(1.2, 4.0, (TAU / 95.0) / px);
-    float m = mix(0.25, g1 * g2, fine);
-    c = texPal(length(q) * 0.3 + hue, vec3(0.3, 0.45, 0.6)) * (0.04 + 1.1 * pow(m, 1.2));
-  } else if (uTexStyle == 4) {   // Maze
-    vec2 g = q * 5.0 + vec2(t * 0.08, t * 0.05), i = floor(g), f = fract(g) - 0.5;
-    float flip = step(0.5, hash(i + floor(t * 0.12 + hash(i + 3.0)) * 7.13));
-    if (flip > 0.5) f.x = -f.x;
-    vec2 a = f - 0.5, b = f + 0.5;
-    float da = abs(length(a) - 0.5), db = abs(length(b) - 0.5);
-    vec2 n = da < db ? a : b;
-    float d = min(da, db) / (5.0 * px);
-    float run = 0.5 + 0.5 * sin(atan(n.y, n.x) * 4.0 + (da < db ? 1.0 : -1.0) * (1.0 - 2.0 * flip) * t * 3.0 + hash(i) * TAU);
-    c = texPal(hash(i) * 0.25 + hue + (i.x + i.y) * 0.02, vec3(0.1, 0.4, 0.7)) * texLine(d, 1.6 * w) * (0.3 + 0.8 * run * run);
-  } else if (uTexStyle == 5) {   // Silk
-    vec2 m = q * 1.3;
-    float h = rdFbm(m + 0.6 * vec2(rdFbm(m * 0.7 + t * 0.03), rdFbm(m * 0.7 + 4.1 - t * 0.025)));
-    float band = pow(0.5 + 0.5 * cos(TAU * (h * 16.0 - t * 0.12)), 5.0);
-    c = texPal(h * 1.8 + hue, vec3(0.8, 0.9, 0.3)) * (0.04 + 0.85 * band);
-  } else if (uTexStyle == 6) {   // Hex
-    vec2 g = q * 6.0;
-    const vec2 r = vec2(1.0, 1.7320508);
-    vec2 a = mod(g, r) - 0.5 * r, b = mod(g - 0.5 * r, r) - 0.5 * r;
-    vec2 gv = dot(a, a) < dot(b, b) ? a : b, id = g - gv;
-    float hd = max(dot(abs(gv), vec2(0.5, 0.8660254)), abs(gv).x);   // 0.5 at the hexagon's edge
-    float wave = 0.5 + 0.5 * sin(length(id) * 0.7 - t * 2.2 + hash(id) * 1.5);
-    float size = 0.12 + 0.34 * wave * wave;
-    float d = abs(hd - size) / (6.0 * px);
-    c = texPal(length(id) * 0.04 - hue + hash(id) * 0.15, vec3(0.0, 0.33, 0.67)) * (texLine(d, w) * (0.35 + 0.65 * wave) + 0.18 * wave * step(hd, size));
-  } else {                       // Spiral
-    float r = length(q), an = atan(q.y, q.x);
-    float u = log(max(r, 1e-3)) * 2.2 - t * 0.35;
-    float s1 = 0.5 + 0.5 * sin(u * 6.0 + an * 3.0), s2 = 0.5 + 0.5 * sin(u * 6.0 - an * 5.0);
-    float k = pow(s1, 6.0) + 0.6 * pow(s2, 10.0);
-    c = texPal(u * 0.15 + hue, vec3(0.65, 0.35, 0.05)) * k * smoothstep(0.0, 0.12, r) * 0.9;
-  }
-  return c;
-}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -1082,10 +991,9 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 33) return seedTopo(p, uTime);
   if (id == 34) return seedLife(p, scene);
   if (id == 35) return seedRadar(p, uTime);
-  if (id == 36) return seedTexture(p, uTime);
-  // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31) and the fractal flights (25 to 30), each drawn just before this
-  // pass (see draw3D) filling the screen
-  if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32)) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
+  // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31), the fractal flights (25 to 30) and a Patch's layers (37),
+  // each drawn just before this pass (see draw3D, drawPatch) filling the screen
+  if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32) || id == 37) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);
   if (id == 5) return live(uVid0, uVid1, uAspVid, 0.0, p, 5, 0.3);
   if (id == 6) return live(uCam0, uCam1, uAspCam, uFlipCam, p, 6, 0.3);

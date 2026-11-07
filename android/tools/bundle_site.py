@@ -21,6 +21,7 @@ FILES = {
     'styles/app.css': 'text/css',
     'js/fractal-math.js': 'application/javascript',
     'js/shaders.js': 'application/javascript',
+    'js/patch.js': 'application/javascript',
     'js/helpers.js': 'application/javascript',
     'js/recording-formats.js': 'application/javascript',
     'js/output-template.js': 'application/javascript',
