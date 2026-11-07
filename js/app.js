@@ -10141,8 +10141,13 @@ syncShapeUI();
 // automatic size.
 const deck = $('.deck'), deckSplit = $('#deckSplit');
 var rzDragging = false;   // a handle on the picture's frame is being dragged (see fit)
+// A width saved on a bigger screen or window (a 4K monitor, say) is cut down to what this one has room for, so the
+// controls never get pushed off the edge; the saved width itself is kept for when there's room again
+const monFit = (v) => { const W = deck.clientWidth; return W > 0 ? Math.round(clamp(v, 220, Math.max(220, W - 7 - WIDE_CTL_MIN))) : v; };
+const sideFit = (v) => { const W = deck.clientWidth; return W > 0 ? Math.round(clamp(v, 260, Math.max(260, W - 360))) : v; };
+const WIDE_CTL_MIN = 600;   // the controls' narrowest with Spread out controls on: room for two columns
 function applyLayout() {
-  for (const [key, v] of [['--side-w', layout.side], ['--mon-w', layout.mon]]) {
+  for (const [key, v] of [['--side-w', layout.side && sideFit(layout.side)], ['--mon-w', layout.mon && monFit(layout.mon)]]) {
     if (v) deck.style.setProperty(key, v + 'px'); else deck.style.removeProperty(key);
   }
   stage.classList.toggle('sized', rzDragging && !narrowMQ.matches);
@@ -10152,11 +10157,11 @@ const wideOn = () => document.body.classList.contains('wide-ctl') && !narrowMQ.m
 // Widths the controls can take: never so narrow they're unusable, never so wide the picture has no room
 function setControlsWidth(px) {
   const W = deck.clientWidth;
-  if (wideOn()) layout.mon = Math.round(clamp(W - px - 7, 220, Math.max(220, W - 420)));
+  if (wideOn()) layout.mon = Math.round(clamp(W - px - 7, 220, Math.max(220, W - 7 - WIDE_CTL_MIN)));
   else layout.side = Math.round(clamp(px, 260, Math.max(260, W - 360)));
   applyLayout();
 }
-const controlsWidth = () => (wideOn() ? deck.clientWidth - (layout.mon || 320) - 7 : layout.side || 380);
+const controlsWidth = () => (wideOn() ? deck.clientWidth - monFit(layout.mon || 320) - 7 : sideFit(layout.side || 380));
 function relayout() { fit(); window.dispatchEvent(new Event('resize')); }
 let relayoutQueued = false;
 function relayoutSoon() { if (!relayoutQueued) { relayoutQueued = true; requestAnimationFrame(() => { relayoutQueued = false; relayout(); }); } }
@@ -10207,7 +10212,7 @@ for (const h of $$('.rz')) {
       if (kind.includes('r')) {
         const w = Math.max(160, Math.round(c0.width + ev.clientX - e.clientX));
         // Room the picture's column has for it at most, leaving the controls at least their narrowest
-        const room = d0.width - 7 - (wideOn() ? 420 : 260) - monPad - padX;
+        const room = d0.width - 7 - (wideOn() ? WIDE_CTL_MIN : 260) - monPad - padX;
         layout.cw = Math.min(w, Math.max(160, Math.round(room)));
         const need = layout.cw + padX + monPad;
         if (wideOn()) { if (need > (layout.mon || 320)) { layout.mon = Math.round(need); } }
@@ -10224,6 +10229,8 @@ for (const h of $$('.rz')) {
 }
 applyLayout();
 narrowMQ.addEventListener?.('change', () => { applyLayout(); fit(); });
+// The window got smaller or bigger (or the Phosphor Stream panel opened or closed): widths are fitted to it again
+window.addEventListener('resize', () => { if (!rzDragging) applyLayout(); });
 
 /* ================= output window ================= */
 // Opens the picture on its own for a projector or second screen. Each frame is copied into it
@@ -10698,7 +10705,8 @@ function wideArrange() {
   const W = wideCols, n = loopCount;
   const width = panelIn.clientWidth;
   const fits = (c) => c * WIDE_COL_MIN + (c - 1) * WIDE_GAP <= width;
-  const per = fits(1 + n) ? 1 : 2;
+  // A column per loop, else two loops to a column, else (a narrow window) all the loops in one column
+  const per = fits(1 + n) ? 1 : n <= 2 || fits(1 + Math.ceil(n / 2)) ? Math.min(2, n) : n;
   const nCols = Math.ceil(n / per);
   for (const k of KEYS) if (!loopOn(k) && W.mirrors[k]) { W.mirrors[k].parentElement.remove(); delete W.mirrors[k]; }
   for (const k of activeKeys()) if (!W.mirrors[k]) W.mirrors[k] = makeMirror(k);
