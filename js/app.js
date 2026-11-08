@@ -1517,6 +1517,7 @@ function syncUI() {
   $$('#subject button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.subject === (t.subject || 'off'))));
   syncSubjectStatus();
   syncVisibility();
+  stackRender();
   if (!mirroring) mirrorRefreshSoon();
 }
 
@@ -2311,7 +2312,7 @@ function neutral() {
   const flat = {
     in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' || src === 'cloud' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
-    form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
+    form: loops.A.tgt.form, specRound: loops.A.tgt.specRound, stack: [],
   };
   for (const k of activeKeys()) patchLoop(k, { ...flat }, true);
   for (const k of activeKeys()) { const L = loops[k]; for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q]; mirrorCut(k); }
@@ -2325,6 +2326,7 @@ function neutral() {
   setRelief(RELIEF_DEF);
   setType({ ...typeArt, tAmt: 0 });
   setCloud({ ...cloud, cAmt: 0 });
+  stackSetAll([]);
   [cam, scr, pho, ...Object.values(vids)].forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
@@ -2363,7 +2365,7 @@ function neutralLoop(k) {
     in1: src, in2: 'none', blend: 50, motion: false,
     size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
-    form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic,
+    form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic, stack: [],
   }, true);
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
   mirrorCut(k);
@@ -9122,6 +9124,7 @@ function snapshot() {
     relief: { ...relief },
     type: { ...typeArt },
     cloud: { ...cloud },
+    ...(stackAll ? { stackAll: clone(stackAll) } : {}),
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
@@ -9243,6 +9246,8 @@ function loadPreset(pr, quiet) {
   setType(d.type);
   // Presets saved before the Point cloud existed load with the whole-picture dots off
   setCloud(d.cloud || { ...cloud, cAmt: 0 });
+  // The effect stacks it was saved with; a preset from before them gets stacks made from its settings
+  stackAfterLoad(d);
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
@@ -10324,7 +10329,7 @@ $$('#gradeWhere button').forEach((b) => b.addEventListener('click', () => {
 { let saved = null; try { saved = JSON.parse(localStorage.getItem(GRADE_KEY) || 'null'); } catch (_) {} setGrade(saved); }
 const gradeOn = () => Object.keys(GRADE_DEF).some((k) => grade[k] !== GRADE_DEF[k]);
 function setGradeUniforms() {
-  set1f(dispProg, 'uGradeOn', gradeOn() && !grade.gInside && !seq.gradeOwned ? 1 : 0);
+  set1f(dispProg, 'uGradeOn', !stackMode && gradeOn() && !grade.gInside && !seq.gradeOwned ? 1 : 0);
   set4f(dispProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, grade.gGamma / 100, grade.gSat / 100);
   set2f(dispProg, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
   set3f(dispProg, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
@@ -10396,7 +10401,7 @@ function setReliefUniforms(now) {
   reliefTurn = (reliefTurn + dt * (R.rSpin / 100) ** 2 * Math.PI / 2) % (2 * Math.PI);
   const a = R.rLight * Math.PI / 180 + reliefTurn, e = 40 * Math.PI / 180;
   reliefL[0] = Math.cos(a) * Math.cos(e); reliefL[1] = Math.sin(a) * Math.cos(e); reliefL[2] = Math.sin(e);
-  set3f(dispProg, 'uRelief', R.rDepth / 100, 0.004 + 0.046 * R.rSmooth / 100, R.rShine / 100);
+  set3f(dispProg, 'uRelief', stackMode ? 0 : R.rDepth / 100, 0.004 + 0.046 * R.rSmooth / 100, R.rShine / 100);
   set3f(dispProg, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
 }
 window.__plRelief = { relief, setRelief, adj };
@@ -10528,8 +10533,8 @@ const typeFinalSt = { st: null };
 const typeLoopSt = { A: null, B: null, C: null, D: null };
 let typeScratch = null;
 // Final Pass: the finished picture typed at the screen's own size. Gives back the picture to show.
-function typeFinal(tex) {
-  const on = typeArt.tAmt > 0 && !typeArt.tInside;
+function typeFinal(tex, force) {
+  const on = typeArt.tAmt > 0 && (force ?? !typeArt.tInside);
   if (!on) { if (typeFinalSt.st && typeEng) { typeEng.release(typeFinalSt.st); typeFinalSt.st = null; } return tex; }
   const eng = typeEngine();
   if (!eng) return tex;
@@ -10538,8 +10543,8 @@ function typeFinal(tex) {
 }
 // Within Loops: loop k's newest picture typed and put back, so next frame the loop feeds on it. Higher Amount
 // types more of it each frame (all of it at the top), at the same pace at any frame rate (f: sixtieths this frame).
-function typeInLoop(k, f) {
-  const on = typeArt.tAmt > 0 && typeArt.tInside;
+function typeInLoop(k, f, force) {
+  const on = typeArt.tAmt > 0 && (force ?? typeArt.tInside);
   if (!on) { if (typeLoopSt[k] && typeEng) { typeEng.release(typeLoopSt[k]); typeLoopSt[k] = null; } return; }
   const eng = typeEngine();
   const L = loops[k];
@@ -10701,8 +10706,8 @@ function drawCloud(k, t, scale, dt, otherTex) {
   return eng.run(cloudSt[k], tex, aspect, simW, simH, hits ? cloud : { ...cloud, cMusic: false }, dt, { ptr: cloudPtr, trails: 0, fit: scale / 2.5, flip });
 }
 // Whole picture as dots: the finished picture's dots at the screen's own size, over the picture by Amount
-function cloudFinal(tex, dt) {
-  if (!(cloud.cAmt > 0)) { if (cloudSt.final && cloudEng) { cloudEng.release(cloudSt.final); cloudSt.final = null; } return tex; }
+function cloudFinal(tex, dt, force) {
+  if (!(cloud.cAmt > 0) || force === false) { if (cloudSt.final && cloudEng) { cloudEng.release(cloudSt.final); cloudSt.final = null; } return tex; }
   const eng = cloudEngine();
   if (!eng) return tex;
   if (!cloudSt.final) cloudSt.final = eng.state();
@@ -10762,8 +10767,8 @@ window.__plCloud = { cloud, setCloud, cloudSt, boom: cloudBoomAt, ready: () => !
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
 // tenth of the way each sixtieth of a second (f: how many sixtieths this frame is), so it builds up at the same
 // pace at any frame rate instead of piling up at once.
-function setLoopGradeUniforms(f) {
-  const on = grade.gInside && gradeOn() && !seq.gradeOwned;
+function setLoopGradeUniforms(f, k) {
+  const on = (stackRunK && k === stackRunK ? stackHas(k, 'grade', 'in') : grade.gInside) && gradeOn() && !seq.gradeOwned;
   set1f(fbProg, 'uGradeK', on ? 1 - Math.pow(0.9, f) : 0);
   if (!on) return;
   set4f(fbProg, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, Math.max(0.05, grade.gGamma / 100), grade.gSat / 100);
@@ -11941,7 +11946,11 @@ function warpedTex(k) { const L = loops[k]; return L.tw && L.tw.live ? L.tw.warp
 // ...and after slit-scan, when Photo finish or Corridor is on
 function shownTex(k) { const L = loops[k]; return L.sc && L.sc.live ? L.sc.out[L.sc.of].tex : warpedTex(k); }
 // What loop k gives the mix: its picture, or that picture after its final pass (see finalPass)
-function mixTex(k) { const pz = loops[k].pz; return pz && pz.live ? pz.rt[pz.f].tex : shownTex(k); }
+function mixTex(k) {
+  const so = loops[k].so;
+  if (stackMode && so && so.live) return so.rt[so.f].tex;
+  const pz = loops[k].pz; return pz && pz.live ? pz.rt[pz.f].tex : shownTex(k);
+}
 // The effects that can work in the final pass instead of within the loop, each with the switch that says so.
 // Posterize and Halftone start in the final pass; the others start within the loop, where they've always been.
 const FINAL_FX = { poster: 'posterIn', halftone: 'halftoneFinal', mirror: 'mirrorFinal', warp: 'warpFinal', split: 'splitFinal', chroma: 'chromaFinal' };
@@ -11950,6 +11959,8 @@ const isFinal = (t, fx) => (fx === 'poster' ? !t.posterIn : !!t[FINAL_FX[fx]]);
 // pair of pictures of its own, taking turns, so Posterize can see the steps it drew last frame. Made when first
 // needed, at the current sharpness, and let go when no effect is in the final pass.
 function finalPass(k) {
+  if (stackMode && KEYS.includes(k) && !extraLoop(k)) { stackOut(k); return; }
+  if (loops[k].so) stackDropOut(loops[k]);
   const L = loops[k], t = L.tgt, c = L.cur;
   const amt = (fx, v) => (isFinal(t, fx) ? v : 0);
   const steps = amt('poster', c.poster > 0.5 ? posterSteps(c.poster) : 0);
@@ -12756,7 +12767,7 @@ function runLoop(k, xf, brush, f) {
   let z = c.zoom, s = c.spin, col = c.color, w = c.warp, sx = c.shiftX, sy = c.shiftY;
   let sizeBoost = 0, gainBoost = 1;
   if (reacts(k)) {
-    const a = sndPower(), E = snd.env, m = snd.map;
+    const a = sndPower(), E = snd.env, m = sndMapNow();
     if (m.kick) z += a * (E.low * 45 + E.beat * 45);
     if (m.spin) s += a * E.mid * 60 * (s < 0 ? -1 : 1);
     if (m.color) col += a * (E.high * 60 + E.beat * 15);
@@ -12767,7 +12778,7 @@ function runLoop(k, xf, brush, f) {
     if (m.lines && sndLineOn && usesLines(t)) sizeBoost *= 0.5;
   }
   // Lopsided effects (Off-center, Wind): the music's hits jolt them, with React to sound's switch
-  const hitK = reacts(k) && snd.map.asym ? sndPower() : 0;
+  const hitK = reacts(k) && sndMapNow().asym ? sndPower() : 0;
   const newHit = snd.beats !== L.offBeats;
   L.offBeats = snd.beats;
   const oc = clamp(c.offc, 0, 100) / 100;
@@ -12781,7 +12792,7 @@ function runLoop(k, xf, brush, f) {
   if (calmK > 0.001) { z = calmCap(z, 35); s = calmCap(s, 30); col = calmCap(col, 30); w = calmCap(w, 40); }
   L.warpNow = w;   // with the music's push, for Warp in the final pass
   // Effects set to Final Pass are left out of the loop (see finalPass)
-  if (t.warpFinal) w = 0;
+  if (!fxIn(k, t, 'warp')) w = 0;
   const tr = clamp(c.trails, 0, 100) / 100;
   // Below 10 the trails fade away completely, so 0 shows the input with no feedback at all
   const ramp = tr >= 0.1 ? 1 : (tr / 0.1) * (tr / 0.1) * (3 - 2 * tr / 0.1);
@@ -12840,7 +12851,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uWarp', (w / 100) * 0.006 * f);
   const fl = (clamp(c.flow, 0, 100) / 100) * FLOW_K;
   set1f(fbProg, 'uFlow', fl * f);
-  const sp = t.splitFinal ? 0 : calmCap(clamp(c.split, 0, 100), 30) / 100;
+  const sp = !fxIn(k, t, 'split') ? 0 : calmCap(clamp(c.split, 0, 100), 30) / 100;
   set1f(fbProg, 'uSplit', Math.pow(sp, 1.5) * 0.007 * f);
   set1f(fbProg, 'uSplitOff', sp * 0.06);
   // Gentle low on the slider, wild at the top
@@ -12864,7 +12875,7 @@ function runLoop(k, xf, brush, f) {
   const wn = calmCap(clamp(c.wind, 0, 100), 50) / 100;
   const wk = wn > 0.005 ? Math.pow(wn, 1.2) * WIND_K * f : 0;
   set3f(fbProg, 'uWind', Math.cos(L.windAng), Math.sin(L.windAng), wk);
-  set1f(fbProg, 'uChroma', t.chromaFinal ? 0 : Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
+  set1f(fbProg, 'uChroma', !fxIn(k, t, 'chroma') ? 0 : Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
   set1f(fbProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.3 * clamp(c.restless, 0, 100) / 100, f));
   set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
@@ -12878,11 +12889,11 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uGrowR', GROW_R[t.growSize] ?? GROW_R[1]);
   set1f(fbProg, 'uGrowTurn', Math.random() * 6.2831853);
   // Color filters set to work inside this loop (see "color filters")
-  set1f(fbProg, 'uPoster', t.posterIn && c.poster > 0.5 ? posterSteps(c.poster) : 0);
-  set1f(fbProg, 'uHalftone', !t.halftoneFinal && c.halftone > 0.5 ? halftoneCell(c.halftone) : 0);
-  setLoopGradeUniforms(f);
+  set1f(fbProg, 'uPoster', fxIn(k, t, 'poster') && c.poster > 0.5 ? posterSteps(c.poster) : 0);
+  set1f(fbProg, 'uHalftone', fxIn(k, t, 'halftone') && c.halftone > 0.5 ? halftoneCell(c.halftone) : 0);
+  setLoopGradeUniforms(f, k);
   set1f(fbProg, 'uAspText', textAspect);
-  mirrorUniforms(fbProg, k, !t.mirrorFinal);
+  mirrorUniforms(fbProg, k, fxIn(k, t, 'mirror'));
   set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
@@ -15240,6 +15251,738 @@ void initSpotify();
 
 
 let captureNextAt = 0;
+/* ================= effect stack ================= */
+// Each loop's effects in one list you put in order (js/stack.js has the kinds), in three zones: Inside the loop (works
+// on what the loop keeps, every frame), On the way out (laid over the loop's picture once, what Final Pass was) and
+// Whole picture (over every loop mixed, shared by all loops). Classic layout keeps the old panels.
+// The loop's own effects keep their faders in the loop's settings, as always, so Autopilot, presets, pins, limits and
+// the sequencer go on working with them. Each loop's list is kept with its settings (tgt.stack, never changed in
+// place, so copies of the settings stay as they were); the whole-picture list is stackAll.
+// - Inside the loop, the loop's own effects are pieces of the loop's one pass, put together in the stack's order
+//   (feedbackFS in js/shaders.js; one program for each order, made when first needed). Patch's effects and Type art
+//   inside a loop are passes of their own after it, in their order.
+// - What the stack shows follows the faders: an effect brought in by Autopilot, a preset or Surprise (its fader up
+//   from 0) joins the stack by itself (auto), in its old place, and leaves again once its fader is back to 0 and
+//   you aren't using it. Taking an effect out puts its faders to 0; adding one starts it at a gentle amount.
+// - React to sound's list of what the music moves is replaced by movers on every fader (Still, Slow wave, Fast wave,
+//   Music, Bass, Beat hits); only Sound on lines is still set there.
+var STK = window.PhosphorStack;
+var stackMode = (() => { try { return localStorage.getItem('phosphor-fx-mode') !== 'classic'; } catch (_) { return true; } })();
+var stackAll = null;          // the whole-picture list (null: made from the settings when first needed)
+var stackRunK = null;         // the loop whose stack is being drawn right now (see runLoopAny)
+var stackReady = false;
+const STACK_ALL_KEY = 'phosphor-stack-all-v1';
+try { stackAll = STK.cleanList(JSON.parse(localStorage.getItem(STACK_ALL_KEY) || 'null'), true); } catch (_) { stackAll = null; }
+const stackOpen = new Set(), stackTouch = {};
+const { feedbackFS, feedbackParts } = window.PhosphorShaders;
+const fbClassic = fbProg;
+const fbCache = new Map([[feedbackParts(null).sig, fbClassic]]);
+const STACK_SND_OFF = { kick: false, size: false, spin: false, color: false, warp: false, flash: false, asym: false };
+// What the music moves: React to sound's list in Classic; in the stack only Sound on lines (movers do the rest)
+function sndMapNow() { return stackMode ? { ...STACK_SND_OFF, lines: snd.map.lines } : snd.map; }
+
+// ---- the lists
+function stackFind(list, kind, zone) { return list.find((it) => it.kind === kind && (!zone || it.zone === zone)) || null; }
+// Whether loop k's effect is on now, from its faders (the stack's own record aside)
+// (still: also while it's gliding out, so an effect fading away leaves the stack only once it's gone)
+function kindActive(k, kind, still) {
+  const L = loops[k], t = L.tgt;
+  if (kind === 'mirror') return t.mirror > 0 || (!!still && mirrorAny(k));
+  return STK.LOOP_KINDS[kind].keys.some((key) => Math.abs(+t[key] || 0) > 0.5 || (!!still && Math.abs(+L.cur[key] || 0) > 0.5));
+}
+function wholeActive(kind) {
+  if (kind === 'grade') return gradeOn();
+  if (kind === 'relief') return relief.rDepth > 0;
+  if (kind === 'type') return typeArt.tAmt > 0;
+  if (kind === 'cloud') return cloud.cAmt > 0;
+  return false;
+}
+// Where a loop's effect worked in Classic
+function classicZone(k, kind) {
+  const K = STK.LOOP_KINDS[kind];
+  if (K.first) return 'out';
+  return K.fx && isFinal(loops[k].tgt, K.fx) ? 'out' : 'in';
+}
+// A stack made from a loop's settings: each effect that's on, in the old order and where it worked, with movers for
+// what React to sound moved
+function stackFromClassic(k) {
+  let list = [];
+  for (const kind of STK.CLASSIC) if (kindActive(k, kind)) list = STK.insertAt(list, STK.newItem(kind, classicZone(k, kind), { auto: true }));
+  if (grade.gInside && gradeOn()) list.push(STK.newItem('grade', 'in', { auto: true }));
+  if (typeArt.tInside && typeArt.tAmt > 0) list.push(STK.newItem('type', 'in', { auto: true }));
+  const m = snd.map, mv = (kind, key, how, a) => { const it = stackFind(list, kind); if (it) it.mv[key] = { m: how, a }; };
+  if (m.kick) mv('zoom', 'zoom', 'bass', 35);
+  if (m.spin) mv('zoom', 'spin', 'music', 25);
+  if (m.color) mv('color', 'color', 'music', 35);
+  if (m.warp) mv('warp', 'warp', 'beat', 35);
+  if (m.asym) mv('offc', 'offc', 'beat', 40);
+  return STK.tidy(list);
+}
+function loopStack(k) {
+  const t = loops[k].tgt;
+  if (!Array.isArray(t.stack)) t.stack = stackFromClassic(k);
+  return t.stack;
+}
+function stackAllList() {
+  if (!stackAll) {
+    stackAll = [];
+    if (gradeOn() && !grade.gInside) stackAll.push(STK.newItem('grade', 'all', { auto: true }));
+    if (relief.rDepth > 0) stackAll.push(STK.newItem('relief', 'all', { auto: true }));
+    if (cloud.cAmt > 0) stackAll.push(STK.newItem('cloud', 'all', { auto: true }));
+    if (typeArt.tAmt > 0 && !typeArt.tInside) stackAll.push(STK.newItem('type', 'all', { auto: true }));
+  }
+  return stackAll;
+}
+const stackCopy = (list) => JSON.parse(JSON.stringify(list));
+function stackSetLoop(k, list) { loops[k].tgt.stack = STK.tidy(list); }
+function stackSetAll(list) {
+  stackAll = list;
+  try { localStorage.setItem(STACK_ALL_KEY, JSON.stringify(list)); } catch (_) {}
+}
+// Whether loop k's stack has kind on in zone (inside the loop, for Color grading and Type art)
+function stackHas(k, kind, zone) { const it = stackFind(loopStack(k), kind, zone); return !!(it && it.on); }
+// Whether effect fx works inside loop k's own pass now: from the stack while it's drawn, else Classic's switch
+function fxIn(k, t, fx) {
+  if (stackRunK && k === stackRunK) { const it = stackFind(loopStack(k), fx); return !!(it && it.on && it.zone === 'in'); }
+  return !isFinal(t, fx);
+}
+function stackAfterLoad(d) {
+  for (const k of KEYS) loops[k].tgt.stack = STK.cleanList(d[k] && d[k].stack, false);
+  stackSetAll(STK.cleanList(d.stackAll, true));
+  if (!stackAll) stackAll = null;
+  stackSig = '';
+  stackRender();
+}
+
+// ---- keeping the stack in step with the faders (a few times a second)
+let stackSyncAt = 0;
+const stackHeld = (it, now) => stackOpen.has(it.id) || now - (stackTouch[it.id] || 0) < 5000;
+function stackSync(now) {
+  if (!stackMode || now < stackSyncAt) return;
+  stackSyncAt = now + 300;
+  let changed = false;
+  const anyWhere = (kind) => stackAllList().some((it) => it.kind === kind) || activeKeys().some((k) => !!stackFind(loopStack(k), kind));
+  for (const k of activeKeys()) {
+    const was = loopStack(k);
+    let list = was;
+    for (const kind of STK.CLASSIC) {
+      const it = stackFind(list, kind);
+      if (!it && kindActive(k, kind)) list = STK.insertAt(list, STK.newItem(kind, classicZone(k, kind), { auto: true }));
+      else if (it && it.auto && !kindActive(k, kind, true) && !stackHeld(it, now)) list = list.filter((x) => x !== it);
+    }
+    for (const kind of ['grade', 'type']) {
+      const it = stackFind(list, kind);
+      if (it && it.auto && !wholeActive(kind) && !stackHeld(it, now)) list = list.filter((x) => x !== it);
+    }
+    if (list !== was) { stackSetLoop(k, list); changed = true; }
+  }
+  let all = stackAllList();
+  const wasAll = all;
+  for (const kind of ['grade', 'relief', 'type', 'cloud']) {
+    const it = stackFind(all, kind), act = wholeActive(kind);
+    if (act && !anyWhere(kind)) {
+      // Type art and Color grading set to work inside the loops in Classic come into each loop
+      if ((kind === 'type' && typeArt.tInside) || (kind === 'grade' && grade.gInside)) {
+        for (const k of activeKeys()) stackSetLoop(k, [...loopStack(k), STK.newItem(kind, 'in', { auto: true })]);
+      } else all = [...all, STK.newItem(kind, 'all', { auto: true })];
+    } else if (!act && it && it.auto && !stackHeld(it, now)) all = all.filter((x) => x !== it);
+  }
+  if (all !== wasAll) { stackSetAll(all); changed = true; }
+  if (changed) stackRender();
+}
+
+// ---- drawing
+// The loop's faders as the stack draws them: an effect that's out of the stack or switched off counts as 0, and movers move theirs
+function stackEff(k) {
+  const L = loops[k], c = L.cur, e = L.eff || (L.eff = {});
+  Object.assign(e, c);
+  const list = loopStack(k), env = patchEnv(k), now = simT + 11 * (LOOP_OFF[k] || 0);
+  for (const kind of STK.CLASSIC) {
+    const it = stackFind(list, kind);
+    for (const key of STK.LOOP_KINDS[kind].keys) {
+      if (!it || !it.on) { e[key] = 0; continue; }
+      const m = it.mv[key];
+      if (m && m.m) { const el = sliderEls[key]; e[key] = clamp(c[key] + STK.moverDelta(it.id, key, m, now, env), +el.min, +el.max); }
+    }
+  }
+  return e;
+}
+// The loop's own pass for its stack's order inside the loop (one program per order, kept)
+function stackProg(k) {
+  const order = loopStack(k).filter((it) => it.on && it.zone === 'in' && STK.isLoopKind(it.kind)).map((it) => it.kind);
+  const parts = feedbackParts(order);
+  let p = fbCache.get(parts.sig);
+  if (!p) {
+    try {
+      p = program(feedbackFS(order));
+      gl.useProgram(p.p);
+      UNITS.forEach((name, i) => set1i(p, name, i));
+    } catch (err) { console.error('Effect stack order could not be drawn', err); p = fbClassic; }
+    fbCache.set(parts.sig, p);
+  }
+  return p;
+}
+// Loop k's frame: in Classic as it always was; with the stack, its faders as the stack has them, its own pass in the
+// stack's order, then its passes inside the loop (Patch effects, Type art)
+function runLoopAny(k, xf, brush, f) {
+  if (!stackMode) { fbProg = fbClassic; runLoop(k, xf, brush, f); typeInLoop(k, f); return; }
+  const L = loops[k], real = L.cur;
+  fbProg = stackProg(k);
+  L.cur = stackEff(k);
+  stackRunK = k;
+  try { runLoop(k, xf, brush, f); stackInside(k, f); }
+  finally { L.cur = real; stackRunK = null; fbProg = fbClassic; }
+}
+// Patch's layers as stack effects: their own copy of Patch's pass, with how much of it is laid over (uMix)
+let stackPatchProg = null;
+try {
+  stackPatchProg = program(PATCH.FS.replace('out vec4 o;', 'uniform float uMix;\nout vec4 o;')
+    .replace('o = vec4(clamp(c, 0.0, 1.0), 1.0);', 'o = vec4(clamp(mix(prev, c, uMix), 0.0, 1.0), 1.0);'));
+} catch (err) { console.error('Patch effects in the stack could not start', err); }
+function stackPatchPass(dst, srcTex, it, k, mixK, dt) {
+  if (!stackPatchProg) { copyInto(dst, srcTex); return; }
+  const K = STK.PATCH_KINDS[it.kind], pr = stackPatchProg;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(pr.p);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex);
+  set1i(pr, 'uPrev', 0);
+  set2f(pr, 'uSim', simW, simH);
+  set1f(pr, 'uPxK', simH / SIM_H);
+  set1f(pr, 'uZoom', 1);
+  const env = patchEnv(KEYS.includes(k) ? k : 'A'), now = simT + 11 * (LOOP_OFF[k] || 0);
+  const vals = K.p.map((q) => PATCH.value(it, q, now, env));
+  const si = K.p.findIndex((q) => q.k === 'speed');
+  const ck = 'stk:' + k + ':' + it.id;
+  patchClock[ck] = ((patchClock[ck] ?? 0) + dt * (si >= 0 ? PATCH.speedRate(vals[si]) : 1)) % 20000;
+  patchUP.fill(0);
+  K.p.forEach((q, i) => { patchUP[i] = q.opts ? vals[i] : vals[i] / 100; });
+  set1i(pr, 'uKind', K.id);
+  set1i(pr, 'uMode', it.blend || 0);
+  set1f(pr, 'uOpac', (it.opacity ?? 100) / 100);
+  set1f(pr, 'uT', patchClock[ck]);
+  set1f(pr, 'uMix', mixK);
+  const uP = U(pr, 'uP[0]');
+  if (uP) gl.uniform1fv(uP, patchUP);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+// Inside the loop, after its own pass: Patch's effects and Type art, in the stack's order. Each works on what the
+// loop keeps, part of the way each frame (Amount), at the same pace at any frame rate.
+function stackInside(k, f) {
+  const L = loops[k];
+  let typed = false;
+  for (const it of loopStack(k)) {
+    if (!it.on || it.zone !== 'in' || !L.rt) continue;
+    if (it.kind === 'type') { typeInLoop(k, f, true); typed = true; continue; }
+    if (!STK.isPatch(it.kind)) continue;
+    const a = clamp(it.amt ?? 100, 0, 100) / 100;
+    const src = L.rt[L.front], dst = L.rt[1 - L.front];
+    stackPatchPass(dst, src.tex, it, k, 1 - Math.pow(1 - a, f), f / 60);
+    L.front = 1 - L.front;
+  }
+  if (!typed) typeInLoop(k, f, false);
+}
+// On the way out: each effect laid over the loop's picture once, in order, into a pair of pictures taking turns.
+// Posterize keeps a picture of its own steps, so it can remember them as it does in Classic.
+function stackDropOut(L) {
+  if (!L.so) return;
+  L.so.rt.forEach(dropTarget);
+  if (L.so.mem) dropTarget(L.so.mem);
+  L.so = null;
+}
+function stackOut(k) {
+  const L = loops[k];
+  if (L.pz) { L.pz.rt.forEach(dropTarget); L.pz = null; }
+  const items = L.rt && (loopOn(k) || extraLoop(k)) ? loopStack(k).filter((it) => it.on && it.zone === 'out' && !(STK.LOOP_KINDS[it.kind] && STK.LOOP_KINDS[it.kind].first)) : [];
+  if (!items.length) { stackDropOut(L); return; }
+  if (!L.so || L.so.w !== simW || L.so.h !== simH) { stackDropOut(L); L.so = { rt: [makeTarget(), makeTarget()], f: 1, w: simW, h: simH, mem: null, stepped: false }; }
+  const so = L.so, e = L.eff || L.cur, dt = 1 / 60;
+  let src = shownTex(k);
+  for (const it of items) {
+    so.f = 1 - so.f;
+    const dst = so.rt[so.f];
+    if (STK.isPatch(it.kind)) stackPatchPass(dst, src, it, k, clamp(it.amt ?? 100, 0, 100) / 100, dt);
+    else stackFinalOne(k, it.kind, src, dst, e, so);
+    src = dst.tex;
+  }
+  so.live = true;
+}
+// One of the loop's effects laid over once, with Classic's Final Pass program (only that effect turned up)
+function stackFinalOne(k, kind, src, dst, e, so) {
+  const L = loops[k];
+  if (kind === 'poster' && !so.mem) so.mem = makeTarget();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(finalProg.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, kind === 'poster' ? so.mem.tex : src);
+  set2f(finalProg, 'uSim', simW, simH);
+  set1f(finalProg, 'uPxK', simH / SIM_H);
+  set1f(finalProg, 'uTime', simT + (11.0 * LOOP_OFF[k]));
+  mirrorUniforms(finalProg, k, kind === 'mirror' && mirrorAny(k));
+  set1f(finalProg, 'uSplit', kind === 'split' ? clamp(e.split, 0, 100) / 100 * 0.06 : 0);
+  set1f(finalProg, 'uWarp', kind === 'warp' ? clamp(L.warpNow ?? e.warp, 0, 100) / 100 * 0.05 : 0);
+  set1f(finalProg, 'uChroma', kind === 'chroma' ? Math.pow(clamp(e.chroma, 0, 100) / 100, 1.2) * 0.035 : 0);
+  set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
+  const steps = kind === 'poster' && e.poster > 0.5 ? posterSteps(e.poster) : 0;
+  set1f(finalProg, 'uN', steps);
+  set1f(finalProg, 'uHalftone', kind === 'halftone' && e.halftone > 0.5 ? halftoneCell(e.halftone) : 0);
+  set1f(finalProg, 'uFresh', kind === 'poster' && so.stepped ? 0 : 1);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  if (kind === 'poster') { copyInto(so.mem, dst.tex); so.stepped = steps > 0; }
+}
+// Whole picture: over every loop mixed (and Shapes), in order. Color grading and 3D lighting have passes of their own
+// here (in Classic they're part of the display pass, which leaves them out while the stack is on).
+let stackWholeProg = null;
+try {
+  stackWholeProg = program(`#version 300 es
+precision highp float;
+uniform sampler2D uTex;
+uniform vec2 uSim;
+uniform int uKind;
+uniform vec4 uGradeTone;
+uniform vec2 uGradeColor;
+uniform vec3 uGradeRGB;
+uniform vec3 uRelief, uReliefL;
+out vec4 o;
+${COMMON}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  vec3 col = texture(uTex, uv).rgb;
+  if (uKind == 0) col = gradeCol(col, uGradeTone, uGradeColor, uGradeRGB);
+  else {
+    vec2 k = vec2(uSim.y / uSim.x, 1.0) * uRelief.y;
+    vec3 t = vec3(0.0);
+    for (int i = 0; i < 16; i++) t = reliefAdd(t, reliefH(texture(uTex, uv + RELIEF_RING[i] * k).rgb), i);
+    col = reliefShade(col, t, reliefH(col), uRelief.x, uRelief.z, uReliefL);
+  }
+  o = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`);
+} catch (err) { console.error('Whole-picture effects could not start', err); }
+let stackWholeRT = null;
+function stackWholeTarget() {
+  if (!stackWholeRT || stackWholeRT.w !== simW || stackWholeRT.h !== simH) {
+    if (stackWholeRT) stackWholeRT.rt.forEach(dropTarget);
+    stackWholeRT = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH };
+  }
+  stackWholeRT.f = 1 - stackWholeRT.f;
+  return stackWholeRT.rt[stackWholeRT.f];
+}
+function stackWholePass(src, kind) {
+  if (!stackWholeProg) return src;
+  const dst = stackWholeTarget(), pr = stackWholeProg;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.viewport(0, 0, simW, simH);
+  gl.useProgram(pr.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src);
+  set1i(pr, 'uTex', 0);
+  set2f(pr, 'uSim', simW, simH);
+  if (kind === 'grade') {
+    set1i(pr, 'uKind', 0);
+    set4f(pr, 'uGradeTone', grade.gExposure / 10, grade.gContrast / 100, grade.gGamma / 100, grade.gSat / 100);
+    set2f(pr, 'uGradeColor', grade.gHue * Math.PI / 180, grade.gSepia / 100);
+    set3f(pr, 'uGradeRGB', grade.gRed / 100, grade.gGreen / 100, grade.gBlue / 100);
+  } else {
+    const R = reliefNow();
+    set1i(pr, 'uKind', 1);
+    set3f(pr, 'uRelief', R.rDepth / 100, 0.004 + 0.046 * R.rSmooth / 100, R.rShine / 100);
+    set3f(pr, 'uReliefL', reliefL[0], reliefL[1], reliefL[2]);
+  }
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return dst.tex;
+}
+function stackWhole(tex, dt) {
+  let out = tex, typed = false, dotted = false;
+  for (const it of stackAllList()) {
+    if (!it.on) continue;
+    if (it.kind === 'cloud') { out = cloudFinal(out, dt, true); dotted = true; }
+    else if (it.kind === 'type') { out = typeFinal(out, true); typed = true; }
+    else if (it.kind === 'grade') { if (gradeOn() && !seq.gradeOwned) out = stackWholePass(out, 'grade'); }
+    else if (it.kind === 'relief') { if (reliefNow().rDepth > 0) out = stackWholePass(out, 'relief'); }
+    else if (STK.isPatch(it.kind)) {
+      const dst = stackWholeTarget();
+      stackPatchPass(dst, out, it, 'A', clamp(it.amt ?? 100, 0, 100) / 100, dt);
+      out = dst.tex;
+    }
+  }
+  if (!dotted) cloudFinal(tex, dt, false);
+  if (!typed) typeFinal(tex, false);
+  return out;
+}
+
+// ---- the list on screen
+const stkList = $('#stkList'), stkAdd = $('#stkAdd'), stkFixed = $('#stkFixed');
+// Each control row's home in the Classic layout, so it can go back there
+const stackHome = new Map();
+function homeOf(el) {
+  if (!el) return null;
+  if (!stackHome.has(el)) { const ph = document.createComment('stack home'); el.before(ph); stackHome.set(el, ph); }
+  return el;
+}
+function sendHome(el) { const ph = stackHome.get(el); if (ph && ph.parentNode && el.previousSibling !== ph) ph.after(el); }
+function sendAllHome() { for (const el of stackHome.keys()) sendHome(el); }
+const ctlRow = (id) => { const el = document.getElementById(id); return el ? el.closest('.ctl') : null; };
+// The rows a card holds: the loop's own effect's control rows, or a whole-picture section's contents
+function stackRows(kind) {
+  if (STK.isLoopKind(kind)) return STK.LOOP_KINDS[kind].ctl.map(ctlRow).filter(Boolean);
+  const W = STK.WHOLE_KINDS[kind];
+  if (W.ctl) return W.ctl.map(ctlRow).filter(Boolean);
+  const body = $('#' + W.group + ' .group-body') || $('#' + W.group);
+  return [...body.children].filter((el) => el.tagName !== 'H2');
+}
+// The Classic hints that talk about Final Pass and Within Loops have no place in the stack
+for (const id of ['#gradeWhere', '#typeWhere']) { const n = $(id) && $(id).nextElementSibling; if (n && n.classList.contains('hint')) n.classList.add('stk-classic-hint'); }
+for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup']) $('#' + id).classList.add('classic-only');
+const MV_OPTS = (cur) => STK.MOVERS.map(([v, l]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${v ? '∿ ' : ''}${escapeHTML(l)}</option>`).join('');
+const KEY_NAME = { zoom: 'Zoom', spin: 'Spin' };
+function stackFader(label, act, k, v, min = 0, max = 100) {
+  return `<input type="range" min="${min}" max="${max}" step="1" value="${Math.round(v)}" style="--b: ${Math.round((v - min) / (max - min) * 100)}%" data-act="${act}"${k ? ` data-k="${k}"` : ''} aria-label="${escapeHTML(label)}">`;
+}
+function stackMoverRow(it, key, label) {
+  const m = it.mv[key];
+  return `<div class="stk-mvrow${m ? ' moving' : ''}"><span>${escapeHTML(label)} moves with</span><select data-act="mvm" data-k="${key}" aria-label="${escapeHTML(label)}: what moves it">${MV_OPTS(m && m.m)}</select>` +
+    (m ? stackFader(label + ': how far', 'mva', key, m.a) : '') + '</div>';
+}
+function stackPatchBody(it) {
+  const K = STK.PATCH_KINDS[it.kind];
+  let h = `<div class="pl-f"><div class="pl-fh"><span>Amount${it.zone === 'in' ? ' (each frame)' : ''}</span></div>${stackFader('Amount', 'amt', '', it.amt ?? 100)}</div>`;
+  if (K.g === 'pattern') {
+    h += `<div class="pl-c"><span>Blend</span><select data-act="blend">${PATCH.BLENDS.map((b, j) => `<option value="${j}"${j === (it.blend || 0) ? ' selected' : ''}>${b}</option>`).join('')}</select></div>`;
+    h += `<div class="pl-f"><div class="pl-fh"><span>Opacity</span></div>${stackFader('Opacity', 'opacity', '', it.opacity ?? 100)}</div>`;
+  }
+  for (const q of K.p) {
+    if (q.opts) {
+      h += `<div class="pl-c"><span>${escapeHTML(q.label)}</span><select data-act="opt" data-k="${q.k}">${q.opts.map((o, j) => `<option value="${j}"${j === it.p[q.k] ? ' selected' : ''}>${escapeHTML(o)}</option>`).join('')}</select></div>`;
+      continue;
+    }
+    h += `<div class="pl-f"><div class="pl-fh"><span>${escapeHTML(q.label)}</span></div>${stackFader(q.label, 'p', q.k, it.p[q.k])}</div>` + stackMoverRow(it, q.k, q.label);
+  }
+  return h;
+}
+const ZONE_RANK = { in: 0, out: 1, all: 2 };
+function stackItemHTML(it, i, n) {
+  const open = stackOpen.has(it.id), moving = Object.values(it.mv || {}).some((m) => m && m.m);
+  // Up and down go nowhere only at the very top or bottom with no other zone that way it can work in
+  const r = ZONE_RANK[it.zone], zs = STK.zonesOf(it.kind).map((z) => ZONE_RANK[z]);
+  const noUp = i === 0 && !zs.some((z) => z < r), noDown = i === n - 1 && !zs.some((z) => z > r);
+  return `<div class="stk-item z-${it.zone}${it.on ? '' : ' off'}" data-id="${it.id}" data-z="${it.zone}">` +
+    `<div class="stk-head"><button class="stk-grip" data-act="grip" title="Drag to move this effect up or down (or into another zone)" aria-label="Move ${escapeHTML(STK.labelOf(it.kind))}">⋮⋮</button>` +
+    `<button class="btn small pl-on" data-act="on" aria-pressed="${it.on}" title="Switch this effect on or off (it keeps its settings)"><span class="led"></span></button>` +
+    `<button class="stk-name" data-act="fold" aria-expanded="${open}">${escapeHTML(STK.labelOf(it.kind))}${moving ? '<span class="stk-mv" title="Something moves its faders">∿</span>' : ''}<span class="pl-caret">${open ? '▾' : '▸'}</span></button>` +
+    `<button class="pl-ic" data-act="up" title="Move up"${noUp ? ' aria-disabled="true"' : ''}>↑</button>` +
+    `<button class="pl-ic" data-act="down" title="Move down"${noDown ? ' aria-disabled="true"' : ''}>↓</button>` +
+    `<button class="pl-ic" data-act="del" title="Take this effect out">✕</button></div>` +
+    (open ? `<div class="stk-body" data-body="${it.id}">${STK.isPatch(it.kind) ? stackPatchBody(it) : ''}</div>` : '') + '</div>';
+}
+// Everything shown for the loop being edited, top to bottom: its items inside, its items on the way out, then the
+// whole-picture items (the same under every loop)
+function stackSeq() {
+  const list = loopStack(edit);
+  return [...list.filter((it) => it.zone === 'in'), '|out', ...list.filter((it) => it.zone === 'out'), '|all', ...stackAllList()];
+}
+const ZONE_HEAD = {
+  in: ['Inside the loop', 'builds up every frame'],
+  out: ['On the way out', 'laid over this loop once'],
+  all: ['Whole picture', 'every loop mixed, shared'],
+};
+let stackSig = '';
+function stackRender(force) {
+  if (!stackReady) return;
+  document.body.classList.toggle('stk', stackMode);
+  if (!stackMode) { if (stackSig) { sendAllHome(); stackSig = ''; } return; }
+  const seqList = stackSeq();
+  const sig = edit + '|' + JSON.stringify(seqList.map((it) => (typeof it === 'string' ? it : [it.id, it.kind, it.on, it.zone, stackOpen.has(it.id), Object.entries(it.mv || {}).map(([k, m]) => k + (m && m.m)).join(), it.blend, STK.isPatch(it.kind) ? STK.PATCH_KINDS[it.kind].p.filter((q) => q.opts).map((q) => it.p[q.k]).join() : ''])));
+  if (!force && sig === stackSig) { stackRefreshFaders(); return; }
+  stackSig = sig;
+  // Rows go home first, so rebuilding the list never throws them away
+  sendAllHome();
+  const trails = homeOf(ctlRow('trails'));
+  if (trails) stkFixed.append(trails);
+  const zones = { in: [], out: [], all: [] };
+  for (const it of seqList) if (typeof it !== 'string') zones[it.zone].push(it);
+  let html = '', idx = 0;
+  const n = seqList.filter((x) => typeof x !== 'string').length;
+  for (const z of ['in', 'out', 'all']) {
+    html += `<div class="stk-zone" data-zone="${z}">${ZONE_HEAD[z][0]} <small>${ZONE_HEAD[z][1]}</small></div>`;
+    if (!zones[z].length) html += `<p class="stk-empty" data-zone="${z}">Nothing here yet.</p>`;
+    for (const it of zones[z]) html += stackItemHTML(it, idx++, n);
+  }
+  stkList.innerHTML = html;
+  for (const it of seqList) {
+    if (typeof it === 'string' || !stackOpen.has(it.id) || STK.isPatch(it.kind)) continue;
+    const body = stkList.querySelector(`[data-body="${it.id}"]`);
+    if (!body) continue;
+    for (const row of stackRows(it.kind)) body.append(homeOf(row));
+    // Movers for the loop's own faders
+    if (STK.isLoopKind(it.kind)) {
+      const keys = STK.LOOP_KINDS[it.kind].keys;
+      const box = document.createElement('div');
+      box.innerHTML = keys.map((key) => stackMoverRow(it, key, KEY_NAME[key] || STK.labelOf(it.kind))).join('');
+      body.append(...box.children);
+    }
+  }
+  stackBuildAdd();
+}
+function stackRefreshFaders() {
+  for (const el of stkList.querySelectorAll('input[type="range"][data-act]')) {
+    if (el === document.activeElement) continue;
+    const it = stackItem(el), a = el.dataset.act, k = el.dataset.k;
+    if (!it) continue;
+    const v = a === 'p' ? it.p[k] : a === 'mva' ? it.mv[k] && it.mv[k].a : a === 'opacity' ? it.opacity : a === 'amt' ? it.amt : null;
+    if (v != null && el.value !== String(Math.round(v))) { el.value = String(Math.round(v)); el.style.setProperty('--b', el.value + '%'); }
+  }
+}
+function stackBuildAdd() {
+  const here = loopStack(edit), all = stackAllList();
+  const has = (kind) => (STK.isLoopKind(kind) ? !!stackFind(here, kind) : !!stackFind(all, kind) && (!STK.WHOLE_KINDS[kind].zones.includes('in') || !!stackFind(here, kind)));
+  let h = '<option value="">+ Add an effect…</option>';
+  for (const [g, kinds] of STK.MENU) h += `<optgroup label="${g}">` + kinds.map((k) => `<option value="${k}"${has(k) ? ' disabled' : ''}>${escapeHTML(STK.labelOf(k))}${has(k) ? ' (in the stack)' : ''}</option>`).join('') + '</optgroup>';
+  for (const [g, label] of PATCH.GROUPS) {
+    const ks = Object.entries(STK.PATCH_KINDS).filter(([, K]) => K.g === g);
+    h += `<optgroup label="From Patch: ${label}">` + ks.map(([k, K]) => `<option value="${k}">${escapeHTML(K.label)}</option>`).join('') + '</optgroup>';
+  }
+  stkAdd.innerHTML = h;
+  stkAdd.value = '';
+}
+function stackItem(el) {
+  const c = el.closest('.stk-item');
+  if (!c) return null;
+  return stackSeq().find((it) => typeof it !== 'string' && it.id === c.dataset.id) || null;
+}
+// Changes one item (by id), in the loop's list or the whole-picture list, without changing the old copies
+function stackChange(id, fn) {
+  const list = loopStack(edit);
+  if (list.some((it) => it.id === id)) { const l = stackCopy(list); fn(l.find((it) => it.id === id), l); stackSetLoop(edit, l); }
+  else { const l = stackCopy(stackAllList()); const it = l.find((x) => x.id === id); if (it) { fn(it, l); stackSetAll(l); } }
+}
+// A loop fader set from the stack (taking an effect out, or starting one), as if moved by hand
+function stackSetVal(k, key, v) {
+  if (ap.on) takeOver(key, k);
+  loops[k].tgt[key] = v;
+  if (k === edit) syncUI();
+}
+function stackStart(kind, zone) {
+  const k = edit;
+  if (STK.isLoopKind(kind)) {
+    if (kindActive(k, kind)) return;
+    const st = STK.LOOP_KINDS[kind].start || Object.fromEntries(STK.LOOP_KINDS[kind].keys.map((key) => [key, 30]));
+    for (const [key, v] of Object.entries(st)) {
+      if (key === 'mirror') { if (ap.on) takeOver('mirror', k); loops[k].tgt.mirror = v; } else stackSetVal(k, key, v);
+    }
+    syncUI();
+  } else if (kind === 'type' && !(typeArt.tAmt > 0)) setType({ ...typeArt, tAmt: 60 });
+  else if (kind === 'relief' && !(relief.rDepth > 0)) setRelief({ ...relief, rDepth: 50 });
+  else if (kind === 'cloud' && !(cloud.cAmt > 0)) setCloud({ ...cloud, cAmt: 80 });
+}
+function stackStop(it, k) {
+  if (STK.isLoopKind(it.kind)) {
+    if (it.kind === 'mirror') { if (ap.on) takeOver('mirror', k); loops[k].tgt.mirror = 0; syncUI(); return; }
+    for (const key of STK.LOOP_KINDS[it.kind].keys) stackSetVal(k, key, 0);
+    return;
+  }
+  if (!STK.isWhole(it.kind)) return;
+  // A whole-picture effect still in another loop (or the whole picture) keeps going
+  const left = [...stackAllList(), ...activeKeys().flatMap((j) => loopStack(j))].filter((x) => x.kind === it.kind && x.id !== it.id);
+  if (left.length) return;
+  if (it.kind === 'type') setType({ ...typeArt, tAmt: 0 });
+  else if (it.kind === 'relief') setRelief({ ...relief, rDepth: 0 });
+  else if (it.kind === 'cloud') setCloud({ ...cloud, cAmt: 0 });
+  else if (it.kind === 'grade') setGrade(GRADE_DEF);
+}
+stkAdd.addEventListener('change', () => {
+  const kind = stkAdd.value;
+  stkAdd.value = '';
+  if (!kind || !STK.known(kind)) return;
+  let zone = STK.isPatch(kind) ? 'out' : STK.zonesOf(kind)[0];
+  if (kind === 'grade' || kind === 'type') zone = stackFind(stackAllList(), kind) ? 'in' : 'all';
+  const it = STK.newItem(kind, zone);
+  if (zone === 'all') stackSetAll([...stackAllList(), it]);
+  else if (STK.isLoopKind(kind)) stackSetLoop(edit, STK.insertAt(loopStack(edit), it));
+  else {
+    // After the last one in its zone
+    const l = loopStack(edit), at = zone === 'in' ? l.filter((x) => x.zone === 'in').length : l.length;
+    stackSetLoop(edit, [...l.slice(0, at), it, ...l.slice(at)]);
+  }
+  stackOpen.add(it.id);
+  stackTouch[it.id] = performance.now();
+  stackStart(kind, zone);
+  stackRender(true);
+  toast(`${STK.labelOf(kind)} added ${zone === 'in' ? 'inside the loop' : zone === 'out' ? 'on the way out' : 'over the whole picture'}. Drag it to change where it works.`);
+});
+// Moves an item to spot `to` in what's shown (stackSeq, with its zone markers), into the zone that spot is in.
+// Refused when the effect can't work there.
+function stackMoveTo(id, to, quiet) {
+  const seqList = stackSeq().map((x) => (typeof x === 'string' ? x : { ...x }));
+  const from = seqList.findIndex((x) => typeof x !== 'string' && x.id === id);
+  if (from < 0) return false;
+  const [it] = seqList.splice(from, 1);
+  if (to > from) to--;
+  to = clamp(to, 0, seqList.length);
+  seqList.splice(to, 0, it);
+  // The zone is set by the markers above it
+  let zone = 'in';
+  for (let i = 0; i < seqList.length; i++) {
+    const x = seqList[i];
+    if (x === '|out') zone = 'out'; else if (x === '|all') zone = 'all';
+    else if (typeof x !== 'string' && x.id === id) break;
+  }
+  if (!STK.zonesOf(it.kind).includes(zone)) {
+    const where = STK.zonesOf(it.kind).map((z) => ({ in: 'inside the loop', out: 'on the way out', all: 'over the whole picture' }[z])).join(' or ');
+    if (!quiet) toast(`${STK.labelOf(it.kind)} only works ${where}.`);
+    return false;
+  }
+  const wasZone = it.zone;
+  if (STK.isWhole(it.kind) && zone !== wasZone) {
+    const twin = zone === 'all' ? stackFind(stackAllList(), it.kind) : stackFind(loopStack(edit), it.kind);
+    if (twin) { if (!quiet) toast(`${STK.labelOf(it.kind)} is already there.`); return false; }
+  }
+  it.zone = zone;
+  if (STK.isPatch(it.kind) && wasZone !== zone) it.amt = zone === 'in' ? Math.min(it.amt ?? 100, 30) : (wasZone === 'in' ? 100 : it.amt);
+  const loopList = [], allList = [];
+  let z = 'in';
+  for (const x of seqList) {
+    if (x === '|out') { z = 'out'; continue; }
+    if (x === '|all') { z = 'all'; continue; }
+    (z === 'all' ? allList : loopList).push(x);
+  }
+  const tidy = STK.tidy(loopList);
+  if (!quiet && tidy.some((x, i) => x !== loopList[i]) && STK.LOOP_KINDS[it.kind] && !STK.LOOP_KINDS[it.kind].first) toast('Time warp, Photo finish and Corridor come first on the way out: they need the loop’s own past frames.');
+  stackSetLoop(edit, tidy);
+  stackSetAll(allList);
+  stackTouch[id] = performance.now();
+  stackRender(true);
+  return true;
+}
+function stackStep(id, dir) {
+  const seqList = stackSeq();
+  const at = seqList.findIndex((x) => typeof x !== 'string' && x.id === id);
+  if (at < 0) return;
+  // Down past a zone marker drops it at the top of the next zone; up past one, at the bottom of the zone before.
+  // When it can't work in the next zone it tries the one after.
+  for (let to = dir < 0 ? at - 1 : at + 2, tries = 0; tries < seqList.length && to >= 0 && to <= seqList.length; tries++, to += dir) {
+    if (stackMoveTo(id, to, true)) return;
+  }
+  stackMoveTo(id, dir < 0 ? at - 1 : at + 2);
+}
+stkList.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
+  const it = stackItem(b);
+  if (!it) return;
+  const a = b.dataset.act;
+  if (a === 'fold') { if (stackOpen.has(it.id)) stackOpen.delete(it.id); else stackOpen.add(it.id); stackRender(true); }
+  else if (a === 'on') { stackChange(it.id, (x) => { x.on = !x.on; x.auto = false; }); stackRender(true); }
+  else if (a === 'up' || a === 'down') { if (b.getAttribute('aria-disabled') !== 'true') stackStep(it.id, a === 'up' ? -1 : 1); }
+  else if (a === 'del') {
+    const k = edit;
+    if (STK.isLoopKind(it.kind) || it.zone !== 'all') stackSetLoop(k, loopStack(k).filter((x) => x.id !== it.id));
+    else stackSetAll(stackAllList().filter((x) => x.id !== it.id));
+    stackOpen.delete(it.id);
+    stackStop(it, k);
+    stackRender(true);
+  }
+});
+function stackOnField(e) {
+  const el = e.target, a = el.dataset && el.dataset.act;
+  const card = el.closest && el.closest('.stk-item');
+  if (card) stackTouch[card.dataset.id] = performance.now();
+  if (!a || !card) return;
+  const it = stackItem(el);
+  if (!it) return;
+  const v = +el.value, k = el.dataset.k;
+  if (el.type === 'range') el.style.setProperty('--b', ((v - +el.min) / (+el.max - +el.min) * 100) + '%');
+  stackChange(it.id, (x) => {
+    x.auto = false;
+    if (a === 'p') x.p[k] = v;
+    else if (a === 'opt') x.p[k] = v;
+    else if (a === 'blend') x.blend = v;
+    else if (a === 'opacity') x.opacity = v;
+    else if (a === 'amt') x.amt = v;
+    else if (a === 'mva' && x.mv[k]) x.mv[k].a = v;
+    else if (a === 'mvm') { if (el.value) x.mv[k] = { m: el.value, a: x.mv[k] ? x.mv[k].a : 30 }; else delete x.mv[k]; }
+  });
+  if (a === 'mvm' || a === 'opt' || a === 'blend') stackRender(true);
+}
+stkList.addEventListener('input', stackOnField);
+stkList.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') stackOnField(e); });
+// Touching a loop fader inside a card makes the effect yours: it stays in the stack even at 0
+stkList.addEventListener('input', (e) => {
+  const card = e.target.closest('.stk-item');
+  if (!card || e.target.dataset.act) return;
+  const it = stackItem(card);
+  if (it && it.auto) stackChange(it.id, (x) => { x.auto = false; });
+}, true);
+// Dragging a card by its handle: a line shows where it will land
+const drag = { id: null, to: -1, el: null };
+function dragSpot(y) {
+  const seqList = stackSeq();
+  const marks = [...stkList.querySelectorAll('.stk-item, .stk-zone')];
+  let to = seqList.length, mark = null, after = false;
+  for (const m of marks) {
+    const r = m.getBoundingClientRect();
+    if (y < r.top + r.height / 2) {
+      mark = m;
+      if (m.classList.contains('stk-item')) to = seqList.findIndex((x) => typeof x !== 'string' && x.id === m.dataset.id);
+      else {
+        // Above a zone heading: the end of the zone before it
+        const z = m.dataset.zone;
+        to = z === 'in' ? 0 : seqList.indexOf(z === 'out' ? '|out' : '|all');
+      }
+      break;
+    }
+  }
+  if (!mark) { mark = marks[marks.length - 1]; after = true; }
+  return { to, mark, after };
+}
+stkList.addEventListener('pointerdown', (e) => {
+  const g = e.target.closest('.stk-grip');
+  if (!g || e.button !== 0) return;
+  const card = g.closest('.stk-item');
+  e.preventDefault();
+  drag.id = card.dataset.id;
+  drag.el = card;
+  card.classList.add('dragging');
+  g.setPointerCapture(e.pointerId);
+});
+stkList.addEventListener('pointermove', (e) => {
+  if (!drag.id) return;
+  const { to, mark, after } = dragSpot(e.clientY);
+  drag.to = to;
+  for (const m of stkList.querySelectorAll('.drop, .drop-after')) m.classList.remove('drop', 'drop-after');
+  if (mark) mark.classList.add(after ? 'drop-after' : 'drop');
+  if (mark && after) mark.classList.add('drop');
+});
+function dragEnd(apply) {
+  if (!drag.id) return;
+  const id = drag.id, to = drag.to;
+  drag.id = null;
+  if (drag.el) drag.el.classList.remove('dragging');
+  for (const m of stkList.querySelectorAll('.drop, .drop-after')) m.classList.remove('drop', 'drop-after');
+  if (apply && to >= 0) stackMoveTo(id, to);
+}
+stkList.addEventListener('pointerup', () => dragEnd(true));
+stkList.addEventListener('pointercancel', () => dragEnd(false));
+// Classic layout and back
+function setStackMode(on) {
+  stackMode = !!on;
+  try { localStorage.setItem('phosphor-fx-mode', stackMode ? 'stack' : 'classic'); } catch (_) {}
+  if (stackMode) {
+    // Effects set in Classic since the stack was last shown come in by themselves; the stacks themselves stay
+    stackSyncAt = 0;
+  } else {
+    for (const k of KEYS) stackDropOut(loops[k]);
+  }
+  stackSig = '';
+  syncUI();
+  showOSD('EFFECTS', stackMode ? 'EFFECT STACK' : 'CLASSIC LAYOUT');
+}
+$$('[data-fxmode]').forEach((b) => b.addEventListener('click', () => setStackMode(b.dataset.fxmode === 'stack')));
+stackReady = true;
+window.__plStack = { get mode() { return stackMode; }, setMode: setStackMode, list: (k) => loopStack(k || edit), all: () => stackAllList(),
+  moveTo: stackMoveTo, step: stackStep, sig: () => feedbackParts(loopStack(edit).filter((it) => it.on && it.zone === 'in').map((it) => it.kind)).sig,
+  programs: () => fbCache.size, sync: () => { stackSyncAt = 0; stackSync(performance.now()); } };
+
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
   const captureFps = capCfg()?.fps;
@@ -15301,6 +16044,7 @@ function frame() {
   drawMeter();
   seqTick(now);
   shapesTick(now, dt);
+  stackSync(now);
   if (!frozen) writeSpec(dt);
   // The 3D flights fly on, surging forward on the kick, and their lights flare on the beat
   if (Object.keys(SCENES).some(uses)) {
@@ -15309,7 +16053,7 @@ function frame() {
     // Only a scene shown by a loop that reacts surges with the music
     const sceneReacts = (name) => activeKeys().some((k) => reacts(k) && (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name));
     if (snd.analyser && Object.keys(SCENES).some(sceneReacts)) {
-      const a = sndPower(), E = snd.env, m = snd.map;
+      const a = sndPower(), E = snd.env, m = sndMapNow();
       if (m.kick) surge *= 1 + a * (E.low * 1.2 + E.beat * 2.5);
       if (m.flash) glow += a * (E.beat * 0.35 + E.low * 0.2);
     }
@@ -15348,7 +16092,7 @@ function frame() {
       if (loopOn(o) && (clamp(mix.cur[FEED_INTO[key]], 0, 100) > 0.1 || readsOther(key))) need[o] = true;
     }
     for (const key of act) mirrorStep(key, dt);
-    for (const key of act) if (need[key]) { runLoop(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f); typeInLoop(key, f); }
+    for (const key of act) if (need[key]) runLoopAny(key, clamp(mix.cur[FEED_INTO[key]], 0, 100) / 100, W[key] > 0.01 ? brush : null, f);
     // Cue mode's scout: the spare loop where new looks are tried out of sight
     if (cue.scout && loops.C.rt) { mirrorStep('C', dt); runLoop('C', 0, null, f); cueCapture(performance.now()); }
     // ... and the live previews' small loops, and the previews' moving pictures
@@ -15380,7 +16124,7 @@ function frame() {
   eyeTick(now, dt, wA, wB);
   const shown = drawShapes(now) || comp;
   // Whole picture as dots, then Type art set to Final Pass types the finished picture, shapes and all
-  const finalTex = typeFinal(cloudFinal(shown.tex, dt));
+  const finalTex = stackMode ? stackWhole(shown.tex, dt) : typeFinal(cloudFinal(shown.tex, dt));
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
@@ -15396,7 +16140,7 @@ function frame() {
   for (const key of activeKeys()) { wAll += W[key]; if (reacts(key)) wReact += W[key]; }
   const share = wAll > 0 ? wReact / wAll : 0;
   if (snd.analyser && share > 0) {
-    const a = sndPower() * share, E = snd.env, m = snd.map, calm = reduceMotion ? 0.4 : 1;
+    const a = sndPower() * share, E = snd.env, m = sndMapNow(), calm = reduceMotion ? 0.4 : 1;
     if (m.kick) punch = a * (E.beat * 0.06 + E.low * 0.025) * calm;
     if (m.flash) flash = a * E.beat * 0.3;
     if (m.color) hueKick = a * (E.high * 0.35 + E.beat * 0.3) * (snd.beats % 2 ? 1 : -1);

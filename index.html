@@ -705,8 +705,20 @@
           </div>
         </div>
 
-        <div class="group">
+        <div class="group stk-only" id="stackGroup">
+          <h2 id="h-stack">Effects</h2>
+          <div class="stk-top">
+            <span class="hint">Effects work top to bottom: drag one by its handle (or use the arrows) to change the order. Inside the loop, an effect builds up every frame; on the way out it's laid over the loop once; whole picture covers every loop mixed together. Every fader can be moved by a wave or the music: pick it beside the fader.</span>
+            <button class="btn small" data-fxmode="classic" title="The old layout, with separate areas for each kind of effect">Classic layout</button>
+          </div>
+          <div class="stk-fixed" id="stkFixed"></div>
+          <div class="stk-list" id="stkList"></div>
+          <select class="stk-add" id="stkAdd" aria-label="Add an effect"></select>
+        </div>
+
+        <div class="group classic-only" id="classicFx">
           <h2 id="h-shape">Effects</h2>
+          <div class="stk-top"><span class="hint">Try the new effect stack: every effect in one list you put in order.</span><button class="btn small" data-fxmode="stack">Effect stack</button></div>
           <div class="ctl">
             <div class="ctl-head"><label for="zoom">Zoom</label><output id="zoomOut" for="zoom"></output></div>
             <input type="range" id="zoom" class="bipolar" min="-100" max="100" step="1" value="0">
@@ -1042,6 +1054,7 @@
           </div>
           <div class="ctl">
             <span class="lbl">What the music moves</span>
+            <span class="hint stk-only">With the effect stack, the music moves whatever faders you pick inside each effect (beside the fader, choose Music, Bass or Beat hits). Only Sound on lines is set here.</span>
             <div class="chips" id="sndMap">
               <button class="chip" data-map="kick" aria-pressed="true" title="The picture punches in on every kick and pumps with the bass"><span class="led"></span>Zoom kick</button>
               <button class="chip" data-map="size" aria-pressed="true" title="The input swells on the bass"><span class="led"></span>Input size</button>
@@ -2000,6 +2013,7 @@
 <script src="js/pointcloud.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/patch.js"></script>
+<script src="js/stack.js"></script>
 <script src="js/helpers.js"></script>
 <script src="js/recording-formats.js"></script>
 <script src="js/output-template.js"></script>

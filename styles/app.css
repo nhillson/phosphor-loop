@@ -1268,3 +1268,40 @@ button.seq-card { cursor: pointer; }
 .pl-amt { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faint); padding-left: 12px; }
 .pl-amt input[type="range"] { flex: 1; height: 20px; }
 .pl-empty { margin: 0; padding: 10px; font-size: 13px; color: var(--dim); border: 1px dashed var(--line); border-radius: 6px; }
+
+/* ===== Effect stack (see "effect stack" in js/app.js) ===== */
+body:not(.stk) .stk-only, body.stk .classic-only { display: none !important; }
+body.stk .where-mini, body.stk #gradeWhere, body.stk #typeWhere, body.stk .stk-classic-hint { display: none !important; }
+body.stk #sndMap .chip:not([data-map="lines"]) { display: none; }
+.stk-top { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 2px 0 6px; }
+.stk-top .hint { flex: 1; }
+.stk-fixed { margin-bottom: 6px; }
+.stk-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 8px; }
+.stk-zone { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.stk-zone::after { content: ""; flex: 1; border-top: 1px dashed var(--line); }
+.stk-zone small { text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--faint); opacity: .8; }
+.stk-zone.drop { color: var(--amber-ink); }
+.stk-zone.drop::after { border-top-color: var(--amber); border-top-style: solid; }
+.stk-empty { margin: 0; padding: 7px 10px; font-size: 12px; color: var(--faint); border: 1px dashed var(--line); border-radius: 6px; }
+.stk-item { border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 6px; background: var(--well); position: relative; }
+.stk-item.z-out { border-left-color: var(--loop-b); }
+.stk-item.z-all { border-left-color: var(--loop-c); }
+.stk-item.off { opacity: .5; }
+.stk-item.drop::before { content: ""; position: absolute; left: -3px; right: 0; top: -5px; border-top: 2px solid var(--amber); }
+.stk-item.drop-after::before { top: auto; bottom: -5px; }
+.stk-item.dragging { opacity: .4; }
+.stk-head { display: flex; align-items: center; gap: 4px; padding: 3px 4px; }
+.stk-grip { width: 22px; height: 28px; border: 0; background: none; color: var(--faint); cursor: grab; padding: 0; font-size: 14px; letter-spacing: -2px; touch-action: none; }
+.stk-grip:active { cursor: grabbing; }
+.stk-head .pl-on { min-height: 28px; padding: 4px 8px; }
+.stk-name { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 4px; text-align: left; cursor: pointer; font-weight: 500; color: inherit; font: inherit; }
+.stk-name .stk-mv { color: var(--amber-ink); font-size: 12px; }
+.stk-name .stk-val { margin-left: auto; font-size: 11px; color: var(--faint); font-weight: 400; }
+.stk-name .pl-caret { margin-left: 6px; color: var(--dim); }
+.stk-body { display: grid; gap: 6px; padding: 2px 10px 8px; }
+.stk-body > .ctl { margin: 0; }
+.stk-mvrow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--faint); }
+.stk-mvrow select { width: auto; min-height: 24px; padding: 1px 6px; font-size: 12px; background: transparent; }
+.stk-mvrow.moving select { color: var(--amber-ink); border-color: var(--amber); }
+.stk-mvrow input[type="range"] { flex: 1; height: 20px; }
+.stk-add { width: 100%; }

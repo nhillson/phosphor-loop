@@ -123,7 +123,78 @@ vec2 mirrorFold(vec2 p) {
 }
 `;
 
-const FS_FEEDBACK = `#version 300 es
+// The loop's own pass is put together from pieces, so the Effect stack (see "effect stack" in js/app.js) can choose
+// the order the effects inside the loop work in. Movements change where each spot of the last frame is read from;
+// colors A work on the trails before the new input lands, colors B on the result. A slot name starting with #
+// is part of the loop itself and never moves. With no order given (Classic), the pieces come in their old order,
+// so the program is exactly the one it always was. The pieces of effects that are switched off cost nothing:
+// each waits behind a test of its own strength.
+const FB_MOVE = {
+  mirror: '',   // see feedbackParts: the first piece starts from the folded picture the inputs use too
+  zoom: '  q = rot(uSpin) * (q - uCenter) * exp(-uZoom) + uCenter;',
+  julia: '  if (uJulia > 0.0) q = mix(q, juliaAt(q), uJulia);',
+  crystal: '  if (uCrystal > 0.0) q = crystalAt(q);',
+  '#shift': '  q -= uShift;',
+  flow: '  if (uFlow > 0.0) q -= uFlow * flowAt(q, uTime * 0.6);',
+  '#ink': '  if (uInkDt > 0.0) q -= uInkDt * inkPush(pf);',
+  warp: `  q += uWarp * vec2(sin(q.y * 7.0 + uTime * 1.1 + sin(q.x * 3.0 + uTime * 0.5)),
+                    cos(q.x * 7.0 - uTime * 0.9 + sin(q.y * 2.0 - uTime * 0.3)));`,
+  // Wind: the picture is carried one way, in gusts (some patches blow harder than others) with a little curl,
+  // so it streams off to one side like smoke instead of spreading evenly
+  wind: `  if (uWind.z > 0.0) {
+    vec2 wd = uWind.xy, wp = vec2(-wd.y, wd.x);
+    float g = noiseD(q * 1.6 - wd * uTime * 0.9 + vec2(7.0, 3.0)).x;
+    q -= wd * uWind.z * (0.35 + 1.3 * g) + wp * uWind.z * 0.18 * flowAt(q, uTime * 0.8).y;
+  }`,
+  melt: '  if (uMelt > 0.0) q += meltAt(q, asp);',
+  push: '  if (uPush > 0.0) q += pushAt(q, asp);',
+  lookup: '  if (uLook > 0.0) q = lookAt(q, asp);',
+  // Shapes that swallow: the picture round them is pulled in and wound round
+  '#swallow': '  if (uSwN > 0) q += swallow(p);',
+  split: '  q.x += uSplit * side;',
+};
+const FB_COLOR_A = {
+  // Restless: only what is changing gets to stay. The picture that lands here is compared with what was here
+  // a frame ago; where they match, it fades away. Both are softened first, so it follows real movement.
+  restless: `  if (uRestless > 0.0) {
+    vec3 here = 0.25 * (texture(uPrev, uv + vec2(px.x, 0.0)).rgb + texture(uPrev, uv - vec2(px.x, 0.0)).rgb +
+                        texture(uPrev, uv + vec2(0.0, px.y)).rgb + texture(uPrev, uv - vec2(0.0, px.y)).rgb);
+    vec3 d = abs(cb - here);
+    fb *= 1.0 - uRestless + uRestless * smoothstep(0.004, 0.06, luma(d));
+  }`,
+  grow: '  if (uGrow > 0.0) fb = growAt(fb, cb, st);',
+  // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
+  '#xfeed': '  if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);',
+  dye: '  if (uDye > 0.0) fb = dyeBy(fb, pf, asp);',
+  color: '  fb = max(hueRot(fb, uHue), 0.0);',
+};
+const FB_COLOR_B = {
+  grade: '  if (uGradeK > 0.0) outc = mix(outc, gradeCol(outc, uGradeTone, uGradeColor, uGradeRGB), uGradeK);',
+  poster: '  if (uPoster > 0.0) outc = posterize(outc, uPoster, 1.0);',
+  // Halftone here only darkens the gaps between its dots and never lights them up, or the loop would feed on its
+  // own full-bright dots and burn to white. It goes part of the way each frame, so trails fade as dots that shrink
+  // instead of vanishing at once
+  halftone: '  if (uHalftone > 0.0) outc = mix(outc, min(outc, halftone(outc, gl_FragCoord.xy / uPxK, uHalftone)), 0.25);',
+};
+// The pieces in the order asked for. Only the effects named in order trade places, and only among the slots they
+// already hold, so every other piece (and every slot in Classic) stays where it was.
+function fbOrder(table, order) {
+  const names = Object.keys(table);
+  if (!order) return names;
+  const mine = order.filter((n) => n in table && !n.startsWith('#'));
+  const set = new Set(mine);
+  let i = 0;
+  return names.map((n) => (set.has(n) ? mine[i++] : n));
+}
+function feedbackParts(order) {
+  const mv = fbOrder(FB_MOVE, order);
+  const moves = mv.map((n, i) => (n === 'mirror' ? (i === 0 ? '  q = pf;' : '  q = mirrorFold(q);') : FB_MOVE[n])).join('\n');
+  return { moves, colorsA: fbOrder(FB_COLOR_A, order).map((n) => FB_COLOR_A[n]).join('\n'),
+           colorsB: fbOrder(FB_COLOR_B, order).map((n) => FB_COLOR_B[n]).join('\n'), sig: mv.join() + '|' + fbOrder(FB_COLOR_A, order).join() + '|' + fbOrder(FB_COLOR_B, order).join() };
+}
+function feedbackFS(order) {
+  const { moves, colorsA, colorsB } = feedbackParts(order);
+  return `#version 300 es
 precision highp float;
 uniform sampler2D uPrev, uOther, uPic, uVid0, uVid1, uCam0, uCam1, uScr0, uScr1, uPho0, uPho1, uOtherPrev, uScene1, uScene2, uText;
 uniform vec2 uSim;
@@ -1054,27 +1125,8 @@ void main() {
   s *= uGain;
 
   // Where this pixel was one frame ago
-  vec2 q = rot(uSpin) * (pf - uCenter) * exp(-uZoom) + uCenter;
-  if (uJulia > 0.0) q = mix(q, juliaAt(q), uJulia);
-  if (uCrystal > 0.0) q = crystalAt(q);
-  q -= uShift;
-  if (uFlow > 0.0) q -= uFlow * flowAt(q, uTime * 0.6);
-  if (uInkDt > 0.0) q -= uInkDt * inkPush(pf);
-  q += uWarp * vec2(sin(q.y * 7.0 + uTime * 1.1 + sin(q.x * 3.0 + uTime * 0.5)),
-                    cos(q.x * 7.0 - uTime * 0.9 + sin(q.y * 2.0 - uTime * 0.3)));
-  // Wind: the picture is carried one way, in gusts (some patches blow harder than others) with a little curl,
-  // so it streams off to one side like smoke instead of spreading evenly
-  if (uWind.z > 0.0) {
-    vec2 wd = uWind.xy, wp = vec2(-wd.y, wd.x);
-    float g = noiseD(q * 1.6 - wd * uTime * 0.9 + vec2(7.0, 3.0)).x;
-    q -= wd * uWind.z * (0.35 + 1.3 * g) + wp * uWind.z * 0.18 * flowAt(q, uTime * 0.8).y;
-  }
-  if (uMelt > 0.0) q += meltAt(q, asp);
-  if (uPush > 0.0) q += pushAt(q, asp);
-  if (uLook > 0.0) q = lookAt(q, asp);
-  // Shapes that swallow: the picture round them is pulled in and wound round
-  if (uSwN > 0) q += swallow(p);
-  q.x += uSplit * side;
+  vec2 q = p;
+${moves}
   vec2 st = q / vec2(asp, 1.0) + 0.5;
   float inside = 1.0;
   if (uEdge > 0.5) {
@@ -1094,17 +1146,7 @@ void main() {
   // Restless: only what is changing gets to stay. The picture that lands here is compared with what was here
   // a frame ago; where they match, it fades away.
   // Both are softened first, so it follows real movement rather than feeding on its own grain.
-  if (uRestless > 0.0) {
-    vec3 here = 0.25 * (texture(uPrev, uv + vec2(px.x, 0.0)).rgb + texture(uPrev, uv - vec2(px.x, 0.0)).rgb +
-                        texture(uPrev, uv + vec2(0.0, px.y)).rgb + texture(uPrev, uv - vec2(0.0, px.y)).rgb);
-    vec3 d = abs(cb - here);
-    fb *= 1.0 - uRestless + uRestless * smoothstep(0.004, 0.06, luma(d));
-  }
-  if (uGrow > 0.0) fb = growAt(fb, cb, st);
-  // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
-  if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);
-  if (uDye > 0.0) fb = dyeBy(fb, pf, asp);
-  fb = max(hueRot(fb, uHue), 0.0);
+${colorsA}
   fb = clamp(fb * uDecay - uFloor, 0.0, 1.0) * inside;
 
 
@@ -1120,16 +1162,13 @@ void main() {
   if (specA > 0.0) outc = mix(outc, s, specA);
   // Color filters inside the loop land on what the loop keeps, so it feeds itself the filtered picture next frame.
   // The grading only goes part of the way each frame; all of it every frame would pile up within a blink.
-  if (uGradeK > 0.0) outc = mix(outc, gradeCol(outc, uGradeTone, uGradeColor, uGradeRGB), uGradeK);
-  if (uPoster > 0.0) outc = posterize(outc, uPoster, 1.0);
-  // Halftone here only darkens the gaps between its dots and never lights them up, or the loop would feed on its
-  // own full-bright dots and burn to white. It goes part of the way each frame, so trails fade as dots that shrink
-  // instead of vanishing at once
-  if (uHalftone > 0.0) outc = mix(outc, min(outc, halftone(outc, gl_FragCoord.xy / uPxK, uHalftone)), 0.25);
+${colorsB}
   // Alpha: 1 less how much a Subject silhouette covers this spot this frame, so on screen it lies over the
   // other loops too (see FS_COMPOSITE)
   o = vec4(outc, 1.0 - cover);
 }`;
+}
+const FS_FEEDBACK = feedbackFS(null);
 
 const FS_COMPOSITE = `#version 300 es
 precision highp float;
@@ -3125,5 +3164,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { feedbackFS, feedbackParts, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();
