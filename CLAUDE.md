@@ -228,3 +228,20 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    Use Point cloud (`apSet.cloud`, `apCloud`). `python3 tests/cloud_check.py` (about 2.5 minutes). Check with `--shot "Dust portrait"`
    and `--shot "Dot galaxy"`. js/pointcloud.js is listed in sw.js and android/tools/bundle_site.py.
    tests/check.py presses its buttons from a page script (Playwright's own click times out on this page in the workspace).
+4z6. **Effect stack** (branch `stack-mode`; Effects › Effect stack / Classic layout, `stackMode`, kept in `phosphor-fx-mode`, on to start with;
+   kinds in `js/stack.js`, glue under "effect stack" in js/app.js). Each loop's list is `tgt.stack` (never changed in place; `loopStack(k)`
+   makes one from the settings with `stackFromClassic` when missing), the whole-picture list `stackAll` (`phosphor-stack-all-v1`, in presets
+   as `stackAll`). Zones: `in` (the loop's own pass, put together in the stack's order by `feedbackFS(order)` / `feedbackParts` in
+   js/shaders.js: movements, colors before the input (A) and after it (B) trade places only among their own slots, so Classic order is the
+   old program exactly; one program per order in `fbCache`), `out` (`stackOut`: one pass per effect, the loop's own through `finalProg`
+   with only that effect up, Posterize remembering its steps in `so.mem`; Time warp / Photo finish / Corridor always first, `first`),
+   `all` (`stackWhole`: Point cloud dots, Type art, and Color grading / 3D lighting as passes of their own, `stackWholeProg`; the display
+   pass leaves those two out while the stack is on). Patch's effects/colors/patterns (`p:<kind>`) work in any zone through
+   `stackPatchProg` (Patch's pass plus `uMix`; inside a loop, Amount goes part of the way each frame). `runLoopAny` swaps `L.cur` for
+   `stackEff(k)` (out-of-stack or switched-off effects at 0, movers added) and sets `stackRunK` so `fxIn` / `setLoopGradeUniforms` read the
+   stack. `stackSync` (every 300 ms): an effect whose fader comes up joins its loop's stack (`auto`, old place and zone); an auto one leaves
+   once its fader is back to 0 and has faded (`kindActive(..., still)`), unless its card is open or was touched in the last 5 s. Taking an
+   effect out puts its faders to 0 (`stackStop`); adding starts it gently (`stackStart`). Cards hold the real control rows (moved in
+   with `homeOf` / `sendHome`, so pins, tooltips and Spread out columns keep working; `mirrorForward` picks the column's loop before finding
+   the control, since the cards are drawn afresh for it). React to sound's list is replaced by movers (`sndMapNow`: only Sound on lines).
+   `python3 tests/stack_check.py` (about 7 minutes; reaches in through `window.__plStack`). Cue mode's scout and live previews stay Classic.

@@ -10894,9 +10894,11 @@ function mirrorForward(e) {
   // A label's click is only passed on through the control it belongs to
   if (e.type === 'click' && t.closest && t.closest('label') && !t.closest('button, input, select, a')) return;
   const path = mirrorPath(m, t);
-  const real = path && atPath(editor, path);
-  if (!real) { mirrorRefreshSoon(); return; }
+  if (!path) { mirrorRefreshSoon(); return; }
+  // The loop is chosen first: its controls (the effect stack's cards) may be drawn afresh for it
   if (edit !== k) setEdit(k);
+  const real = atPath(editor, path);
+  if (!real) { mirrorRefreshSoon(); return; }
   if (e.type === 'input' || e.type === 'change') {
     if ('value' in t && real.value !== t.value) real.value = t.value;
     if (t.type === 'checkbox' || t.type === 'radio') real.checked = t.checked;
