@@ -1173,7 +1173,7 @@
         <button class="linkish ap-reset" id="apReset">Put these settings back to normal</button>
       </section>
 
-      <section class="group" aria-labelledby="h-screen">
+      <section class="group" id="screenGroup" aria-labelledby="h-screen">
         <h2 id="h-screen">Screen</h2>
         <div class="ctl">
           <span class="lbl" id="shapeLbl">Screen shape</span>
@@ -1194,6 +1194,19 @@
           </div>
           <span class="hint" id="sharpNote"></span>
         </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fpsLim">Frame rate limit</label><output id="fpsLimOut" for="fpsLim">NO LIMIT</output></div>
+          <input type="range" id="fpsLim" min="10" max="145" step="1" value="145">
+          <div class="ends"><span>Slower, lighter</span><span>No limit</span></div>
+          <span class="hint">The most frames a second Phosphor Loop draws. Lower it to give the computer a rest or to match a video (24 or 30), or to keep it steady when it can't quite keep up. Fewer frames also means fewer echoes in the loops, so looks change a little. Snaps to 15, 24, 25, 30, 48, 50, 60, 75, 90, 120 and 144. Double-click for No limit.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="resLim">Resolution limit</label><output id="resLimOut" for="resLim">NO LIMIT</output></div>
+          <input type="range" id="resLim" min="0" max="9" step="1" value="9">
+          <div class="ends"><span>240</span><span>No limit</span></div>
+          <span class="hint">The most lines the picture is drawn with, on this screen and in the Output window, whatever Picture sharpness picks. Lower it to lighten the load on a big screen or projector: the picture gets softer, and smoother if the computer was struggling. Double-click for No limit.</span>
+        </div>
+        <p class="hint" id="limNote"></p>
       </section>
 
       <section class="group" id="gradeGroup" aria-labelledby="h-grade">

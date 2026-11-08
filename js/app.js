@@ -32,7 +32,7 @@ const notCopy = (el) => !el.closest('.loop-col');
 // report what's happening right now (what's pinned, what Check each look has judged, a loop that isn't on screen,
 // a preset note...) stay on show. A description whose words change later (Pushed by's, say, which names the other
 // loop) keeps its tooltip up to date.
-const HINT_KEEP = ['feedNote', 'hiddenHint', 'vidLoopText', 'limSum', 'apCheckStat', 'apPinList', 'sharpNote', 'shapeNote',
+const HINT_KEEP = ['feedNote', 'hiddenHint', 'vidLoopText', 'limSum', 'apCheckStat', 'apPinList', 'sharpNote', 'limNote', 'shapeNote',
   'sharedHint', 'adminMsg', 'presetEmpty', 'presetApNote', 'tasteSum', 'micTip', 'loopbackHint', 'tasteAdminNote', 'spotifySetup'];
 // Where a description that isn't inside a control's own box goes
 const HINT_TARGET = { loopsHint: '#h-mix', dropHint: '#in1Lbl' };
@@ -8174,7 +8174,7 @@ $('#movesStop').addEventListener('click', () => movesStop());
 const mvTakeOver = (e) => {
   if (!MV.play || MV.applying || !e.isTrusted) return;
   const el = e.target;
-  if (!el.closest || !el.closest('aside.panel, .loop-col') || el.closest('#clipsDlg, .preset-row, .seq')) return;
+  if (!el.closest || !el.closest('aside.panel, .loop-col') || el.closest('#clipsDlg, .preset-row, .seq, #screenGroup')) return;
   if (e.type === 'input' && !el.matches('input[type="range"], select, input[type="checkbox"]')) return;
   if (e.type === 'click' && !el.closest('[data-src], .recipe, #inputs button')) return;
   movesStop(false, 'You took over, so the recording stopped. The picture stays as it was.');
@@ -10029,21 +10029,43 @@ const sharpAuto = { level: 0, top: sharpLowMem ? 3 : SHARP_LEVELS.length - 1, ce
 sharpAuto.ceiling = sharpAuto.top;
 try { const v = +localStorage.getItem(SHARP_AUTO_KEY); if (v > 0 && v <= sharpAuto.top) sharpAuto.level = Math.round(v); } catch (_) {}
 let fitLines = SIM_H, fitAspect = 4 / 3;
-// How many lines to draw, for the setting and the size the picture is shown at (never fewer than Standard)
+// Frame rate limit and Resolution limit (under Screen, kept in this browser): the most frames a second drawn (0: no
+// limit; see frame) and the most lines the picture is drawn with, the loops and the screen's own canvas (and the
+// Output window's) alike, whatever Picture sharpness picks (0: no limit; see wantLines, fit). Neither applies while
+// something else sets the size and speed: Phosphor Stream, Save clip's recording of a look, Export video (capCfg).
+const LIM_FPS_KEY = 'phosphor-fps-limit', LIM_RES_KEY = 'phosphor-res-limit';
+const LIM_FPS_OFF = 145;   // the fader's top: no limit
+const LIM_FPS_SNAP = [15, 24, 25, 30, 48, 50, 60, 75, 90, 120, 144];
+const LIM_RES = [240, 360, 480, 576, 720, 900, 1080, 1440, 2160, 0];
+const LIM_RES_NAME = { 240: '240', 360: '360', 480: '480', 576: '576 · STANDARD', 720: '720 · HD', 900: '900', 1080: '1080 · FULL HD', 1440: '1440 · 2K', 2160: '2160 · 4K' };
+const lim = { fps: 0, res: 0 };
+// Frames actually drawn a second, measured each second (shown at the top of the page and under the limits)
+const fpsMeter = { t: 0, n: 0, fps: 0, total: 0 };
+try {
+  const f = Math.round(+localStorage.getItem(LIM_FPS_KEY));
+  if (f >= 10 && f < LIM_FPS_OFF) lim.fps = f;
+  const r = Math.round(+localStorage.getItem(LIM_RES_KEY));
+  if (LIM_RES.includes(r)) lim.res = r;
+} catch (_) {}
+const limFps = () => (capCfg() ? 0 : lim.fps);
+const limLines = () => (capCfg() ? 0 : lim.res);
+// What Auto sharpness counts as smooth: 60 frames a second, or the frame rate limit when that's lower
+const limTarget = () => Math.min(60, limFps() || 60);
+// How many lines to draw, for the setting and the size the picture is shown at (never fewer than Standard, unless
+// the Resolution limit asks for fewer)
 function wantLines() {
   const cap = capCfg();
   if (cap) return cap.renderHeight || SIM_H;
   const top = Math.max(SIM_H, fitLines);
-  if (sharp === 'standard') return SIM_H;
-  if (sharp === 'high') return Math.min(1080, top);
-  if (sharp === 'full') return top;
-  return Math.min(SHARP_LEVELS[sharpAuto.level], top);
+  const n = sharp === 'standard' ? SIM_H : sharp === 'high' ? Math.min(1080, top) : sharp === 'full' ? top
+    : Math.min(SHARP_LEVELS[sharpAuto.level], top);
+  return limLines() ? Math.min(n, limLines()) : n;
 }
 function resim(aspect) {
   fitAspect = aspect;
   const cap = capCfg();
   // The stream app sets the lines itself (its build test asks for fewer than usual, on a computer with no graphics card)
-  let h = cap ? Math.max(120, Math.round(wantLines())) : Math.max(SIM_H, Math.round(wantLines()));
+  let h = cap ? Math.max(120, Math.round(wantLines())) : Math.max(Math.min(SIM_H, limLines() || SIM_H), Math.round(wantLines()));
   const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
   let w = clamp(Math.round(h * aspect / 4) * 4, 256, Math.min(maxTex, cap ? 3840 : Math.round(1600 * h / SIM_H)));
   if (!cap && h > SIM_H && w * h > maxPx()) {
@@ -10073,8 +10095,7 @@ function resim(aspect) {
 // The Picture sharpness buttons, its note and the line count at the top of the page
 function sharpSay() {
   $$('#sharp button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sharp === sharp)));
-  const lines = $('#linesOut');
-  if (lines) lines.textContent = `· ${simH} lines`;
+  topSay();
   const note = $('#sharpNote');
   if (!note) return;
   note.textContent = sharp === 'auto' ? `Auto: ${simH} lines right now. It sharpens the picture while this computer keeps it smooth, and steps back if it starts to slow down.`
@@ -10094,6 +10115,62 @@ $$('#sharp button').forEach((b) => b.addEventListener('click', () => {
   resim(fitAspect);
   showOSD('SHARPNESS', `${sharp.toUpperCase()} · ${simH} LINES`);
 }));
+// The line count and frames a second at the top of the page
+function topSay() {
+  const el = $('#linesOut');
+  if (el) el.textContent = `· ${simH} lines` + (fpsMeter.fps ? ` · ${fpsMeter.fps} fps` : '');
+}
+const fpsLimEl = $('#fpsLim'), resLimEl = $('#resLim');
+const fpsLimText = () => (lim.fps ? `${lim.fps} FPS` : 'NO LIMIT');
+const resLimText = () => (lim.res ? LIM_RES_NAME[lim.res] : 'NO LIMIT');
+// The faders, their read-outs and the note under them
+function limSay() {
+  fpsLimEl.value = lim.fps || LIM_FPS_OFF; fillTrack(fpsLimEl);
+  resLimEl.value = Math.max(0, LIM_RES.indexOf(lim.res)); fillTrack(resLimEl);
+  $('#fpsLimOut').textContent = fpsLimText();
+  $('#resLimOut').textContent = resLimText();
+  limNote();
+}
+function limNote() {
+  const n = $('#limNote');
+  if (!n) return;
+  const now = fpsMeter.fps ? `Right now: about ${fpsMeter.fps} frames a second, ${simH} lines.` : '';
+  n.textContent = capCfg() ? `${now} The limits rest while Phosphor Stream, a Save clip recording or Export video sets the size and speed.`.trim() : now;
+}
+function setFpsLim(v, quiet) {
+  v = Math.round(+v);
+  if (v >= LIM_FPS_OFF - 0.5 || !(v >= 10)) v = 0;
+  else { const s = LIM_FPS_SNAP.find((x) => Math.abs(x - v) <= 2); if (s) v = s; }
+  if (v === lim.fps) { limSay(); return; }
+  lim.fps = v;
+  try { localStorage.setItem(LIM_FPS_KEY, String(v)); } catch (_) {}
+  // Auto sharpness measures afresh against the new speed
+  Object.assign(sharpAuto, { t0: 0, fast: 0, slow: 0, justUp: false, settle: 30 });
+  limSay();
+  if (!quiet) showOSD('FRAME RATE LIMIT', fpsLimText());
+}
+function setResLim(i, quiet) {
+  const v = LIM_RES[clamp(Math.round(+i), 0, LIM_RES.length - 1)] ?? 0;
+  if (v === lim.res) { limSay(); return; }
+  lim.res = v;
+  try { localStorage.setItem(LIM_RES_KEY, String(v)); } catch (_) {}
+  Object.assign(sharpAuto, { t0: 0, fast: 0, slow: 0, justUp: false });
+  limSay();
+  // The size changes straight away: the screen's canvas, then the loops
+  clearTimeout(resimTimer);
+  firstFit = true;
+  fit();
+  if (!quiet) showOSD('RESOLUTION LIMIT', resLimText());
+}
+fpsLimEl.addEventListener('input', () => setFpsLim(fpsLimEl.value));
+fpsLimEl.addEventListener('dblclick', () => setFpsLim(LIM_FPS_OFF));
+resLimEl.addEventListener('input', () => setResLim(resLimEl.value));
+resLimEl.addEventListener('dblclick', () => setResLim(LIM_RES.length - 1));
+limSay();
+window.__plLimits = { get fps() { return fpsMeter.fps; }, get lines() { return simH; }, get drawn() { return { w: canvas.width, h: canvas.height }; },
+  get set() { return { ...lim }; }, get drawnFrames() { return fpsMeter.total; },
+  // (the workspace's software graphics draw fewer than 10 frames a second, so the test limits below the fader's lowest)
+  forceFps(v) { lim.fps = v; }, setFps: (v) => setFpsLim(v ?? LIM_FPS_OFF, true), setRes: (lines) => setResLim(lines ? LIM_RES.indexOf(lines) : LIM_RES.length - 1, true) };   // for tests/limits_check.py
 // Auto: every 120 frames it looks at how smoothly they came. Two smooth stretches in a row (55 or more frames a
 // second) step it up a level; two slow ones (under 45), or one right after a step up, step it back down, and it
 // stays below that level for five minutes before trying again. A paused page (hidden panel, sleeping laptop)
@@ -10103,17 +10180,20 @@ function sharpTick(now) {
   if (sharp !== 'auto' || capCfg() || document.hidden) { A.t0 = 0; return; }
   if (A.settle > 0) { A.settle--; A.t0 = 0; return; }
   if (!A.t0) { A.t0 = now; A.frames = 0; return; }
-  if (++A.frames < 120) return;
+  // With a Frame rate limit under 60, smooth means keeping up with the limit (and the stretches are as long in time)
+  const goal = limTarget();
+  if (++A.frames < Math.max(30, Math.round(120 * goal / 60))) return;
   const sec = (now - A.t0) / 1000;
   A.t0 = 0;
-  if (sec > 8) { A.fast = A.slow = 0; return; }
+  if (sec > 8 * 60 / goal) { A.fast = A.slow = 0; return; }
   const fps = A.frames / sec;
   if (A.ceiling < A.top && now - A.ceilingAt > 300000) A.ceiling = A.top;
   let to = A.level;
-  if (fps >= 55) {
+  const roomUp = SHARP_LEVELS[A.level] < Math.max(SIM_H, fitLines) && !(limLines() && SHARP_LEVELS[A.level] >= limLines());
+  if (fps >= goal * 55 / 60) {
     A.slow = 0; A.justUp = false;
-    if (++A.fast >= 2 && A.level < A.ceiling && SHARP_LEVELS[A.level] < Math.max(SIM_H, fitLines)) { to = A.level + 1; A.justUp = true; }
-  } else if (fps < 45) {
+    if (++A.fast >= 2 && A.level < A.ceiling && roomUp) { to = A.level + 1; A.justUp = true; }
+  } else if (fps < goal * 45 / 60) {
     A.fast = 0;
     if ((A.justUp || ++A.slow >= 2) && A.level > 0) {
       to = A.level - 1;
@@ -10167,6 +10247,8 @@ function fit() {
     const ow = Math.max(1, outWin.innerWidth), oh = Math.max(1, outWin.innerHeight);
     const odpr = Math.min(outWin.devicePixelRatio || 1, 2, Math.sqrt(Math.max(6e6, maxPx()) / (ow * oh)));
     cw = Math.max(1, Math.round(ow * odpr)); ch = Math.max(1, Math.round(oh * odpr));
+    // The Resolution limit: drawn smaller, and the Output window stretches it to fill its screen
+    if (limLines() && ch > limLines()) { cw = Math.max(1, Math.round(cw * limLines() / ch)); ch = limLines(); }
     if (outCanvas.width !== cw || outCanvas.height !== ch) { outCanvas.width = cw; outCanvas.height = ch; }
     aspect = ow / oh;
   } else {
@@ -10174,6 +10256,7 @@ function fit() {
     const full = maxPx() > SHARP_MAX_PX;
     const dpr = Math.min(window.devicePixelRatio || 1, full ? 2 : 1.5, Math.sqrt((full ? FULL_MAX_PX : 4.5e6) / (w * h)));
     cw = Math.max(1, Math.round(w * dpr)); ch = Math.max(1, Math.round(h * dpr));
+    if (limLines() && ch > limLines()) { cw = Math.max(1, Math.round(cw * limLines() / ch)); ch = limLines(); }
     aspect = w / h;
   }
   if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
@@ -15876,11 +15959,19 @@ window.__plStack = { get mode() { return stackMode; }, setMode: setStackMode, li
 
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
-  const captureFps = capCfg()?.fps;
-  if (captureFps) {
-    if (now < captureNextAt - 1) { requestAnimationFrame(frame); return; }
-    captureNextAt = Math.max(captureNextAt + 1000 / captureFps, now);
+  // At most this many frames a second: Phosphor Stream's own speed, or else the Frame rate limit (under Screen).
+  // The screen's frames that come too soon are skipped; the next one due is counted from the last one due, so the
+  // speed averages out right even when the screen's own rate doesn't divide evenly (60 Hz at 24, say).
+  const captureFps = capCfg()?.fps, maxFps = captureFps || limFps();
+  if (maxFps) {
+    if (now < captureNextAt - (captureFps ? 1 : 3)) { nextFrame(); return; }
+    captureNextAt = Math.max(captureNextAt + 1000 / maxFps, now);
   }
+  if (now - fpsMeter.t >= 1000) {
+    if (fpsMeter.t && now - fpsMeter.t < 3000) { fpsMeter.fps = Math.round(fpsMeter.n * 1000 / (now - fpsMeter.t)); topSay(); limNote(); }
+    fpsMeter.t = now; fpsMeter.n = 0;
+  }
+  fpsMeter.n++; fpsMeter.total++;
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
   sharpTick(now);
@@ -16067,7 +16158,10 @@ function frame() {
     else { try { outCtx.drawImage(canvas, 0, 0, outCanvas.width, outCanvas.height); } catch (_) {} }
   }
   updateTC(now);
-  // If this window is covered or minimized while the output window is showing, let that window keep the beat
+  nextFrame();
+}
+// If this window is covered or minimized while the output window is showing, let that window keep the beat
+function nextFrame() {
   if (outputOpen() && document.hidden) outWin.requestAnimationFrame(frame);
   else requestAnimationFrame(frame);
 }
