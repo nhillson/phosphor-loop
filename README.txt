@@ -283,6 +283,27 @@ TIPS
     type. Bold, Outline, Classic and Typewriter change the lettering, and long
     text wraps onto more lines by itself. Presets keep the words. The Guide's
     "Name in lights" recipe flies them down a tunnel.
+  - Point cloud: the picture as a cloud of glowing dots in 3D, bright parts
+    standing out towards you. Two ways to use it:
+      Point cloud input (under Inputs): pick what it makes dots of under
+        Dots of: Picture (a nature picture or your own), Video, Camera or
+        the Other loop.
+      Whole picture as dots (the Point cloud section, under Type art): turns
+        the whole finished picture into dots. Off at 0.
+    Both use the Point cloud section's settings: Recipes (Disintegrate,
+    Sandstorm, Jelly, Galaxy, Rain down, Ghost, Calm), Wind and its
+    direction, Swirliness, Gravity, Hold shape (how hard dots spring back),
+    Come back, Dissolve (and which side it blows away from), colors, how many
+    dots, depth, dot size and the rest.
+    While dots are on screen, dragging on the picture moves them: Smears,
+    Pushes, Pulls, Swirls or Tears (pick under "Dragging on the picture";
+    Draws goes back to drawing). Double-click or double-tap the picture to
+    blow it apart from there, or press Explode. With "Music hits blow it
+    apart" on and React to sound listening, the hits do it too.
+    Autopilot can bring Point cloud in as an input, and "Use Point cloud"
+    (under Autopilot) lets it turn the whole picture into dots with some
+    looks. Presets keep it; Neutral turns the whole-picture dots off.
+    Guide recipes: "Dust portrait" and "Dot galaxy".
   - Grow (in "Shape loop", under Dyed by) makes the picture grow patterns out
     of itself, like coral, zebra stripes or fingerprints. They start at
     outlines and spread through anything lit. Fine, Medium and Big set how far

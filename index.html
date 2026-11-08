@@ -426,6 +426,7 @@
             <button data-src="life" aria-pressed="false" title="Conway’s Game of Life: glowing cells that are born, live and die by a few simple rules">Life</button>
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
             <button data-src="patch" aria-pressed="false" title="Build your own moving picture from layers: patterns, effects and colors, read top to bottom, each fader movable by a wave or the music">Patch</button>
+            <button data-src="cloud" aria-pressed="false" title="A picture, video, the camera or the other loop turned into a cloud of glowing 3D dots that wind, your finger and explosions can blow about">Point cloud</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -518,6 +519,18 @@
             <span class="hint">The beam goes round every 4 seconds and the storms drift and change as it sweeps. Input size shrinks the circle to show more of the map.</span>
           </div>
 
+          <div class="dev" id="row-cloud" hidden>
+            <div class="ctl">
+              <span class="lbl" id="cloudOfLbl">Dots of</span>
+              <div class="seg seg-4" id="cloudOf" role="group" aria-labelledby="cloudOfLbl">
+                <button data-v="picture" aria-pressed="true" title="This loop’s picture: a nature picture or your own (the Picture controls show below)">Picture</button>
+                <button data-v="video" aria-pressed="false" title="This loop’s video">Video</button>
+                <button data-v="camera" aria-pressed="false" title="The camera, live">Camera</button>
+                <button data-v="loop" aria-pressed="false" title="The other loop’s picture, so the feedback itself turns into dots">Other loop</button>
+              </div>
+            </div>
+            <span class="hint">Bright parts stand out towards you. Wind, Dissolve, the colours and what dragging on the picture does are set in the Point cloud section (under Type art), shared with the whole-picture dots there.</span>
+          </div>
           <div class="dev" id="row-patch" hidden>
             <div class="ctl">
               <div class="preset-row pl-top">
@@ -1136,8 +1149,8 @@
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
         <div class="ctl">
-          <div class="chips"><button class="chip" id="apType" aria-pressed="false"><span class="led"></span>Use Type art</button></div>
-          <span class="hint">Autopilot brings Type art in with some new looks (its own pick of characters, font, color and size, fading in) and takes it out again with others. Off, it leaves Type art as you set it.</span>
+          <div class="chips"><button class="chip" id="apType" aria-pressed="false"><span class="led"></span>Use Type art</button><button class="chip" id="apCloud" aria-pressed="false"><span class="led"></span>Use Point cloud</button></div>
+          <span class="hint">Autopilot brings Type art in with some new looks (its own pick of characters, font, color and size, fading in) and takes it out again with others. Off, it leaves Type art as you set it. Use Point cloud does the same with the whole picture as dots (a recipe of its own picking, fading in).</span>
         </div>
         <div class="ctl">
           <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
@@ -1382,6 +1395,140 @@
           <span class="hint">Shows the picture faintly behind the characters.</span>
         </div>
         <div class="dev-actions"><button class="btn small" id="typeReset">Back to normal</button></div>
+      </section>
+
+      <section class="group" id="cloudGroup" aria-labelledby="h-cloud">
+        <h2 id="h-cloud">Point cloud</h2>
+        <p class="hint">Turns the picture into a cloud of glowing dots in 3D: bright parts stand out towards you. Wind, swirling air and gravity push the dots about, a spring pulls each one home, Dissolve lets parts stream away, and you can drag them with your finger or blow them up. Amount does it to the whole finished picture; the Point cloud input does it to one loop’s input. Both use the settings here. Presets keep them and Neutral turns Amount off.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cAmt">Whole picture as dots</label><output id="cAmtOut" for="cAmt"></output></div>
+          <input type="range" id="cAmt" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Only dots</span></div>
+          <span class="hint">Turns the whole finished picture into dots. Off leaves it alone; in between, the dots glow over the picture.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl">Recipes</span>
+          <div class="chips" id="cloudRecipes"></div>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="cloudModeLbl">Dragging on the picture</span>
+          <div class="seg seg-3" id="cloudMode" role="group" aria-labelledby="cloudModeLbl">
+            <button data-v="off" title="Dragging draws, as usual">Draws</button>
+            <button data-v="smear" title="Dots follow your finger like jelly">Smears</button>
+            <button data-v="push" title="Dots are shoved away from your finger and towards you">Pushes</button>
+            <button data-v="pull" title="Dots are sucked in towards your finger">Pulls</button>
+            <button data-v="swirl" title="Dots whirl round your finger like a whirlpool">Swirls</button>
+            <button data-v="tear" title="Dots under your finger come loose and blow away on the wind">Tears</button>
+          </div>
+          <span class="hint">While dots are on screen, dragging on the picture moves them (Draws goes back to drawing). Double-click or double-tap the picture to blow it apart from there.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cBrush">Finger size</label><output id="cBrushOut" for="cBrush"></output></div>
+          <input type="range" id="cBrush" min="5" max="80" step="1" value="25">
+          <div class="ends"><span>Small</span><span>Big</span></div>
+          <span class="hint">How much of the cloud your finger moves.</span>
+        </div>
+        <div class="dev-actions">
+          <button class="btn small" id="cloudBoom">💥 Explode</button>
+          <button class="btn small" id="cloudRebuild">Rebuild</button>
+          <button class="chip" id="cloudMusic" aria-pressed="true"><span class="led"></span>Music hits blow it apart</button>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cWind">Wind</label><output id="cWindOut" for="cWind"></output></div>
+          <input type="range" id="cWind" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Still</span><span>Gale</span></div>
+          <span class="hint">Blows loose dots away and makes the rest ripple.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cWindDir">Wind blows towards</label><output id="cWindDirOut" for="cWindDir"></output></div>
+          <input type="range" id="cWindDir" min="0" max="359" step="1" value="20">
+          <span class="hint">0° is to the right, 90° up, 180° left, 270° down.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cTurb">Swirliness</label><output id="cTurbOut" for="cTurb"></output></div>
+          <input type="range" id="cTurb" min="0" max="100" step="1" value="15">
+          <div class="ends"><span>Smooth</span><span>Stormy</span></div>
+          <span class="hint">Swirling currents in the air, so streams of dots curl and twist.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cGravity">Gravity</label><output id="cGravityOut" for="cGravity"></output></div>
+          <input type="range" id="cGravity" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Floating</span><span>Heavy</span></div>
+          <span class="hint">Loose dots fall like sand.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cHold">Hold shape</label><output id="cHoldOut" for="cHold"></output></div>
+          <input type="range" id="cHold" min="0" max="100" step="1" value="75">
+          <div class="ends"><span>Floppy</span><span>Firm</span></div>
+          <span class="hint">How hard each dot is pulled back to its place in the picture. Low turns it to jelly.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cHeal">Come back</label><output id="cHealOut" for="cHeal"></output></div>
+          <input type="range" id="cHeal" min="0" max="100" step="1" value="40">
+          <div class="ends"><span>Stay away</span><span>Quickly</span></div>
+          <span class="hint">How fast loose dots find their way home again.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cDissolve">Dissolve</label><output id="cDissolveOut" for="cDissolve"></output></div>
+          <input type="range" id="cDissolve" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Mostly gone</span></div>
+          <span class="hint">Lets go of parts of the picture, which stream away on the wind and keep reforming.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="cloudSideLbl">Dissolve from</span>
+          <div class="seg seg-5" id="cloudSide" role="group" aria-labelledby="cloudSideLbl">
+            <button data-v="0">Patches</button><button data-v="1">Right</button><button data-v="2">Left</button><button data-v="3">Top</button><button data-v="4">Bottom</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="cloudColorLbl">Colors</span>
+          <div class="seg seg-4" id="cloudColor" role="group" aria-labelledby="cloudColorLbl">
+            <button data-v="0">Picture</button><button data-v="1">Silver</button><button data-v="2">Purple</button><button data-v="3">Rainbow</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="cloudDensLbl">How many dots</span>
+          <div class="seg seg-4" id="cloudDens" role="group" aria-labelledby="cloudDensLbl">
+            <button data-v="0" title="About 30 thousand: light work for any computer">Few</button><button data-v="1" title="About 90 thousand">Some</button><button data-v="2" title="About 230 thousand">Lots</button><button data-v="3" title="About half a million: for a strong graphics card">Masses</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cDepth">Depth</label><output id="cDepthOut" for="cDepth"></output></div>
+          <input type="range" id="cDepth" min="0" max="100" step="1" value="45">
+          <div class="ends"><span>Flat</span><span>Deep</span></div>
+          <span class="hint">How far bright parts stand out towards you.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cSize">Dot size</label><output id="cSizeOut" for="cSize"></output></div>
+          <input type="range" id="cSize" min="5" max="40" step="1" value="16">
+          <div class="ends"><span>Fine</span><span>Fat</span></div>
+          <span class="hint">How big each dot is.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cBright">Brightness</label><output id="cBrightOut" for="cBright"></output></div>
+          <input type="range" id="cBright" min="10" max="200" step="1" value="80">
+          <div class="ends"><span>Dim</span><span>Blazing</span></div>
+          <span class="hint">How brightly the dots glow.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cTrails">Dot trails</label><output id="cTrailsOut" for="cTrails"></output></div>
+          <input type="range" id="cTrails" min="0" max="95" step="1" value="35">
+          <div class="ends"><span>None</span><span>Long</span></div>
+          <span class="hint">Moving dots leave glowing streaks (whole-picture dots only: the input uses its loop’s Trails).</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cSpark">Sparkle on loose dots</label><output id="cSparkOut" for="cSpark"></output></div>
+          <input type="range" id="cSpark" min="0" max="100" step="1" value="60">
+          <div class="ends"><span>Plain</span><span>Blazing</span></div>
+          <span class="hint">Dots that come loose glow white-hot, like embers.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cSway">Sway</label><output id="cSwayOut" for="cSway"></output></div>
+          <input type="range" id="cSway" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Still</span><span>Swaying</span></div>
+          <span class="hint">The view turns gently from side to side, so you see the cloud is 3D.</span>
+        </div>
+        <div class="dev-actions"><button class="btn small" id="cloudReset">Back to normal</button></div>
       </section>
 
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
@@ -1850,6 +1997,7 @@
 <script src="js/fractal-math.js"></script>
 <script src="js/shapes.js"></script>
 <script src="js/typeart.js"></script>
+<script src="js/pointcloud.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/patch.js"></script>
 <script src="js/helpers.js"></script>

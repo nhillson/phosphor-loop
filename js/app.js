@@ -159,16 +159,16 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, patch: 37 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, patch: 37, cloud: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', patch: 'Patch',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', patch: 'Patch', cloud: 'Point cloud',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null,
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
@@ -774,7 +774,7 @@ function vidFor(k) {
   for (const j of KEYS) if (vids[j].on) return vids[j];
   return own || vid;
 }
-const loopUsesVid = (k) => { const t = loops[k].tgt; return t.in1 === 'video' || t.in2 === 'video'; };
+const loopUsesVid = (k) => { const t = loops[k].tgt; return t.in1 === 'video' || t.in2 === 'video' || ((t.in1 === 'cloud' || t.in2 === 'cloud') && t.cloudOf === 'video'); };
 // Whether any loop on screen shows this player's video (its own loop, or one borrowing it)
 const vidInUse = (s) => activeKeys().some((k) => loopUsesVid(k) && vidFor(k) === s);
 // The video a recording or Save clip means: the edited loop's when it shows, or else the first one shown
@@ -1071,7 +1071,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patch (your layers)'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patch (your layers)'], ['cloud', 'Point cloud'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1296,7 +1296,7 @@ $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
 }));
 if (!twProg) $('#timeCtl').hidden = true;
 
-function uses(src) { return activeKeys().some((k) => loops[k].tgt.in1 === src || loops[k].tgt.in2 === src); }
+function uses(src) { return activeKeys().some((k) => { const t = loops[k].tgt; return t.in1 === src || t.in2 === src || ((t.in1 === 'cloud' || t.in2 === 'cloud') && (t.cloudOf || 'picture') === src); }); }
 
 // Pick an input for the loop being edited. Devices start right here, inside the click, so the
 // browser treats the camera or screen request as something the person asked for.
@@ -1315,6 +1315,7 @@ function chooseSource(slot, src) {
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src === 'genart') genEnsure(gens[edit]);
   if (src === 'patch' && !PhosphorPatch.clean(loops[edit].tgt.patch)) loops[edit].tgt.patch = PhosphorPatch.copy(PhosphorPatch.STARTERS[0]);
+  if (src === 'cloud') cloudSourceStart(loops[edit].tgt.cloudOf || 'picture');
   if (src !== 'none' && src !== 'picture' && src !== 'genart' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
@@ -1400,7 +1401,7 @@ function topoTrace(t) {
 }
 function readsOther(k) {
   const L = loops[k];
-  return [L.tgt.in1, L.tgt.in2].includes('loop') || topoTrace(L.tgt) === 'loop' || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
+  return [L.tgt.in1, L.tgt.in2].includes('loop') || ([L.tgt.in1, L.tgt.in2].includes('cloud') && L.tgt.cloudOf === 'loop') || topoTrace(L.tgt) === 'loop' || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
 }
 // A feed pours into the other loop, so if that loop isn't on screen, raising the slider slides
 // What you see to Both. (Only for the slider itself.)
@@ -1469,7 +1470,9 @@ function syncUI() {
   $$('#mirrorFx button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mfx === t.mirrorFx)));
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'patch']) $('#row-' + s).hidden = !usesHere(s);
+  const cloudHere = usesHere('cloud') ? (t.cloudOf || 'picture') : null;
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'patch', 'cloud']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere;
+  $$('#cloudOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.cloudOf || 'picture'))));
   if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
   syncTopoUI(t);
   syncLifeUI(t);
@@ -1551,10 +1554,11 @@ function patchLoop(k, p, force) {
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
-    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch']) n[q] = p[q] ?? L.tgt[q]; }
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
+  if (!['picture', 'video', 'camera', 'loop'].includes(n.cloudOf)) n.cloudOf = 'picture';
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
   // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
@@ -1584,7 +1588,7 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, patch: randomPatch(),
@@ -2305,7 +2309,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' || src === 'cloud' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound,
   };
@@ -2320,6 +2324,7 @@ function neutral() {
   setGrade(GRADE_DEF);
   setRelief(RELIEF_DEF);
   setType({ ...typeArt, tAmt: 0 });
+  setCloud({ ...cloud, cAmt: 0 });
   [cam, scr, pho, ...Object.values(vids)].forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   clearTargets();
@@ -2356,7 +2361,7 @@ function neutralLoop(k) {
   const L = loops[k], src = L.tgt.in1;
   patchLoop(k, {
     in1: src, in2: 'none', blend: 50, motion: false,
-    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'loop'].includes(src) ? 100 : 50,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic,
   }, true);
@@ -2390,7 +2395,7 @@ window.__plNeutralLoop = neutralLoop;   // for tests/neutral_loop_check.py
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2495,11 +2500,11 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patches'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cue: false, cuePreviews: true, cueLive: false, cueFade: false, cueFadeSecs: 2,
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cloud: false, cue: false, cuePreviews: true, cueLive: false, cueFade: false, cueFadeSecs: 2,
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
 // Autopilot never changes them, and moving their controls neither pins anything nor stops it.
@@ -2548,6 +2553,7 @@ try {
     for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(s[k])) apSet[k] = clamp(Math.round(s[k]), 0, 100);
     apSet.beat = s.beat === true;
     apSet.type = s.type === true;
+    apSet.cloud = s.cloud === true;
     apSet.cue = s.cue === true;
     apSet.cuePreviews = s.cuePreviews !== false;
     apSet.cueLive = s.cueLive === true;
@@ -3265,7 +3271,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3460,6 +3466,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (sc.in1 === 'radar') sc.size = Math.round(rnd(75, 100));
     if (sc.in1 === 'patch') sc.size = Math.round(rnd(70, 100));
+    if (sc.in1 === 'cloud') sc.size = Math.round(rnd(80, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
@@ -3468,6 +3475,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
     if ((sc.in1 === 'patch' || sc.in2 === 'patch') && !isPinned('in1', k)) sc.patch = randomPatch();
+    if ((sc.in1 === 'cloud' || sc.in2 === 'cloud') && !isPinned('in1', k)) sc.cloudOf = cloudApOf(k);
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
       if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
@@ -3526,7 +3534,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -3731,6 +3739,7 @@ function apStep(now, onBeat) {
   apGenart(came);
   apClip(came);
   apTypeArt(came, now);
+  apCloud(came, now);
   syncUI();
   apStatus();
 }
@@ -4493,6 +4502,7 @@ function tasteFeats(L) {
   if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
+  if (L.in1 === 'cloud' || L.in2 === 'cloud') f.push('cloud:' + (L.cloudOf || 'picture'));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -5238,6 +5248,7 @@ function syncApUI() {
   Object.keys(apCtl).forEach(showAp);
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $('#apType').setAttribute('aria-pressed', String(apSet.type));
+  $('#apCloud').setAttribute('aria-pressed', String(apSet.cloud));
   $('#apCheck').setAttribute('aria-pressed', String(apSet.check));
   $('#apHints').setAttribute('aria-pressed', String(apSet.hints));
   $('#apFsKeep').setAttribute('aria-pressed', String(apSet.fsKeep));
@@ -8772,16 +8783,20 @@ function startDraw(e, el) {
   // On a shape, it's picked up (and flung when let go) instead of drawn on
   const hit = shapes.hit(p[0], p[1]);
   if (hit) { shapes.grab(hit, p[0], p[1], performance.now()); pickShape(hit.id); el.style.cursor = 'grabbing'; return; }
+  // With dots on screen, dragging moves them (unless Point cloud's Dragging is set to Draws)
+  if (cloudPress(e, el)) return;
   drawing = true;
   pCur = p; pPrev = pCur;
 }
 function moveDraw(e, el) {
   if (shapes.held) { const p = pointerToP(e, el); shapes.drag(p[0], p[1], performance.now()); }
+  else if (cloudMove(e, el)) return;
   else if (drawing) pCur = pointerToP(e, el);
   else shapeHover(e, el);
 }
 function endDraw(e) {
   drawing = false;
+  cloudPtr.down = false;
   if (shapes.held) { shapes.release(performance.now()); if (e && e.target) e.target.style.cursor = ''; }
 }
 canvas.addEventListener('pointerdown', (e) => startDraw(e, canvas));
@@ -8965,6 +8980,18 @@ const RECIPES = [
     how: 'PATCH · LIQUID MARBLE · ZOOM 12 · SPIN 8 · TRAILS 82',
     sw: 'radial-gradient(ellipse at 30% 40%,#c04dff 0 6%,transparent 18%),repeating-linear-gradient(115deg,#07040c 0 9px,#2fd0ff 9px 10px,#07040c 10px 17px,#ff9a3d 17px 18px)',
     patch: { A: { in1: 'patch', patch: PhosphorPatch.copy(PhosphorPatch.STARTERS[0]), size: 100, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0 } } },
+  { name: 'Dust portrait', after: 'Drag on the picture to tear it, double-click to blow it apart. Pick another nature picture with ◀ ▶ under Picture, or Camera under Dots of.',
+    text: 'The picture as a cloud of glowing dots in 3D, one side blowing away on the wind in streams of embers and forever reforming.',
+    how: 'POINT CLOUD OF PICTURE · DISSOLVE FROM THE RIGHT · TRAILS 30',
+    sw: 'radial-gradient(circle at 40% 45%,#e8e4dc 0 3%,#9a968e 12%,transparent 30%),repeating-linear-gradient(20deg,#050505 0 3px,#d8d4cc 3px 4px,#050505 4px 9px)',
+    patch: { A: { in1: 'cloud', cloudOf: 'picture', size: 100, zoom: 0, spin: 0, trails: 30, color: 0, blur: 0 } },
+    cloud: { ...window.PhosphorPointCloud.RECIPES.Disintegrate, cAmt: 0, cMode: 'tear' } },
+  { name: 'Dot galaxy', after: 'Drag on the picture to stir the dots into whirlpools. Try other recipes under Point cloud.',
+    text: 'The whole feedback picture turned into rainbow dots in 3D that swirl like a galaxy and slowly pull back into shape.',
+    how: 'SHAPE · ZOOM IN 14 · SPIN 8 · TRAILS 88 · WHOLE PICTURE AS DOTS',
+    sw: 'radial-gradient(circle,#fff 0 2%,#ff5fc8 6%,#3bd1ff 14%,#8b1ab8 26%,#05030c 55%)',
+    patch: { A: { in1: 'shape', form: 3, size: 60, zoom: 14, spin: 8, trails: 88, color: 12, blur: 0 } },
+    cloud: { ...window.PhosphorPointCloud.RECIPES.Galaxy, cAmt: 100 } },
   { name: 'Terrain flight', after: 'It wanders from canyon to ridges to plains about once a minute.',
     text: 'A flight over land made of triangles, every edge a glowing wire: teal valleys, gold peaks and a low sun under a starry nebula.',
     how: 'TERRAIN · EVERYTHING ELSE OFF',
@@ -9008,6 +9035,7 @@ function applyRecipe(r) {
   mix.base = { ...mix.tgt };
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((p.adj && p.adj[src]) || {}) }; });
   syncAdjUI();
+  if (r.cloud) setCloud({ ...CLOUD_DEF, ...r.cloud });
   closeGuide();
   setEdit('A');
   // Start any device right here, inside the click, so the browser lets it ask for permission
@@ -9093,12 +9121,13 @@ function snapshot() {
     grade: { ...grade },
     relief: { ...relief },
     type: { ...typeArt },
+    cloud: { ...cloud },
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
   return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, taste: apSet.taste, beat: apSet.beat, check: apSet.check,
-    hints: apSet.hints, touch: apSet.touch, type: apSet.type,
+    hints: apSet.hints, touch: apSet.touch, type: apSet.type, cloud: apSet.cloud,
     off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim), weights: cleanWeights(apSet.weights) };
 }
 function markPreset(id) {
@@ -9212,6 +9241,8 @@ function loadPreset(pr, quiet) {
   setRelief(d.relief);
   // Presets saved before Type art existed load with it off
   setType(d.type);
+  // Presets saved before the Point cloud existed load with the whole-picture dots off
+  setCloud(d.cloud || { ...cloud, cAmt: 0 });
   // Start any camera, screen or phone the preset uses, right here inside the click
   const used = activeKeys().flatMap((k) => [loops[k].tgt.in1, loops[k].tgt.in2]);
   // A preset that shows Text brings back the words it was saved with (others leave your words alone)
@@ -9233,6 +9264,7 @@ function loadPreset(pr, quiet) {
     for (const k of ['every', 'fade', 'wild', 'mix', 'taste']) if (Number.isFinite(a[k])) apSet[k] = clamp(Math.round(a[k]), 0, 100);
     apSet.beat = a.beat === true;
     apSet.type = a.type === true;
+    apSet.cloud = a.cloud === true;
     // Presets saved before Check each look (or Learn from hints) existed have it on
     apSet.check = a.check !== false;
     apSet.hints = a.hints !== false;
@@ -10522,6 +10554,209 @@ function typeInLoop(k, f) {
   copyInto(L.rt[L.front], typeScratch.tex);
 }
 window.__plType = { typeArt, setType, ready: () => !!typeEng, failed: () => typeFailed, fadeTo: (v, secs) => { typeFadeTo(v, performance.now()); typeGlide.dur = secs * 1000; }, get gliding() { return typeGlide.on; } };
+/* ================= point cloud ================= */
+// The picture as a cloud of glowing 3D dots (js/pointcloud.js). Two ways in, sharing the Point cloud section's
+// settings (cloud): the Point cloud input turns one loop's picture, video, camera or the other loop into dots (a state
+// per loop, read through the slot a 3D world would use, as Patch is), and Whole picture as dots (cAmt) does it to the
+// finished picture, after Shapes and before Type art. While dots are on screen, dragging on the picture moves them
+// (cMode; Draws gives drawing back) and a double-click blows them apart. Presets keep it, Neutral turns cAmt off,
+// Autopilot brings the whole-picture dots in and out with Use Point cloud.
+const PCL = window.PhosphorPointCloud;
+const CLOUD_OF = ['picture', 'video', 'camera', 'loop'];
+const CLOUD_KEY = 'phosphor-cloud-v1';
+const CLOUD_DEF = { ...PCL.DEFAULTS };
+const CLOUD_NUM = ['cAmt', 'cBrush', 'cWind', 'cWindDir', 'cTurb', 'cGravity', 'cHold', 'cHeal', 'cDissolve', 'cDepth', 'cSize', 'cBright', 'cTrails', 'cSpark', 'cSway'];
+const CLOUD_SEG = { cMode: '#cloudMode', cSide: '#cloudSide', cColor: '#cloudColor', cDens: '#cloudDens' };
+const cloud = { ...CLOUD_DEF };
+const cloudEls = {};
+for (const k of CLOUD_NUM) cloudEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
+function cloudText(k, v) {
+  switch (k) {
+    case 'cAmt': return v === 0 ? 'OFF' : `${v}%`;
+    case 'cWindDir': return `${v}°`;
+    case 'cWind': case 'cDissolve': case 'cGravity': case 'cTrails': case 'cSway': return v === 0 ? 'OFF' : String(v);
+    case 'cSize': return (v / 10).toFixed(1);
+    default: return String(v);
+  }
+}
+// Any saved or loaded settings, made safe: missing or broken values are the defaults
+function cleanCloud(c) {
+  const out = { ...CLOUD_DEF };
+  if (!c || typeof c !== 'object') return out;
+  for (const k of CLOUD_NUM) { const { el } = cloudEls[k]; if (Number.isFinite(c[k])) out[k] = clamp(Math.round(c[k]), +el.min, +el.max); }
+  if (PCL.MODES.includes(c.cMode)) out.cMode = c.cMode;
+  if (Number.isInteger(c.cSide)) out.cSide = clamp(c.cSide, 0, 4);
+  if (Number.isInteger(c.cColor)) out.cColor = clamp(c.cColor, 0, 3);
+  if (Number.isInteger(c.cDens)) out.cDens = clamp(c.cDens, 0, PCL.DENS.length - 1);
+  out.cMusic = c.cMusic !== false;
+  return out;
+}
+function syncCloudUI() {
+  for (const [k, { el, out }] of Object.entries(cloudEls)) { el.value = cloud[k]; fillTrack(el); out.textContent = cloudText(k, cloud[k]); }
+  for (const [k, sel] of Object.entries(CLOUD_SEG)) $$(sel + ' button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === String(cloud[k]))));
+  $('#cloudMusic').setAttribute('aria-pressed', String(cloud.cMusic));
+}
+function saveCloud() { try { localStorage.setItem(CLOUD_KEY, JSON.stringify(cloud)); } catch (_) {} }
+const cloudGlide = { on: false, from: 0, to: 0, t0: 0, dur: 1, ui: 0 };
+function setCloud(c) { cloudGlide.on = false; Object.assign(cloud, cleanCloud(c)); syncCloudUI(); saveCloud(); }
+for (const [k, { el, out }] of Object.entries(cloudEls)) {
+  el.addEventListener('input', () => { cloudGlide.on = false; cloud[k] = +el.value; fillTrack(el); out.textContent = cloudText(k, cloud[k]); saveCloud(); });
+  el.addEventListener('dblclick', () => setCloud({ ...cloud, [k]: CLOUD_DEF[k] }));
+}
+for (const [k, sel] of Object.entries(CLOUD_SEG)) $$(sel + ' button').forEach((b) => b.addEventListener('click', () => {
+  setCloud({ ...cloud, [k]: k === 'cMode' ? b.dataset.v : +b.dataset.v });
+}));
+$('#cloudMusic').addEventListener('click', () => {
+  setCloud({ ...cloud, cMusic: !cloud.cMusic });
+  toast(cloud.cMusic ? 'The music’s hits blow the dots apart (with React to sound on).' : 'The music leaves the dots alone now.');
+});
+$('#cloudReset').addEventListener('click', () => setCloud({ ...CLOUD_DEF, cAmt: cloud.cAmt }));
+$('#cloudBoom').addEventListener('click', () => cloudBoomAt(null, null, 4.5));
+$('#cloudRebuild').addEventListener('click', () => { cloudAll((st) => cloudEng.rebuild(st)); });
+// A recipe sets the motion and look; with no dots on screen yet it also turns the whole picture into dots
+for (const name of Object.keys(PCL.RECIPES)) {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = name;
+  b.addEventListener('click', () => {
+    setCloud({ ...cloud, ...PCL.RECIPES[name], cAmt: cloudOnScreen() ? cloud.cAmt : 100 });
+    if (cloudEng) cloudAll((st) => cloudEng.rebuild(st));
+    showOSD('POINT CLOUD', name.toUpperCase());
+  });
+  $('#cloudRecipes').append(b);
+}
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(CLOUD_KEY) || 'null'); } catch (_) {} setCloud(saved); }
+// Dots of: what the Point cloud input of the loop being edited turns into dots. The camera starts right here, in the click.
+$$('#cloudOf button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.cloudOf = b.dataset.v;
+  cloudSourceStart(b.dataset.v);
+  settleDevices();
+  syncUI();
+  showOSD(`POINT CLOUD ${edit}`, b.textContent.toUpperCase());
+}));
+function cloudSourceStart(of) {
+  if (of === 'camera' && !cam.on) startCamera();
+  if (of === 'video' && !anyVid()) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
+}
+// What Autopilot gives a new Point cloud input to make dots of
+function cloudApOf(k) {
+  const o = ['picture', 'picture', 'picture', 'loop'];
+  if (vidFor(k).on && apAllowed('video')) o.push('video');
+  if (cam.on && apAllowed('camera')) o.push('camera');
+  return pick(o);
+}
+// The engine is made the first time dots are needed, so a graphics card that can't run it only loses the point cloud
+let cloudEng = null, cloudFailed = false;
+function cloudEngine() {
+  if (cloudEng || cloudFailed) return cloudEng;
+  try { cloudEng = PCL.create(gl); } catch (err) {
+    console.warn('Point cloud could not start:', err);
+    cloudFailed = true;
+    toast('The point cloud can’t run on this graphics card.');
+  }
+  return cloudEng;
+}
+const cloudSt = { final: null, A: null, B: null, C: null, D: null };
+function cloudAll(fn) { for (const st of Object.values(cloudSt)) if (st) fn(st); }
+const cloudUses = (k) => { const t = loops[k].tgt; return t.in1 === 'cloud' || t.in2 === 'cloud'; };
+function cloudOnScreen() { return cloud.cAmt > 0 || activeKeys().some((k) => cloudUses(k) && wOf(mix.cur, k) > 0.01); }
+// Your finger on the picture (0 to 1 across and up), for the dots
+const cloudPtr = { down: false, u: 0.5, v: 0.5, tap: 0, tx: 0, ty: 0 };
+function cloudPress(e, el) {
+  if (!cloudOnScreen() || cloudFailed) return false;
+  const r = el.getBoundingClientRect();
+  const u = (e.clientX - r.left) / r.width, v = 1 - (e.clientY - r.top) / r.height, now = performance.now();
+  if (now - cloudPtr.tap < 350 && Math.hypot(e.clientX - cloudPtr.tx, e.clientY - cloudPtr.ty) < 40) { cloudBoomAt(u, v, 4); cloudPtr.tap = 0; }
+  else Object.assign(cloudPtr, { tap: now, tx: e.clientX, ty: e.clientY });
+  if (cloud.cMode === 'off') return false;
+  Object.assign(cloudPtr, { down: true, u, v });
+  return true;
+}
+function cloudMove(e, el) {
+  if (!cloudPtr.down) return false;
+  const r = el.getBoundingClientRect();
+  cloudPtr.u = (e.clientX - r.left) / r.width; cloudPtr.v = 1 - (e.clientY - r.top) / r.height;
+  return true;
+}
+// A blast from (u, v), or the middle, through every cloud on screen
+function cloudBoomAt(u, v, strength) {
+  if (!cloudEngine()) return;
+  if (cloud.cAmt > 0 && !cloudSt.final) cloudSt.final = cloudEng.state();
+  for (const k of KEYS) if (cloudUses(k) && !cloudSt[k]) cloudSt[k] = cloudEng.state();
+  cloudAll((st) => cloudEng.burst(st, u, v, strength));
+}
+// The Point cloud input: loop k's dots, drawn at the loop's size. Input size 100 fits the whole picture.
+function drawCloud(k, t, scale, dt, otherTex) {
+  const eng = cloudEngine();
+  if (!eng) return null;
+  const of = t.cloudOf || 'picture';
+  let tex = null, aspect = simW / simH, flip = false;
+  if (of === 'picture') { const p = picOf(k); tex = p.tex; aspect = p.aspect; }
+  else if (of === 'video') { const v = vidFor(k); if (v.on && v.frames) { tex = v.cur; aspect = v.aspect; } }
+  else if (of === 'camera') { if (cam.on && cam.frames) { tex = cam.cur; aspect = cam.aspect; flip = cam.flip; } }
+  else tex = otherTex;
+  if (!tex) return null;
+  if (!cloudSt[k]) cloudSt[k] = eng.state();
+  const hits = reacts(k);
+  return eng.run(cloudSt[k], tex, aspect, simW, simH, hits ? cloud : { ...cloud, cMusic: false }, dt, { ptr: cloudPtr, trails: 0, fit: scale / 2.5, flip });
+}
+// Whole picture as dots: the finished picture's dots at the screen's own size, over the picture by Amount
+function cloudFinal(tex, dt) {
+  if (!(cloud.cAmt > 0)) { if (cloudSt.final && cloudEng) { cloudEng.release(cloudSt.final); cloudSt.final = null; } return tex; }
+  const eng = cloudEngine();
+  if (!eng) return tex;
+  if (!cloudSt.final) cloudSt.final = eng.state();
+  return eng.run(cloudSt.final, tex, simW / simH, canvas.width, canvas.height, cloud, dt, { ptr: cloudPtr, orig: tex, amt: cloud.cAmt / 100 });
+}
+// Each frame: Autopilot's fade, the music's hits, and letting go of the dots of loops that stopped using them
+let cloudBeats = 0;
+function cloudTick(now) {
+  if (cloudGlide.on) {
+    const u = clamp((now - cloudGlide.t0) / cloudGlide.dur, 0, 1), e = u * u * (3 - 2 * u);
+    cloud.cAmt = Math.round(cloudGlide.from + (cloudGlide.to - cloudGlide.from) * e);
+    if (u >= 1) { cloudGlide.on = false; syncCloudUI(); saveCloud(); }
+    else if (now - cloudGlide.ui > 250) { cloudGlide.ui = now; const c = cloudEls.cAmt; c.el.value = cloud.cAmt; fillTrack(c.el); c.out.textContent = cloudText('cAmt', cloud.cAmt); }
+  }
+  if (!cloudEng) return;
+  for (const k of KEYS) if (cloudSt[k] && !(cloudUses(k) && loopOn(k))) { cloudEng.release(cloudSt[k]); cloudSt[k] = null; }
+  if (snd.beats !== cloudBeats) {
+    cloudBeats = snd.beats;
+    if (cloud.cMusic && snd.analyser) {
+      const a = sndPower() * snd.env.beat;
+      if (a > 0.2) {
+        const u = rnd(0.3, 0.7), v = rnd(0.3, 0.7), str = 1 + 3 * Math.min(1, a);
+        if (cloudSt.final && share() > 0) cloudEng.burst(cloudSt.final, u, v, str);
+        for (const k of KEYS) if (cloudSt[k] && reacts(k)) cloudEng.burst(cloudSt[k], u, v, str);
+      }
+    }
+  }
+  function share() { return activeKeys().some((k) => reacts(k)) ? 1 : 0; }
+}
+// Autopilot's whole-picture dots (Use Point cloud, under Autopilot; off at first): like Use Type art, about a quarter
+// of new looks bring them in (more with How wild up) with a recipe of its own picking, fading up; the rest fade them out.
+function apCloud(came, now) {
+  if (!apSet.cloud || !came || cloudFailed) return;
+  const wild = apSet.wild / 100, isOn = cloud.cAmt > 0;
+  if (Math.random() >= 0.15 + 0.25 * wild) { if (isOn) cloudFadeTo(0, now); return; }
+  if (!isOn || Math.random() < 0.5) {
+    const ri = (a, b) => Math.round(rnd(a, b));
+    Object.assign(cloud, cleanCloud({ ...cloud, ...PCL.RECIPES[pick(Object.keys(PCL.RECIPES))], cAmt: cloud.cAmt,
+      cColor: Math.random() < 0.5 ? ri(0, 3) : 0, cDepth: ri(25, 80), cSway: ri(20, 80), cMode: cloud.cMode }));
+    if (cloudEng) cloudAll((st) => cloudEng.rebuild(st));
+  }
+  cloudFadeTo(Math.round(rnd(60 + 20 * wild, 100)), now);
+}
+function cloudFadeTo(to, now) {
+  Object.assign(cloudGlide, { on: true, from: cloud.cAmt, to, t0: now, dur: (ap.quick ? 1.5 : apFadeSec()) * 1000 });
+  syncCloudUI();
+}
+$('#apCloud').addEventListener('click', () => {
+  apSet.cloud = !apSet.cloud;
+  saveAp();
+  syncApUI();
+  toast(apSet.cloud ? 'Autopilot will turn the picture into dots with some new looks, and back with others.' : 'Autopilot leaves the Point cloud alone now.');
+});
+window.__plCloud = { cloud, setCloud, cloudSt, boom: cloudBoomAt, ready: () => !!cloudEng, failed: () => cloudFailed, ptr: cloudPtr, snap: () => snapshot(), load: (d) => loadPreset({ name: 'test', data: d }, true) };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
@@ -12562,12 +12797,16 @@ function runLoop(k, xf, brush, f) {
   const patchTex = t.in1 === 'patch' || t.in2 === 'patch' ? drawPatch(k, t, scale, f / 60) : null;
   if (t.in1 === 'patch') flyTex1 = patchTex;
   if (t.in2 === 'patch') flyTex2 = patchTex;
+  // A Point cloud's dots likewise
+  const cloudTex = t.in1 === 'cloud' || t.in2 === 'cloud' ? drawCloud(k, t, scale, f / 60, shownTex(otherLoop(k))) : null;
+  if (t.in1 === 'cloud') flyTex1 = cloudTex;
+  if (t.in2 === 'cloud') flyTex2 = cloudTex;
   // Life's board is read through the picture slot its input would use for a 3D world (it has no slot of its own:
   // see UNITS). Traced by Topo map, it's read from the first, as a traced 3D world is.
   const traced = topoTrace(t);
   const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
   const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
-  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'patch' && !patchTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
+  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'patch' && !patchTex) || (n === 'cloud' && !cloudTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -15054,6 +15293,7 @@ function frame() {
   exTick(now);
   movesTick(now);
   typeTick(now);
+  cloudTick(now);
   vcrTick();
   packAdj();
   analyzeSound(dt, now);
@@ -15139,8 +15379,8 @@ function frame() {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   eyeTick(now, dt, wA, wB);
   const shown = drawShapes(now) || comp;
-  // Type art set to Final Pass types the finished picture, shapes and all
-  const finalTex = typeFinal(shown.tex);
+  // Whole picture as dots, then Type art set to Final Pass types the finished picture, shapes and all
+  const finalTex = typeFinal(cloudFinal(shown.tex, dt));
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);

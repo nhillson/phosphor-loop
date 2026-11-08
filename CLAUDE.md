@@ -220,3 +220,11 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    `python3 tests/patch_check.py` (about 1.5 minutes, includes Spread out columns). js/patch.js is also listed in sw.js and
    android/tools/bundle_site.py. In this workspace check.py's Playwright clicks (Surprise, Autopilot...) and loops_check.py
    can time out on versions before Patch too; pressing them from a page script (`element.click()`) passes.
+4z5. **Point cloud** (js/pointcloud.js: one engine, a state per use, `create(gl)` → `state/run/release/burst/rebuild`; glue under
+   "point cloud" in js/app.js: settings `cloud` (`phosphor-cloud-v1`, kept in presets as `cloud`), the **Point cloud input**
+   (`src 'cloud'`, read through the 3D world slot as Patch is, `SRC_ID.cloud = 37`; per-loop `cloudOf` picture/video/camera/loop,
+   `drawCloud`), **Whole picture as dots** (`cAmt`, `cloudFinal` after Shapes, before Type art), dragging (`cloudPress`/`cloudMove` in
+   startDraw/moveDraw, `cMode` off = drawing), double-click / Explode (`cloudBoomAt`), music hits (`cloudTick`), Autopilot's
+   Use Point cloud (`apSet.cloud`, `apCloud`). `python3 tests/cloud_check.py` (about 2.5 minutes). Check with `--shot "Dust portrait"`
+   and `--shot "Dot galaxy"`. js/pointcloud.js is listed in sw.js and android/tools/bundle_site.py.
+   tests/check.py presses its buttons from a page script (Playwright's own click times out on this page in the workspace).

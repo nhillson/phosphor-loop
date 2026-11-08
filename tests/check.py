@@ -147,7 +147,9 @@ def run(c, a, base, problems):
                 if sel.startswith('js:'):
                     pg.evaluate(sel[3:])
                 else:
-                    pg.click(sel)
+                    # A page-script click: Playwright's own click can wait forever on this page in the workspace browser
+                    if not pg.evaluate('(s) => { const b = document.querySelector(s); if (!b) return false; b.click(); return true; }', sel):
+                        raise RuntimeError('not found')
             except Exception as e:
                 problems.append(f'could not press {sel}: {str(e).splitlines()[0]}')
                 continue
@@ -161,7 +163,8 @@ def run(c, a, base, problems):
         for kv in sets:
             k, v = kv.split('=', 1)
             if k.strip() == 'click':
-                pg.click(v.strip(), timeout=FAIL_FAST_MS)
+                if not pg.evaluate('(s) => { const b = document.querySelector(s); if (!b) return false; b.click(); return true; }', v.strip()):
+                    problems.append(f'nothing to click at {v.strip()}')
             elif k.strip() == 'pick':
                 sel, val = v.strip().rsplit(':', 1)
                 pg.select_option(sel, val, timeout=FAIL_FAST_MS)
