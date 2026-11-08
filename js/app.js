@@ -15772,6 +15772,15 @@ function apStackFor(k, sc) {
   const cur = Array.isArray(L.tgt.stack) ? L.tgt.stack : [];
   const fav = Array.isArray(sc.stack) ? STK.cleanList(stackCopy(sc.stack), false) : null;
   const on = (kind) => (kind === 'mirror' ? sc.mirror > 0 : STK.LOOP_KINDS[kind].keys.some((key) => Math.abs(+sc[key] || 0) > 0.5));
+  // Not too many at once: besides Zoom & spin, Color shift, Mirror and your Posterize and Halftone, a new look keeps
+  // its strongest few effects (2 at How wild 0 up to 5 at 100) and the rest are left out. Pinned ones always stay.
+  if (!fav) {
+    const BASE = ['zoom', 'color', 'mirror', 'poster', 'halftone'];
+    const strength = (kind) => Math.max(...STK.LOOP_KINDS[kind].keys.map((key) => Math.abs(+sc[key] || 0)));
+    const pinnedKind = (kind) => STK.LOOP_KINDS[kind].keys.some((key) => isPinned(key, k));
+    const extra = STK.CLASSIC.filter((kind) => !BASE.includes(kind) && on(kind) && !pinnedKind(kind)).sort((a, b) => strength(b) - strength(a));
+    for (const kind of extra.slice(2 + Math.round(3 * w))) for (const key of STK.LOOP_KINDS[kind].keys) sc[key] = 0;
+  }
   const zoneOf = (kind) => {
     const K = STK.LOOP_KINDS[kind];
     if (K.first) return 'out';
@@ -15862,7 +15871,8 @@ window.__plStack = { get mode() { return stackMode; }, setMode: setStackMode, li
   moveTo: stackMoveTo, step: stackStep, sig: () => feedbackParts(loopStack(edit).filter((it) => it.on && it.zone === 'in').map((it) => it.kind)).sig,
   programs: () => fbCache.size, sync: () => { stackSyncAt = 0; stackSync(performance.now()); },
   addTaste(p) { const c = cleanTasteProfile(p); if (c) { taste.profiles.push(c); renderTaste(); } return !!c; },
-  tasteShown: () => [...document.querySelectorAll('#tasteList .tp')].map((t) => t.dataset.id) };
+  tasteShown: () => [...document.querySelectorAll('#tasteList .tp')].map((t) => t.dataset.id),
+  kinds: Object.fromEntries(Object.entries(STK.LOOP_KINDS).map(([k, K]) => [k, K.keys])) };
 
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames

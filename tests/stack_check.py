@@ -215,6 +215,10 @@ def main():
         for L in seen:
             print('       look: ' + ', '.join(L))
         ok(all(len(L) for L in seen), 'every Autopilot look came with a stack')
+        # Not too many at once: at How wild 100 at most 5 effects beyond the basics, plus any still fading from the look before
+        fresh = pg.evaluate("""() => window.__plStack.list('A').filter(it => !['zoom','color','mirror','poster','halftone'].includes(it.kind)
+          && !it.kind.startsWith('p:') && ['A'].every(k => Math.max(...(window.__plStack.kinds[it.kind] || []).map(key => Math.abs(window.__plAp.loops.A.tgt[key] || 0))) > 0.5)).length""")
+        ok(fresh <= 5, f'the newest look has at most 5 effects besides the basics ({fresh})')
         ok(pg.evaluate('window.__plStack.programs()') > progs0, 'Autopilot changed the order inside the loop (a new program was made)')
         print(f'       {patchy} of 8 looks had a Patch effect or pattern, {moved} had a mover')
         shot('11b-autopilot-stacks', 20)

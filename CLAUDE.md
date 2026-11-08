@@ -211,7 +211,7 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    how each was made in `genart/CREDITS.txt`; `gen`, `gens` (a LiveSource video player per loop), `genPick`, `genTick` in js/app.js).
    It has no picture slot of its own (16-texture limit): its frames go through the Picture's slot (`loopUsesGen`, `SRC_ID.genart = 4`).
    The service worker leaves the .webm files to the network (Range requests). `python3 tests/genart_check.py` (about 2.5 minutes).
-4z4. **Patch's layers** (the Patch input was removed on the `stack-mode` branch; its kinds live on as effect stack items `p:<kind>`):
+4z4. **Patch's layers** (the Patch input was removed; its kinds live on as effect stack items `p:<kind>`):
    `js/patch.js` holds the layer kinds `KINDS` (patterns ids 0-14, effects 100-110, colors 200-204), movers (`value`: slow/fast wave,
    music, bass, beat; `speed` faders run a per-layer clock, `speedRate`) and the one-pass-per-layer shader `FS`; js/app.js keeps only
    `patchEnv`, `patchClock`, `patchUP` for the stack. Old looks whose input was Patch fall back to Wave (`patchLoop`). js/patch.js is
@@ -224,7 +224,7 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    Use Point cloud (`apSet.cloud`, `apCloud`). `python3 tests/cloud_check.py` (about 2.5 minutes). Check with `--shot "Dust portrait"`
    and `--shot "Dot galaxy"`. js/pointcloud.js is listed in sw.js and android/tools/bundle_site.py.
    tests/check.py presses its buttons from a page script (Playwright's own click times out on this page in the workspace).
-4z6. **Effect stack** (branch `stack-mode`; Effects › Effect stack / Classic layout, `stackMode`, kept in `phosphor-fx-mode`, on to start with;
+4z6. **Effect stack** (Effects › Effect stack / Classic layout, `stackMode`, kept in `phosphor-fx-mode`, on to start with;
    kinds in `js/stack.js`, glue under "effect stack" in js/app.js). Each loop's list is `tgt.stack` (never changed in place; `loopStack(k)`
    makes one from the settings with `stackFromClassic` when missing), the whole-picture list `stackAll` (`phosphor-stack-all-v1`, in presets
    as `stackAll`). Zones: `in` (the loop's own pass, put together in the stack's order by `feedbackFS(order)` / `feedbackParts` in
@@ -240,7 +240,8 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    effect out puts its faders to 0 (`stackStop`); adding starts it gently (`stackStart`). Cards hold the real control rows (moved in
    with `homeOf` / `sendHome`, so pins, tooltips and Spread out columns keep working; `mirrorForward` picks the column's loop before finding
    the control, since the cards are drawn afresh for it). React to sound's list is replaced by movers (`sndMapNow`: only Sound on lines).
-   **Autopilot's stacks** (`apStackFor`, called from `apFinish`, so Surprise and Cue looks get them too): the look's effects in their
+   **Autopilot's stacks** (`apStackFor`, called from `apFinish`, so Surprise and Cue looks get them too): the look's strongest few effects
+   (2 at How wild 0 to 5 at 100, besides Zoom & spin, Color shift, Mirror, Posterize, Halftone and anything pinned; the rest set to 0) in their
    places and zones, some swapped inside the loop and now and then one moved across (more with How wild; Posterize/Halftone stay put),
    sometimes a Patch effect or faint pattern (`AP_PATCH_FX` / `AP_PATCH_PAT`, `fadeIn`), movers (React to sound's old choices plus a
    random one); a liked look's stack comes back nearly as it was. Effects still fading stay until gone; Patch effects a new look drops
