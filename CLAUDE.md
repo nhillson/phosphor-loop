@@ -211,15 +211,11 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    how each was made in `genart/CREDITS.txt`; `gen`, `gens` (a LiveSource video player per loop), `genPick`, `genTick` in js/app.js).
    It has no picture slot of its own (16-texture limit): its frames go through the Picture's slot (`loopUsesGen`, `SRC_ID.genart = 4`).
    The service worker leaves the .webm files to the network (Range requests). `python3 tests/genart_check.py` (about 2.5 minutes).
-4z4. **Patch** (Inputs › Patch, an Auragen-style layer stack: `js/patch.js` holds the layer kinds `KINDS` (patterns ids 0-14,
-   effects 100-110, colors 200-204), ready-made `STARTERS`, movers (`value`: slow/fast wave, music, bass, beat; `speed` faders run a
-   per-layer clock, `speedRate`) and the one-pass-per-layer shader `FS`. Glue under "Patch: a stack of layers" in js/app.js:
-   `drawPatch` ping-pongs `patchRT[k]` and hands the result to the loop through the 3D world slot (`SRC_ID.patch = 37`, read with
-   `uSceneK` like a 3D world); each loop's patch is `tgt.patch`, never changed in place (`patchSet` copies); saved patches in
-   `phosphor-patches-v1`; `randomPatch` for Surprise/Autopilot. UI is rebuilt only when the stack's make-up changes (`patchSig`).
-   `python3 tests/patch_check.py` (about 1.5 minutes, includes Spread out columns). js/patch.js is also listed in sw.js and
-   android/tools/bundle_site.py. In this workspace check.py's Playwright clicks (Surprise, Autopilot...) and loops_check.py
-   can time out on versions before Patch too; pressing them from a page script (`element.click()`) passes.
+4z4. **Patch's layers** (the Patch input was removed on the `stack-mode` branch; its kinds live on as effect stack items `p:<kind>`):
+   `js/patch.js` holds the layer kinds `KINDS` (patterns ids 0-14, effects 100-110, colors 200-204), movers (`value`: slow/fast wave,
+   music, bass, beat; `speed` faders run a per-layer clock, `speedRate`) and the one-pass-per-layer shader `FS`; js/app.js keeps only
+   `patchEnv`, `patchClock`, `patchUP` for the stack. Old looks whose input was Patch fall back to Wave (`patchLoop`). js/patch.js is
+   listed in sw.js and android/tools/bundle_site.py.
 4z5. **Point cloud** (js/pointcloud.js: one engine, a state per use, `create(gl)` → `state/run/release/burst/rebuild`; glue under
    "point cloud" in js/app.js: settings `cloud` (`phosphor-cloud-v1`, kept in presets as `cloud`), the **Point cloud input**
    (`src 'cloud'`, read through the 3D world slot as Patch is, `SRC_ID.cloud = 37`; per-loop `cloudOf` picture/video/camera/loop,
@@ -244,4 +240,13 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    effect out puts its faders to 0 (`stackStop`); adding starts it gently (`stackStart`). Cards hold the real control rows (moved in
    with `homeOf` / `sendHome`, so pins, tooltips and Spread out columns keep working; `mirrorForward` picks the column's loop before finding
    the control, since the cards are drawn afresh for it). React to sound's list is replaced by movers (`sndMapNow`: only Sound on lines).
-   `python3 tests/stack_check.py` (about 7 minutes; reaches in through `window.__plStack`). Cue mode's scout and live previews stay Classic.
+   **Autopilot's stacks** (`apStackFor`, called from `apFinish`, so Surprise and Cue looks get them too): the look's effects in their
+   places and zones, some swapped inside the loop and now and then one moved across (more with How wild; Posterize/Halftone stay put),
+   sometimes a Patch effect or faint pattern (`AP_PATCH_FX` / `AP_PATCH_PAT`, `fadeIn`), movers (React to sound's old choices plus a
+   random one); a liked look's stack comes back nearly as it was. Effects still fading stay until gone; Patch effects a new look drops
+   fade out (`stackCarry` marks them `bye`, `stackAmt` eases amounts, `stackSync` removes them). New orders compile alongside drawing
+   (`stackProg` through `sceneReady`; the loop keeps `L.fbLast` meanwhile). **Taste**: profiles and sessions carry `mode: 'stack'` and
+   are shown/followed only in their layout (`tasteMode`, `tpMode`; switching layout waits for a session to finish); looks keep their
+   stack in votes (`tasteLook`), words `sk:` (effect@zone), `so:` (order), `sl:` (with the input), `sm:` (movers), `sa:` (whole picture).
+   Add menu: Movement / Color, texture and patterns / Time / Whole picture, A to Z (`STK.MENU`; some Patch kinds renamed, `PATCH_NAME`).
+   `python3 tests/stack_check.py` (about 9 minutes; reaches in through `window.__plStack`). Cue mode's scout and live previews stay Classic.

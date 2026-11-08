@@ -48,23 +48,30 @@ const WHOLE_KINDS = {
 };
 // The order the loop's own effects worked in before (Classic). New ones slot in by it.
 const CLASSIC = Object.keys(LOOP_KINDS);
+function labelOf(k) { return (LOOP_KINDS[k] || WHOLE_KINDS[k] || PATCH_KINDS[k] || { label: k }).label; }
+// Patch's kinds that join them (Patch's own Mirror, Zoom & turn and Posterize are left out: the loop has its own).
+// A few get names of their own here, so none reads the same as one of the loop's effects or inputs.
+const PATCH_SKIP = new Set(['mirror', 'move', 'poster']);
+const PATCH_NAME = { warp: 'Liquid warp', ripples: 'Raindrops', shape: 'Polygon', hue: 'Hue shift', tone: 'Brightness & contrast', dots: 'Dot grid' };
+const PATCH_KINDS = {};
+for (const [k, K] of Object.entries(PP.KINDS)) if (!PATCH_SKIP.has(k)) PATCH_KINDS['p:' + k] = { ...K, label: PATCH_NAME[k] || K.label };
+// The add menu: everything together by what it does, A to Z. Patch's movements are under Movement; its softening,
+// edges, colors and patterns (laid over the picture) under Color, texture and patterns.
+const byName = (a, b) => labelOf(a).localeCompare(labelOf(b));
 const MENU = [
-  ['Movement', ['zoom', 'mirror', 'warp', 'flow', 'melt', 'wind', 'offc', 'split', 'julia', 'crystal', 'lookup', 'chase', 'breathe', 'push']],
-  ['Color and texture', ['color', 'poster', 'halftone', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief']],
+  ['Movement', ['zoom', 'mirror', 'warp', 'flow', 'melt', 'wind', 'offc', 'split', 'julia', 'crystal', 'lookup', 'chase', 'breathe', 'push',
+    'p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].sort(byName)],
+  ['Color, texture and patterns', ['color', 'poster', 'halftone', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief',
+    ...Object.keys(PATCH_KINDS).filter((k) => !['p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].includes(k))].sort(byName)],
   ['Time', ['time', 'scan', 'corr']],
   ['Whole picture', ['type', 'cloud']],
 ];
-// Patch's kinds that join them (Patch's own Mirror, Zoom & turn and Posterize are left out: the loop has its own)
-const PATCH_SKIP = new Set(['mirror', 'move', 'poster']);
-const PATCH_KINDS = {};
-for (const [k, K] of Object.entries(PP.KINDS)) if (!PATCH_SKIP.has(k)) PATCH_KINDS['p:' + k] = K;
 const ZONE_NAME = { in: 'Inside the loop', out: 'On the way out', all: 'Whole picture' };
 
 const isLoopKind = (k) => k in LOOP_KINDS;
 const isWhole = (k) => k in WHOLE_KINDS;
 const isPatch = (k) => k in PATCH_KINDS;
 const known = (k) => isLoopKind(k) || isWhole(k) || isPatch(k);
-const labelOf = (k) => (LOOP_KINDS[k] || WHOLE_KINDS[k] || PATCH_KINDS[k] || { label: k }).label;
 function zonesOf(kind) {
   if (isLoopKind(kind)) return LOOP_KINDS[kind].zones;
   if (isWhole(kind)) return WHOLE_KINDS[kind].zones;

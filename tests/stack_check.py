@@ -124,6 +124,10 @@ def main():
         ok(pg.evaluate(LIST)[0] == 'poster:in', f'Posterize moved to the top inside the loop ({pg.evaluate(LIST)})')
         shot('4-posterize-inside')
         # Patch effects: Kaleido on the way out, then Gradient colors; Kaleido then into the loop
+        groups = pg.evaluate("() => [...document.querySelectorAll('#stkAdd optgroup')].map(g => g.label)")
+        ok(not any('Patch' in g for g in groups), f'no Patch groups in the menu ({groups})')
+        ok(pg.evaluate("() => document.querySelector('#stkAdd option[value=\"p:kaleido\"]').parentElement.label") == 'Movement', 'Kaleido is under Movement')
+        ok(not pg.evaluate("() => !!document.querySelector('#inputs [data-src=\"patch\"]')"), 'the Patch input is gone')
         pg.evaluate(PICK, ['#stkAdd', 'p:kaleido'])
         pg.evaluate(PICK, ['#stkAdd', 'p:colors'])
         c.wait_frames(3, 'after adding Patch effects')
@@ -196,6 +200,30 @@ def main():
         print('       Autopilot’s stack: ' + ', '.join(L))
         shot('11-autopilot', 10)
         pg.evaluate(CLICK, '#autopilot')
+        # Autopilot building whole stacks: at How wild 100, a run of new looks on loop A
+        pg.evaluate("() => { const A = window.__plAp; A.apSet.wild = 100; A.apSet.runs = ['A']; }")
+        pg.evaluate(CLICK, '#autopilot')
+        progs0 = pg.evaluate('window.__plStack.programs()')
+        seen, patchy, moved = [], 0, 0
+        for i in range(8):
+            pg.evaluate('window.__plAp.step()')
+            c.wait_frames(12, f'Autopilot look {i + 1}')
+            L = pg.evaluate("() => window.__plStack.list('A').map(it => it.kind + ':' + it.zone + (it.mv && Object.keys(it.mv).length ? '~' : ''))")
+            seen.append(L)
+            patchy += any(x.startswith('p:') for x in L)
+            moved += any('~' in x for x in L)
+        for L in seen:
+            print('       look: ' + ', '.join(L))
+        ok(all(len(L) for L in seen), 'every Autopilot look came with a stack')
+        ok(pg.evaluate('window.__plStack.programs()') > progs0, 'Autopilot changed the order inside the loop (a new program was made)')
+        print(f'       {patchy} of 8 looks had a Patch effect or pattern, {moved} had a mover')
+        shot('11b-autopilot-stacks', 20)
+        pg.evaluate(CLICK, '#autopilot')
+        # Taste profiles: the stack's are kept apart from Classic's
+        vote = [{'w': 1, 'src': 'up', 'feats': ['in:wave']}]
+        pg.evaluate('(v) => window.__plStack.addTaste({ id: "classicT", name: "Old taste", votes: v })', vote)
+        pg.evaluate('(v) => window.__plStack.addTaste({ id: "stackT", name: "Stack taste", votes: v, mode: "stack" })', vote)
+        ok(pg.evaluate('window.__plStack.tasteShown()') == ['stackT'], f'with the stack only its own taste profiles show ({pg.evaluate("window.__plStack.tasteShown()")})')
         # Loop B has a stack of its own
         pg.evaluate(CLICK, '#tabB')
         c.wait_frames(3, 'after picking loop B')
@@ -221,6 +249,8 @@ def main():
         ok(not pg.evaluate('window.__plStack.mode'), 'Classic layout chosen')
         ok(pg.evaluate("() => getComputedStyle(document.getElementById('classicFx')).display !== 'none'"), 'the Classic effects show')
         ok(pg.evaluate("() => document.getElementById('classicFx').contains(document.getElementById('zoom'))"), 'Zoom is back in the Classic layout')
+        shown = pg.evaluate('window.__plStack.tasteShown()')
+        ok('classicT' in shown and 'stackT' not in shown, f'in Classic only Classic taste profiles show ({shown})')
         shot('13-classic')
         pg.evaluate(CLICK, '#classicFx [data-fxmode="stack"]')
         c.wait_frames(5, 'after switching back')

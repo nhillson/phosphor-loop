@@ -159,9 +159,9 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, patch: 37, cloud: 37 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, cloud: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', patch: 'Patch', cloud: 'Point cloud',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', cloud: 'Point cloud',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
@@ -1071,7 +1071,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patch (your layers)'], ['cloud', 'Point cloud'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['cloud', 'Point cloud'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1314,7 +1314,6 @@ function chooseSource(slot, src) {
   if (src === 'spectro' && !snd.analyser && snd.src === 'off') toast('The spectrograph draws sound. Under the inputs, pick Computer sound or Microphone.');
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src === 'genart') genEnsure(gens[edit]);
-  if (src === 'patch' && !PhosphorPatch.clean(loops[edit].tgt.patch)) loops[edit].tgt.patch = PhosphorPatch.copy(PhosphorPatch.STARTERS[0]);
   if (src === 'cloud') cloudSourceStart(loops[edit].tgt.cloudOf || 'picture');
   if (src !== 'none' && src !== 'picture' && src !== 'genart' && src !== 'video') hideTip();
   settleDevices();
@@ -1471,13 +1470,12 @@ function syncUI() {
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   const cloudHere = usesHere('cloud') ? (t.cloudOf || 'picture') : null;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'patch', 'cloud']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere;
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'cloud']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere;
   $$('#cloudOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.cloudOf || 'picture'))));
   if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
   syncTopoUI(t);
   syncLifeUI(t);
   $$('#radarShows button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.radarWind)));
-  if (usesHere('patch') && patchUIReady) patchSync();
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
@@ -1559,6 +1557,8 @@ function patchLoop(k, p, force) {
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
+  // A new stack: the Patch effects of the one before fade out rather than vanish (see stackCarry)
+  if (!force && stackMode && Array.isArray(n.stack) && Array.isArray(L.tgt.stack)) n.stack = stackCarry(k, L.tgt.stack, n.stack);
   if (!['picture', 'video', 'camera', 'loop'].includes(n.cloudOf)) n.cloudOf = 'picture';
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
@@ -1589,10 +1589,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'cloud', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, patch: randomPatch(),
+    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3,
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -3273,7 +3273,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'cloud', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3467,7 +3467,6 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'topo') sc.size = Math.round(rnd(55, 100));
     if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (sc.in1 === 'radar') sc.size = Math.round(rnd(75, 100));
-    if (sc.in1 === 'patch') sc.size = Math.round(rnd(70, 100));
     if (sc.in1 === 'cloud') sc.size = Math.round(rnd(80, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
@@ -3476,7 +3475,6 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'topo' || sc.in2 === 'topo') && !isPinned('in1', k)) sc.topoPic = Math.random() < 0.35;
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
-    if ((sc.in1 === 'patch' || sc.in2 === 'patch') && !isPinned('in1', k)) sc.patch = randomPatch();
     if ((sc.in1 === 'cloud' || sc.in2 === 'cloud') && !isPinned('in1', k)) sc.cloudOf = cloudApOf(k);
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
@@ -3484,6 +3482,8 @@ function apFinish(sc, k, keep) {
     }
   }
   withPins(sc, k);
+  // With the effect stack, the look comes with a stack of its own (see apStackFor)
+  if (stackMode && KEYS.includes(k)) sc.stack = apStackFor(k, sc);
   return sc;
 }
 function clearLoop(k) {
@@ -4386,14 +4386,14 @@ const tasteNew = () => 't' + Date.now().toString(36) + randId(4);
 function cleanTasteProfile(p) {
   if (!p || typeof p !== 'object' || typeof p.id !== 'string' || !/^[a-z0-9]{1,40}$/i.test(p.id) || !Array.isArray(p.votes)) return null;
   return { id: p.id, name: String(p.name || 'Taste').slice(0, 40), votes: p.votes.filter(tasteVoteOK).slice(-TASTE_MAX),
-    thumb: tasteThumbOK(p.thumb) ? p.thumb : '', saved: Number(p.saved) || 0 };
+    thumb: tasteThumbOK(p.thumb) ? p.thumb : '', saved: Number(p.saved) || 0, ...(p.mode === 'stack' ? { mode: 'stack' } : {}) };
 }
 try {
   const t = JSON.parse(localStorage.getItem(TASTE_KEY) || 'null');
   if (t && Array.isArray(t.profiles)) {
     taste.profiles = t.profiles.map(cleanTasteProfile).filter(Boolean);
     if (typeof t.active === 'string' || t.active === null) taste.active = t.active;
-    if (t.session && Array.isArray(t.session.votes)) taste.session = { votes: t.session.votes.filter(tasteVoteOK), started: t.session.started || Date.now(), into: typeof t.session.into === 'string' ? t.session.into : null };
+    if (t.session && Array.isArray(t.session.votes)) taste.session = { votes: t.session.votes.filter(tasteVoteOK), started: t.session.started || Date.now(), into: typeof t.session.into === 'string' ? t.session.into : null, ...(t.session.mode === 'stack' ? { mode: 'stack' } : {}) };
   } else {
     // Ratings from before there were profiles become a profile of their own
     const old = JSON.parse(localStorage.getItem(TASTE_OLD_KEY) || 'null');
@@ -4421,9 +4421,10 @@ function tasteSource() {
     if (p) return { kind: 'session', training: p, name: p.name, votes: p.votes.concat(S.votes), target: S.votes };
     return { kind: 'session', name: 'this taste session', votes: S.votes, target: S.votes };
   }
-  const own = taste.profiles.find((p) => p.id === taste.active);
+  // Profiles are learned in one layout and followed only in it (see tasteMode): the effect stack starts fresh
+  const own = taste.profiles.find((p) => p.id === taste.active && tpMode(p) === tasteMode());
   if (own) return { kind: 'own', p: own, name: own.name, votes: own.votes };
-  const sh = taste.sharedList.find((p) => p.id === taste.active);
+  const sh = taste.sharedList.find((p) => p.id === taste.active && tpMode(p) === tasteMode());
   if (sh) return { kind: 'shared', p: sh, name: sh.name, votes: sh.votes };
   return { kind: 'none', name: '', votes: [] };
 }
@@ -4432,11 +4433,11 @@ function tasteSource() {
 function tasteTarget() {
   const s = tasteSource();
   if (s.kind === 'none') {
-    taste.session = { votes: [], started: Date.now(), into: null };
+    taste.session = { votes: [], started: Date.now(), into: null, ...(stackMode ? { mode: 'stack' } : {}) };
     return { votes: taste.session.votes, note: ' That started a taste session: rate some more, then Finish and name it under the picture.' };
   }
   if (s.kind !== 'shared') return { votes: s.target || s.votes, note: '' };
-  const copy = { id: tasteNew(), name: tasteFreeName(`${s.name} (mine)`), votes: s.votes.map((v) => ({ ...v })), thumb: s.p.thumb || '', saved: Date.now() };
+  const copy = { id: tasteNew(), name: tasteFreeName(`${s.name} (mine)`), votes: s.votes.map((v) => ({ ...v })), thumb: s.p.thumb || '', saved: Date.now(), ...(s.p.mode === 'stack' ? { mode: 'stack' } : {}) };
   taste.profiles.push(copy);
   taste.active = copy.id;
   return { votes: copy.votes, note: ` “${s.name}” is shared, so this starts your own copy, “${copy.name}”.` };
@@ -4451,6 +4452,10 @@ function tasteFreeName(name, except) {
   return `${name.slice(0, 36)} ${i}`;
 }
 const tasteCount = (votes) => votes.filter((v) => v.src === 'up' || v.src === 'down').length;
+// Which layout's taste: profiles made with the effect stack learn its order and zones, and are kept apart from the
+// Classic ones (which go on working in Classic layout)
+function tasteMode() { return stackMode ? 'stack' : 'classic'; }
+const tpMode = (p) => (p && p.mode === 'stack' ? 'stack' : 'classic');
 
 // What one loop's look is made of, in words Autopilot can count, in rough steps rather than exact numbers:
 //  - the plain words: its inputs, which effects are on (and how strongly, and how many), its mirror, where Zoom,
@@ -4513,6 +4518,18 @@ function tasteFeats(L) {
   for (const k of ['zoom', 'spin', 'mirror', 'trails', 'color']) f.push(`lk:${src}&${k}:${b[k]}`);
   for (let i = 0; i < b.fx.length; i++) for (let j = i + 1; j < b.fx.length; j++) f.push(`lfx:${b.fx[i]}+${b.fx[j]}`);
   f.push('look:' + lookKey(b));
+  // The effect stack: each effect with where it works, with the input, which comes right before which, and movers
+  if (Array.isArray(L.stack)) {
+    const on = L.stack.filter((it) => it && it.on !== false && STK.known(it.kind));
+    f.push('sn:' + Math.min(on.length, 6));
+    let prev = null;
+    for (const it of on) {
+      f.push(`sk:${it.kind}@${it.zone}`, `sl:${src}&${it.kind}@${it.zone}`);
+      if (prev && prev.zone === it.zone) f.push(`so:${prev.kind}>${it.kind}`);
+      prev = it;
+      for (const m of Object.values(it.mv || {})) if (m && m.m) f.push(`sm:${it.kind}:${m.m}`);
+    }
+  }
   return f;
 }
 // Loop k's look, keeping only what differs from the defaults (so ratings take little room and travel well)
@@ -4522,6 +4539,8 @@ function tasteLook(k) {
     const v = typeof t[f] === 'number' ? Math.round(t[f] * 100) / 100 : t[f];
     if (v !== TASTE_DEF[f]) o[f] = v;
   }
+  // With the effect stack, its order, zones and movers (what's being faded out left out)
+  if (stackMode && Array.isArray(t.stack)) o.stack = t.stack.filter((it) => !it.bye).map(({ id, auto, fadeIn, bye, ...r }) => r);
   return o;
 }
 // How a picture looks, from the eye's copies of it (all 0 to 1)
@@ -4558,6 +4577,7 @@ function tasteSceneNow() {
   const P = activeKeys().map((k) => pics[k]).find((x) => loopUsesPic(x.key) && !x.own && x.cur >= 0);
   const p = P && nat.pics && nat.pics[P.cur];
   if (p) sc.nat = { f: p.f, c: p.c };
+  if (stackMode) sc.all = stackAllList().filter((it) => it.on).map((it) => it.kind);
   return sc;
 }
 // Which looks are on the loops: a rating is "the same picture" only while neither loop has a new look
@@ -4634,6 +4654,8 @@ function sceneFeats(sc) {
     add('natc:' + sc.nat.c, 0.8);
     add('natf:' + sc.nat.f, 1);
   }
+  // The effect stack's whole-picture effects
+  if (Array.isArray(sc.all)) for (const kind of sc.all) add('sa:' + kind, 1);
   // How they act on each other
   const fed = Math.max(vis.A > 0.25 ? feedInto.A : 0, vis.B > 0.25 ? feedInto.B : 0);
   add('feed:' + (fed > 0.4 ? 'strong' : fed > 0.08 ? 'some' : 'none'), 1);
@@ -4702,7 +4724,7 @@ function tasteModel() {
 }
 // How much each kind of word counts: a whole pair of looks most, then a whole look, inputs, effects and how the
 // loops meet and act on each other
-const TASTE_WEIGHT = { natf: 1.5, natc: 1.2, pl: 2.5, look: 2, pxx: 1.2, in: 1.6, world: 1.6, fx: 1.3, pair: 1.3, pfx: 1.3, inter: 1.3, feed: 1.3, pi: 1.2, px: 1.1, lk: 1.1 };
+const TASTE_WEIGHT = { sk: 1.3, so: 1.2, sl: 1.1, sa: 1.1, natf: 1.5, natc: 1.2, pl: 2.5, look: 2, pxx: 1.2, in: 1.6, world: 1.6, fx: 1.3, pair: 1.3, pfx: 1.3, inter: 1.3, feed: 1.3, pi: 1.2, px: 1.1, lk: 1.1 };
 // How much a whole picture's settings match what you've liked, from -1 to 1. Inputs, effects, and how the loops
 // meet and act on each other count most. It adds up (rather than averages), so a picture with both loops in it
 // isn't marked down just for having more in it.
@@ -5021,8 +5043,8 @@ function renderTaste() {
     confirmBox.querySelector('.yes').addEventListener('click', () => { confirmBox.hidden = true; if (isShared) tasteUnshare(p); else tasteDelete(p); });
     return t;
   };
-  for (const p of taste.profiles) list.appendChild(tile(p, false));
-  for (const p of taste.sharedList) list.appendChild(tile(p, true));
+  for (const p of taste.profiles) if (tpMode(p) === tasteMode()) list.appendChild(tile(p, false));
+  for (const p of taste.sharedList) if (tpMode(p) === tasteMode()) list.appendChild(tile(p, true));
   $('#tasteAdminNote').hidden = !admin;
   tasteSummary();
 }
@@ -5084,7 +5106,7 @@ $('#tasteRenForm').addEventListener('submit', async (e) => {
 function sessionStart(into) {
   if (taste.session) { toast('A taste session is already under way. Rate looks, then press Finish under the picture.'); return; }
   const p = into && taste.profiles.find((x) => x.id === into);
-  taste.session = { votes: [], started: Date.now(), into: p ? p.id : null };
+  taste.session = { votes: [], started: Date.now(), into: p ? p.id : null, ...(stackMode ? { mode: 'stack' } : {}) };
   taste.pending = [];
   saveTaste();
   // Autopilot brings looks to rate, starting with a new one now
@@ -5152,7 +5174,7 @@ $('#sessionForm').addEventListener('submit', async (e) => {
   // A picture of the screen as it finishes, for the profile's tile
   let thumb = '';
   try { thumb = await Promise.race([new Promise((res) => { thumbReq = res; }), new Promise((res) => setTimeout(() => res(''), 3000))]); } catch (_) {}
-  const p = { id: tasteNew(), name, votes: s.votes, thumb: tasteThumbOK(thumb) ? thumb : '', saved: Date.now() };
+  const p = { id: tasteNew(), name, votes: s.votes, thumb: tasteThumbOK(thumb) ? thumb : '', saved: Date.now(), ...(s.mode === 'stack' ? { mode: 'stack' } : {}) };
   taste.profiles.push(p);
   taste.active = p.id;
   taste.session = null;
@@ -5166,7 +5188,7 @@ $('#sessionForm').addEventListener('submit', async (e) => {
 // it on the page)
 const tasteSlim = (votes) => votes.map(({ sid, k, gen, gens, look, ...v }) => v);
 function tasteFileSave(p) {
-  const data = { kind: TASTE_FILE_KIND, v: 1, name: p.name, saved: Date.now(), thumb: p.thumb || '', votes: tasteSlim(p.votes) };
+  const data = { kind: TASTE_FILE_KIND, v: 1, name: p.name, saved: Date.now(), thumb: p.thumb || '', votes: tasteSlim(p.votes), ...(p.mode === 'stack' ? { mode: 'stack' } : {}) };
   const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'taste';
   offerFile(`taste-${slug}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
 }
@@ -5174,7 +5196,7 @@ async function tasteFileOpen(file) {
   let d = null;
   try { d = JSON.parse(await file.text()); } catch (_) {}
   if (!d || d.kind !== TASTE_FILE_KIND || !Array.isArray(d.votes)) { toast('That file isn’t a Phosphor Loop taste profile.'); return; }
-  const p = cleanTasteProfile({ id: tasteNew(), name: tasteFreeName(d.name || file.name.replace(/\.json$/i, '')), votes: d.votes, thumb: d.thumb, saved: Date.now() });
+  const p = cleanTasteProfile({ id: tasteNew(), name: tasteFreeName(d.name || file.name.replace(/\.json$/i, '')), votes: d.votes, thumb: d.thumb, saved: Date.now(), mode: d.mode });
   if (!p || !p.votes.length) { toast('That taste file has no ratings in it.'); return; }
   taste.profiles.push(p);
   if (!taste.session) taste.active = p.id;
@@ -5189,7 +5211,7 @@ $('#tasteFile').addEventListener('change', (e) => { const f = e.target.files && 
 async function tasteShare(p) {
   if (!tasteCount(p.votes)) { toast('Rate a few looks into this profile first.'); return; }
   toast('Sharing…', 15000);
-  const entry = { name: p.name, votes: tasteSlim(p.votes).slice(-200), thumb: p.thumb || '', saved: Date.now() };
+  const entry = { name: p.name, votes: tasteSlim(p.votes).slice(-200), thumb: p.thumb || '', saved: Date.now(), ...(p.mode === 'stack' ? { mode: 'stack' } : {}) };
   if (await changeShared((list) => list, `Share taste profile "${p.name}"`, (tl) => {
     const same = tl.find((x) => x.name.toLowerCase() === p.name.toLowerCase());
     return same ? tl.map((x) => (x === same ? { ...x, ...entry } : x)) : [...tl, { id: 'x' + Date.now().toString(36) + randId(4), ...entry }];
@@ -8977,11 +8999,15 @@ const RECIPES = [
     how: 'DOPPLER RADAR · TRAILS 60',
     sw: 'conic-gradient(from 20deg,#06210f 0 70%,#3dff70 72%,#02060a 73%),radial-gradient(circle at 60% 40%,#fd0000 0 6%,#fdf802 7% 13%,#01c501 14% 24%,transparent 25%)',
     patch: { A: { in1: 'radar', radarWind: false, size: 100, zoom: 0, spin: 0, trails: 60, color: 0, blur: 0 } } },
-  { name: 'Liquid marble', after: 'Under Patch, open a layer to change it, give any fader a mover (a wave, the music, the bass), or add layers of your own.',
-    text: 'A Patch of three layers: Marble veins, a Swirl that slowly tightens and loosens, and Gradient colors, with soft echoes spinning out of it.',
-    how: 'PATCH · LIQUID MARBLE · ZOOM 12 · SPIN 8 · TRAILS 82',
+  { name: 'Liquid marble', after: 'With the effect stack, open any card to change it, give a fader a mover (a wave, the music, the bass), or add effects of your own.',
+    text: 'Marble veins soaking into a turning Shape, a Swirl that slowly tightens and loosens, and Gradient colors over it all, with soft echoes spinning out.',
+    how: 'EFFECT STACK · MARBLE · SWIRL · GRADIENT COLORS · ZOOM 12 · SPIN 8 · TRAILS 82',
     sw: 'radial-gradient(ellipse at 30% 40%,#c04dff 0 6%,transparent 18%),repeating-linear-gradient(115deg,#07040c 0 9px,#2fd0ff 9px 10px,#07040c 10px 17px,#ff9a3d 17px 18px)',
-    patch: { A: { in1: 'patch', patch: PhosphorPatch.copy(PhosphorPatch.STARTERS[0]), size: 100, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0 } } },
+    patch: { A: { in1: 'shape', size: 80, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0, stack: window.PhosphorStack.cleanList([
+      { kind: 'zoom', zone: 'in' }, { kind: 'color', zone: 'in' },
+      { kind: 'p:marble', zone: 'in', p: { scale: 45, veins: 60, speed: 25 }, blend: 1, opacity: 60, amt: 25 },
+      { kind: 'p:swirl', zone: 'out', p: { amount: 62, radius: 60 }, mv: { amount: { m: 'slow', a: 15 } } },
+      { kind: 'p:colors', zone: 'out', p: { pal: 6, shift: 10, spread: 55, speed: 15 } }], false) } } },
   { name: 'Dust portrait', after: 'Drag on the picture to tear it, double-click to blow it apart. Pick another nature picture with ◀ ▶ under Picture, or Camera under Dots of.',
     text: 'The picture as a cloud of glowing dots in 3D, one side blowing away on the wind in streams of embers and forever reforming.',
     how: 'POINT CLOUD OF PICTURE · DISSOLVE FROM THE RIGHT · TRAILS 30',
@@ -12205,265 +12231,18 @@ function drawExt(k, sc, scale) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip);
   return extTex[k];
 }
-/* ================= Patch: a stack of layers (the Patch input; layers and shader in js/patch.js) ================= */
-// Each loop's patch lives in its settings (tgt.patch) and is drawn, one pass a layer, into a pair of pictures of
-// its own, read by the loop through the slot a 3D world would use. A patch is never changed in place: every edit
-// makes a fresh copy (patchSet), so copies of a loop's settings (presets, Autopilot's base, the sequencer) stay as they were.
+/* ================= Patch's layers, for the effect stack ================= */
+// The Patch input is gone: its effects, colors and patterns live on in the effect stack (see "effect stack"), drawn
+// with its pass (js/patch.js). What the movers set to Music, Bass or Beat hits hear (nothing while this loop doesn't
+// react to sound), each layer's own clock, and its faders as the pass reads them.
 var PATCH = window.PhosphorPatch;
-let patchProg = null;
-try { patchProg = program(PATCH.FS); } catch (e) { console.error('Patch layers could not start', e); patchProg = null; }
-const patchRT = {}, patchClock = {};
+const patchClock = {};
 const patchUP = new Float32Array(8);
-function patchTargets(k) {
-  let r = patchRT[k];
-  if (!r || r.w !== simW || r.h !== simH) {
-    if (r) r.t.forEach(dropTarget);
-    r = patchRT[k] = { w: simW, h: simH, t: [makeTarget(), makeTarget()] };
-  }
-  return r.t;
-}
-// What the movers set to Music, Bass or Beat hits hear (nothing while this loop doesn't react to sound)
 function patchEnv(k) {
   if (!snd.analyser || (KEYS.includes(k) && !reacts(k))) return null;
   const a = sndPower() * 0.8, E = snd.env;
   return { low: E.low * a, mid: E.mid * a, high: E.high * a, beat: E.beat * a };
 }
-const patchOk = (pt) => !!(pt && Array.isArray(pt.layers));
-function drawPatch(k, t, scale, dt) {
-  if (!patchProg) return null;
-  const pt = patchOk(t.patch) ? t.patch : PATCH.STARTERS[0];
-  const [A, B] = patchTargets(k);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, A.fbo);
-  gl.viewport(0, 0, simW, simH);
-  gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.useProgram(patchProg.p);
-  set2f(patchProg, 'uSim', simW, simH);
-  set1f(patchProg, 'uPxK', simH / SIM_H);
-  set1f(patchProg, 'uZoom', 2.5 / scale);   // Input size 100 draws the patterns at their own size; smaller fits more in
-  set1i(patchProg, 'uPrev', 0);
-  const env = patchEnv(k), now = simT + 11 * (LOOP_OFF[k] || 0), uP = U(patchProg, 'uP[0]');
-  let src = A, dst = B;
-  for (const ly of pt.layers) {
-    const K = PATCH.KINDS[ly.kind];
-    if (!K || ly.on === false) continue;
-    const vals = K.p.map((q) => PATCH.value(ly, q, now, env));
-    const si = K.p.findIndex((q) => q.k === 'speed');
-    const ck = k + ':' + ly.id;
-    patchClock[ck] = ((patchClock[ck] ?? 11 * (LOOP_OFF[k] || 0)) + dt * (si >= 0 ? PATCH.speedRate(vals[si]) : 1)) % 20000;
-    patchUP.fill(0);
-    K.p.forEach((q, i) => { patchUP[i] = q.opts ? vals[i] : vals[i] / 100; });
-    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, src.tex);
-    set1i(patchProg, 'uKind', K.id);
-    set1i(patchProg, 'uMode', ly.blend || 0);
-    set1f(patchProg, 'uOpac', (ly.opacity ?? 100) / 100);
-    set1f(patchProg, 'uT', patchClock[ck]);
-    if (uP) gl.uniform1fv(uP, patchUP);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    [src, dst] = [dst, src];
-  }
-  return src.tex;
-}
-// Patches you've saved (in this browser), beside the ready-made ones
-var PATCH_KEY = 'phosphor-patches-v1';
-function patchLib() {
-  try { const v = JSON.parse(localStorage.getItem('phosphor-patches-v1') || '[]'); return Array.isArray(v) ? v.map(window.PhosphorPatch.clean).filter(Boolean) : []; } catch (_) { return []; }
-}
-function patchLibSave(list) { try { localStorage.setItem(PATCH_KEY, JSON.stringify(list)); return true; } catch (_) { return false; } }
-// For Surprise and Autopilot: a ready-made or saved patch, its faders nudged (more as How wild rises) and, often,
-// another palette
-function randomPatch() {
-  let w = 0.5;
-  try { w = apSet.wild / 100; } catch (_) {}
-  const PP = window.PhosphorPatch;
-  const pt = PP.copy(pick([...PP.STARTERS, ...patchLib()]));
-  for (const ly of pt.layers) {
-    for (const q of PP.KINDS[ly.kind].p) {
-      if (q.opts) { if (q.k === 'pal' && Math.random() < 0.4 + 0.5 * w) ly.p.pal = Math.floor(Math.random() * q.opts.length); continue; }
-      ly.p[q.k] = clamp(ly.p[q.k] + (Math.random() - 0.5) * 50 * w, 0, 100);
-    }
-  }
-  return pt;
-}
-
-// ---- The stack's controls (Inputs › Patch)
-const patchStack = $('#patchStack'), patchAddSel = $('#patchAdd'), patchPickSel = $('#patchPick'), patchNameIn = $('#patchName');
-const patchOpen = new Set();
-let patchSig = '';
-const PATCH_G = { pattern: 'Pattern', effect: 'Effect', color: 'Color' };
-function patchNow() { const t = loops[edit].tgt; return patchOk(t.patch) ? t.patch : null; }
-function patchSet(fn, rebuild) {
-  takeOver('in1');
-  const t = loops[edit].tgt;
-  const pt = PATCH.copy(patchNow() || PATCH.STARTERS[0]);
-  fn(pt);
-  t.patch = pt;
-  if (rebuild) patchSig = '';
-  patchSync();
-}
-function patchFader(label, act, k, v, title) {
-  return `<input type="range" min="0" max="100" step="1" value="${Math.round(v)}" style="--b: ${Math.round(v)}%" data-act="${act}"${k ? ` data-k="${k}"` : ''} aria-label="${escapeHTML(label)}"${title ? ` title="${escapeHTML(title)}"` : ''}>`;
-}
-function patchHTML(pt) {
-  const n = pt.layers.length;
-  return pt.layers.map((ly, i) => {
-    const K = PATCH.KINDS[ly.kind], open = patchOpen.has(ly.id);
-    let body = '';
-    if (open) {
-      if (K.g === 'pattern') {
-        body += `<div class="pl-c"><span>Blend</span><select data-act="blend" title="How this pattern lies over the layers above it">${PATCH.BLENDS.map((b, j) => `<option value="${j}"${j === (ly.blend || 0) ? ' selected' : ''}>${b}</option>`).join('')}</select></div>`;
-        body += `<div class="pl-f"><div class="pl-fh"><span>Opacity</span></div>${patchFader('Opacity', 'opacity', '', ly.opacity ?? 100)}</div>`;
-      }
-      for (const q of K.p) {
-        if (q.opts) {
-          body += `<div class="pl-c"><span>${escapeHTML(q.label)}</span><select data-act="opt" data-k="${q.k}">${q.opts.map((o, j) => `<option value="${j}"${j === ly.p[q.k] ? ' selected' : ''}>${escapeHTML(o)}</option>`).join('')}</select></div>`;
-          continue;
-        }
-        const m = ly.mv[q.k];
-        body += `<div class="pl-f${m ? ' moving' : ''}"><div class="pl-fh"><span>${escapeHTML(q.label)}</span>` +
-          `<select class="pl-mv" data-act="mvm" data-k="${q.k}" aria-label="${escapeHTML(q.label)}: what moves it" title="What moves this fader by itself">` +
-          PATCH.MOVERS.map(([v, l]) => `<option value="${v}"${(m ? m.m : '') === v ? ' selected' : ''}>${v ? '∿ ' : ''}${l}</option>`).join('') + `</select></div>` +
-          patchFader(q.label, 'p', q.k, ly.p[q.k]) +
-          (m ? `<div class="pl-amt"><span>How far</span>${patchFader(q.label + ': how far it moves', 'mva', q.k, m.a, 'How far the mover takes this fader from where you set it')}</div>` : '') + `</div>`;
-      }
-    }
-    return `<div class="pl-layer pl-${K.g}${ly.on === false ? ' off' : ''}" data-i="${i}">` +
-      `<div class="pl-head"><button class="btn small pl-on" data-act="on" aria-pressed="${ly.on !== false}" title="Switch this layer on or off"><span class="led"></span></button>` +
-      `<button class="pl-name" data-act="fold" aria-expanded="${open}" title="${open ? 'Fold this layer away' : 'Open this layer’s controls'}"><span class="pl-g">${PATCH_G[K.g]}</span>${escapeHTML(K.label)}<span class="pl-caret">${open ? '▾' : '▸'}</span></button>` +
-      `<button class="pl-ic" data-act="up" title="Move up"${i === 0 ? ' aria-disabled="true"' : ''}>↑</button>` +
-      `<button class="pl-ic" data-act="down" title="Move down"${i === n - 1 ? ' aria-disabled="true"' : ''}>↓</button>` +
-      `<button class="pl-ic" data-act="del" title="Remove this layer">✕</button></div>` +
-      (open ? `<div class="pl-body">${body}</div>` : '') + `</div>`;
-  }).join('');
-}
-function buildPatchAdd() {
-  patchAddSel.innerHTML = '<option value="">+ Add a layer…</option>' + PATCH.GROUPS.map(([g, label]) => `<optgroup label="${label}">` +
-    Object.entries(PATCH.KINDS).filter(([, K]) => K.g === g).map(([k, K]) => `<option value="${k}">${escapeHTML(K.label)}</option>`).join('') + '</optgroup>').join('');
-}
-function buildPatchPick() {
-  const lib = patchLib();
-  patchPickSel.innerHTML = '<option value="">Load a patch…</option><optgroup label="Ready-made">' +
-    PATCH.STARTERS.map((p, i) => `<option value="s${i}">${escapeHTML(p.name)}</option>`).join('') + '</optgroup>' +
-    (lib.length ? '<optgroup label="Your patches">' + lib.map((p, i) => `<option value="u${i}">${escapeHTML(p.name)}</option>`).join('') + '</optgroup>' : '') +
-    '<optgroup label="Start over"><option value="new">Empty patch</option></optgroup>';
-}
-buildPatchAdd();
-buildPatchPick();
-function patchSync() {
-  const pt = patchNow();
-  if (!pt) return;
-  const struct = edit + '|' + JSON.stringify(pt.layers.map((l) => [l.id, l.kind, l.on, patchOpen.has(l.id), l.blend,
-    Object.entries(l.mv).map(([k, m]) => k + m.m).join(), PATCH.KINDS[l.kind].p.filter((q) => q.opts).map((q) => l.p[q.k]).join()]));
-  if (struct !== patchSig) {
-    patchSig = struct;
-    patchStack.innerHTML = patchHTML(pt) || '<p class="pl-empty">No layers yet. Add one below: start with a Pattern, then Effects and Colors.</p>';
-  } else {
-    for (const el of patchStack.querySelectorAll('input[type="range"]')) {
-      if (el === document.activeElement) continue;
-      const ly = pt.layers[+el.closest('.pl-layer').dataset.i], a = el.dataset.act, k = el.dataset.k;
-      const v = a === 'p' ? ly.p[k] : a === 'mva' ? ly.mv[k] && ly.mv[k].a : a === 'opacity' ? ly.opacity : null;
-      if (v != null && el.value !== String(Math.round(v))) { el.value = String(Math.round(v)); el.style.setProperty('--b', el.value + '%'); }
-    }
-  }
-  if (patchNameIn !== document.activeElement && patchNameIn.value !== pt.name) patchNameIn.value = pt.name;
-}
-const patchLayerOf = (el) => { const c = el.closest('.pl-layer'); return c ? +c.dataset.i : -1; };
-patchStack.addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-act]');
-  if (!b) return;
-  const i = patchLayerOf(b), act = b.dataset.act, pt = patchNow();
-  if (i < 0 || !pt || !pt.layers[i]) return;
-  if (act === 'fold') {
-    const id = pt.layers[i].id;
-    if (patchOpen.has(id)) patchOpen.delete(id); else patchOpen.add(id);
-    patchSig = '';
-    patchSync();
-    return;
-  }
-  patchSet((p) => {
-    const L = p.layers;
-    if (act === 'on') L[i].on = L[i].on === false;
-    else if (act === 'up' && i > 0) [L[i - 1], L[i]] = [L[i], L[i - 1]];
-    else if (act === 'down' && i < L.length - 1) [L[i + 1], L[i]] = [L[i], L[i + 1]];
-    else if (act === 'del') L.splice(i, 1);
-  }, true);
-});
-patchStack.addEventListener('input', (e) => {
-  const el = e.target;
-  if (el.tagName !== 'INPUT') return;
-  const i = patchLayerOf(el), act = el.dataset.act, k = el.dataset.k, v = +el.value;
-  if (i < 0) return;
-  el.style.setProperty('--b', el.value + '%');
-  patchSet((p) => {
-    const L = p.layers[i];
-    if (!L) return;
-    if (act === 'p') L.p[k] = v;
-    else if (act === 'mva' && L.mv[k]) L.mv[k].a = v;
-    else if (act === 'opacity') L.opacity = v;
-  }, false);
-});
-patchStack.addEventListener('change', (e) => {
-  const el = e.target;
-  if (el.tagName !== 'SELECT') return;
-  const i = patchLayerOf(el), act = el.dataset.act, k = el.dataset.k, v = el.value;
-  if (i < 0) return;
-  patchSet((p) => {
-    const L = p.layers[i];
-    if (!L) return;
-    if (act === 'blend') L.blend = +v;
-    else if (act === 'opt') L.p[k] = +v;
-    else if (act === 'mvm') { if (v) L.mv[k] = { m: v, a: L.mv[k] ? L.mv[k].a : 25 }; else delete L.mv[k]; }
-  }, true);
-});
-patchAddSel.addEventListener('change', () => {
-  const kind = patchAddSel.value;
-  patchAddSel.value = '';
-  if (!kind) return;
-  const pt = patchNow();
-  if (pt && pt.layers.length >= PATCH.MAX_LAYERS) { toast(`A patch can have up to ${PATCH.MAX_LAYERS} layers.`); return; }
-  const n = PATCH.newLayer(kind);
-  patchOpen.add(n.id);
-  patchSet((p) => {
-    // A new pattern or effect goes in above the Colors at the bottom, so they still color it; new Colors go last
-    let at = p.layers.length;
-    if (PATCH.KINDS[kind].g !== 'color') while (at > 0 && PATCH.KINDS[p.layers[at - 1].kind].g === 'color') at--;
-    p.layers.splice(at, 0, n);
-  }, true);
-  showOSD('PATCH', '+ ' + PATCH.KINDS[kind].label.toUpperCase());
-});
-patchPickSel.addEventListener('change', () => {
-  const v = patchPickSel.value;
-  patchPickSel.value = '';
-  if (!v) return;
-  const lib = patchLib();
-  const src = v === 'new' ? { name: 'New patch', layers: [] } : v[0] === 's' ? PATCH.STARTERS[+v.slice(1)] : lib[+v.slice(1)];
-  if (!src) return;
-  patchSet((p) => { p.name = src.name; p.layers = PATCH.copy(src).layers; }, true);
-  showOSD('PATCH', src.name.toUpperCase().slice(0, 18));
-});
-$('#patchSave').addEventListener('click', () => {
-  const pt = patchNow();
-  if (!pt) return;
-  const name = (patchNameIn.value.trim() || pt.name || 'My patch').slice(0, 40);
-  patchSet((p) => { p.name = name; }, false);
-  const lib = patchLib().filter((p) => p.name !== name);
-  lib.push(PATCH.copy({ ...patchNow(), name }));
-  if (!patchLibSave(lib)) { toast('The patch couldn’t be saved: this browser’s storage is full.'); return; }
-  buildPatchPick();
-  toast(`Saved the patch “${name}”. Autopilot can use it too.`);
-});
-$('#patchDel').addEventListener('click', () => {
-  const pt = patchNow(), lib = patchLib();
-  const name = pt && pt.name;
-  if (!name || !lib.some((p) => p.name === name)) { toast('Only patches you’ve saved can be deleted. Load one of yours first.'); return; }
-  patchLibSave(lib.filter((p) => p.name !== name));
-  buildPatchPick();
-  toast(`Deleted the saved patch “${name}”. It stays on this loop until you load another.`);
-});
-var patchUIReady = true;
-window.__plPatch = { loops, PATCH, patchLib, randomPatch, get edit() { return edit; } };   // for tests/patch_check.py
 // The keys that walk Mount Ribbit's hiker (W A S D, Shift to run, J to jump). They steer the loop being edited if it
 // shows Mount Ribbit, otherwise the other loop. Walk by itself (on unless switched off) takes over 10 seconds after.
 const RIB_KEYS = { KeyW: 'fwd', KeyS: 'back', KeyA: 'left', KeyD: 'right', ShiftLeft: 'run', ShiftRight: 'run' };
@@ -12806,10 +12585,6 @@ function runLoop(k, xf, brush, f) {
   const fly2 = t.in2 !== t.in1 && is3D(t.in2) ? t.in2 : null;
   let flyTex1 = fly1 ? draw3D(k, fly1, 0, scale) : null;
   let flyTex2 = fly2 ? draw3D(k, fly2, 1, scale) : flyTex1;
-  // A Patch's layers are drawn into a picture of their own, read through the same slot a 3D world would use
-  const patchTex = t.in1 === 'patch' || t.in2 === 'patch' ? drawPatch(k, t, scale, f / 60) : null;
-  if (t.in1 === 'patch') flyTex1 = patchTex;
-  if (t.in2 === 'patch') flyTex2 = patchTex;
   // A Point cloud's dots likewise
   const cloudTex = t.in1 === 'cloud' || t.in2 === 'cloud' ? drawCloud(k, t, scale, f / 60, shownTex(otherLoop(k))) : null;
   if (t.in1 === 'cloud') flyTex1 = cloudTex;
@@ -12819,7 +12594,7 @@ function runLoop(k, xf, brush, f) {
   const traced = topoTrace(t);
   const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
   const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
-  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'patch' && !patchTex) || (n === 'cloud' && !cloudTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
+  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'cloud' && !cloudTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -15376,6 +15151,8 @@ function stackSync(now) {
       const it = stackFind(list, kind);
       if (it && it.auto && !wholeActive(kind) && !stackHeld(it, now)) list = list.filter((x) => x !== it);
     }
+    // Patch effects a new look let go of, once they've faded out
+    if (list.some((it) => it.bye && (stackGl.get(k + ':' + it.id) ?? 0) < 0.02)) list = list.filter((it) => !(it.bye && (stackGl.get(k + ':' + it.id) ?? 0) < 0.02));
     if (list !== was) { stackSetLoop(k, list); changed = true; }
   }
   let all = stackAllList();
@@ -15410,19 +15187,24 @@ function stackEff(k) {
   return e;
 }
 // The loop's own pass for its stack's order inside the loop (one program per order, kept)
+// A new order is built alongside the drawing where the graphics card can (as the 3D worlds are, see sceneReady), so
+// Autopilot changing the order never stalls a frame: until it's ready the loop keeps the program it had. Every
+// program holds every effect's piece, so any of them can draw any stack; only the order differs.
 function stackProg(k) {
   const order = loopStack(k).filter((it) => it.on && it.zone === 'in' && STK.isLoopKind(it.kind)).map((it) => it.kind);
-  const parts = feedbackParts(order);
-  let p = fbCache.get(parts.sig);
-  if (!p) {
-    try {
-      p = program(feedbackFS(order));
-      gl.useProgram(p.p);
-      UNITS.forEach((name, i) => set1i(p, name, i));
-    } catch (err) { console.error('Effect stack order could not be drawn', err); p = fbClassic; }
-    fbCache.set(parts.sig, p);
+  const parts = feedbackParts(order), L = loops[k];
+  let e = fbCache.get(parts.sig);
+  if (!e) { e = { fs: feedbackFS(order), state: 'idle', z: 0 }; fbCache.set(parts.sig, e); }
+  if (e.p) return (L.fbLast = e);   // the Classic program
+  if (e.state === 'ready' && e.units) return (L.fbLast = e.prog);
+  if (sceneReady(e, false)) {
+    gl.useProgram(e.prog.p);
+    UNITS.forEach((name, i) => set1i(e.prog, name, i));
+    e.units = true;
+    return (L.fbLast = e.prog);
   }
-  return p;
+  if (e.state === 'failed') console.error('Effect stack order could not be drawn');
+  return L.fbLast || fbClassic;
 }
 // Loop k's frame: in Classic as it always was; with the stack, its faders as the stack has them, its own pass in the
 // stack's order, then its passes inside the loop (Patch effects, Type art)
@@ -15471,6 +15253,19 @@ function stackPatchPass(dst, srcTex, it, k, mixK, dt) {
 }
 // Inside the loop, after its own pass: Patch's effects and Type art, in the stack's order. Each works on what the
 // loop keeps, part of the way each frame (Amount), at the same pace at any frame rate.
+// How much of a Patch effect is laid over just now: it eases to its Amount (over Autopilot's Fade time when
+// Autopilot brought it in, otherwise in a moment), and to nothing when it's on its way out (bye)
+const stackGl = new Map();
+function stackAmt(k, it, dt) {
+  const want = it.bye ? 0 : clamp(it.amt ?? 100, 0, 100) / 100, key = k + ':' + it.id;
+  let v = stackGl.get(key);
+  if (v == null) v = it.fadeIn ? 0 : want;
+  const rate = KEYS.includes(k) && ap.on && apRuns(k) ? 3 / apFadeSec() : 6;
+  v += (want - v) * (1 - Math.exp(-dt * rate));
+  if (Math.abs(want - v) < 0.002) v = want;
+  stackGl.set(key, v);
+  return v;
+}
 function stackInside(k, f) {
   const L = loops[k];
   let typed = false;
@@ -15478,7 +15273,8 @@ function stackInside(k, f) {
     if (!it.on || it.zone !== 'in' || !L.rt) continue;
     if (it.kind === 'type') { typeInLoop(k, f, true); typed = true; continue; }
     if (!STK.isPatch(it.kind)) continue;
-    const a = clamp(it.amt ?? 100, 0, 100) / 100;
+    const a = stackAmt(k, it, f / 60);
+    if (a <= 0.001) continue;
     const src = L.rt[L.front], dst = L.rt[1 - L.front];
     stackPatchPass(dst, src.tex, it, k, 1 - Math.pow(1 - a, f), f / 60);
     L.front = 1 - L.front;
@@ -15504,7 +15300,7 @@ function stackOut(k) {
   for (const it of items) {
     so.f = 1 - so.f;
     const dst = so.rt[so.f];
-    if (STK.isPatch(it.kind)) stackPatchPass(dst, src, it, k, clamp(it.amt ?? 100, 0, 100) / 100, dt);
+    if (STK.isPatch(it.kind)) stackPatchPass(dst, src, it, k, stackAmt(k, it, dt), dt);
     else stackFinalOne(k, it.kind, src, dst, e, so);
     src = dst.tex;
   }
@@ -15604,7 +15400,7 @@ function stackWhole(tex, dt) {
     else if (it.kind === 'relief') { if (reliefNow().rDepth > 0) out = stackWholePass(out, 'relief'); }
     else if (STK.isPatch(it.kind)) {
       const dst = stackWholeTarget();
-      stackPatchPass(dst, out, it, 'A', clamp(it.amt ?? 100, 0, 100) / 100, dt);
+      stackPatchPass(dst, out, it, 'A', stackAmt('all', it, dt), dt);
       out = dst.tex;
     }
   }
@@ -15737,13 +15533,10 @@ function stackRefreshFaders() {
 }
 function stackBuildAdd() {
   const here = loopStack(edit), all = stackAllList();
-  const has = (kind) => (STK.isLoopKind(kind) ? !!stackFind(here, kind) : !!stackFind(all, kind) && (!STK.WHOLE_KINDS[kind].zones.includes('in') || !!stackFind(here, kind)));
+  // Patch's effects can come as often as you like; the rest once
+  const has = (kind) => (STK.isPatch(kind) ? false : STK.isLoopKind(kind) ? !!stackFind(here, kind) : !!stackFind(all, kind) && (!STK.WHOLE_KINDS[kind].zones.includes('in') || !!stackFind(here, kind)));
   let h = '<option value="">+ Add an effect…</option>';
   for (const [g, kinds] of STK.MENU) h += `<optgroup label="${g}">` + kinds.map((k) => `<option value="${k}"${has(k) ? ' disabled' : ''}>${escapeHTML(STK.labelOf(k))}${has(k) ? ' (in the stack)' : ''}</option>`).join('') + '</optgroup>';
-  for (const [g, label] of PATCH.GROUPS) {
-    const ks = Object.entries(STK.PATCH_KINDS).filter(([, K]) => K.g === g);
-    h += `<optgroup label="From Patch: ${label}">` + ks.map(([k, K]) => `<option value="${k}">${escapeHTML(K.label)}</option>`).join('') + '</optgroup>';
-  }
   stkAdd.innerHTML = h;
   stkAdd.value = '';
 }
@@ -15965,8 +15758,90 @@ function dragEnd(apply) {
 }
 stkList.addEventListener('pointerup', () => dragEnd(true));
 stkList.addEventListener('pointercancel', () => dragEnd(false));
+// ---- Autopilot's stacks
+// Each new look Autopilot (or Surprise) makes comes with a stack: the effects the look turns on, in their old places
+// and zones, then (more as How wild goes up) a few of them swapped round inside the loop, now and then one moved
+// across to the other side, sometimes a Patch effect or a faint pattern, and movers: what React to sound moved in
+// Classic, and now and then one more. A look brought back from one you liked keeps its stack, nearly as it was.
+// Effects still fading out of the look before stay until they've gone (stackSync takes them out), and Patch effects
+// it lets go of fade out (stackCarry), so nothing jumps.
+const AP_PATCH_FX = ['p:kaleido', 'p:swirl', 'p:tile', 'p:polar', 'p:ripple', 'p:warp', 'p:edges', 'p:colors', 'p:hue', 'p:pixel', 'p:tone', 'p:blur'];
+const AP_PATCH_PAT = ['p:stripes', 'p:rings', 'p:noise', 'p:hex', 'p:spiral', 'p:moire', 'p:silk', 'p:marble'];
+function apStackFor(k, sc) {
+  const w = apSet.wild / 100, L = loops[k];
+  const cur = Array.isArray(L.tgt.stack) ? L.tgt.stack : [];
+  const fav = Array.isArray(sc.stack) ? STK.cleanList(stackCopy(sc.stack), false) : null;
+  const on = (kind) => (kind === 'mirror' ? sc.mirror > 0 : STK.LOOP_KINDS[kind].keys.some((key) => Math.abs(+sc[key] || 0) > 0.5));
+  const zoneOf = (kind) => {
+    const K = STK.LOOP_KINDS[kind];
+    if (K.first) return 'out';
+    const was = stackFind(cur, kind);
+    let z = was ? was.zone : K.fx && isFinal(L.tgt, K.fx) ? 'out' : 'in';
+    // Posterize and Halftone stay where you put them, as they always have
+    if (K.zones.length > 1 && kind !== 'poster' && kind !== 'halftone' && Math.random() < 0.1 + 0.2 * w) z = z === 'in' ? 'out' : 'in';
+    return z;
+  };
+  let list = fav ? fav.filter((it) => !STK.isLoopKind(it.kind) || on(it.kind)).map((it) => ({ ...it, id: STK.newItem(it.kind).id, auto: true, fadeIn: true })) : [];
+  for (const kind of STK.CLASSIC) if (on(kind) && !stackFind(list, kind)) list = STK.insertAt(list, STK.newItem(kind, zoneOf(kind), { auto: true }));
+  // What's on screen and not in the new look stays until it has faded
+  for (const it of cur) if (STK.isLoopKind(it.kind) && !stackFind(list, it.kind) && kindActive(k, it.kind, true)) list = STK.insertAt(list, { ...stackCopy(it), auto: true });
+  // A few swapped round inside the loop
+  if (Math.random() < (fav ? 0.15 * w : 0.35 + 0.4 * w)) {
+    const ins = list.filter((it) => it.zone === 'in');
+    for (let n = 1 + Math.floor(rnd(0, 1 + 3 * w)); n > 0 && ins.length > 1; n--) {
+      const i = Math.floor(Math.random() * (ins.length - 1));
+      [ins[i], ins[i + 1]] = [ins[i + 1], ins[i]];
+    }
+    list = [...ins, ...list.filter((it) => it.zone !== 'in')];
+  }
+  if (!fav) {
+    // Now and then a Patch effect or a faint pattern
+    let n = Math.random() < 0.2 + 0.35 * w ? (Math.random() < 0.3 * w ? 2 : 1) : 0;
+    while (n-- > 0) {
+      const pat = Math.random() < 0.15, kind = pick(pat ? AP_PATCH_PAT : AP_PATCH_FX);
+      const zone = pat || Math.random() < 0.7 ? 'out' : 'in';
+      const it = STK.newItem(kind, zone, { auto: true, fadeIn: true });
+      for (const q of STK.PATCH_KINDS[kind].p) {
+        if (q.opts) { if (q.k === 'pal' || q.k === 'kind') it.p[q.k] = Math.floor(Math.random() * q.opts.length); continue; }
+        it.p[q.k] = Math.round(clamp(q.def + rnd(-30, 30) * (0.4 + w), 0, 100));
+      }
+      if (zone === 'in') it.amt = Math.round(rnd(10, 25 + 20 * w));
+      if (pat) { it.blend = 1; it.opacity = Math.round(rnd(20, 45)); }
+      const at = zone === 'in' ? list.filter((x) => x.zone === 'in').length : list.length;
+      list.splice(at, 0, it);
+    }
+    // Movers: what React to sound moved in Classic, and now and then one more
+    const m = snd.map, mv = (kind, key, how, a) => { const it = stackFind(list, kind); if (it && !it.mv[key]) it.mv[key] = { m: how, a }; };
+    if (m.kick) mv('zoom', 'zoom', 'bass', 35);
+    if (m.spin) mv('zoom', 'spin', 'music', 25);
+    if (m.color) mv('color', 'color', 'music', 35);
+    if (m.warp) mv('warp', 'warp', 'beat', 35);
+    if (m.asym) mv('offc', 'offc', 'beat', 40);
+    if (Math.random() < 0.2 + 0.3 * w) {
+      const faders = [];
+      for (const it of list) {
+        if (STK.isLoopKind(it.kind)) for (const key of STK.LOOP_KINDS[it.kind].keys) faders.push([it, key]);
+        else if (STK.isPatch(it.kind)) for (const q of STK.PATCH_KINDS[it.kind].p) if (!q.opts) faders.push([it, q.k]);
+      }
+      if (faders.length) {
+        const [it, key] = pick(faders);
+        if (!it.mv[key]) it.mv[key] = { m: snd.analyser ? pick(['music', 'bass', 'beat', 'slow']) : pick(['slow', 'fast']), a: Math.round(rnd(15, 40)) };
+      }
+    }
+  }
+  return STK.tidy(list);
+}
+// A new stack replacing loop k's: the Patch effects of the old one that aren't in the new one fade out
+function stackCarry(k, old, next) {
+  const ids = new Set(next.map((it) => it.id));
+  const going = old.filter((it) => STK.isPatch(it.kind) && !ids.has(it.id) && !it.bye && (stackGl.get(k + ':' + it.id) ?? 1) > 0.02).map((it) => ({ ...stackCopy(it), bye: true }));
+  return going.length ? STK.tidy([...next, ...going]) : next;
+}
 // Classic layout and back
 function setStackMode(on) {
+  if (!!on === stackMode) return;
+  // Taste profiles belong to one layout, so a taste session under way finishes in the layout it started in
+  if (taste.session) { toast('Finish or cancel the taste session first: its ratings belong to the layout it started in.', 6000); return; }
   stackMode = !!on;
   try { localStorage.setItem('phosphor-fx-mode', stackMode ? 'stack' : 'classic'); } catch (_) {}
   if (stackMode) {
@@ -15976,6 +15851,8 @@ function setStackMode(on) {
     for (const k of KEYS) stackDropOut(loops[k]);
   }
   stackSig = '';
+  taste.model = null;
+  renderTaste();
   syncUI();
   showOSD('EFFECTS', stackMode ? 'EFFECT STACK' : 'CLASSIC LAYOUT');
 }
@@ -15983,7 +15860,9 @@ $$('[data-fxmode]').forEach((b) => b.addEventListener('click', () => setStackMod
 stackReady = true;
 window.__plStack = { get mode() { return stackMode; }, setMode: setStackMode, list: (k) => loopStack(k || edit), all: () => stackAllList(),
   moveTo: stackMoveTo, step: stackStep, sig: () => feedbackParts(loopStack(edit).filter((it) => it.on && it.zone === 'in').map((it) => it.kind)).sig,
-  programs: () => fbCache.size, sync: () => { stackSyncAt = 0; stackSync(performance.now()); } };
+  programs: () => fbCache.size, sync: () => { stackSyncAt = 0; stackSync(performance.now()); },
+  addTaste(p) { const c = cleanTasteProfile(p); if (c) { taste.profiles.push(c); renderTaste(); } return !!c; },
+  tasteShown: () => [...document.querySelectorAll('#tasteList .tp')].map((t) => t.dataset.id) };
 
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
