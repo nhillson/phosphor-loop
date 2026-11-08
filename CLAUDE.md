@@ -179,6 +179,12 @@ file don't rebuild the app.
    in `fit`. Both rest while `capCfg()` is set (Stream, Save clip recording, Export video). Auto sharpness judges smooth against
    `limTarget()`. Skipped calls still count in the tests' `__plFrames`; drawn frames are `__plLimits.drawnFrames`.
    `python3 tests/limits_check.py` (about a minute).
+4z8. **Chromatic aberration** (Effects, under Halftone; loop keys `aberr`, `aberrShape` 0 Lens / 1 Sideways / 2 Turning, `aberrFinal`,
+   true to start with; `LENS` group in js/app.js, `aberrUniforms`, `ABERR_ONCE` / `ABERR_K`; `aberrOff` in js/shaders.js). Final Pass /
+   On the way out: `aberrSpread`, five tinted looks along the split (smooth rainbow fringes). Within the loop: red and blue read apart
+   every frame in the loop's pass (next to Color chase's `c0`), so they drift apart echo after echo. Lens spreads from the middle
+   (follows Off-center's `offAt`). Stack kind `aberr` (zones out, in). Autopilot, Surprise, taste, pins, limits and the sequencer
+   include it. Check with `--shot "Prism lens"` and `--shot "Rainbow tunnel"`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):

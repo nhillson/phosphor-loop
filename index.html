@@ -742,6 +742,17 @@
             <span class="hint">Turns this loop’s picture into dots, like newspaper printing: red, green and blue each get their own screen of dots, bigger where that color is brighter. Further right, bigger dots further apart. Final Pass lays the dots over the finished picture. Within Loops, the loop feeds on its dots, so trails fade as shrinking dots. Autopilot leaves it where you put it.</span>
           </div>
           <div class="ctl">
+            <div class="ctl-head"><label for="aberr">Chromatic aberration</label><div class="seg seg-2 where-mini where" data-where="aberrFinal" role="group" aria-label="Where Chromatic aberration works"><button data-final="1" aria-pressed="true">Final Pass</button><button data-final="0" aria-pressed="false">Within Loops</button></div><output id="aberrOut" for="aberr"></output></div>
+            <input type="range" id="aberr" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Far apart</span></div>
+            <div class="seg seg-3" id="aberrShape" role="group" aria-label="Which way the colors split">
+              <button data-ashape="0" aria-pressed="true">Lens</button>
+              <button data-ashape="1" aria-pressed="false">Sideways</button>
+              <button data-ashape="2" aria-pressed="false">Turning</button>
+            </div>
+            <span class="hint">Red, green and blue come apart into rainbow edges, like a cheap lens or a projector out of line. Lens: the colors spread out from the middle, more toward the edges. Sideways: red slides one way and blue the other. Turning: the same, slowly coming round. Final Pass splits the finished picture once. Within Loops, the split builds up echo after echo into rainbow tunnels.</span>
+          </div>
+          <div class="ctl">
             <div class="ctl-head"><label for="warp">Warp</label><div class="seg seg-2 where-mini where" data-where="warpFinal" role="group" aria-label="Where Warp works"><button data-final="1" aria-pressed="false">Final Pass</button><button data-final="0" aria-pressed="true">Within Loops</button></div><output id="warpOut" for="warp"></output></div>
             <input type="range" id="warp" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>Wobbly</span></div>

@@ -215,6 +215,8 @@ uniform vec2 uCenter;             // Chase: the point Zoom and Spin turn around 
 uniform vec2 uInOff;              // Off-center: how far the inputs are drawn from the middle, following its point
 uniform vec3 uWind;               // Wind: which way it blows (x, y) and how far it carries the picture this frame (z)
 uniform float uChroma, uChromaTurn;   // Color chase: how far each color is pushed by another this frame, and a slow turn
+uniform vec4 uAberr;              // Chromatic aberration: its way (xy), how far red and blue part this frame (z), 1 for Lens (w)
+uniform vec2 uAberrAt;            // ... and Lens's middle
 uniform float uRestless;          // Restless: how much of what holds still fades this frame
 uniform float uJulia;             // Fractal fold: how much of the fold (0 none, 1 all of it)
 uniform vec2 uJuliaC;             // Fractal fold: the fractal's constant, which drifts slowly
@@ -500,6 +502,13 @@ vec2 lookAt(vec2 q, float asp) {
                    texture(uPrev, st + vec2(r.x, -r.y)).rgb + texture(uPrev, st + vec2(-r.x, r.y)).rgb);
   vec2 way = rot(c.b * TAU + luma(c) * 9.0) * (c.rg - 0.5 + vec2(0.18, 0.0));
   return q + way * uLook * smoothstep(0.02, 0.2, luma(c));
+}
+// Chromatic aberration: how far red is moved from here (blue goes the same way back). Lens spreads out from the
+// middle (uAberrAt, which follows Off-center), 1 at the corners; Sideways and Turning go the way uAberr.xy points
+vec2 aberrOff(vec2 st, float asp) {
+  vec2 p = (st - 0.5) * vec2(asp, 1.0) - uAberrAt;
+  vec2 d = uAberr.w > 0.5 ? p / (0.5 * length(vec2(asp, 1.0))) : uAberr.xy;
+  return d * uAberr.z / vec2(asp, 1.0);
 }
 // Color chase: red is pushed around by the green parts of the picture, green by the blue and blue by the red.
 // Each color slides along the outlines of the one pushing it, and its brightness picks which way, so the three
@@ -1138,6 +1147,9 @@ ${moves}
   }
   vec2 px = uPxK / uSim;
   vec3 c0 = uChroma > 0.0 ? chromaAt(st, asp) : texture(uPrev, st).rgb;
+  // Chromatic aberration within the loop: red and blue are read a little apart every frame, so they drift further
+  // apart echo after echo
+  if (uAberr.z > 0.0) { vec2 ao = aberrOff(st, asp); c0 = vec3(texture(uPrev, st + ao).r, c0.g, texture(uPrev, st - ao).b); }
   // Wind leaves streaks: a little of what's further upwind is smeared in
   if (uWind.z > 0.0) c0 = mix(c0, texture(uPrev, st - uWind.xy / vec2(asp, 1.0) * uWind.z * 3.0).rgb, min(0.35, uWind.z * 90.0));
   vec3 cb = 0.25 * (texture(uPrev, st + vec2(px.x, 0.0)).rgb + texture(uPrev, st - vec2(px.x, 0.0)).rgb +
@@ -1213,9 +1225,31 @@ uniform float uPxK, uTime;
 uniform float uMirror, uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;   // Mirror (uMirror 0 and uMirrorT 1: none)
 uniform float uSplit, uWarp, uChroma, uChromaTurn;
 uniform float uN, uFresh, uHalftone;
+uniform vec4 uAberr;   // Chromatic aberration (see aberrOff): way, how far apart, Lens
+uniform vec2 uAberrAt;
 out vec4 o;
 ${COMMON}
 ${MIRROR}
+// Chromatic aberration: how far red is moved from here (blue goes the same way back). Lens spreads out from the
+// middle (uAberrAt, which follows Off-center), 1 at the corners; Sideways and Turning go the way uAberr.xy points
+vec2 aberrOff(vec2 st, float asp) {
+  vec2 p = (st - 0.5) * vec2(asp, 1.0) - uAberrAt;
+  vec2 d = uAberr.w > 0.5 ? p / (0.5 * length(vec2(asp, 1.0))) : uAberr.xy;
+  return d * uAberr.z / vec2(asp, 1.0);
+}
+// Laid over once: five looks along the split, each tinted its part of the rainbow, so the edges come out as smooth
+// rainbow fringes rather than three hard copies, and plain areas keep their own color
+vec3 aberrSpread(vec2 st, float asp) {
+  vec2 ao = aberrOff(st, asp);
+  vec3 sum = vec3(0.0), ws = vec3(0.0);
+  for (int i = 0; i < 5; i++) {
+    float u = float(i) * 0.5 - 1.0;
+    vec3 w = max(vec3(1.0 - abs(u - 1.0), 1.0 - abs(u), 1.0 - abs(u + 1.0)), 0.0);
+    sum += texture(uNow, st + ao * u).rgb * w;
+    ws += w;
+  }
+  return sum / ws;
+}
 // The same pushes as Color chase within the loop (see chromaAt), taken once at full strength from the picture here
 vec3 chromaOnce(vec2 st, float asp) {
   vec2 r = vec2(0.012 / asp, 0.012);
@@ -1244,6 +1278,7 @@ void main() {
   vec2 st = p / vec2(asp, 1.0) + 0.5;
   vec4 now = texture(uNow, st);
   vec3 c = uChroma > 0.0 ? chromaOnce(st, asp) : now.rgb;
+  if (uAberr.z > 0.0) c = uChroma > 0.0 ? mix(c, aberrSpread(st, asp), 0.5) : aberrSpread(st, asp);
   if (uN > 0.0) {
     c = 0.5 * c + 0.125 * (texture(uNow, st + vec2(px.x, 0.0)).rgb + texture(uNow, st - vec2(px.x, 0.0)).rgb +
                            texture(uNow, st + vec2(0.0, px.y)).rgb + texture(uNow, st - vec2(0.0, px.y)).rgb);

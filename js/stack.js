@@ -35,6 +35,7 @@ const LOOP_KINDS = {
   color:    L('Color shift', ['color'], IN, { start: { color: 30 } }),
   poster:   L('Posterize', ['poster'], ['out', 'in'], { fx: 'poster', start: { poster: 40 } }),
   halftone: L('Halftone', ['halftone'], ['out', 'in'], { fx: 'halftone', start: { halftone: 40 } }),
+  aberr:    L('Chromatic aberration', ['aberr'], ['out', 'in'], { fx: 'aberr', start: { aberr: 35 } }),
   time:     L('Time warp', ['time'], ['out'], { first: true, start: { time: 50 } }),
   scan:     L('Photo finish', ['scan'], ['out'], { first: true, start: { scan: 70 } }),
   corr:     L('Corridor', ['corr'], ['out'], { first: true, start: { corr: 70 } }),
@@ -61,7 +62,7 @@ const byName = (a, b) => labelOf(a).localeCompare(labelOf(b));
 const MENU = [
   ['Movement', ['zoom', 'mirror', 'warp', 'flow', 'melt', 'wind', 'offc', 'split', 'julia', 'crystal', 'lookup', 'chase', 'breathe', 'push',
     'p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].sort(byName)],
-  ['Color, texture and patterns', ['color', 'poster', 'halftone', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief',
+  ['Color, texture and patterns', ['color', 'poster', 'halftone', 'aberr', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief',
     ...Object.keys(PATCH_KINDS).filter((k) => !['p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].includes(k))].sort(byName)],
   ['Time', ['time', 'scan', 'corr']],
   ['Whole picture', ['type', 'cloud']],

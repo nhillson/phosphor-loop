@@ -172,7 +172,7 @@ function loopDefaults() {
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
-           offc: 0, wind: 0, windDir: 0, scan: 0, scanSpeed: 1, corr: 0, corrShape: 0 };
+           offc: 0, wind: 0, windDir: 0, aberr: 0, aberrShape: 0, aberrFinal: true, scan: 0, scanSpeed: 1, corr: 0, corrShape: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
 const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
@@ -186,8 +186,10 @@ const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crys
 const ASYM = ['offc', 'wind'];
 // The sliders under Effects › Slit-scan: Photo finish and Corridor
 const SLIT = ['scan', 'corr'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM, ...SLIT];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT];
+// Chromatic aberration (Effects, under Halftone): red, green and blue pulled apart (aberrShape 0 Lens, 1 Sideways, 2 Turning)
+const LENS = ['aberr'];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM, ...SLIT, ...LENS];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT, ...LENS];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -987,7 +989,7 @@ function sliderText(k, v) {
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
     case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
     case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal':
-    case 'offc': case 'wind': case 'scan': case 'corr': return v === 0 ? 'OFF' : String(v);
+    case 'offc': case 'wind': case 'scan': case 'corr': case 'aberr': return v === 0 ? 'OFF' : String(v);
     case 'poster': return v === 0 ? 'OFF' : `${Math.round(posterSteps(v))} STEPS`;
     case 'halftone': return v === 0 ? 'OFF' : `${Math.round(halftoneCell(v))} PX`;
     // How far back the far edge reaches
@@ -1254,6 +1256,16 @@ $$('#windDir button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`WIND ${edit}`, WIND_DIRS[t.windDir]);
 }));
+const ABERR_SHAPE_NAME = ['LENS', 'SIDEWAYS', 'TURNING'];
+$$('#aberrShape button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('aberr');
+  const t = loops[edit].tgt;
+  t.aberrShape = +b.dataset.ashape;
+  // Picking a shape with it off turns it on, so the button always shows something
+  if (!(t.aberr > 0)) t.aberr = 35;
+  syncUI();
+  showOSD(`CHROMATIC ABERRATION ${edit}`, ABERR_SHAPE_NAME[t.aberrShape]);
+}));
 $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
   takeOver('grow');
   const t = loops[edit].tgt;
@@ -1271,6 +1283,7 @@ $$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b)
   t[key] = b.dataset.final === '1';
   // Picking where with Halftone off turns it on, so the button always shows something
   if (key === 'halftoneFinal' && !(t.halftone > 0)) t.halftone = 30;
+  if (key === 'aberrFinal' && !(t.aberr > 0)) t.aberr = 35;
   syncUI();
   showOSD(`${g.getAttribute('aria-label').replace(/^Where | works$/g, '').toUpperCase()} ${edit}`, b.dataset.final === '1' ? 'FINAL PASS' : 'WITHIN LOOPS');
 })));
@@ -1479,6 +1492,7 @@ function syncUI() {
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
+  $$('#aberrShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ashape === (t.aberrShape ?? 0))));
   $$('.scan-speed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.sspeed === (t.scanSpeed ?? 1))));
   $$('#corrShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.cshape === (t.corrShape ?? 0))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
@@ -1608,6 +1622,7 @@ function randomLoop() {
     ...surpriseSelf(),
     offc: Math.random() < 0.15 ? Math.round(rnd(35, 80)) : 0,
     wind: Math.random() < 0.15 ? Math.round(rnd(25, 70)) : 0, windDir: Math.floor(Math.random() * 9),
+    aberr: Math.random() < 0.15 ? Math.round(rnd(15, 60)) : 0, aberrShape: Math.floor(Math.random() * 3), aberrFinal: Math.random() < 0.7,
     scan: Math.random() < 0.06 ? Math.round(rnd(60, 100)) : 0, corr: Math.random() < 0.08 ? Math.round(rnd(70, 100)) : 0,
     scanSpeed: Math.floor(Math.random() * 3), corrShape: Math.floor(Math.random() * 3),
     mirror: pick([0, 0, 2, 4, 6, 8]),
@@ -2423,6 +2438,7 @@ const PINS = {
   crystal: { name: 'Crystal', fields: ['crystal'] },
   offc: { name: 'Off-center', fields: ['offc'] },
   wind: { name: 'Wind', fields: ['wind', 'windDir'] },
+  aberr: { name: 'Chromatic aberration', fields: ['aberr', 'aberrShape'] },
   scan: { name: 'Photo finish', fields: ['scan', 'scanSpeed'] },
   corr: { name: 'Corridor', fields: ['corr', 'corrShape', 'scanSpeed'] },
   // The Show A and Show B faders together (one pin, on either fader, holds both)
@@ -2437,7 +2453,7 @@ const PINS = {
 // on one: a value it picks inside the range stays as it is, and one outside gets a fresh value from somewhere
 // inside it. Sliders moved by hand, and pinned ones, aren't limited. Kept as { trails: [40, 90], ... }, listing
 // only the sliders whose range is narrowed.
-const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'mirror', 'split', 'time', ...SELF, ...ASYM, ...SLIT];
+const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'mirror', 'split', 'time', ...SELF, ...ASYM, ...SLIT, ...LENS];
 const LIM_MIX = ['view', 'xab', 'xba'];
 const limScale = (k) => (k === 'zoom' || k === 'spin' ? [-100, 100] : k === 'mirror' ? [0, 8] : [0, 100]);
 // Mirror has only five stops (Off, 2, 4, 6, 8), so its limits move two at a time, and both of its handles are
@@ -3385,6 +3401,7 @@ const AP_FX = {
   time: (w) => rnd(30, 30 + 70 * w),
   offc: (w) => rnd(30, 30 + 60 * w),
   wind: (w) => rnd(20, 20 + 60 * w),
+  aberr: (w) => rnd(15, 15 + 55 * w),
   scan: (w) => rnd(50, 50 + 50 * w),
   corr: (w) => rnd(55, 55 + 45 * w),
 };
@@ -3396,6 +3413,8 @@ function apFx(sc, w) {
   if (sc.grow && sc.growSize == null) sc.growSize = Math.floor(Math.random() * 3);
   if (sc.time && sc.timeShape == null) sc.timeShape = Math.floor(Math.random() * TIME_SHAPES);
   if (sc.wind && sc.windDir == null) sc.windDir = Math.floor(Math.random() * WIND_DIRS.length);
+  // Chromatic aberration: a new look picks its shape, and now and then works it within the loop
+  if (sc.aberr) { if (sc.aberrShape == null) sc.aberrShape = Math.floor(Math.random() * 3); if (sc.aberrFinal == null) sc.aberrFinal = Math.random() < 0.7; }
   // Photo finish and Corridor take over the whole picture, so they come in less often than the rest
   for (const key of SLIT) if (sc[key] > 0 && Math.random() < 0.6) sc[key] = 0;
   if (sc.scan || sc.corr) { if (sc.scanSpeed == null) sc.scanSpeed = Math.floor(Math.random() * 3); if (sc.corr && sc.corrShape == null) sc.corrShape = Math.floor(Math.random() * 3); }
@@ -3558,7 +3577,7 @@ function glideLook(k) {
 // white-out watch lowers the peak as well as what's on screen.
 const WORLD_STAY = 5 / 3;
 const RAMP_CLEAN = { trails: 0, zoom: 0, spin: 0, color: 0, warp: 0, blur: 0, shiftX: 0, shiftY: 0, blend: 0,
-  flow: 0, melt: 0, push: 0, dye: 0, split: 0, grow: 0, time: 0, ...Object.fromEntries([...SELF, ...ASYM, ...SLIT].map((x) => [x, 0])) };
+  flow: 0, melt: 0, push: 0, dye: 0, split: 0, grow: 0, time: 0, ...Object.fromEntries([...SELF, ...ASYM, ...SLIT, ...LENS].map((x) => [x, 0])) };
 // Starts the build-up on loop k if its new look is a 3D world or fractal (snap: it came in out of sight, so it can
 // jump straight to clean). Returns whether it did.
 function rampStart(k, now, snap) {
@@ -4369,8 +4388,8 @@ window.__plAp = { loops, ap, apSet, apTurn, dark, mix, eye, step() { ap.quick = 
 //   3. Check each look leans towards tries that look like your favourites, alone and blended with the other loop
 //   4. how the loops are shown and fed into each other is picked the same way, as a whole picture
 const TASTE_KEY = 'phosphor-taste-v2', TASTE_OLD_KEY = 'phosphor-taste-v1', TASTE_MAX = 400, TASTE_SKIP_MS = 8000;
-const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT];
-const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], offc: [30, 90], wind: [20, 80], scan: [50, 100], corr: [55, 100], ...SELF_RANGE };
+const TASTE_FX = ['flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT, ...LENS];
+const TASTE_RANGE = { flow: [30, 80], melt: [20, 80], push: [25, 80], dye: [20, 80], split: [10, 60], grow: [35, 85], time: [30, 90], offc: [30, 90], wind: [20, 80], scan: [50, 100], corr: [55, 100], aberr: [15, 70], ...SELF_RANGE };
 const TASTE_DEF = loopDefaults();
 const TASTE_LOOK = Object.keys(TASTE_DEF).filter((f) => f !== 'mirrorFx' && f !== 'mirrorSpin');
 const TASTE_PIC = ['mean', 'lit', 'busy', 'shades', 'detail', 'motion', 'color'];
@@ -4501,6 +4520,7 @@ function tasteFeats(L) {
   if (b.fx.includes('grow')) f.push('growsize:' + (L.growSize ?? 1));
   if (b.fx.includes('time')) f.push('timeshape:' + (L.timeShape ?? 0));
   if (b.fx.includes('wind')) f.push('winddir:' + (L.windDir ?? 0));
+  if (b.fx.includes('aberr')) f.push('ashape:' + (L.aberrShape ?? 0), 'awhere:' + (L.aberrFinal === false ? 'in' : 'out'));
   if (b.fx.includes('corr')) f.push('corrshape:' + (L.corrShape ?? 0));
   if (L.motion && LIVE.includes(L.in1)) f.push('motion:on');
   if (b.zoom === 'out') f.push('edge:' + (L.edge ? 'fold' : 'dark'));
@@ -8901,6 +8921,16 @@ const RECIPES = [
     how: 'WAVE · WIND 65 TO THE RIGHT · TRAILS 93 · BLUR',
     sw: 'linear-gradient(90deg,#0b0614 0 20%,#4a2a6a 40%,#c7a3ff 55%,#2a1450 75%,#0b0614)',
     patch: { A: { in1: 'wave', form: 3, zoom: 0, spin: 0, trails: 93, color: 18, blur: 0.12, wind: 65, windDir: 0 } } },
+  { name: 'Prism lens', after: 'Try Sideways or Turning under Chromatic aberration, or switch it to Within Loops for rainbow tunnels.',
+    text: 'The colors come apart toward the edges like light through a cheap lens, into soft rainbow fringes.',
+    how: 'SHAPE · CHROMATIC ABERRATION 70, LENS · ZOOM 30 · TRAILS 88',
+    sw: 'linear-gradient(90deg,#0b0614 0 15%,#ff3b5c 30%,#f2f2f2 50%,#3b8bff 70%,#0b0614 85%)',
+    patch: { A: { in1: 'shape', form: 3, zoom: 30, spin: 12, trails: 88, color: 6, aberr: 70, aberrShape: 0, aberrFinal: true } } },
+  { name: 'Rainbow tunnel', after: 'Move Chromatic aberration down for thinner fringes, or pick Turning to keep them coming round.',
+    text: 'Red and blue drift apart echo after echo, so every ring of the tunnel splits into rainbow layers.',
+    how: 'SHAPE · CHROMATIC ABERRATION 45 WITHIN LOOPS · ZOOM 35 · TRAILS 92',
+    sw: 'radial-gradient(circle,#f2f2f2 0 8%,#ff3b5c 14%,#3bff8b 20%,#3b8bff 26%,#0b0614 40%)',
+    patch: { A: { in1: 'shape', form: 4, zoom: 35, spin: 8, trails: 92, color: 4, aberr: 45, aberrShape: 0, aberrFinal: false } } },
   { name: 'Name in lights', after: 'Type your own words in the Your text box under Inputs.',
     text: 'Your band’s name, a title or the venue, flying down a tunnel of its own echoes. Type your own words and they change straight away.',
     how: 'TEXT · ZOOM IN 32 · TRAILS 88 · COLOR 16',
@@ -11951,6 +11981,19 @@ function sndLineAmp(k) {
 }
 const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
 const LOOK_K = 0.05;     // how far Look-up at 100 lets each spot read from where its color points, in one frame
+// Chromatic aberration: how far apart red and blue are pulled at 100, laid over once (a share of the picture's height;
+// the Lens shape spreads by this much at the corners, less nearer the middle) and within the loop each frame
+const ABERR_ONCE = 0.03, ABERR_K = 0.0035;
+const aberrOnce = (v) => Math.pow(clamp(v, 0, 100) / 100, 1.3) * ABERR_ONCE;
+// The split's way for its shape: Lens spreads from the middle (follows Off-center's point); Sideways is across;
+// Turning comes slowly round, each loop on its own
+function aberrUniforms(pr, k, t, amt) {
+  const sh = t.aberrShape ?? 0, L = loops[k];
+  const a = sh === 2 ? simT * 0.35 + 1.7 * LOOP_OFF[k] : 0;
+  set4f(pr, 'uAberr', Math.cos(a), Math.sin(a), amt, sh === 0 ? 1 : 0);
+  const off = L && L.offAt ? L.offAt : [0, 0];
+  set2f(pr, 'uAberrAt', off[0] || 0, off[1] || 0);
+}
 const CHROMA_K = 0.005;  // how far Color chase at 100 pushes each color in one frame
 const MELT_K = 0.02;     // how far Melt at 100 lets the picture push itself in one frame
 const PUSH_K = 0.02;     // how far Pushed by the other loop at 100 moves this loop in one frame
@@ -12064,7 +12107,7 @@ function mixTex(k) {
 }
 // The effects that can work in the final pass instead of within the loop, each with the switch that says so.
 // Posterize and Halftone start in the final pass; the others start within the loop, where they've always been.
-const FINAL_FX = { poster: 'posterIn', halftone: 'halftoneFinal', mirror: 'mirrorFinal', warp: 'warpFinal', split: 'splitFinal', chroma: 'chromaFinal' };
+const FINAL_FX = { poster: 'posterIn', halftone: 'halftoneFinal', mirror: 'mirrorFinal', warp: 'warpFinal', split: 'splitFinal', chroma: 'chromaFinal', aberr: 'aberrFinal' };
 const isFinal = (t, fx) => (fx === 'poster' ? !t.posterIn : !!t[FINAL_FX[fx]]);
 // Loop k's final pass (FS_FINAL): its picture with the effects set to Final Pass laid over it once, drawn into a
 // pair of pictures of its own, taking turns, so Posterize can see the steps it drew last frame. Made when first
@@ -12080,7 +12123,8 @@ function finalPass(k) {
   const split = amt('split', clamp(c.split, 0, 100) / 100 * 0.06);
   const warp = amt('warp', clamp(L.warpNow ?? c.warp, 0, 100) / 100 * 0.05);
   const chroma = amt('chroma', Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * 0.035);
-  const on = L.rt && (loopOn(k) || extraLoop(k)) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005);
+  const aberr = amt('aberr', aberrOnce(c.aberr));
+  const on = L.rt && (loopOn(k) || extraLoop(k)) && (steps > 0 || dots > 0 || mirror || split > 0.0005 || warp > 0.0005 || chroma > 0.0005 || aberr > 0.0002);
   if (L.pz && (!on || L.pz.w !== simW || L.pz.h !== simH)) { L.pz.rt.forEach(dropTarget); L.pz = null; }
   if (!on) return;
   if (!L.pz) L.pz = { rt: [makeTarget(), makeTarget()], f: 0, w: simW, h: simH, stepped: false };
@@ -12099,6 +12143,7 @@ function finalPass(k) {
   set1f(finalProg, 'uWarp', warp);
   set1f(finalProg, 'uChroma', chroma);
   set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
+  aberrUniforms(finalProg, k, t, aberr);
   set1f(finalProg, 'uN', steps);
   set1f(finalProg, 'uHalftone', dots);
   // Posterize has no steps of its own to remember on its first frame
@@ -12737,6 +12782,7 @@ function runLoop(k, xf, brush, f) {
   set3f(fbProg, 'uWind', Math.cos(L.windAng), Math.sin(L.windAng), wk);
   set1f(fbProg, 'uChroma', !fxIn(k, t, 'chroma') ? 0 : Math.pow(clamp(c.chroma, 0, 100) / 100, 1.2) * CHROMA_K * f);
   set1f(fbProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
+  aberrUniforms(fbProg, k, t, !fxIn(k, t, 'aberr') ? 0 : Math.pow(calmCap(clamp(c.aberr, 0, 100), 60) / 100, 1.3) * ABERR_K * f);
   set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.3 * clamp(c.restless, 0, 100) / 100, f));
   set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
   const ja = 2.2 + 0.9 * Math.sin(simT * 0.021 + (2.0 * LOOP_OFF[k]));
@@ -12956,7 +13002,7 @@ const SEQ_SLIDERS = [
   ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'],
-    ['offc', 'Off-center'], ['wind', 'Wind'], ['scan', 'Photo finish'], ['corr', 'Corridor'], ['mirror', 'Mirror']]],
+    ['offc', 'Off-center'], ['wind', 'Wind'], ['aberr', 'Chromatic aberration'], ['scan', 'Photo finish'], ['corr', 'Corridor'], ['mirror', 'Mirror']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
     ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
   // 3D lighting is one for the whole picture: when blocks on several tracks set it, it's a mix of them, each counted
@@ -15406,6 +15452,7 @@ function stackFinalOne(k, kind, src, dst, e, so) {
   set1f(finalProg, 'uWarp', kind === 'warp' ? clamp(L.warpNow ?? e.warp, 0, 100) / 100 * 0.05 : 0);
   set1f(finalProg, 'uChroma', kind === 'chroma' ? Math.pow(clamp(e.chroma, 0, 100) / 100, 1.2) * 0.035 : 0);
   set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
+  aberrUniforms(finalProg, k, L.tgt, kind === 'aberr' ? aberrOnce(e.aberr) : 0);
   const steps = kind === 'poster' && e.poster > 0.5 ? posterSteps(e.poster) : 0;
   set1f(finalProg, 'uN', steps);
   set1f(finalProg, 'uHalftone', kind === 'halftone' && e.halftone > 0.5 ? halftoneCell(e.halftone) : 0);
