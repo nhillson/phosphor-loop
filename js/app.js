@@ -10766,12 +10766,14 @@ function cleanCloud(c) {
   if (Number.isInteger(c.cColor)) out.cColor = clamp(c.cColor, 0, 3);
   if (Number.isInteger(c.cDens)) out.cDens = clamp(c.cDens, 0, PCL.DENS.length - 1);
   out.cMusic = c.cMusic !== false;
+  out.cSame = c.cSame === true;
   return out;
 }
 function syncCloudUI() {
   for (const [k, { el, out }] of Object.entries(cloudEls)) { el.value = cloud[k]; fillTrack(el); out.textContent = cloudText(k, cloud[k]); }
   for (const [k, sel] of Object.entries(CLOUD_SEG)) $$(sel + ' button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === String(cloud[k]))));
   $('#cloudMusic').setAttribute('aria-pressed', String(cloud.cMusic));
+  $('#cloudSame').setAttribute('aria-pressed', String(cloud.cSame));
 }
 function saveCloud() { try { localStorage.setItem(CLOUD_KEY, JSON.stringify(cloud)); } catch (_) {} }
 const cloudGlide = { on: false, from: 0, to: 0, t0: 0, dur: 1, ui: 0 };
@@ -10786,6 +10788,10 @@ for (const [k, sel] of Object.entries(CLOUD_SEG)) $$(sel + ' button').forEach((b
 $('#cloudMusic').addEventListener('click', () => {
   setCloud({ ...cloud, cMusic: !cloud.cMusic });
   toast(cloud.cMusic ? 'Strong hits in the music shake the dots (with React to sound on).' : 'The music leaves the dots alone now.');
+});
+$('#cloudSame').addEventListener('click', () => {
+  setCloud({ ...cloud, cSame: !cloud.cSame });
+  toast(cloud.cSame ? 'Every loop of the dots is now the same, for recordings that repeat exactly.' : 'Every loop of the dots is different now.');
 });
 $('#cloudReset').addEventListener('click', () => setCloud({ ...CLOUD_DEF, cAmt: cloud.cAmt }));
 $('#cloudBoom').addEventListener('click', () => cloudBoomAt(null, null, 4.5));
@@ -11008,11 +11014,14 @@ function mirrorAttrs(r, m) {
   }
 }
 // Brings copy m in line with the real element r: what shows, what's pressed, the words and the slider positions.
-// A part whose make-up has changed (new buttons, say) is copied afresh, unless it's being used right now.
-function mirrorCopy(r, m) {
-  const busy = m.contains(document.activeElement);
+// A part whose make-up has changed (new buttons, say) is copied afresh, unless something in it is being typed in or
+// dragged right now (a text box, slider or menu with the focus; a button keeps the focus after a click, and counting
+// that kept a clicked effect card from ever opening in its column), or hold is set (the mouse is over that column).
+function mirrorCopy(r, m, hold) {
+  const ae = document.activeElement;
+  const busy = !!ae && m.contains(ae) && ae.matches('input, select, textarea');
   if (r.children.length !== m.children.length || [...r.children].some((c, i) => c.tagName !== m.children[i].tagName)) {
-    if (busy) return;
+    if (busy || hold) return;
     m.replaceChildren(...[...r.childNodes].map(mirrorClone));
   } else if (r.children.length === 0) {
     if (m.textContent !== r.textContent) m.textContent = r.textContent;
@@ -11022,7 +11031,7 @@ function mirrorCopy(r, m) {
   for (let i = 0; i < r.children.length; i++) {
     const rc = r.children[i], mc = m.children[i];
     mirrorAttrs(rc, mc);
-    mirrorCopy(rc, mc);
+    mirrorCopy(rc, mc, hold);
   }
   if ((r.tagName === 'INPUT' || r.tagName === 'SELECT' || r.tagName === 'TEXTAREA') && m !== document.activeElement) {
     if (m.value !== r.value) m.value = r.value;
@@ -11033,18 +11042,25 @@ function mirrorCopy(r, m) {
     try { const g = m.getContext('2d'); g.clearRect(0, 0, m.width, m.height); g.drawImage(r, 0, 0, m.width, m.height); } catch (_) {}
   }
 }
-// Copies every loop's column from the real settings, each shown for its own loop in turn
+// Copies every loop's column from the real settings, each shown for its own loop in turn. At most about 8 times a
+// second (each copy shows every loop's settings in turn, which takes a while), except straight after something done in
+// a column. The column under the mouse keeps its cards where they are (no cards appearing or going under the pointer),
+// unless the change is the mouse's own doing.
+let mirrorLast = 0, mirrorHoverK = null, mirrorForceK = null;
 function mirrorRefresh() {
   mirrorTimer = 0;
   if (!wideCols || mirroring) return;
-  const keep = edit;
+  if (!mirrorForceK && performance.now() - mirrorLast < 120) { mirrorTimer = requestAnimationFrame(mirrorRefresh); return; }
+  mirrorLast = performance.now();
+  const keep = edit, force = mirrorForceK;
+  mirrorForceK = null;
   mirroring = true;
   try {
     for (const k of activeKeys()) {
       const m = wideCols.mirrors[k];
       if (!m) continue;
       if (edit !== k) setEdit(k);
-      mirrorCopy(editor, m);
+      mirrorCopy(editor, m, k === mirrorHoverK && k !== force);
       m.dataset.loop = k;
       m.parentElement.classList.toggle('editing', k === keep);
     }
@@ -11072,8 +11088,15 @@ function mirrorForward(e) {
   if (!path) { mirrorRefreshSoon(); return; }
   // The loop is chosen first: its controls (the effect stack's cards) may be drawn afresh for it
   if (edit !== k) setEdit(k);
-  const real = atPath(editor, path);
-  if (!real) { mirrorRefreshSoon(); return; }
+  // Inside an effect card, the card is found by its id, not its place: the column under the mouse is held still, so
+  // cards may have come or gone above it in the real list meanwhile
+  const card = t.closest && t.closest('.stk-item[data-id]');
+  let real;
+  if (card && m.contains(card)) {
+    const rc = editor.querySelector(`.stk-item[data-id="${CSS.escape(card.dataset.id)}"]`), sub = mirrorPath(card, t);
+    real = rc && sub ? atPath(rc, sub) : null;
+  } else real = atPath(editor, path);
+  if (!real) { mirrorForceK = k; mirrorRefreshSoon(); return; }
   if (e.type === 'input' || e.type === 'change') {
     if ('value' in t && real.value !== t.value) real.value = t.value;
     if (t.type === 'checkbox' || t.type === 'radio') real.checked = t.checked;
@@ -11084,6 +11107,7 @@ function mirrorForward(e) {
       button: e.button, buttons: e.buttons, detail: e.detail, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey }));
   }
   for (const w of Object.values(wideCols ? wideCols.mirrors : {})) w.parentElement.classList.toggle('editing', w.dataset.loop === edit);
+  if (e.type !== 'input') mirrorForceK = k;   // shown at once, even under the mouse
   mirrorRefreshSoon();
 }
 function makeMirror(k) {
@@ -11097,6 +11121,8 @@ function makeMirror(k) {
   m.classList.add('mirror');
   m.dataset.loop = k;
   for (const type of ['click', 'dblclick', 'contextmenu', 'input', 'change', 'keydown']) m.addEventListener(type, mirrorForward);
+  wrap.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') mirrorHoverK = k; });
+  wrap.addEventListener('pointerleave', () => { if (mirrorHoverK === k) { mirrorHoverK = null; mirrorRefreshSoon(); } });
   wrap.append(head, m);
   return m;
 }

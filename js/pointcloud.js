@@ -14,10 +14,11 @@ const DENS = [240, 400, 640, 960];              // dots across, for Few / Some /
 const MODES = ['off', 'smear', 'push', 'pull', 'swirl', 'tear'];
 const DEFAULTS = { cAmt: 0, cMode: 'smear', cBrush: 25, cWind: 0, cWindDir: 20, cTurb: 15, cGravity: 0, cHold: 75, cLoop: 8,
   cPulse: 0, cVortex: 0, cDissolve: 0, cSide: 1, cDepth: 45, cSize: 16, cDens: 2, cBright: 80, cTrails: 35, cSpark: 60, cSway: 50,
-  cColor: 0, cMusic: true };
-// Everything that moves by itself repeats every Loop length (cLoop seconds): the swirling air, gusts, sway, rainbow
-// and Dissolve's wave, which takes part of the picture away and brings it all back before the loop starts again.
-// So every recipe loops cleanly (dragging, explosions and music hits are the only things that don't repeat).
+  cColor: 0, cMusic: true, cSame: false };
+// Everything that moves by itself keeps time with Loop length (cLoop seconds): the swirling air, gusts, sway, rainbow
+// and Dissolve's wave, which takes part of the picture away and brings it all back before the loop ends. Each loop is
+// different (a seed per loop: where the wave comes from and its ragged edge, the air's currents, the gusts, where
+// Pulse shoves from); Same every loop (cSame) plays one loop over and over, for recordings that must repeat exactly.
 const RECIPES = {
   'Calm':         { cWind: 0, cTurb: 15, cGravity: 0, cHold: 75, cPulse: 0, cVortex: 0, cDissolve: 0, cTrails: 35, cSway: 50, cSpark: 60, cLoop: 8 },
   'Disintegrate': { cWind: 35, cWindDir: 25, cTurb: 55, cGravity: 0, cHold: 80, cPulse: 0, cVortex: 0, cDissolve: 45, cSide: 1, cTrails: 55, cSpark: 85, cColor: 1, cLoop: 8 },
@@ -44,15 +45,17 @@ precision highp float;
 uniform sampler2D uPos, uVel, uSrc;
 uniform vec2 uGrid;
 uniform float uAspect, uDepth, uTime, uDt;
-uniform float uHold, uWind, uWindDir, uTurb, uGravity, uDissolve, uSide, uPh, uVortex;
+uniform float uHold, uWind, uWindDir, uTurb, uGravity, uDissolve, uSide, uPh, uVortex, uSeed;
 uniform vec3 uMouse; uniform vec2 uMouseVel; uniform float uBrush, uMode, uInit;
 uniform vec4 uBurst; uniform float uFlip;
 layout(location=0) out vec4 oPos;
 layout(location=1) out vec4 oVel;
 ${NOISE}
-// Swirling air that comes round to where it started every loop: the noise is read along a circle as the loop goes by
-vec3 curl(vec3 p, vec2 cyc){
-  float s=1.3, e=.04; vec3 q=vec3(p.x*s+cyc.x*.8, p.y*s, cyc.y*.8);
+float hs(float s, float k){ return fract(sin(s*12.9898+k*78.233)*43758.5453); }
+// Swirling air that comes round to where it started every loop: the noise is read along a circle as the loop goes by,
+// in a part of the noise picked by the loop's seed
+vec3 curl(vec3 p, vec2 cyc, float seed){
+  float s=1.3, e=.04; vec3 q=vec3(p.x*s+cyc.x*.8+hs(seed,1.)*40., p.y*s+hs(seed,2.)*40., cyc.y*.8+hs(seed,3.)*40.);
   float n1=vnoise(q+vec3(0,e,0)), n2=vnoise(q-vec3(0,e,0)), n3=vnoise(q+vec3(e,0,0)), n4=vnoise(q-vec3(e,0,0));
   vec2 c=vec2(n1-n2, -(n3-n4))/(2.*e);
   float z=vnoise(vec3(p.xy*s*.8+31.7+cyc*.6, p.z))-.5;
@@ -69,24 +72,35 @@ void main(){
   vec3 p=P.xyz, v=V.xyz; float fr=P.w, al=V.w;   // al: how far a dot that was put back home has faded in again
   float rnd=hash(uv*917.13), mass=.6+.8*rnd;
   vec2 cyc=vec2(cos(6.2831853*uPh), sin(6.2831853*uPh));
+  // Near the end of a loop the air turns into the next loop's, so the change of seed is never a jolt
+  float nb=smoothstep(.82, 1., uPh), sd=uSeed;
   // Dissolve: a wave each loop. Part of the picture (uDissolve of it, from the side picked, with a ragged edge) lets
   // go in turn during the first 40% of the loop and streams away; from halfway to 80% it comes back in the same
   // order, so by the end of the loop the picture is whole again.
   bool loose=false;
   if(uDissolve>.001){
-    float n=fbm(vec3(uv*vec2(uAspect,1.)*2.6, 1.7)), r;
+    // This loop's own wave: its ragged edge and patches, a slant of up to about 25 degrees off the side picked,
+    // Middle's middle moved about, and a little more or less of the picture going
+    float n=fbm(vec3(uv*vec2(uAspect,1.)*2.6, 1.7+hs(sd,4.)*37.)), r;
+    float D=clamp(uDissolve*(.85+.3*hs(sd,5.)), 0., 1.);
     if(uSide<.5) r=clamp((n-.28)*2.2, 0., 1.);
-    else if(uSide<4.5){ float g = uSide<1.5 ? 1.-uv.x : uSide<2.5 ? uv.x : uSide<3.5 ? 1.-uv.y : uv.y; r=clamp(g*.82+(n-.5)*.36+.05, 0., 1.); }
-    else r=clamp(length((uv-.5)*vec2(uAspect,1.))/(.5*length(vec2(uAspect,1.)))*.82+(n-.5)*.36+.05, 0., 1.);
-    if(r<uDissolve){ float q=r/uDissolve; loose = uPh>=q*.4 && uPh<.5+q*.3; }
+    else if(uSide<4.5){
+      float base = uSide<1.5 ? 0. : uSide<2.5 ? 3.1415927 : uSide<3.5 ? 1.5707963 : -1.5707963;
+      float ang=base+(hs(sd,6.)-.5)*.9;
+      float g=.5-dot((uv-.5)*vec2(uAspect,1.)/max(uAspect,1.), vec2(cos(ang), sin(ang)));
+      r=clamp(g*.82+(n-.5)*.36+.05, 0., 1.);
+    }
+    else { vec2 mc=.5+(vec2(hs(sd,7.),hs(sd,8.))-.5)*.3; r=clamp(length((uv-mc)*vec2(uAspect,1.))/(.5*length(vec2(uAspect,1.)))*.82+(n-.5)*.36+.05, 0., 1.); }
+    if(r<D){ float q=r/D; loose = uPh>=q*.4 && uPh<.5+q*.3; }
   }
   if(loose) fr=min(1., fr+uDt*(3.+5.*rnd)); else fr=max(0., fr-uDt*2.5);
   float att=1.-fr, k=uHold*uHold*90.;
   if(!loose && fr>0.) k=max(k, 30.);   // coming back: firmly enough to be home before the loop ends
   vec3 a=(home-p)*k*att - v*(2.*sqrt(k)*.7+.5)*att;
-  float wr=.12+.88*fr, gust=.65+.35*sin(6.2831853*uPh+p.x*.7+rnd*2.);
+  float wr=.12+.88*fr;
+  float gust=mix(.65+.35*sin(6.2831853*(uPh+hs(sd,9.))+p.x*.7+rnd*2.), .65+.35*sin(6.2831853*(uPh+hs(sd+1.,9.))+p.x*.7+rnd*2.), nb);
   a+=vec3(cos(uWindDir), sin(uWindDir), 0.)*uWind*7.*gust*wr/mass;
-  a+=curl(p, cyc)*uTurb*9.*wr/mass;
+  if(uTurb>0.){ vec3 cu=curl(p, cyc, sd); if(nb>0.) cu=mix(cu, curl(p, cyc, sd+1.), nb); a+=cu*uTurb*9.*wr/mass; }
   a.y-=uGravity*6.*fr;
   // Whirl: loose dots orbit the middle
   if(uVortex>0.){ float L=length(p.xy)+.35; a.xy+=vec2(-p.y,p.x)/L*uVortex*5.*wr; a.xy-=p.xy*uVortex*.6*fr; }
@@ -261,8 +275,14 @@ function create(gl) {
     const steps = Math.min(6, Math.ceil(raw * 30 - 1e-6));
     dt = Math.min(1 / 20, raw / steps);
     const loopS = Math.max(1, s.cLoop || 8), cycle = Math.floor(st.time / loopS), uPh = (st.time / loopS) % 1;
-    // Pulse: a springy shove from the middle as each loop starts (under 2.5, so it never tears dots loose)
-    if (st.cycle !== undefined && cycle !== st.cycle && s.cPulse > 0) st.bursts.push([null, null, 2.2 * s.cPulse / 100]);
+    // Each loop's seed (always 0 with Same every loop)
+    const seed = s.cSame ? 0 : cycle % 997;
+    const hj = (k) => { const x = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+    // Pulse: a springy shove as each loop starts (under 2.5, so it never tears dots loose), from the middle with
+    // Same every loop, otherwise from somewhere near it
+    if (st.cycle !== undefined && cycle !== st.cycle && s.cPulse > 0) {
+      st.bursts.push(s.cSame ? [null, null, 2.2 * s.cPulse / 100] : [0.35 + 0.3 * hj(11), 0.35 + 0.3 * hj(12), 2.2 * s.cPulse / 100]);
+    }
     st.cycle = cycle;
     aspect = Number.isFinite(aspect) && aspect > 0.05 ? aspect : outW / outH;
     if (!st.grid || st.grid.dens !== s.cDens || Math.abs(st.grid.aspect - aspect) / aspect > .01) buildGrid(st, s.cDens, aspect);
@@ -311,7 +331,7 @@ function create(gl) {
     gl.uniform1f(u.uTime, st.time); gl.uniform1f(u.uDt, dt);
     gl.uniform1f(u.uHold, s.cHold / 100); gl.uniform1f(u.uWind, s.cWind / 100); gl.uniform1f(u.uWindDir, s.cWindDir * Math.PI / 180);
     gl.uniform1f(u.uTurb, s.cTurb / 100); gl.uniform1f(u.uGravity, s.cGravity / 100); gl.uniform1f(u.uDissolve, s.cDissolve / 100);
-    gl.uniform1f(u.uSide, s.cSide); gl.uniform1f(u.uPh, uPh); gl.uniform1f(u.uVortex, (s.cVortex || 0) / 100);
+    gl.uniform1f(u.uSide, s.cSide); gl.uniform1f(u.uPh, uPh); gl.uniform1f(u.uVortex, (s.cVortex || 0) / 100); gl.uniform1f(u.uSeed, seed);
     gl.uniform3f(u.uMouse, mouse[0], mouse[1], mouse[2]); gl.uniform2f(u.uMouseVel, st.vel[0], st.vel[1]);
     gl.uniform1f(u.uBrush, Math.max(.03, s.cBrush / 100)); gl.uniform1f(u.uMode, Math.max(0, mode));
     gl.uniform1f(u.uInit, st.needInit ? 1 : 0);

@@ -1492,6 +1492,10 @@
           <span class="hint">Everything that moves by itself (swirling air, gusts, sway, rainbow, Dissolve’s wave and Pulse) repeats every this many seconds, so the dots loop cleanly for a track or a video.</span>
         </div>
         <div class="ctl">
+          <div class="chips"><button class="chip" id="cloudSame" aria-pressed="false"><span class="led"></span>Same every loop</button></div>
+          <span class="hint">Off: every loop is different (where Dissolve's wave comes from, its edge, the air's currents and gusts, where Pulse shoves from) while keeping the loop's timing. On: one loop plays over and over exactly, for a recording that must repeat seamlessly.</span>
+        </div>
+        <div class="ctl">
           <div class="ctl-head"><label for="cPulse">Pulse</label><output id="cPulseOut" for="cPulse"></output></div>
           <input type="range" id="cPulse" min="0" max="100" step="1" value="0">
           <div class="ends"><span>Off</span><span>Strong</span></div>

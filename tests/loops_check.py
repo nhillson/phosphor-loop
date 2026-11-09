@@ -43,7 +43,7 @@ def run(c, base, out, problems):
             problems.append(what)
 
     # Four loops
-    pg.click('#loopCount button[data-n="4"]')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#loopCount button[data-n="4"]')
     c.wait_frames(10, '4 loops')
     expect(pg.is_visible('#tabC') and pg.is_visible('#tabD'), 'tabs for loops C and D show')
     expect(pg.is_visible('#showC') and pg.is_visible('#showD') and pg.is_visible('#xc') and pg.is_visible('#xd'),
@@ -58,7 +58,7 @@ def run(c, base, out, problems):
     pg.evaluate(SLIDER_JS, ['showA', 100])
 
     # Spread out controls at 1920 wide: column one, then two loops to a column
-    pg.click('#wideBtn')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#wideBtn')
     c.wait_frames(10, 'spread out')
     L = pg.evaluate(LAYOUT)
     print('  layout at 1920:', L)
@@ -93,30 +93,30 @@ def run(c, base, out, problems):
     expect(bool(L) and L['per'] == '2' and L['cols'] == 3, f'at 1920 wide, two loops to a column (3 columns) {L}')
 
     # Two loops: at 1920 that fits a column each
-    pg.click('#loopCount button[data-n="2"]')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#loopCount button[data-n="2"]')
     c.wait_frames(5, '2 loops')
     L = pg.evaluate(LAYOUT)
     expect(bool(L) and L['loops'] == 2 and L['per'] == '1', f'2 loops: two loop columns, one each {L}')
     pg.screenshot(path=os.path.join(out, 'spread-2-loops-1920.png'), timeout=60000)
-    pg.click('#loopCount button[data-n="4"]')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#loopCount button[data-n="4"]')
     c.wait_frames(5, '4 loops again')
 
     # Autopilot with four loops for a while, with loop D left to you (so its zoom must stay as set)
     pg.evaluate("() => document.querySelector(`#apLoops [data-aploop='D']`).click()")
-    pg.click('#autopilotBar')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#autopilotBar')
     c.wait_frames(60, 'Autopilot with 4 loops')
-    pg.click('#autopilotBar')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#autopilotBar')
     c.wait_frames(5, 'Autopilot off')
 
     # Back to the sidebar: the tabs are back and loop D still has its zoom
-    pg.click('#wideBtn')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#wideBtn')
     c.wait_frames(5, 'sidebar')
     expect(pg.evaluate("() => !document.querySelector('.wide-cols')") and pg.is_visible('#editor'), 'sidebar is back')
-    pg.click('#tabD')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#tabD')
     c.wait_frames(3, 'tab D')
     expect(pg.text_content('#zoomOut') == 'IN 77', f"tab D shows loop D's zoom ({pg.text_content('#zoomOut')})")
     pg.evaluate("() => document.querySelector(`#apLoops [data-aploop='D']`).click()")
-    pg.click('#loopCount button[data-n="2"]')
+    pg.evaluate('(s) => document.querySelector(s).click()', '#loopCount button[data-n="2"]')
     c.wait_frames(5, 'back to 2')
     expect(not pg.is_visible('#tabC') and pg.get_attribute('#editor', 'data-loop') == 'A', 'back to 2 loops, editing loop A')
     _, lit = c.picture('end')

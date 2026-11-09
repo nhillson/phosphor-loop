@@ -290,9 +290,12 @@ TIPS
         the Other loop.
       Whole picture as dots: in the Effect stack, add Point cloud (under
         Whole picture), or raise "Whole picture as dots" in its card. Off at 0.
-    Everything that moves by itself repeats every Loop length (2 to 32
-    seconds): the swirling air, gusts, sway, rainbow, Pulse and Dissolve. So
-    every recipe loops cleanly for a track or a video. Dissolve is a wave each
+    Everything that moves by itself keeps time with Loop length (2 to 32
+    seconds): the swirling air, gusts, sway, rainbow, Pulse and Dissolve.
+    Every loop is different (where Dissolve's wave comes from and its edge,
+    the air's currents and gusts, where Pulse shoves from) while each ends
+    whole. Switch on "Same every loop" to play one loop over and over
+    exactly, for a track or video that must repeat seamlessly. Dissolve is a wave each
     loop: part of the picture (how much is the Dissolve slider) blows away from
     the side picked under "Dissolve from" (Patches, Right, Left, Top, Bottom or
     Middle), streams off on the wind, and comes back before the loop starts

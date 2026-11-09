@@ -292,3 +292,12 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    (`eyeCollect`, now asking every 90 ms) and the Chase/Breathe/Crystal maps (`probeCollect`, every 50 ms) are picked up there;
    `eyeTick` reads `eye.got`, `probeTick` only asks (`probeAsk`). Measure on Nick's computer by wrapping WebGL2RenderingContext.prototype
    methods and a longtask PerformanceObserver.
+4z13. **Each point cloud loop differs** (`uSeed` = the loop's number, 0 with **Same every loop** `cSame`; `hs(seed, k)` in FS_UPDATE):
+   Dissolve's noise and patches, the wave's slant (up to about 25 degrees off the side) and Middle's centre, the amount (0.85-1.15 of it),
+   the curl noise's place and the gusts' timing; the air blends into the next loop's from 82% of the loop (`nb`), so no jolt. Pulse shoves
+   from near the middle (`hj` in run). Checked: the same point in two loops differs (4.6) with cSame off, identical with it on.
+4z14. **Spread out columns and clicks** (`mirrorCopy(r, m, hold)`, `mirrorRefresh`, `mirrorForward`): a copy is only left alone while a
+   text box, slider or menu in it has the focus (a clicked button keeps the focus, and counting that kept clicked effect cards from ever
+   opening in a column: 0/10 clicks showed); the column under the mouse (`mirrorHoverK`) keeps its make-up unless the change is its own
+   click (`mirrorForceK`); copies at most every 120 ms; a click inside an effect card is passed to the real card found by `data-id`, not by
+   place. tests/loops_check.py now presses from a page script. Checked with a churn test: 10/10 column card clicks showing next frame.
