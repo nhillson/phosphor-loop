@@ -1,1 +1,5 @@
 body{margin:0}img{max-width:100%}[hidden]{display:none!important}
+
+/* Phones: a tap on a button is only a tap. Without this, two quick taps in the same place (opening an effect card and
+   closing it again, say) count as double-tap-to-zoom and the second tap is lost. Pinch-zoom and scrolling still work. */
+button, summary, select, [role="button"], [data-act], .chip, h2.fold, label { touch-action: manipulation; }

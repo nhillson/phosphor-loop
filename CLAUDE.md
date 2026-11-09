@@ -274,3 +274,8 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    narrow layout's picture height comes from the tallest the window gets at this width (100lvh, the address bar hidden), so the
    address bar sliding while the page scrolls doesn't resize the canvas and rebuild the loops (`resim`). Computers still follow
    innerHeight. Checked by setting a phone-sized page's height back and forth (`is_mobile`, `has_touch`) and counting canvas sizes.
+4z10. **Taps on phones** (styles/base.css: `touch-action: manipulation` on buttons, summaries, selects, `[data-act]`, chips,
+   section headings and labels): two quick taps in one place were double-tap-to-zoom, so the second was lost (opening an effect
+   card and closing it again). New looks keep the cards' ids of the effects still there (`stackKeepIds` in `apStackFor`), so an
+   open card stays open. Checked by opening and closing every card twice with `touchscreen.tap` on an `is_mobile` page and with
+   the mouse, Autopilot on and off.

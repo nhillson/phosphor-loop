@@ -16018,7 +16018,19 @@ function apStackFor(k, sc) {
       }
     }
   }
-  return STK.tidy(list);
+  return STK.tidy(stackKeepIds(cur, list));
+}
+// A new look's cards take over the ids of the same effects in the stack shown now, so a card that's open stays open
+// and a tap that lands as the look changes still finds its card
+function stackKeepIds(old, next) {
+  const pool = old.filter((it) => !it.bye);
+  const used = new Set();
+  return next.map((it) => {
+    const o = pool.find((x) => x.kind === it.kind && x.zone === it.zone && !used.has(x.id)) || pool.find((x) => x.kind === it.kind && !used.has(x.id));
+    if (!o) return it;
+    used.add(o.id);
+    return { ...it, id: o.id };
+  });
 }
 // A new stack replacing loop k's: the Patch effects of the old one that aren't in the new one fade out
 function stackCarry(k, old, next) {
