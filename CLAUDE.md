@@ -279,3 +279,16 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    card and closing it again). New looks keep the cards' ids of the effects still there (`stackKeepIds` in `apStackFor`), so an
    open card stays open. Checked by opening and closing every card twice with `touchscreen.tap` on an `is_mobile` page and with
    the mouse, Autopilot on and off.
+4z11. **Point cloud loops** (js/pointcloud.js): everything self-moving repeats every `cLoop` seconds: `uPh` = (state clock / loop) % 1 drives
+   the curl noise (read along a circle, `cyc`), gusts, rainbow, the camera sway (one turn in a whole number of loops, about 12 s) and
+   **Dissolve's wave** (each dot's order `r` from `cSide` 0 Patches / 1-4 Right Left Top Bottom / 5 Middle, plus static noise; the dots
+   with r < cDissolve are loose from q*.4 to .5+q*.3 of the loop, q = r/cDissolve). Coming back: spring at least 30; a dot out of sight
+   (more than 2.3 away, or 1.2 when coming back) goes home and fades in (`vel.w`). Pulse (`cPulse`): a burst under 2.5 as each loop
+   starts. Whirl (`cVortex`). The state's clock follows real time; on slow frames the dots move in up to 6 steps a frame so they're home
+   in time. Come back (`cHeal`) was removed. Checked by pictures at the same point of two loops in a row (identical).
+4z12. **Click lag: readbacks at the start of a frame** (`readsEarly` at the top of `frame()`): picking up a pixel copy
+   (`getBufferSubData`) waits for the browser's graphics process to work through everything drawn before it; mid-frame that was up to
+   33 ms, about 30 times a second with Autopilot (Nick's laptop: 35 freezes of 50-110 ms in 20 s, clicks lagging). Autopilot's eye
+   (`eyeCollect`, now asking every 90 ms) and the Chase/Breathe/Crystal maps (`probeCollect`, every 50 ms) are picked up there;
+   `eyeTick` reads `eye.got`, `probeTick` only asks (`probeAsk`). Measure on Nick's computer by wrapping WebGL2RenderingContext.prototype
+   methods and a longtask PerformanceObserver.

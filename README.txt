@@ -290,6 +290,14 @@ TIPS
         the Other loop.
       Whole picture as dots: in the Effect stack, add Point cloud (under
         Whole picture), or raise "Whole picture as dots" in its card. Off at 0.
+    Everything that moves by itself repeats every Loop length (2 to 32
+    seconds): the swirling air, gusts, sway, rainbow, Pulse and Dissolve. So
+    every recipe loops cleanly for a track or a video. Dissolve is a wave each
+    loop: part of the picture (how much is the Dissolve slider) blows away from
+    the side picked under "Dissolve from" (Patches, Right, Left, Top, Bottom or
+    Middle), streams off on the wind, and comes back before the loop starts
+    again. Pulse gives a springy shove as each loop starts; Whirl makes loose
+    dots circle the middle. Dragging, Explode and music hits don't repeat.
     Both use the Point cloud card's settings (it shows in the stack while
     either is in use; open it with its name; in the Classic layout it's the
     Point cloud section): Recipes (Disintegrate,

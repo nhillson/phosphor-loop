@@ -1486,21 +1486,33 @@
           <span class="hint">How hard each dot is pulled back to its place in the picture. Low turns it to jelly.</span>
         </div>
         <div class="ctl">
-          <div class="ctl-head"><label for="cHeal">Come back</label><output id="cHealOut" for="cHeal"></output></div>
-          <input type="range" id="cHeal" min="0" max="100" step="1" value="40">
-          <div class="ends"><span>Stay away</span><span>Quickly</span></div>
-          <span class="hint">How fast loose dots find their way home again.</span>
+          <div class="ctl-head"><label for="cLoop">Loop length</label><output id="cLoopOut" for="cLoop"></output></div>
+          <input type="range" id="cLoop" min="2" max="32" step="1" value="8">
+          <div class="ends"><span>2 s</span><span>32 s</span></div>
+          <span class="hint">Everything that moves by itself (swirling air, gusts, sway, rainbow, Dissolve’s wave and Pulse) repeats every this many seconds, so the dots loop cleanly for a track or a video.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cPulse">Pulse</label><output id="cPulseOut" for="cPulse"></output></div>
+          <input type="range" id="cPulse" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Strong</span></div>
+          <span class="hint">A springy shove from the middle as each loop starts: the cloud wobbles like jelly and settles.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="cVortex">Whirl</label><output id="cVortexOut" for="cVortex"></output></div>
+          <input type="range" id="cVortex" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Fast</span></div>
+          <span class="hint">Loose dots circle round the middle like a galaxy (use it with Dissolve).</span>
         </div>
         <div class="ctl">
           <div class="ctl-head"><label for="cDissolve">Dissolve</label><output id="cDissolveOut" for="cDissolve"></output></div>
           <input type="range" id="cDissolve" min="0" max="100" step="1" value="0">
-          <div class="ends"><span>Off</span><span>Mostly gone</span></div>
-          <span class="hint">Lets go of parts of the picture, which stream away on the wind and keep reforming.</span>
+          <div class="ends"><span>Off</span><span>Nearly all</span></div>
+          <span class="hint">How much of the picture blows away each loop. A wave takes it away from the side picked in the first part of the loop, the dots stream off on the wind, and it all comes back before the loop starts again.</span>
         </div>
         <div class="ctl">
           <span class="lbl" id="cloudSideLbl">Dissolve from</span>
-          <div class="seg seg-5" id="cloudSide" role="group" aria-labelledby="cloudSideLbl">
-            <button data-v="0">Patches</button><button data-v="1">Right</button><button data-v="2">Left</button><button data-v="3">Top</button><button data-v="4">Bottom</button>
+          <div class="seg seg-3" id="cloudSide" role="group" aria-labelledby="cloudSideLbl">
+            <button data-v="0">Patches</button><button data-v="1">Right</button><button data-v="2">Left</button><button data-v="3">Top</button><button data-v="4">Bottom</button><button data-v="5">Middle</button>
           </div>
         </div>
         <div class="ctl">

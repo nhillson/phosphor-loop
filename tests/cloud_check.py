@@ -117,7 +117,7 @@ def run(c, base, problems):
     # Recipe chips and Autopilot's switch
     pg.evaluate("[...document.querySelectorAll('#cloudRecipes button')].find(b => b.textContent === 'Sandstorm').click()")
     c.wait_frames(5, 'recipe')
-    ok(pg.evaluate('__plCloud.cloud.cAmt') == 100 and pg.evaluate('__plCloud.cloud.cDissolve') == 55, 'the Sandstorm recipe did not set things up')
+    ok(pg.evaluate('__plCloud.cloud.cAmt') == 100 and pg.evaluate('__plCloud.cloud.cDissolve') == 60, 'the Sandstorm recipe did not set things up')
     pg.evaluate(CLICK, '#apCloud')
     ok(pg.evaluate("document.getElementById('apCloud').getAttribute('aria-pressed')") == 'true', 'Use Point cloud did not light')
     pg.evaluate(CLICK, '#apCloud')

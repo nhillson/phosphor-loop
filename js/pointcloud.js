@@ -12,17 +12,20 @@
 window.PhosphorPointCloud = (() => {
 const DENS = [240, 400, 640, 960];              // dots across, for Few / Some / Lots / Masses
 const MODES = ['off', 'smear', 'push', 'pull', 'swirl', 'tear'];
-const DEFAULTS = { cAmt: 0, cMode: 'smear', cBrush: 25, cWind: 0, cWindDir: 20, cTurb: 15, cGravity: 0, cHold: 75, cHeal: 40,
-  cDissolve: 0, cSide: 1, cDepth: 45, cSize: 16, cDens: 2, cBright: 80, cTrails: 35, cSpark: 60, cSway: 50, cColor: 0, cMusic: true };
-// Ready-made settings (the Point cloud section's recipe buttons, Autopilot's picks)
+const DEFAULTS = { cAmt: 0, cMode: 'smear', cBrush: 25, cWind: 0, cWindDir: 20, cTurb: 15, cGravity: 0, cHold: 75, cLoop: 8,
+  cPulse: 0, cVortex: 0, cDissolve: 0, cSide: 1, cDepth: 45, cSize: 16, cDens: 2, cBright: 80, cTrails: 35, cSpark: 60, cSway: 50,
+  cColor: 0, cMusic: true };
+// Everything that moves by itself repeats every Loop length (cLoop seconds): the swirling air, gusts, sway, rainbow
+// and Dissolve's wave, which takes part of the picture away and brings it all back before the loop starts again.
+// So every recipe loops cleanly (dragging, explosions and music hits are the only things that don't repeat).
 const RECIPES = {
-  'Calm':         { cWind: 0, cTurb: 12, cGravity: 0, cHold: 75, cHeal: 40, cDissolve: 0, cTrails: 35, cSway: 50, cSpark: 60 },
-  'Disintegrate': { cWind: 30, cWindDir: 25, cTurb: 55, cGravity: 0, cHold: 80, cHeal: 40, cDissolve: 32, cSide: 1, cTrails: 55, cSpark: 85, cColor: 1 },
-  'Sandstorm':    { cWind: 75, cWindDir: 0, cTurb: 35, cGravity: 15, cHold: 70, cHeal: 50, cDissolve: 55, cSide: 0, cTrails: 45, cSpark: 40 },
-  'Jelly':        { cWind: 0, cTurb: 5, cGravity: 0, cHold: 45, cHeal: 60, cDissolve: 0, cTrails: 20, cSpark: 30, cMode: 'smear' },
-  'Galaxy':       { cWind: 0, cTurb: 40, cGravity: 0, cHold: 22, cHeal: 30, cDissolve: 0, cTrails: 75, cSpark: 70, cColor: 3, cMode: 'swirl' },
-  'Rain down':    { cWind: 5, cWindDir: 0, cTurb: 20, cGravity: 60, cHold: 80, cHeal: 35, cDissolve: 40, cSide: 3, cTrails: 50, cSpark: 70 },
-  'Ghost':        { cWind: 12, cWindDir: 90, cTurb: 70, cGravity: 0, cHold: 55, cHeal: 50, cDissolve: 18, cSide: 0, cTrails: 85, cSpark: 90, cColor: 2 },
+  'Calm':         { cWind: 0, cTurb: 15, cGravity: 0, cHold: 75, cPulse: 0, cVortex: 0, cDissolve: 0, cTrails: 35, cSway: 50, cSpark: 60, cLoop: 8 },
+  'Disintegrate': { cWind: 35, cWindDir: 25, cTurb: 55, cGravity: 0, cHold: 80, cPulse: 0, cVortex: 0, cDissolve: 45, cSide: 1, cTrails: 55, cSpark: 85, cColor: 1, cLoop: 8 },
+  'Sandstorm':    { cWind: 75, cWindDir: 0, cTurb: 35, cGravity: 15, cHold: 70, cPulse: 0, cVortex: 0, cDissolve: 60, cSide: 0, cTrails: 45, cSpark: 40, cLoop: 8 },
+  'Jelly':        { cWind: 0, cTurb: 8, cGravity: 0, cHold: 45, cPulse: 60, cVortex: 0, cDissolve: 0, cTrails: 25, cSpark: 30, cMode: 'smear', cLoop: 4 },
+  'Galaxy':       { cWind: 0, cTurb: 30, cGravity: 0, cHold: 40, cPulse: 0, cVortex: 60, cDissolve: 55, cSide: 5, cTrails: 75, cSpark: 70, cColor: 3, cMode: 'swirl', cLoop: 16 },
+  'Rain down':    { cWind: 5, cWindDir: 0, cTurb: 20, cGravity: 60, cHold: 80, cPulse: 0, cVortex: 0, cDissolve: 55, cSide: 3, cTrails: 50, cSpark: 70, cLoop: 8 },
+  'Ghost':        { cWind: 15, cWindDir: 90, cTurb: 70, cGravity: 0, cHold: 55, cPulse: 0, cVortex: 0, cDissolve: 30, cSide: 0, cTrails: 85, cSpark: 90, cColor: 2, cLoop: 12 },
 };
 
 const VS_TRI = `#version 300 es
@@ -41,17 +44,18 @@ precision highp float;
 uniform sampler2D uPos, uVel, uSrc;
 uniform vec2 uGrid;
 uniform float uAspect, uDepth, uTime, uDt;
-uniform float uHold, uWind, uWindDir, uTurb, uGravity, uDissolve, uSide, uHeal;
+uniform float uHold, uWind, uWindDir, uTurb, uGravity, uDissolve, uSide, uPh, uVortex;
 uniform vec3 uMouse; uniform vec2 uMouseVel; uniform float uBrush, uMode, uInit;
 uniform vec4 uBurst; uniform float uFlip;
 layout(location=0) out vec4 oPos;
 layout(location=1) out vec4 oVel;
 ${NOISE}
-vec3 curl(vec3 p, float t){
-  float s=1.3, e=.04; vec3 q=vec3(p.xy*s, t*.18);
+// Swirling air that comes round to where it started every loop: the noise is read along a circle as the loop goes by
+vec3 curl(vec3 p, vec2 cyc){
+  float s=1.3, e=.04; vec3 q=vec3(p.x*s+cyc.x*.8, p.y*s, cyc.y*.8);
   float n1=vnoise(q+vec3(0,e,0)), n2=vnoise(q-vec3(0,e,0)), n3=vnoise(q+vec3(e,0,0)), n4=vnoise(q-vec3(e,0,0));
   vec2 c=vec2(n1-n2, -(n3-n4))/(2.*e);
-  float z=vnoise(vec3(p.xy*s*.8+31.7, t*.2+p.z))-.5;
+  float z=vnoise(vec3(p.xy*s*.8+31.7+cyc*.6, p.z))-.5;
   return vec3(c*.35, z*1.2);
 }
 void main(){
@@ -60,21 +64,32 @@ void main(){
   vec3 c=textureLod(uSrc, vec2(uFlip>.5 ? 1.-uv.x : uv.x, uv.y), 0.).rgb;
   float lum=clamp(dot(c, vec3(.299,.587,.114)), 0., 1.5);
   vec3 home=vec3((uv.x*2.-1.)*uAspect, uv.y*2.-1., (lum-.3)*uDepth);
-  if(uInit>.5){ oPos=vec4(home,0.); oVel=vec4(0.); return; }
+  if(uInit>.5){ oPos=vec4(home,0.); oVel=vec4(0.,0.,0.,1.); return; }
   vec4 P=texelFetch(uPos, ic, 0); vec4 V=texelFetch(uVel, ic, 0);
-  vec3 p=P.xyz, v=V.xyz; float fr=P.w;
-  float rnd=hash(uv*917.13), mass=.6+.8*rnd, t=uTime;
-  // Dissolve: patches (or one side, with a ragged edge) let go and stream away; elsewhere loose dots settle back
-  float n=fbm(vec3(uv*vec2(uAspect,1.)*2.6, t*.07)), m=n;
-  if(uSide>.5){ float r = uSide<1.5 ? 1.-uv.x : uSide<2.5 ? uv.x : uSide<3.5 ? 1.-uv.y : uv.y; m=r*.75+n*.4-.12; }
-  bool dis = uDissolve>.001 && m < uDissolve*1.05;
-  if(dis) fr=min(1., fr+uDt*(1.+5.*rnd)); else fr=max(0., fr-uDt*uHeal*1.6);
+  vec3 p=P.xyz, v=V.xyz; float fr=P.w, al=V.w;   // al: how far a dot that was put back home has faded in again
+  float rnd=hash(uv*917.13), mass=.6+.8*rnd;
+  vec2 cyc=vec2(cos(6.2831853*uPh), sin(6.2831853*uPh));
+  // Dissolve: a wave each loop. Part of the picture (uDissolve of it, from the side picked, with a ragged edge) lets
+  // go in turn during the first 40% of the loop and streams away; from halfway to 80% it comes back in the same
+  // order, so by the end of the loop the picture is whole again.
+  bool loose=false;
+  if(uDissolve>.001){
+    float n=fbm(vec3(uv*vec2(uAspect,1.)*2.6, 1.7)), r;
+    if(uSide<.5) r=clamp((n-.28)*2.2, 0., 1.);
+    else if(uSide<4.5){ float g = uSide<1.5 ? 1.-uv.x : uSide<2.5 ? uv.x : uSide<3.5 ? 1.-uv.y : uv.y; r=clamp(g*.82+(n-.5)*.36+.05, 0., 1.); }
+    else r=clamp(length((uv-.5)*vec2(uAspect,1.))/(.5*length(vec2(uAspect,1.)))*.82+(n-.5)*.36+.05, 0., 1.);
+    if(r<uDissolve){ float q=r/uDissolve; loose = uPh>=q*.4 && uPh<.5+q*.3; }
+  }
+  if(loose) fr=min(1., fr+uDt*(3.+5.*rnd)); else fr=max(0., fr-uDt*2.5);
   float att=1.-fr, k=uHold*uHold*90.;
+  if(!loose && fr>0.) k=max(k, 30.);   // coming back: firmly enough to be home before the loop ends
   vec3 a=(home-p)*k*att - v*(2.*sqrt(k)*.7+.5)*att;
-  float wr=.12+.88*fr, gust=.65+.35*sin(t*.9+p.x*.7+rnd*2.);
+  float wr=.12+.88*fr, gust=.65+.35*sin(6.2831853*uPh+p.x*.7+rnd*2.);
   a+=vec3(cos(uWindDir), sin(uWindDir), 0.)*uWind*7.*gust*wr/mass;
-  a+=curl(p, t)*uTurb*9.*wr/mass;
+  a+=curl(p, cyc)*uTurb*9.*wr/mass;
   a.y-=uGravity*6.*fr;
+  // Whirl: loose dots orbit the middle
+  if(uVortex>0.){ float L=length(p.xy)+.35; a.xy+=vec2(-p.y,p.x)/L*uVortex*5.*wr; a.xy-=p.xy*uVortex*.6*fr; }
   v*=exp(-uDt*.6*fr);
   if(uMouse.z>.5){
     vec2 d=p.xy-uMouse.xy; float dd=dot(d,d), fall=exp(-dd/(uBrush*uBrush)), L=sqrt(dd)+1e-4;
@@ -92,15 +107,20 @@ void main(){
     if(f>.12 && uBurst.w>=2.5) fr=1.;   // only a real blast tears dots loose; a music shove springs back
   }
   v+=a*uDt; p+=v*uDt;
+  al=min(1., al+uDt*2.5);
   bool bad = !(p.x==p.x && p.y==p.y && p.z==p.z && v.x==v.x);
-  if(bad || (fr>.01 && (abs(p.x)>uAspect+1.8 || abs(p.y)>2.6 || abs(p.z)>4.))){ p=home; v=vec3(0.); }
-  oPos=vec4(p,fr); oVel=vec4(v,0.);
+  // A dot that has drifted out of sight (it has faded out by then) is put back home and fades in there: while its
+  // part of the picture is loose it streams off again, otherwise it's back. Far-off dots coming back do the same
+  // instead of flying all the way across the picture.
+  float away=length(p-home);
+  if(bad || (fr>.01 && (away>2.3 || abs(p.z)>4.)) || (!loose && fr>.05 && away>1.2)){ p=home; v=vec3(0.); al=0.; if(!loose) fr=0.; }
+  oPos=vec4(p,fr); oVel=vec4(v,al);
 }`;
 const VS_POINTS = `#version 300 es
 precision highp float;
-uniform sampler2D uPos, uSrc;
+uniform sampler2D uPos, uVel, uSrc;
 uniform ivec2 uGridI; uniform float uAspect, uDepth;
-uniform mat4 uVP; uniform float uSize, uPx, uCut, uColor, uSpark, uBright, uTime, uFlip;
+uniform mat4 uVP; uniform float uSize, uPx, uCut, uColor, uSpark, uBright, uPh, uFlip;
 out vec3 vCol;
 vec3 hue(float h){ return clamp(abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.)-1.,0.,1.); }
 void main(){
@@ -112,14 +132,14 @@ void main(){
   vec3 home=vec3((uv.x*2.-1.)*uAspect, uv.y*2.-1., (lum-.3)*uDepth);
   float fr=P.w;
   float vis=smoothstep(uCut, uCut+.06, lum);
-  vis*=mix(1., exp(-length(P.xyz-home)*.45), fr);
+  vis*=mix(1., smoothstep(2.2, .4, length(P.xyz-home)), fr)*texelFetch(uVel, c, 0).w;
   gl_Position=uVP*vec4(P.xyz,1.);
   if(vis<.003){ gl_Position=vec4(2.,2.,2.,1.); gl_PointSize=0.; vCol=vec3(0.); return; }
   vec3 col; int m=int(uColor+.5);
   if(m==0) col=s;
   else if(m==1) col=vec3(lum)*vec3(.92,.97,.88);
   else if(m==2) col=mix(vec3(.545,.10,.72), vec3(1.,.86,1.), lum)*(.35+lum);
-  else col=hue(P.z*.45+uv.y*.35+uTime*.05)*(.3+lum);
+  else col=hue(P.z*.45+uv.y*.35+uPh)*(.3+lum);
   col=mix(col, vec3(.75+lum*.5), fr*uSpark*.7)*(1.+fr*uSpark*1.4);
   vCol=col*vis*uBright;
   gl_PointSize=clamp(uSize*uPx/gl_Position.w*(.7+.6*lum), 1., 48.);
@@ -199,9 +219,11 @@ function create(gl) {
   const FOV = 45 * Math.PI / 180, TF = Math.tan(FOV / 2);
   // The camera: looking at the picture's plane, swaying gently. fit < 1 shows the picture smaller.
   function camera(st, s, outW, outH, fit) {
-    const sa = outW / outH, a = st.grid.aspect, t = st.time, sway = s.cSway / 100;
+    const sa = outW / outH, a = st.grid.aspect, sway = s.cSway / 100;
     const D = Math.max(1, a / sa) / TF * 1.1 / fit;
-    const yaw = st.yaw + sway * .38 * Math.sin(t * .23), pitch = st.pitch + sway * .22 * Math.sin(t * .17 + 1.3);
+    // The sway goes round once in a whole number of loops (about 12 s or more), so it loops too
+    const loop = Math.max(1, s.cLoop || 8), n = Math.max(1, Math.round(12 / loop)), ph = 2 * Math.PI * ((st.time / (loop * n)) % 1);
+    const yaw = st.yaw + sway * .38 * Math.sin(ph), pitch = st.pitch + sway * .22 * Math.sin(ph + 1.3);
     const cy = Math.cos(yaw), sy = Math.sin(yaw), cx = Math.cos(pitch), sx = Math.sin(pitch);
     const R = [[cy, 0, sy], [sx * sy, cx, -sx * cy], [-cx * sy, sx, cx * cy]];
     const f = 1 / TF, near = .05, far = 50;
@@ -232,8 +254,16 @@ function create(gl) {
     const vaoWas = gl.getParameter(gl.VERTEX_ARRAY_BINDING), blendWas = gl.isEnabled(gl.BLEND);
     const bs = gl.getParameter(gl.BLEND_SRC_RGB), bd = gl.getParameter(gl.BLEND_DST_RGB), bsa = gl.getParameter(gl.BLEND_SRC_ALPHA), bda = gl.getParameter(gl.BLEND_DST_ALPHA);
     gl.bindVertexArray(vao);
-    dt = Math.min(1 / 30, Math.max(1 / 240, dt || 1 / 60));
-    st.time += dt;
+    // The loop follows the clock (so 8 s is 8 s even when frames come slowly). The dots keep up with it: when a frame
+    // took long they move in several small steps (1/30 s or less each, at most 6 a frame), so they're home in time.
+    const raw = Math.min(0.25, Math.max(1 / 240, dt || 1 / 60));
+    st.time += raw;
+    const steps = Math.min(6, Math.ceil(raw * 30 - 1e-6));
+    dt = Math.min(1 / 20, raw / steps);
+    const loopS = Math.max(1, s.cLoop || 8), cycle = Math.floor(st.time / loopS), uPh = (st.time / loopS) % 1;
+    // Pulse: a springy shove from the middle as each loop starts (under 2.5, so it never tears dots loose)
+    if (st.cycle !== undefined && cycle !== st.cycle && s.cPulse > 0) st.bursts.push([null, null, 2.2 * s.cPulse / 100]);
+    st.cycle = cycle;
     aspect = Number.isFinite(aspect) && aspect > 0.05 ? aspect : outW / outH;
     if (!st.grid || st.grid.dens !== s.cDens || Math.abs(st.grid.aspect - aspect) / aspect > .01) buildGrid(st, s.cDens, aspect);
     if (!st.acc || st.acc.w !== outW || st.acc.h !== outH) {
@@ -263,13 +293,16 @@ function create(gl) {
     if (st.bursts.length > 4) st.bursts.length = 4;
 
     // Move the dots
-    const cur = g.sets[g.cur], nxt = g.sets[1 - g.cur];
     gl.disable(gl.BLEND);
+    let u;
+    for (let step = 0; step < steps; step++) {
+    if (step > 0) { mouse = [0, 0, 0]; bu = [0, 0, 0, 0]; }
+    const cur = g.sets[g.cur], nxt = g.sets[1 - g.cur];
     gl.bindFramebuffer(gl.FRAMEBUFFER, nxt.fbo);
     gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
     gl.viewport(0, 0, g.W, g.H);
     gl.useProgram(PU.p);
-    let u = PU.u;
+    u = PU.u;
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, cur.pos); gl.uniform1i(u.uPos, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, cur.vel); gl.uniform1i(u.uVel, 1);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(u.uSrc, 2);
@@ -278,7 +311,7 @@ function create(gl) {
     gl.uniform1f(u.uTime, st.time); gl.uniform1f(u.uDt, dt);
     gl.uniform1f(u.uHold, s.cHold / 100); gl.uniform1f(u.uWind, s.cWind / 100); gl.uniform1f(u.uWindDir, s.cWindDir * Math.PI / 180);
     gl.uniform1f(u.uTurb, s.cTurb / 100); gl.uniform1f(u.uGravity, s.cGravity / 100); gl.uniform1f(u.uDissolve, s.cDissolve / 100);
-    gl.uniform1f(u.uSide, s.cSide); gl.uniform1f(u.uHeal, s.cHeal / 100);
+    gl.uniform1f(u.uSide, s.cSide); gl.uniform1f(u.uPh, uPh); gl.uniform1f(u.uVortex, (s.cVortex || 0) / 100);
     gl.uniform3f(u.uMouse, mouse[0], mouse[1], mouse[2]); gl.uniform2f(u.uMouseVel, st.vel[0], st.vel[1]);
     gl.uniform1f(u.uBrush, Math.max(.03, s.cBrush / 100)); gl.uniform1f(u.uMode, Math.max(0, mode));
     gl.uniform1f(u.uInit, st.needInit ? 1 : 0);
@@ -286,6 +319,7 @@ function create(gl) {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     g.cur = 1 - g.cur; st.needInit = false;
     gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+    }
 
     // Trails: what was drawn before fades
     const trails = Math.max(0, Math.min(.95, opt.trails ?? s.cTrails / 100));
@@ -301,13 +335,14 @@ function create(gl) {
     u = PP.u;
     const ps = g.sets[g.cur];
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ps.pos); gl.uniform1i(u.uPos, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ps.vel); gl.uniform1i(u.uVel, 1);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(u.uSrc, 2);
     gl.uniform2i(u.uGridI, g.W, g.H);
     gl.uniform1f(u.uAspect, g.aspect); gl.uniform1f(u.uDepth, s.cDepth / 100 * 1.3);
     gl.uniformMatrix4fv(u.uVP, false, cam.VP);
     gl.uniform1f(u.uSize, s.cSize / 10); gl.uniform1f(u.uPx, cam.f * outH / g.H);
     gl.uniform1f(u.uCut, .08); gl.uniform1f(u.uColor, s.cColor); gl.uniform1f(u.uSpark, s.cSpark / 100);
-    gl.uniform1f(u.uBright, s.cBright / 100 * .45 * (1 - trails * .55)); gl.uniform1f(u.uTime, st.time); gl.uniform1f(u.uFlip, opt.flip ? 1 : 0);
+    gl.uniform1f(u.uBright, s.cBright / 100 * .45 * (1 - trails * .55)); gl.uniform1f(u.uPh, uPh); gl.uniform1f(u.uFlip, opt.flip ? 1 : 0);
     gl.drawArrays(gl.POINTS, 0, g.N);
     gl.disable(gl.BLEND);
     // Out: softly limited, over the original by Amount

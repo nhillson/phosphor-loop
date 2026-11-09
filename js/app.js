@@ -10741,7 +10741,7 @@ const PCL = window.PhosphorPointCloud;
 const CLOUD_OF = ['picture', 'video', 'camera', 'loop'];
 const CLOUD_KEY = 'phosphor-cloud-v1';
 const CLOUD_DEF = { ...PCL.DEFAULTS };
-const CLOUD_NUM = ['cAmt', 'cBrush', 'cWind', 'cWindDir', 'cTurb', 'cGravity', 'cHold', 'cHeal', 'cDissolve', 'cDepth', 'cSize', 'cBright', 'cTrails', 'cSpark', 'cSway'];
+const CLOUD_NUM = ['cAmt', 'cBrush', 'cWind', 'cWindDir', 'cTurb', 'cGravity', 'cHold', 'cLoop', 'cPulse', 'cVortex', 'cDissolve', 'cDepth', 'cSize', 'cBright', 'cTrails', 'cSpark', 'cSway'];
 const CLOUD_SEG = { cMode: '#cloudMode', cSide: '#cloudSide', cColor: '#cloudColor', cDens: '#cloudDens' };
 const cloud = { ...CLOUD_DEF };
 const cloudEls = {};
@@ -10750,7 +10750,8 @@ function cloudText(k, v) {
   switch (k) {
     case 'cAmt': return v === 0 ? 'OFF' : `${v}%`;
     case 'cWindDir': return `${v}°`;
-    case 'cWind': case 'cDissolve': case 'cGravity': case 'cTrails': case 'cSway': return v === 0 ? 'OFF' : String(v);
+    case 'cLoop': return `${v} s`;
+    case 'cWind': case 'cDissolve': case 'cGravity': case 'cTrails': case 'cSway': case 'cPulse': case 'cVortex': return v === 0 ? 'OFF' : String(v);
     case 'cSize': return (v / 10).toFixed(1);
     default: return String(v);
   }
@@ -10761,7 +10762,7 @@ function cleanCloud(c) {
   if (!c || typeof c !== 'object') return out;
   for (const k of CLOUD_NUM) { const { el } = cloudEls[k]; if (Number.isFinite(c[k])) out[k] = clamp(Math.round(c[k]), +el.min, +el.max); }
   if (PCL.MODES.includes(c.cMode)) out.cMode = c.cMode;
-  if (Number.isInteger(c.cSide)) out.cSide = clamp(c.cSide, 0, 4);
+  if (Number.isInteger(c.cSide)) out.cSide = clamp(c.cSide, 0, 5);
   if (Number.isInteger(c.cColor)) out.cColor = clamp(c.cColor, 0, 3);
   if (Number.isInteger(c.cDens)) out.cDens = clamp(c.cDens, 0, PCL.DENS.length - 1);
   out.cMusic = c.cMusic !== false;
@@ -12467,7 +12468,23 @@ function probeTick(k, now) {
   try {
     if (!L.probe) L.probe = probeMake();
     const P = L.probe;
-    if (P.sync) {
+    // A copy still on its way is picked up at the start of a frame (readsEarly), not here
+    if (P.sync) return;
+    if (now - P.askT < 50) return;
+    probeAsk(k, P, now);
+  } catch (err) {
+    probeFailed = true;   // Chase, Breathe and Crystal then just stay still; nothing else is affected
+    console.warn('Probe unavailable:', err);
+  }
+}
+// Collects loop k's map if it has arrived. Called at the very start of a frame: picking a copy up makes the page wait
+// for the browser's graphics process to work through everything drawn before it, which is little at that point but a
+// lot in the middle of a frame (up to 30 ms, which made clicks lag).
+function probeCollect(k) {
+  const P = loops[k].probe;
+  if (!P || !P.sync || probeFailed) return;
+  try {
+    {
       const st = gl.clientWaitSync(P.sync, 0, 0);   // a timeout of 0: only asks, never waits
       if (st === gl.TIMEOUT_EXPIRED && ++P.age < 60) return;
       gl.deleteSync(P.sync);
@@ -12486,9 +12503,15 @@ function probeTick(k, now) {
         P.t = P.askT;
         probeUse(k);
       }
-      return;
     }
-    if (now - P.askT < 33) return;
+  } catch (err) {
+    probeFailed = true;
+    console.warn('Probe unavailable:', err);
+  }
+}
+function probeAsk(k, P, now) {
+  const L = loops[k];
+  {
     gl.bindFramebuffer(gl.FRAMEBUFFER, P.fbo);
     gl.viewport(0, 0, PROBE_W, PROBE_H);
     gl.useProgram(probeProg.p);
@@ -12502,9 +12525,6 @@ function probeTick(k, now) {
     P.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
     P.askT = now;
     P.age = 0;
-  } catch (err) {
-    probeFailed = true;   // Chase, Breathe and Crystal then just stay still; nothing else is affected
-    console.warn('Probe unavailable:', err);
   }
 }
 // The map, softened a little (each spot an average of it and its eight neighbours), and where each spot is on screen
@@ -12986,7 +13006,8 @@ function eyeTick(now, dt, wA, wB) {
   // (and stays open while a rating is still waiting for its picture, a few seconds at most)
   const looking = ap.on || now <= eye.wantUntil || taste.pending.length > 0;
   if (!looking && !eye.sync) return;
-  const got = eyeCollect();
+  const got = eye.got;   // picked up at the start of the frame (readsEarly)
+  eye.got = null;
   if (got) tasteFill(now);
   if (frozen) return;
   if (ap.on && cueTick(now)) {
@@ -13005,7 +13026,7 @@ function eyeTick(now, dt, wA, wB) {
     whiteWatch(now, dt, wA, wB);
     darkWatch(now, dt, wA, wB);
   }
-  if (looking && !eye.sync && now - eye.askT > 55) {
+  if (looking && !eye.sync && now - eye.askT > 90) {
     const P = ap.prep, keys = cue.scout ? ['C', 'comp', 'C'] : P ? [P.k, 'comp', P.k] : ['comp'];
     for (const k of ['A', 'B']) if ((k === 'A' ? wA : wB) > 0.02 && !(P && P.k === k)) keys.push(k);
     const key = keys[eye.turn++ % keys.length];
@@ -16066,6 +16087,12 @@ window.__plStack = { get mode() { return stackMode; }, setMode: setStackMode, li
   tasteShown: () => [...document.querySelectorAll('#tasteList .tp')].map((t) => t.dataset.id),
   kinds: Object.fromEntries(Object.entries(STK.LOOP_KINDS).map(([k, K]) => [k, K.keys])) };
 
+// The copies Autopilot's eye and the Chase/Breathe/Crystal maps asked for, picked up first thing in a frame, before
+// anything new is drawn (see probeCollect)
+function readsEarly() {
+  if (eye.sync && !eye.failed) eye.got = eyeCollect();
+  for (const k of [...KEYS, ...MINI]) if (loops[k] && loops[k].probe && loops[k].probe.sync) probeCollect(k);
+}
 function frame() {
   const now = performance.now();   // this page's clock, even when the output window drives the frames
   // At most this many frames a second: Phosphor Stream's own speed, or else the Frame rate limit (under Screen).
@@ -16083,6 +16110,7 @@ function frame() {
   fpsMeter.n++; fpsMeter.total++;
   const dt = Math.min(0.1, Math.max(0.001, (now - last) / 1000));
   last = now;
+  readsEarly();
   sharpTick(now);
   const k = 1 - Math.exp(-dt * 5);
   // Autopilot glides over its Fade time (about 10 seconds unless changed), or fast when a look cuts in on a beat.
