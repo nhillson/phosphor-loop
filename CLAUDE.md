@@ -270,3 +270,7 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    stack in votes (`tasteLook`), words `sk:` (effect@zone), `so:` (order), `sl:` (with the input), `sm:` (movers), `sa:` (whole picture).
    Add menu: Movement / Color, texture and patterns / Time / Whole picture, A to Z (`STK.MENU`; some Patch kinds renamed, `PATCH_NAME`).
    `python3 tests/stack_check.py` (about 9 minutes; reaches in through `window.__plStack`). Cue mode's scout and live previews stay Classic.
+4z9. **Phones: a steady picture size while scrolling** (`viewH`, `touchUI`, `lvhProbe` before `fit()` in js/app.js): on touch screens the
+   narrow layout's picture height comes from the tallest the window gets at this width (100lvh, the address bar hidden), so the
+   address bar sliding while the page scrolls doesn't resize the canvas and rebuild the loops (`resim`). Computers still follow
+   innerHeight. Checked by setting a phone-sized page's height back and forth (`is_mobile`, `has_touch`) and counting canvas sizes.

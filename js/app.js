@@ -10257,6 +10257,21 @@ function sharpTick(now) {
 let resimTimer = null, firstFit = true;
 let outWin = null, outCanvas = null, outCtx = null;
 function outputOpen() { return !!(outWin && !outWin.closed && outCanvas); }
+// Phones and tablets: while the page scrolls, the browser's address bar slides away and back, and the window's height
+// changes with it. The picture's height comes from the window's height there, so each slide resized the picture and
+// rebuilt the loops (a stutter every scroll). On touch screens the height used is the tallest the window gets at this
+// width (the address bar hidden, 100lvh where the browser knows it), so it only changes when the phone turns.
+const touchUI = window.matchMedia('(hover: none)').matches;
+const lvhProbe = document.createElement('div');
+lvhProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100lvh;visibility:hidden;pointer-events:none';
+document.body.appendChild(lvhProbe);
+let steadyW = 0, steadyH = 0;
+function viewH() {
+  if (!touchUI) return window.innerHeight;
+  if (window.innerWidth !== steadyW) { steadyW = window.innerWidth; steadyH = 0; }
+  steadyH = Math.max(steadyH, window.innerHeight, lvhProbe.offsetHeight || 0);
+  return steadyH;
+}
 function fit() {
   const fs = document.fullscreenElement || document.webkitFullscreenElement;
   const narrow = narrowMQ.matches && !fs;
@@ -10275,7 +10290,7 @@ function fit() {
   const want = out ? outWin.innerWidth / Math.max(1, outWin.innerHeight) : own && !sizing ? layout.cw / layout.ch
     : SHAPES[shape] || (spread ? 16 / 9 : 0);
   let availH = narrow
-    ? Math.round(want ? Math.min(window.innerHeight * 0.62, availW / want) : window.innerHeight * 0.58)
+    ? Math.round(want ? Math.min(viewH() * 0.62, availW / want) : viewH() * 0.58)
     : sizing ? layout.ch
     : spread ? Math.floor(Math.min(availW / want, window.innerHeight * 0.8))
     : Math.max(120, Math.floor(sr.height - padY));
