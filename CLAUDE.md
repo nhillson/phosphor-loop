@@ -237,6 +237,12 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    Use Point cloud (`apSet.cloud`, `apCloud`). `python3 tests/cloud_check.py` (about 2.5 minutes). Check with `--shot "Dust portrait"`
    and `--shot "Dot galaxy"`. js/pointcloud.js is listed in sw.js and android/tools/bundle_site.py.
    tests/check.py presses its buttons from a page script (Playwright's own click times out on this page in the workspace).
+   In the Effect stack the Point cloud is a Whole picture card holding the whole `cloudGroup` panel (`WHOLE_KINDS.cloud.group`;
+   the section itself is Classic only); the card shows while `cAmt` > 0 or any loop uses the input (`wholeActive('cloud')`).
+   Music hits only shove (bursts under 2.5 never tear dots loose; at most one every 0.6 s, `cloudHitAt`).
+   **The stack list holds still** while the mouse is over it, a button is held on it or the add menu is open (`stkBusy`,
+   `stkPending`, `stackLater`): unforced redraws wait, so cards don't jump or lose clicks. **A loop's Neutral** also zeroes every
+   stack kind's faders (`effectsOff`) and turns the whole-picture effects off (grading, 3D lighting, Type art, Point cloud, `stackAll`).
 4z6. **Effect stack** (Effects › Effect stack / Classic layout, `stackMode`, kept in `phosphor-fx-mode`, on to start with;
    kinds in `js/stack.js`, glue under "effect stack" in js/app.js). Each loop's list is `tgt.stack` (never changed in place; `loopStack(k)`
    makes one from the settings with `stackFromClassic` when missing), the whole-picture list `stackAll` (`phosphor-stack-all-v1`, in presets

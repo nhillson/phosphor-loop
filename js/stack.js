@@ -45,7 +45,7 @@ const WHOLE_KINDS = {
   grade:  { label: 'Color grading', zones: ['in', 'all'], group: 'gradeGroup' },
   relief: { label: '3D lighting', zones: ['all'], group: 'reliefGroup' },
   type:   { label: 'Type art', zones: ['in', 'all'], group: 'typeGroup' },
-  cloud:  { label: 'Point cloud dots', zones: ['all'], ctl: ['cAmt'] },
+  cloud:  { label: 'Point cloud', zones: ['all'], group: 'cloudGroup' },
 };
 // The order the loop's own effects worked in before (Classic). New ones slot in by it.
 const CLASSIC = Object.keys(LOOP_KINDS);

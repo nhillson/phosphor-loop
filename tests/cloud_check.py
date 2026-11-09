@@ -44,6 +44,17 @@ def run(c, base, problems):
     ok(light > 3, f'the dots are black (brightness {light:.1f})')
     print(f'  input: brightness {light:.1f}')
 
+    # Its card is in the Effect stack (under Whole picture) while a loop uses the input, and opening it shows the controls
+    card = "[...document.querySelectorAll('#stkList .stk-item')].find(x => x.querySelector('.stk-name').textContent.startsWith('Point cloud'))"
+    c.wait_frames(6, 'the stack catching up')
+    ok(pg.evaluate(f"!!{card} && {card}.dataset.z === 'all'"), 'no Point cloud card under Whole picture in the stack')
+    pg.evaluate(f"{card}.querySelector('.stk-name').click()")
+    c.wait_frames(3, 'opening the card')
+    ok(pg.evaluate(f"!!{card}.querySelector('#cWind') && !!{card}.querySelector('#cloudRecipes')"), 'the Point cloud card does not hold its controls')
+    ok(pg.evaluate("getComputedStyle(document.getElementById('cloudGroup')).display") == 'none', 'the separate Point cloud section still shows with the stack')
+    pg.evaluate(f"{card}.querySelector('.stk-name').click()")
+    c.wait_frames(3, 'closing the card')
+
     # Dots of the other loop
     pg.evaluate(CLICK, '#cloudOf [data-v="loop"]')
     c.wait_frames(15, 'dots of the other loop')

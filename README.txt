@@ -288,9 +288,11 @@ TIPS
       Point cloud input (under Inputs): pick what it makes dots of under
         Dots of: Picture (a nature picture or your own), Video, Camera or
         the Other loop.
-      Whole picture as dots (the Point cloud section, under Type art): turns
-        the whole finished picture into dots. Off at 0.
-    Both use the Point cloud section's settings: Recipes (Disintegrate,
+      Whole picture as dots: in the Effect stack, add Point cloud (under
+        Whole picture), or raise "Whole picture as dots" in its card. Off at 0.
+    Both use the Point cloud card's settings (it shows in the stack while
+    either is in use; open it with its name; in the Classic layout it's the
+    Point cloud section): Recipes (Disintegrate,
     Sandstorm, Jelly, Galaxy, Rain down, Ghost, Calm), Wind and its
     direction, Swirliness, Gravity, Hold shape (how hard dots spring back),
     Come back, Dissolve (and which side it blows away from), colors, how many
@@ -298,8 +300,9 @@ TIPS
     While dots are on screen, dragging on the picture moves them: Smears,
     Pushes, Pulls, Swirls or Tears (pick under "Dragging on the picture";
     Draws goes back to drawing). Double-click or double-tap the picture to
-    blow it apart from there, or press Explode. With "Music hits blow it
-    apart" on and React to sound listening, the hits do it too.
+    blow it apart from there, or press Explode. With "Music hits shake it"
+    on and React to sound listening, strong hits give the dots a springy
+    shove that settles back.
     Autopilot can bring Point cloud in as an input, and "Use Point cloud"
     (under Autopilot) lets it turn the whole picture into dots with some
     looks. Presets keep it; Neutral turns the whole-picture dots off.

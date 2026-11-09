@@ -2316,6 +2316,13 @@ function writeSpec(dt) {
 /* ================= neutral ================= */
 // Back to a plain monitor: loop A shows its current input filling the screen, with every effect off
 const IMAGE_INPUTS = ['picture', 'genart', 'video', 'camera', 'screen', 'phone'];
+// Every effect fader a loop has (each Effect stack kind's faders) at 0. Neutral needs all of them down: the stack
+// brings back any effect whose fader is still up.
+function effectsOff() {
+  const off = {};
+  for (const K of Object.values(window.PhosphorStack.LOOP_KINDS)) for (const key of K.keys) off[key] = 0;
+  return off;
+}
 function neutral() {
   if (MV.play && !MV.applying) movesStop(true);
   if (ap.on) setAutopilot(false, true);
@@ -2325,6 +2332,7 @@ function neutral() {
   let src = loops.A.tgt.in1;
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
+    ...effectsOff(),
     in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' || src === 'cloud' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound, stack: [],
@@ -2353,7 +2361,8 @@ function neutral() {
 }
 $('#neutral').addEventListener('click', neutral);
 // Neutral this loop (Inputs, for the loop being edited, and in each Spread out column): just that loop's input,
-// every effect on it off and nothing fed into it. The other loops and the whole-picture settings stay as they are.
+// every effect on it off and nothing fed into it, and the whole-picture effects off too (they show in every loop's
+// effect stack, so a neutral loop shouldn't keep them). The other loops' own effects stay as they are.
 // A loop Autopilot runs is handed back to you (Autopilot stops if it was its only loop); a sequence playing it
 // stops, as when you pick an input on it.
 function neutralLoop(k) {
@@ -2377,6 +2386,7 @@ function neutralLoop(k) {
   loopGrade[k] = null; seqRelief[k] = null;
   const L = loops[k], src = L.tgt.in1;
   patchLoop(k, {
+    ...effectsOff(),
     in1: src, in2: 'none', blend: 50, motion: false,
     size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
@@ -2384,6 +2394,13 @@ function neutralLoop(k) {
   }, true);
   for (const q of LOOP_SMOOTH) L.cur[q] = L.tgt[q];
   mirrorCut(k);
+  // The whole-picture effects (shared by every loop, shown in each loop's stack)
+  setGrade(GRADE_DEF);
+  setRelief(RELIEF_DEF);
+  setType({ ...typeArt, tAmt: 0 });
+  setCloud({ ...cloud, cAmt: 0 });
+  stackSetAll([]);
+  stackRender(true);
   // Nothing fed into this loop from the others
   for (const [q, to] of Object.entries(FEED_TO)) if (to === k) { mix.tgt[q] = 0; mix.cur[q] = 0; }
   mix.base = { ...mix.tgt };
@@ -2397,10 +2414,10 @@ function neutralLoop(k) {
   syncUI();
   syncApLoops();
   showOSD(`NEUTRAL ${k}`, (SRC_LABEL[src] || 'Nothing').toUpperCase());
-  toast(`Loop ${k} is neutral: just its input, with its effects off.${handed} Raise Trails to bring its feedback back.`);
+  toast(`Loop ${k} is neutral: just its input, with its effects and the whole-picture effects off.${handed} Raise Trails to bring its feedback back.`);
 }
 $('#loopNeutral').addEventListener('click', () => neutralLoop(edit));
-window.__plNeutralLoop = neutralLoop;   // for tests/neutral_loop_check.py
+window.__plNeutralLoop = neutralLoop;
 
 /* ================= autopilot ================= */
 // Every half minute or so (New look every, under Autopilot settings) the hidden loop gets a new look, then the
@@ -10752,7 +10769,7 @@ for (const [k, sel] of Object.entries(CLOUD_SEG)) $$(sel + ' button').forEach((b
 }));
 $('#cloudMusic').addEventListener('click', () => {
   setCloud({ ...cloud, cMusic: !cloud.cMusic });
-  toast(cloud.cMusic ? 'The music’s hits blow the dots apart (with React to sound on).' : 'The music leaves the dots alone now.');
+  toast(cloud.cMusic ? 'Strong hits in the music shake the dots (with React to sound on).' : 'The music leaves the dots alone now.');
 });
 $('#cloudReset').addEventListener('click', () => setCloud({ ...CLOUD_DEF, cAmt: cloud.cAmt }));
 $('#cloudBoom').addEventListener('click', () => cloudBoomAt(null, null, 4.5));
@@ -10853,7 +10870,7 @@ function cloudFinal(tex, dt, force) {
   return eng.run(cloudSt.final, tex, simW / simH, canvas.width, canvas.height, cloud, dt, { ptr: cloudPtr, orig: tex, amt: cloud.cAmt / 100 });
 }
 // Each frame: Autopilot's fade, the music's hits, and letting go of the dots of loops that stopped using them
-let cloudBeats = 0;
+let cloudBeats = 0, cloudHitAt = 0;
 function cloudTick(now) {
   if (cloudGlide.on) {
     const u = clamp((now - cloudGlide.t0) / cloudGlide.dur, 0, 1), e = u * u * (3 - 2 * u);
@@ -10863,12 +10880,15 @@ function cloudTick(now) {
   }
   if (!cloudEng) return;
   for (const k of KEYS) if (cloudSt[k] && !(cloudUses(k) && loopOn(k))) { cloudEng.release(cloudSt[k]); cloudSt[k] = null; }
+  // The music's hits give the dots a springy shove that settles back (never tearing them loose, which only
+  // Explode and double-clicks do), only on strong hits, at most one every 0.6 s
   if (snd.beats !== cloudBeats) {
     cloudBeats = snd.beats;
-    if (cloud.cMusic && snd.analyser) {
+    if (cloud.cMusic && snd.analyser && now - cloudHitAt > 600) {
       const a = sndPower() * snd.env.beat;
-      if (a > 0.2) {
-        const u = rnd(0.3, 0.7), v = rnd(0.3, 0.7), str = 1 + 3 * Math.min(1, a);
+      if (a > 0.45) {
+        cloudHitAt = now;
+        const u = rnd(0.35, 0.65), v = rnd(0.35, 0.65), str = 0.5 + 0.9 * Math.min(1, a);
         if (cloudSt.final && share() > 0) cloudEng.burst(cloudSt.final, u, v, str);
         for (const k of KEYS) if (cloudSt[k] && reacts(k)) cloudEng.burst(cloudSt[k], u, v, str);
       }
@@ -15200,7 +15220,7 @@ function wholeActive(kind) {
   if (kind === 'grade') return gradeOn();
   if (kind === 'relief') return relief.rDepth > 0;
   if (kind === 'type') return typeArt.tAmt > 0;
-  if (kind === 'cloud') return cloud.cAmt > 0;
+  if (kind === 'cloud') return cloud.cAmt > 0 || activeKeys().some((k) => cloudUses(k));
   return false;
 }
 // Where a loop's effect worked in Classic
@@ -15234,7 +15254,7 @@ function stackAllList() {
     stackAll = [];
     if (gradeOn() && !grade.gInside) stackAll.push(STK.newItem('grade', 'all', { auto: true }));
     if (relief.rDepth > 0) stackAll.push(STK.newItem('relief', 'all', { auto: true }));
-    if (cloud.cAmt > 0) stackAll.push(STK.newItem('cloud', 'all', { auto: true }));
+    if (wholeActive('cloud')) stackAll.push(STK.newItem('cloud', 'all', { auto: true }));
     if (typeArt.tAmt > 0 && !typeArt.tInside) stackAll.push(STK.newItem('type', 'all', { auto: true }));
   }
   return stackAll;
@@ -15541,6 +15561,19 @@ function stackWhole(tex, dt) {
 
 // ---- the list on screen
 const stkList = $('#stkList'), stkAdd = $('#stkAdd'), stkFixed = $('#stkFixed');
+// While the mouse is over the list, a button is held down on it, or the + Add an effect menu is open, the list isn't
+// drawn afresh by itself (Autopilot's effects coming and going, a fader reaching 0): cards would jump under the
+// pointer, a button rebuilt between press and release loses its click, and refilling the menu closes it. The redraw
+// waits until the pointer leaves. What you click redraws at once.
+let stkPress = false, stkPending = false, stkHover = false;
+const stkBusy = () => stkPress || stkHover || document.activeElement === stkAdd;
+stkList.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') stkHover = true; });
+stkList.addEventListener('pointerleave', () => { stkHover = false; setTimeout(stackLater, 0); });
+function stackLater() { if (!stkPending || stkBusy()) return; stkPending = false; stackRender(); }
+stkList.addEventListener('pointerdown', () => { stkPress = true; }, true);
+for (const ev of ['pointerup', 'pointercancel']) addEventListener(ev, () => { if (!stkPress) return; stkPress = false; setTimeout(stackLater, 0); }, true);
+stkAdd.addEventListener('blur', () => setTimeout(stackLater, 0));
+stkAdd.addEventListener('change', () => setTimeout(() => { stkAdd.blur(); stackLater(); }, 0));
 // Each control row's home in the Classic layout, so it can go back there
 const stackHome = new Map();
 function homeOf(el) {
@@ -15561,7 +15594,7 @@ function stackRows(kind) {
 }
 // The Classic hints that talk about Final Pass and Within Loops have no place in the stack
 for (const id of ['#gradeWhere', '#typeWhere']) { const n = $(id) && $(id).nextElementSibling; if (n && n.classList.contains('hint')) n.classList.add('stk-classic-hint'); }
-for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup']) $('#' + id).classList.add('classic-only');
+for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup', 'cloudGroup']) $('#' + id).classList.add('classic-only');
 const MV_OPTS = (cur) => STK.MOVERS.map(([v, l]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${v ? '∿ ' : ''}${escapeHTML(l)}</option>`).join('');
 const KEY_NAME = { zoom: 'Zoom', spin: 'Spin' };
 function stackFader(label, act, k, v, min = 0, max = 100) {
@@ -15622,6 +15655,8 @@ function stackRender(force) {
   const seqList = stackSeq();
   const sig = edit + '|' + JSON.stringify(seqList.map((it) => (typeof it === 'string' ? it : [it.id, it.kind, it.on, it.zone, stackOpen.has(it.id), Object.entries(it.mv || {}).map(([k, m]) => k + (m && m.m)).join(), it.blend, STK.isPatch(it.kind) ? STK.PATCH_KINDS[it.kind].p.filter((q) => q.opts).map((q) => it.p[q.k]).join() : ''])));
   if (!force && sig === stackSig) { stackRefreshFaders(); return; }
+  if (!force && stkBusy()) { stkPending = true; stackRefreshFaders(); return; }
+  stkPending = false;
   stackSig = sig;
   // Rows go home first, so rebuilding the list never throws them away
   sendAllHome();

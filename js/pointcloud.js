@@ -89,7 +89,7 @@ void main(){
     vec3 d=p-uBurst.xyz; float L=length(d)+.05, f=exp(-L*L*.35);
     vec3 j=vec3(hash(uv+1.3),hash(uv+2.7),hash(uv+3.1))-.5;
     v+=(d/L+j*.9)*uBurst.w*f*(.5+rnd);
-    if(f>.12) fr=1.;
+    if(f>.12 && uBurst.w>=2.5) fr=1.;   // only a real blast tears dots loose; a music shove springs back
   }
   v+=a*uDt; p+=v*uDt;
   bool bad = !(p.x==p.x && p.y==p.y && p.z==p.z && v.x==v.x);
