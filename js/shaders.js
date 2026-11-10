@@ -1210,6 +1210,92 @@ void main() {
   o = vec4(col, 1.0);
 }`;
 
+// Sound pictures (React to sound: Ripple tank, Build and drop): a reacting loop's finished picture bent on its way to
+// the mix. Ripples: up to 10 rings, each a short train of waves travelling out from where its hit landed; the picture is
+// read a little along each ring's slope (as light bends through water), so crossing rings add up and cancel. Build and
+// drop: wind twists and pinches the middle, float sways the whole picture slowly, release punches in and brightens.
+const FS_SNDWARP = `#version 300 es
+precision highp float;
+uniform sampler2D uPic;
+uniform vec2 uSim;
+uniform float uTime, uRipK, uTwist;
+uniform vec4 uRip[10];     // where the hit landed (x, y: the middle is 0, the picture is 1 tall), the ring's radius now, its wavelength
+uniform float uRipA[10];   // how far it bends the picture now (0: no ring)
+uniform vec3 uBuild;       // wind, float and release, 0 to 1 each
+out vec4 o;
+${COMMON}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  float asp = uSim.x / uSim.y;
+  vec2 p = (uv - 0.5) * vec2(asp, 1.0);
+  float r = length(p), glint = 0.0;
+  if (uBuild.x > 0.001) {
+    float mid = 1.0 - smoothstep(0.0, 0.9, r);
+    p = rot(uTwist * mid * mid) * p;
+    p *= 1.0 + 0.12 * uBuild.x * mid;
+  }
+  if (uBuild.y > 0.001) {
+    p += uBuild.y * 0.016 * vec2(sin(uTime * 0.7 + p.y * 3.1), cos(uTime * 0.55 + p.x * 2.7));
+    p *= 1.0 - 0.035 * uBuild.y;
+  }
+  p *= 1.0 - 0.10 * uBuild.z;
+  vec2 d = vec2(0.0);
+  if (uRipK > 0.0) for (int i = 0; i < 10; i++) {
+    float a = uRipA[i] * uRipK;
+    if (a <= 0.0) continue;
+    vec2 q = p - uRip[i].xy;
+    float rr = length(q) + 1e-4, wl = uRip[i].w, x = rr - uRip[i].z;
+    float env = exp(-x * x / (wl * wl * 2.5)) * a;
+    d += q / rr * sin(x * TAU / wl) * env;
+    glint += cos(x * TAU / wl) * env;
+  }
+  p += d;
+  vec2 st = p / vec2(asp, 1.0) + 0.5;
+  st = 1.0 - abs(1.0 - mod(st, 2.0));   // past an edge the picture folds back instead of smearing
+  vec4 c = texture(uPic, st);
+  o = vec4(max(c.rgb * (1.0 + 8.0 * glint) * (1.0 + 0.5 * uBuild.z), 0.0), c.a);
+}`;
+
+// Scan-line hills (React to sound): the picture redrawn as glowing lines across it, each lifted where the picture is
+// bright (as the Rutt-Etra video synthesizer did) and wobbled by the music's own sound wave (uSnd, see "sound on lines").
+// For each spot, the lines that could have risen (or been pushed) to it are tried, and the brightest glow wins, so
+// crossing lines never add up to white. uK fades between the plain picture (0) and the lines (1).
+const FS_SNDHILLS = `#version 300 es
+precision highp float;
+uniform sampler2D uPic;
+uniform vec2 uSim;
+uniform float uK, uLines, uHeight, uWave;
+uniform vec4 uSnd[24];
+out vec4 o;
+float lum(vec3 c) { return min(dot(c, vec3(0.299, 0.587, 0.114)), 1.2); }
+float sndAt(float u) {
+  float f = clamp(u, 0.0, 1.0) * 95.0;
+  int i = int(f), j = min(i + 1, 95);
+  return mix(uSnd[i >> 2][i & 3], uSnd[j >> 2][j & 3], f - float(i));
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy / uSim;
+  float asp = uSim.x / uSim.y, s = 1.0 / uLines, dx = 1.2 * s / asp;
+  vec4 src = texture(uPic, uv);
+  float w = sndAt(uv.x) * uWave, wl = sndAt(uv.x - dx) * uWave, wr = sndAt(uv.x + dx) * uWave;
+  float j0 = floor(uv.y / s), th = max(0.15 * s, 0.75 / uSim.y);
+  vec3 acc = vec3(0.0);
+  for (int n = -8; n <= 2; n++) {
+    float yj = (j0 + float(n) + 0.5) * s;
+    if (yj < 0.0 || yj > 1.0) continue;
+    vec3 c = texture(uPic, vec2(uv.x, yj)).rgb;
+    float hl = lum(texture(uPic, vec2(uv.x - dx, yj)).rgb), hr = lum(texture(uPic, vec2(uv.x + dx, yj)).rgb);
+    float h = (hl + 2.0 * lum(c) + hr) * 0.25;
+    float y = yj + h * uHeight + w;
+    // measured square to the line, so a steep slope stays as thick as a flat stretch
+    float slope = ((hr - hl) * uHeight + wr - wl) / (2.0 * dx * asp);
+    float dist = abs(uv.y - y) / sqrt(1.0 + slope * slope);
+    float g = exp(-dist * dist / (th * th)) + 0.3 * exp(-dist * dist / (th * th * 9.0));
+    acc = max(acc, (c * 1.15 + vec3(0.07, 0.06, 0.09)) * g);
+  }
+  o = vec4(mix(src.rgb, acc, uK), src.a);
+}`;
+
 // A loop's final pass: effects set to Final Pass are laid over the loop's finished picture once, on its way to the
 // screen, instead of feeding back into it every frame. Mirror folds it, Split lines slides every other line, Warp
 // ripples it like water and Color chase pulls its red, green and blue apart into rainbow fringes; then Posterize
@@ -3199,5 +3285,5 @@ void main() {
   o = vec4(clamp(c * 0.25, 0.0, 1.0), 1.0);
 }`;
 
-return { feedbackFS, feedbackParts, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
+return { feedbackFS, feedbackParts, FS_SNDWARP, FS_SNDHILLS, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, VS, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO };
 })();

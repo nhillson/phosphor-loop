@@ -1051,7 +1051,7 @@
           </div>
           <div class="ctl">
             <span class="lbl">What the music moves</span>
-            <span class="hint stk-only">With the effect stack, the music moves whatever faders you pick inside each effect (beside the fader, choose Music, Bass or Beat hits). Only Sound on lines is set here.</span>
+            <span class="hint stk-only">With the effect stack, the music moves whatever faders you pick inside each effect (beside the fader, choose Music, Bass or Beat hits). Sound on lines, Ripple tank, Build and drop and Scan-line hills are set here.</span>
             <div class="chips" id="sndMap">
               <button class="chip" data-map="kick" aria-pressed="true" title="The picture punches in on every kick and pumps with the bass"><span class="led"></span>Zoom kick</button>
               <button class="chip" data-map="size" aria-pressed="true" title="The input swells on the bass"><span class="led"></span>Input size</button>
@@ -1061,13 +1061,16 @@
               <button class="chip" data-map="flash" aria-pressed="true" title="The picture brightens on beats"><span class="led"></span>Flash</button>
               <button class="chip" data-map="lines" aria-pressed="true" title="The lines of Wave, Shape, Bars and Topo map carry the music’s own sound wave, like an oscilloscope"><span class="led"></span>Sound on lines</button>
               <button class="chip" data-map="asym" aria-pressed="true" title="Every hit shoves Off-center's tunnel somewhere new, and the bass pushes it further out"><span class="led"></span>Off-center</button>
+              <button class="chip" data-map="ripple" aria-pressed="false" title="Every hit drops a ripple that travels across the picture and bends it like water. Low notes make big slow rings, high notes small quick ones"><span class="led"></span>Ripple tank</button>
+              <button class="chip" data-map="build" aria-pressed="false" title="Follows the song’s shape over the last 10 to 30 seconds: the picture winds tighter in a build-up, floats when the bass drops out, and lets go when the bass comes back"><span class="led"></span>Build and drop</button>
+              <button class="chip" data-map="hills" aria-pressed="false" title="The picture redrawn as glowing lines that rise where it’s bright, wobbled by the music’s own sound wave. The classic analog video synth look"><span class="led"></span>Scan-line hills</button>
             </div>
           </div>
           <div class="ctl" id="sndDetailRow">
             <div class="ctl-head"><label for="sndDetail">Line detail</label><output id="sndDetailOut" for="sndDetail"></output></div>
             <input type="range" id="sndDetail" min="0" max="100" step="1" value="30">
             <div class="ends"><span>Smooth</span><span>Fuzzy</span></div>
-            <span class="hint">How much of the sound the lines show. Smooth shows the kick and bass as big swells; Fuzzy shows every hi-hat and voice too.</span>
+            <span class="hint">How much of the sound the lines (and Scan-line hills) show. Smooth shows the kick and bass as big swells; Fuzzy shows every hi-hat and voice too.</span>
           </div>
         </div>
         <p class="hint" id="sndHint">Play music from Spotify, YouTube or anything else. The picture reacts straight away: low, mid and high sounds, and a pulse on every hit (a kick, a snare, a strum) as it’s heard. Record keeps the sound too.</p>
@@ -1616,7 +1619,9 @@
 
       <section class="group" id="presetGroup" aria-labelledby="h-pre">
         <h2 id="h-pre">My presets</h2>
+        <button class="btn wide" id="libOpen" title="Every look you’ve saved, with folders, tags, search and a picture of each">Preset library…</button>
         <p class="hint" id="presetEmpty">Nothing saved yet. Set up a look you like, then save it here.</p>
+        <span class="lbl" id="presetRecent" hidden>Most recent</span>
         <div class="presets" id="presetList"></div>
         <form class="preset-form" id="presetForm" hidden>
           <label for="presetName" class="lbl">Name this look</label>
@@ -1628,7 +1633,7 @@
         </form>
         <button class="btn wide" id="presetSave">Save current look</button>
         <p class="hint" id="presetApNote">Autopilot is on, so this preset will keep Autopilot’s settings and pins too, and start Autopilot again when you load it.</p>
-        <p class="hint" id="presetNote">Presets stay in this browser on this device. Save under the same name to update one. Pictures and videos aren’t saved, only the settings.</p>
+        <p class="hint" id="presetNote">Saved looks go into the Preset library, where you can sort them into folders, tag them and search. Save under the same name to update one. Pictures and videos aren’t saved, only the settings.</p>
       </section>
 
       <section class="group" id="tasteGroup" aria-labelledby="h-taste">
@@ -1714,7 +1719,7 @@
             <dt>Neutral</dt><dd>Just loop A’s input filling the screen, with every effect off. A clean starting point: raise Trails, then Zoom and Spin.</dd>
             <dt>Surprise me</dt><dd>Random settings. Press it a few times.</dd>
             <dt>Shared presets</dt><dd>Looks picked out for everyone who uses Phosphor Loop. Tap one to load it. Ones marked AUTO start Autopilot with their own settings.</dd>
-            <dt>My presets</dt><dd>Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
+            <dt>My presets</dt><dd>Preset library… opens every look you’ve saved in a window of its own: sort them into folders (and folders inside folders), give them tags, search names and tags, and see a picture of each. Click a look to pick it, double-click to load it. Sync and files there saves the whole library to a file or opens one. Save current look keeps every setting under a name, with a snapshot of the picture. Save while Autopilot is running and the preset keeps Autopilot’s settings and pins too: loading it starts Autopilot again from that look. Those presets are marked AUTO. Presets stay in this browser on this device. Save with the same name to update one.</dd>
             <dt>Autopilot</dt><dd>Changes the settings slowly by itself, fading between the two loops every half minute or so. Every 1 to 3 new looks it also puts in a different nature picture, from the kind you chose in the gallery (a picture of your own stays put). It never lets the picture turn white: if too much of the screen gets close to white, it turns its own Trails, feeds and Grow down a notch on the loop that’s doing it, shows one loop instead of two, or moves on to the next look. It never lets the picture go black either: if most of the screen fades nearly to black, it turns its own Trails, Input size and brightness up a notch (and pours in a little of the other loop if that one is still lit), shows the lit loop, or moves on to the next look. Pinned settings and fader limits are always respected. Press it again to stop.</dd>
             <dt>3D worlds and Fractals under Autopilot</dt><dd>Autopilot brings them in as a showcase now and then, about 1 new look in 15. Fractals also come up as an ordinary input, as often as Wave or Shape, with effects and timing like any other look. As a showcase, so you can see them, a 3D world or fractal arrives clean, with no Trails, Zoom, Spin, color shift, Warp, drift or effects, shown on its own and staying about 1⅔ times as long as other looks. Once it has faded in, its effects build up slowly, peak in the middle of its stay, and ease back to clean before the next look fades in over it. Pinned settings stay put, and a setting with a fader limit starts from that limit.</dd>
             <dt>Map my boxes</dt><dd>Under the picture, while the Output window is open: for projecting onto boxes (or any flat surfaces) stacked about. Press <b>Map my boxes</b>, then <b>Add a face</b> for each side of a box the projector can see, and drag its four purple dots onto that face’s corners, on the projector itself or on the map under the picture. Faces aren’t only four-sided: <b>+ Corner</b> (or double-click an edge) adds a dot and <b>− Corner</b> (or right-click a dot) takes one away, so triangles, odd cut-outs and curved edges (lots of dots along the curve) work too. Drag inside a face to move it whole; a corner close to another face’s corner snaps onto it, so neighbouring faces meet with no gap (hold Alt to stop it snapping). Tell each face whether it’s a <b>Top</b>, <b>Front</b> or <b>Side</b>: with <b>Depth shading</b> on, fronts are a little darker and sides darker still, the way light falls on real boxes. Press <b>Done</b>: the picture lands only on the faces, one picture across the whole stack, with black everywhere else so nothing spills onto the wall. <b>Mapping off</b> shows the whole picture again without forgetting the faces, and they’re kept for next time.</dd>
@@ -1909,6 +1914,88 @@
     </div>
   </div>
 
+  <div class="guide nat clips lib" id="lib" role="dialog" aria-modal="true" aria-labelledby="libTitle" hidden>
+    <div class="guide-bar nat-bar">
+      <span class="wordmark" id="libTitle">Preset library</span>
+      <span class="nat-count" id="libCount"></span>
+      <input class="seq-in cx-search" id="libSearch" type="search" placeholder="Search names and tags, e.g. tunnel slow" aria-label="Search looks" autocomplete="off" spellcheck="false">
+      <select id="libSort" aria-label="Order">
+        <option value="new">Newest first</option>
+        <option value="name">By name</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="btn small" id="libSave" title="Saves the look on screen now into the folder picked on the left">Save current look here…</button>
+      <button class="btn small" id="libMore" aria-expanded="false">Sync and files…</button>
+      <button class="btn small" id="libClose">Close</button>
+      <div class="chips cx-tags" id="libTags" role="group" aria-label="Tags"></div>
+    </div>
+    <div class="nat-inner cx-inner">
+      <form class="lb-row" id="libSaveForm" hidden>
+        <label for="libSaveName" class="lbl" id="libSaveLbl">Name this look</label>
+        <input class="seq-in" id="libSaveName" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+        <button class="btn small" type="submit">Save</button>
+        <button class="btn small" type="button" id="libSaveCancel">Cancel</button>
+      </form>
+      <div class="lb-more" id="libMorePanel" hidden>
+        <div class="lb-box" id="libSyncBox" hidden>
+          <b>The same presets on every device</b>
+          <div class="lb-row">
+            <button class="chip" id="libSyncOn" aria-pressed="false"><span class="led"></span>Keep this device in sync</button>
+            <button class="btn small" id="libSyncNow">Sync now</button>
+          </div>
+          <p class="hint" id="libSyncSay" role="status" aria-live="polite"></p>
+          <p class="hint">This uses your GitHub key, the same one as Shared presets. On each other device, open the site with #admin on the end of the address, paste the key, then switch this on there too. The looks are kept on GitHub with the site (in a side branch called preset-library), so someone who goes looking there could read them.</p>
+        </div>
+        <div class="lb-box">
+          <b>Library file</b>
+          <div class="lb-row">
+            <button class="btn small" id="libExport">Save the library to a file</button>
+            <button class="btn small" id="libImport">Open a library file…</button>
+            <input type="file" id="libFile" accept=".json,application/json" hidden>
+          </div>
+          <p class="hint">One file holds every look, folder and tag. Opening one adds its looks to this library and never takes any away. It works on any device, with no key: a backup, or a way to hand your looks to someone.</p>
+        </div>
+      </div>
+      <div class="cx-body">
+        <nav class="cx-tree" aria-label="Folders">
+          <div class="cx-treelist" id="libTree" role="tree"></div>
+          <button class="btn small" id="libNewFolder" title="A new folder inside the one picked here">+ New folder</button>
+          <form class="cx-newform" id="libFolderForm" hidden>
+            <input class="seq-in" id="libFolderName" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Folder name" aria-label="Folder name">
+            <span class="hint" id="libFolderWhere"></span>
+            <div class="lb-row"><button class="btn small" type="submit" id="libFolderGo">Make it</button><button class="btn small" type="button" id="libFolderCancel">Cancel</button></div>
+          </form>
+          <span class="hint">Drag a look onto a folder to move it there.</span>
+        </nav>
+        <div class="cx-main">
+          <div class="nat-grid clips-grid" id="libGrid"></div>
+          <p class="hint" id="libNone" hidden></p>
+        </div>
+        <aside class="cx-side" id="libSide" hidden aria-label="The picked look">
+          <img class="cx-video lb-pic" id="libPic" alt="">
+          <div class="cx-one">
+            <input class="seq-in" id="libName" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Name">
+            <label class="cx-lbl">Folder<select id="libFolderSel" aria-label="Folder"></select></label>
+            <div class="cx-taged">
+              <span class="lbl">Tags</span>
+              <div class="cx-chips" id="libTagList"></div>
+              <input class="seq-in" id="libTagIn" type="text" maxlength="30" list="libTagSuggest" autocomplete="off" spellcheck="false" placeholder="Add a tag, then Enter" aria-label="Add a tag">
+              <datalist id="libTagSuggest"></datalist>
+            </div>
+            <div class="cx-use">
+              <button class="btn" id="libLoad">Load this look</button>
+            </div>
+            <div class="cx-use">
+              <button class="btn small" id="libOver" title="Replaces what this preset holds with the look on screen now. Its name, folder and tags stay">Save the look on screen over it</button>
+              <button class="btn small" id="libDel">Delete</button>
+            </div>
+            <p class="hint cx-facts" id="libFacts"></p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
   <div class="guide nat clips" id="clips" role="dialog" aria-modal="true" aria-labelledby="clipsTitle" hidden>
     <div class="guide-bar nat-bar">
       <span class="wordmark" id="clipsTitle">Clip library</span>
@@ -2038,6 +2125,7 @@
 <script src="js/typeart.js"></script>
 <script src="js/pointcloud.js"></script>
 <script src="js/shaders.js"></script>
+<script src="js/library.js"></script>
 <script src="js/patch.js"></script>
 <script src="js/stack.js"></script>
 <script src="js/helpers.js"></script>

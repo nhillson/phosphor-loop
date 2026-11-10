@@ -206,9 +206,30 @@ ADMIN: SHARED PRESETS FOR EVERYONE
   device" forgets it. If the key runs out, make a new one the same way.
 
 TIPS
-  - My presets: set up a look, press "Save current look" and name it. Presets
-    stay in this browser on this device (another browser or computer won't
-    see them). Save under the same name to update one.
+  - My presets: set up a look, press "Save current look" and name it. Save
+    under the same name to update one. The sidebar shows the newest dozen.
+  - Preset library (the button under My presets): every saved look in a
+    window of its own, with room for 1000. Make folders (and folders inside
+    folders) with + New folder, drag a look onto a folder to move it, and
+    click a look to see its details at the side: name, folder, tags, Load
+    this look, Save the look on screen over it, Delete. Double-click a look
+    to load it straight away. The search box looks through names and tags;
+    clicking a tag at the top shows every look with it, from any folder.
+    "Save current look here..." saves into the folder picked on the left.
+    Each look keeps a picture of itself.
+  - Sync and files (in the Preset library). "Save the library to a file"
+    puts every look, folder and tag in one file; "Open a library file..."
+    adds a file's looks to this library and never takes any away. Use it as
+    a backup or to hand your looks to someone. No key needed.
+  - The same presets on every device (admin only, in Sync and files): with
+    your GitHub key unlocked on a device (see ADMIN below), switch on "Keep
+    this device in sync". Do the same on each other device. A look saved,
+    changed or deleted on one then shows up on the others when they next
+    sync (when the page opens, a few seconds after a change, or Sync now).
+    If the same look was changed on two devices, the later change wins.
+    The looks are kept on GitHub in a side branch of phosphor-loop called
+    preset-library, so they're readable by anyone who goes looking there;
+    saving them never rebuilds the site or the app.
   - Save a preset while Autopilot is running and it keeps Autopilot's
     settings and pins too. Loading it starts Autopilot again from that look.
     Those presets are marked AUTO.
@@ -471,6 +492,17 @@ TIPS
     monitors, Screen 1 or Screen 2 both give the whole computer's sound),
     switch on "Also share system audio" and press Share, then play Spotify
     or anything else. Microphone listens to the room instead.
+  - Ripple tank, Build and drop and Scan-line hills (switches under React to
+    sound, What the music moves; off until you switch them on, and kept with
+    presets). Ripple tank: every hit drops a ripple that travels across the
+    picture and bends it like water; low notes make big slow rings, high
+    notes small quick ones. Build and drop: follows the song's shape over
+    the last 10 to 30 seconds; the picture winds tighter in a build-up,
+    floats when the bass drops out, and lets go when the bass comes back.
+    Scan-line hills: the picture redrawn as glowing lines that rise where
+    it's bright, wobbled by the music's own sound wave (Line detail sets how
+    much of the sound shows). Amount sets how strong all three are, and
+    Loops that react picks which loops get them.
   - Loopback adapter (under React to sound): hears BlackHole on a Mac,
     Stereo Mix on Windows, or another installed loopback input without screen
     sharing. Choose the adapter under Listen to. Route computer audio to it

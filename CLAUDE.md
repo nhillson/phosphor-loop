@@ -207,6 +207,27 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    and packs 96 steps into `uSnd` (vec4[24]); `sndLineAmp(k)` → `uSndAmp`. Wave (per-stretch thirds pushed along the curve's
    normals, `reach` grows its boxes), Shape (one wave all the way round), Bars (a wave through the bar, sharp core) and Topo map
    (`topoHum`, the land ripples). Input size swells half as much meanwhile. `python3 tests/sound_lines_check.py` (about 2 minutes).
+4y2. **Sound pictures** (React to sound › What the music moves › Ripple tank / Build and drop / Scan-line hills, `snd.map.ripple` /
+   `build` / `hills`, off to start with, read straight from `snd.map` so they work in the effect stack and Classic alike; "sound
+   pictures" in js/app.js: `sfx`, `sfxTick`, `sfxPull`, `sfxPass`; FS_SNDWARP and FS_SNDHILLS in js/shaders.js, compiled on first use).
+   `sfxPass(k)` runs after each reacting loop's final pass and gives the mix `L.sfxTex` (two pictures of its own, `L.sfx`).
+   Ripples: one per hit (`snd.hit.finder.last`), at most 10, bass hits big and slow, high hits small and quick. Build and drop
+   (`sfx.bd`): wind / float / rel from `snd.raw` (bass against its fullest lately `ref`, 30 s of mids and highs twice a second, hits a
+   second); `sfxPull` adds to Zoom and Spin in runLoop, the pass twists, sways and punches. Hills use Sound on lines' wave (`sndLine`;
+   `sndLinesTick` also runs for them) and Line detail. `python3 tests/sound_pictures_check.py` (about 3 minutes; this workspace
+   draws too slowly to hear most hits, so the test drops ripples and fakes the bass leaving by hand; reaches in through `window.__plSfx`).
+4y3. **Preset library** (My presets › Preset library…, `#lib`; logic in `js/library.js` = `window.PhosphorLibrary`, glue under "my presets"
+   and "preset library" in js/app.js). A preset is `{ id, name, thumb, data, saved, mod, folder, tags }`; notes `libMeta` =
+   `{ folders, goneFolders, gone }` (times, so two devices' notes merge by the later time). Kept in IndexedDB (`phosphor-library` › `kv` ›
+   `library`: stamp, presets, meta, state), with a copy in the old `phosphor-presets-v1` while it fits; at start whichever has the later
+   stamp is believed (`libReady`). Up to 1000 (`LIB.MAX`); the sidebar lists the newest 12. `savePreset(name, { folder | id })`,
+   `presetDelete(id)` (remembers the deletion), `libRender`, `libFolderMove`. Library file: `libImport` (adds, never removes).
+   **Sync** (admin key only, switch `phosphor-lib-sync`): one file per look, `library/<id>.json` plus `library/_meta.json`, on the
+   `preset-library` branch (never `main`: no Pages or app rebuild). `libSyncRun` lists the folder, `LIB.planSync` compares each file's
+   sha and each look's `mod` with what the last sync saw (`libState`), later change wins (`LIB.settle`), a deleted look that was changed
+   afterwards elsewhere comes back. `node --test tests/library.test.mjs` and `python3 tests/library_check.py` (about 4 minutes: two
+   browser profiles and a stand-in GitHub; service workers blocked so its reload gets the test page). Reaches in through `window.__plLib`.
+   js/library.js is listed in index.html, sw.js and android/tools/bundle_site.py.
 4z. **Lopsided effects** (Effects › Lopsided, `ASYM` = offc / wind in js/app.js; `asymTick`): **Off-center** moves Zoom/Spin's
    point (`uCenter`, added to Chase's) and draws the inputs there too (`uInOff`, 0.8 of it); only it follows the music (React to sound ›
    Off-center, `snd.map.asym`: hits shove it, `L.offKick`; the bass widens its wander). **Wind** (`uWind`, `windDir` 0-7 eighths from →

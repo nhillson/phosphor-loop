@@ -910,6 +910,22 @@
   .clips-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
   .clips-grid .nat-tile { aspect-ratio: 16 / 9; }
   .nat-tile img.sticker-thumb { height: 200%; object-fit: contain; object-position: center top; }
+  /* ---------- the preset library (shares the clip explorer's layout) ---------- */
+  .lb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .lb-row[hidden], .lb-more[hidden], .lb-box[hidden] { display: none; }
+  .lb-row .seq-in { flex: 1 1 220px; max-width: 420px; min-width: 0; }
+  .lb-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .lb-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); }
+  .lb-pic { object-fit: cover; }
+  .lb-pic:not([src]), .lb-pic[src=""] { visibility: hidden; }
+  .lib .nat-tile .lb-none { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; background: none; font-size: 12px; color: var(--faint); text-shadow: none; }
+  .lib .cx-node .lb-fb { flex: none; border: 0; background: none; color: var(--faint); cursor: pointer; padding: 4px 6px; font-size: 13px; border-radius: 5px; }
+  .lib .cx-node .lb-fb:hover { color: var(--ink); background: var(--raise); }
+  .lib .cx-node.drop .cx-fold { outline: 2px dashed var(--loop-a); outline-offset: -2px; color: var(--ink); }
+  .lib .cx-use .btn.small { flex: 1 1 120px; }
+  #libDel.sure { border-color: var(--tally); color: var(--tally); }
+  #presetRecent { display: block; margin: 2px 0 -2px; }
+  #presetRecent[hidden] { display: none; }
   /* ---------- the clip explorer ---------- */
   .cx-search { flex: 1 1 260px; max-width: 460px; min-width: 0; }
   .nat-bar select { margin: 0; width: auto; flex: none; }
@@ -1272,7 +1288,7 @@ button.seq-card { cursor: pointer; }
 /* ===== Effect stack (see "effect stack" in js/app.js) ===== */
 body:not(.stk) .stk-only, body.stk .classic-only { display: none !important; }
 body.stk .where-mini, body.stk #gradeWhere, body.stk #typeWhere, body.stk .stk-classic-hint { display: none !important; }
-body.stk #sndMap .chip:not([data-map="lines"]) { display: none; }
+body.stk #sndMap .chip:not([data-map="lines"]):not([data-map="ripple"]):not([data-map="build"]):not([data-map="hills"]) { display: none; }
 .stk-top { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 2px 0 6px; }
 .stk-top .hint { flex: 1; }
 .stk-fixed { margin-bottom: 6px; }

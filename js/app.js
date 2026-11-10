@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const { FR, makeDrone } = window.PhosphorFractals;
-const { VS, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
+const { VS, FS_SNDWARP, FS_SNDHILLS, FS_LIFE, FS_COPY, FS_PROBE, FS_EYE, COMMON, FS_FEEDBACK, FS_COMPOSITE, FS_FINAL, FS_TIMEWARP, FS_SLIT, FS_SCAN, FS_DISPLAY, FS_CUBES, FS_HORIZON, FS_CAVERN, FS_BLACKHOLE, FS_AURORA, FS_MERCURY, FS_FRACTAL, FS_NEBULA, FS_CITY, FS_TERRAIN, FS_SPONGE, FS_BULB, FS_MANDELBOX, FS_SIERPINSKI, FS_JULIA, FS_KALEIDO } = window.PhosphorShaders;
 const { clamp, rnd, pick, hsv, foldJS, stamp, randId, loadScript } = window.PhosphorHelpers;
 const { addWebmDuration, standardMp4 } = window.PhosphorRecording;
 
@@ -1662,7 +1662,9 @@ const snd = {
   env: { low: 0, mid: 0, high: 0, beat: 0 },
   avg: { low: 0, mid: 0, high: 0 }, peak: { low: 0.1, mid: 0.1, high: 0.1 },
   beats: 0, shakeDir: [1, 0], amount: 60,
-  map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true, lines: true, asym: true },
+  map: { kick: true, size: true, spin: true, color: true, warp: true, flash: true, lines: true, asym: true,
+    // Sound pictures (see "sound pictures"): off until switched on, and the same in the effect stack and Classic
+    ripple: false, build: false, hills: false },
   // Sound on lines: how much of the sound wave the lines show (0 Smooth, just the kick and bass; 100 Fuzzy, everything)
   detail: 30,
   // Which loops move with the sound (Loops that react, at the top of React to sound)
@@ -1853,7 +1855,7 @@ function syncSoundUI() {
   sndAmt.value = snd.amount;
   fillTrack(sndAmt);
   $('#sndAmtOut').textContent = snd.amount === 0 ? 'OFF' : String(snd.amount);
-  $('#sndDetailRow').hidden = !snd.map.lines;
+  $('#sndDetailRow').hidden = !snd.map.lines && !snd.map.hills;
   $('#sndDetail').value = snd.detail;
   fillTrack($('#sndDetail'));
   $('#sndDetailOut').textContent = snd.detail < 34 ? 'Smooth' : snd.detail < 67 ? 'Medium' : 'Fuzzy';
@@ -2188,6 +2190,7 @@ function analyzeSound(dt, now) {
     return sum / (b - a + 1);
   };
   const raw = { low: band(35, 150), mid: band(250, 2000), high: band(3000, 12000) };
+  snd.raw = raw;
   for (const k of ['low', 'mid', 'high']) {
     const v = raw[k];
     snd.avg[k] += (v - snd.avg[k]) * (1 - Math.exp(-dt / 1.5));
@@ -9166,19 +9169,43 @@ guide.addEventListener('keydown', (e) => {
 if (location.hash === '#guide') openGuide();
 
 /* ================= my presets ================= */
-// Saved in this browser's own storage: they survive closing the page, and stay on this device.
-const PRESET_KEY = 'phosphor-presets-v1';
-let thumbReq = null;
+// Saved looks. They live in the Preset library (see "preset library" further down and js/library.js): kept in this
+// browser's IndexedDB, which has room for hundreds with their pictures, with a copy in the old place (localStorage)
+// for as long as it fits. This section is the short list in the sidebar and the saving and loading.
+const PRESET_KEY = 'phosphor-presets-v1', LIB_STAMP_KEY = 'phosphor-presets-stamp', LIB_META_KEY = 'phosphor-lib-meta';
+const LIB = window.PhosphorLibrary;
+let thumbReq = null, thumbW = 160;
 const storageOK = (() => { try { localStorage.setItem('__pl', '1'); localStorage.removeItem('__pl'); return true; } catch (_) { return false; } })();
 function readPresets() {
-  try { const v = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+  try { return LIB.cleanList(JSON.parse(localStorage.getItem(PRESET_KEY) || '[]')); } catch (_) { return []; }
 }
-function writePresets() {
-  if (!storageOK) return false;
-  try { localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); return true; } catch (_) { return false; }
+// The library's notes (folders, deletions) and what the last sync saw; `libReady` once IndexedDB has been read
+let libMeta = (() => { try { return LIB.cleanMeta(JSON.parse(localStorage.getItem(LIB_META_KEY) || 'null')); } catch (_) { return LIB.cleanMeta(null); } })();
+let libState = {}, libReady = false, libDbOK = typeof indexedDB !== 'undefined', libWroteEarly = false;
+let libUp = false;   // the library's own section (further down) has started
+// Saves the library. byHand: you changed something (so a sync follows); a sync's own saving passes false.
+function writePresets(byHand = true) {
+  const stamp = Date.now();
+  let ok = false;
+  if (!libReady) libWroteEarly = true;
+  if (libDbOK) {
+    ok = true;
+    LIB.set('library', { stamp, presets, meta: libMeta, state: libState }).catch(() => {
+      if (libDbOK) toast('This browser wouldn’t keep the Preset library just now. Save the library to a file (Preset library › Sync and files) to be safe.', 9000);
+    });
+  }
+  if (storageOK) {
+    // The old place: everything while it fits, else the newest 60 without their pictures
+    try { localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); ok = true; }
+    catch (_) { try { localStorage.setItem(PRESET_KEY, JSON.stringify(presets.slice(-60).map((q) => ({ ...q, thumb: '' })))); } catch (_) {} }
+    lsSet(LIB_STAMP_KEY, String(stamp));
+    lsSet(LIB_META_KEY, JSON.stringify(libMeta));
+  }
+  if (byHand && libUp) libSyncSoon();
+  return ok;
 }
 let presets = readPresets();
-if (!storageOK) $('#presetNote').textContent = 'This browser isn’t letting the page keep anything (a private window, perhaps), so presets last only until you close the page.';
+if (!storageOK && !libDbOK) $('#presetNote').textContent = 'This browser isn’t letting the page keep anything (a private window, perhaps), so presets last only until you close the page.';
 const presetList = $('#presetList'), presetForm = $('#presetForm'), presetName = $('#presetName'), presetSaveBtn = $('#presetSave');
 
 function snapshot() {
@@ -9210,10 +9237,16 @@ function markPreset(id) {
   activePresetId = id;
   $$('.pre-load').forEach((b) => b.setAttribute('aria-pressed', String(b.parentElement.dataset.id === id)));
 }
+const PRESET_SHORT = 12;
 function renderPresets() {
   presetList.innerHTML = '';
   $('#presetEmpty').hidden = presets.length > 0;
-  presets.forEach((pr) => {
+  // Up to a dozen as they've always been; past that the newest dozen, and the library has the rest
+  const many = presets.length > PRESET_SHORT;
+  const short = many ? [...presets].sort((a, b) => (b.mod || 0) - (a.mod || 0)).slice(0, PRESET_SHORT) : presets;
+  $('#presetRecent').hidden = !many;
+  $('#presetRecent').textContent = `Most recent · all ${presets.length} are in the Preset library`;
+  short.forEach((pr) => {
     const t = document.createElement('div');
     t.className = 'pre';
     t.dataset.id = pr.id;
@@ -9229,18 +9262,49 @@ function renderPresets() {
     t.querySelector('.pre-load').addEventListener('click', () => loadPreset(pr));
     t.querySelector('.pre-del').addEventListener('click', () => { confirmBox.hidden = false; confirmBox.querySelector('.no').focus(); });
     confirmBox.querySelector('.no').addEventListener('click', () => { confirmBox.hidden = true; });
-    confirmBox.querySelector('.yes').addEventListener('click', () => {
-      presets = presets.filter((x) => x.id !== pr.id);
-      writePresets();
-      if (activePresetId === pr.id) activePresetId = null;
-      renderPresets();
-      toast(`Deleted “${pr.name}”.`);
-    });
+    confirmBox.querySelector('.yes').addEventListener('click', () => presetDelete(pr.id));
     presetList.appendChild(t);
   });
+  if (libUp) libRender();
   // Presets count as likes for Learn my taste
   taste.model = null;
   tasteSummary();
+}
+function presetDelete(id) {
+  const pr = presets.find((x) => x.id === id);
+  if (!pr) return;
+  presets = presets.filter((x) => x.id !== id);
+  // Remembered, so a device that syncs later takes it away too instead of bringing it back
+  libMeta.gone[id] = Date.now();
+  writePresets();
+  if (activePresetId === id) activePresetId = null;
+  renderPresets();
+  toast(`Deleted “${pr.name}”.`);
+}
+// Saves the look on screen under a name. where.folder: into that folder of the library (the same name there is
+// updated); without it, a look of that name anywhere is updated, and a new one goes to the top. where.id: over that one.
+async function savePreset(name, where = {}) {
+  name = String(name || '').trim().slice(0, LIB.NAME_MAX) || nextPresetName();
+  const data = snapshot();
+  if (ap.on) data.ap = apSnapshot();
+  thumbW = 240;
+  const thumb = await new Promise((res) => { thumbReq = res; });
+  const now = Date.now(), lower = name.toLowerCase();
+  const existing = where.id ? presets.find((q) => q.id === where.id)
+    : presets.find((q) => q.name.toLowerCase() === lower && (where.folder == null || q.folder === where.folder));
+  if (!existing && presets.length >= LIB.MAX) { toast(`The Preset library is full (${LIB.MAX} looks). Delete a few and try again.`, 7000); return null; }
+  if (existing) { existing.data = data; existing.thumb = thumb; existing.saved = now; existing.mod = now; }
+  else presets.push({ id: 'p' + now.toString(36) + randId(4), name, thumb, data, saved: now, mod: now, folder: LIB.cleanPath(where.folder), tags: LIB.cleanTags(where.tags) });
+  const ok = writePresets();
+  const pr = existing || presets[presets.length - 1];
+  activePresetId = pr.id;
+  renderPresets();
+  if (!ok) toast('Couldn’t save: this browser isn’t letting the page keep anything. Save the library to a file to be safe.', 7000);
+  else {
+    const withAp = data.ap ? ' with Autopilot' : '';
+    toast(existing ? `Updated “${pr.name}”${withAp}.` : `Saved “${name}”${withAp}${pr.folder ? ` in ${pr.folder}` : ''}.`);
+  }
+  return pr;
 }
 function nextPresetName() {
   let n = presets.length + 1;
@@ -9259,25 +9323,9 @@ $('#presetCancel').addEventListener('click', closePresetForm);
 presetName.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closePresetForm(); } });
 presetForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = presetName.value.trim().slice(0, 40) || nextPresetName();
-  const data = snapshot();
-  if (ap.on) data.ap = apSnapshot();
-
-  const thumb = await new Promise((res) => { thumbReq = res; });
-  const existing = presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
-  if (existing) { existing.data = data; existing.thumb = thumb; existing.saved = Date.now(); }
-  else presets.push({ id: 'p' + Date.now().toString(36) + randId(4), name, thumb, data, saved: Date.now() });
-  if (presets.length > 60) presets = presets.slice(-60);
-  const ok = writePresets();
+  const name = presetName.value;
   closePresetForm();
-  const id = (existing || presets[presets.length - 1]).id;
-  activePresetId = id;
-  renderPresets();
-  if (!ok && storageOK) toast('Couldn’t save: this browser’s storage for the page is full. Delete a few presets and try again.');
-  else {
-    const withAp = data.ap ? ' with Autopilot' : '';
-    toast(existing ? `Updated “${name}”${withAp}.` : `Saved “${name}”${withAp} in this browser.`);
-  }
+  await savePreset(name);
 });
 
 function loadPreset(pr, quiet) {
@@ -9599,6 +9647,443 @@ async function loadShared() {
 renderShared();
 loadShared();
 renderTaste();
+
+/* ================= preset library ================= */
+// Every saved look, in a window of its own (Preset library… under My presets): folders inside folders, tags, search
+// over names and tags, a picture of each look, and the picked look's details at the side (name, folder, tags, Load,
+// save over, delete). The logic is in js/library.js. Kept in IndexedDB (`library`: presets, notes, sync state).
+// Sync and files: a library file anyone can save and open; and, with the admin's GitHub key, the same library on
+// every device: each look is a file library/<id>.json on the repository's `preset-library` branch (a side branch,
+// so saving a look never rebuilds the site or the app), with the folders and deletions in library/_meta.json.
+// `libSyncRun` lists the branch, lets LIB.planSync decide, and sends, fetches and deletes one file at a time.
+const libDlg = $('#lib'), libGrid = $('#libGrid'), libTree = $('#libTree'), libSide = $('#libSide');
+const lb = { folder: '', tag: '', q: '', sort: 'new', pick: null, folderMode: null, back: null };
+const LIB_BRANCH = 'preset-library', LIB_DIR = 'library', LIB_SYNC_KEY = 'phosphor-lib-sync';
+const libSync = { on: lsGet(LIB_SYNC_KEY) === '1', busy: false, again: false, timer: 0, last: 0, text: '' };
+const libFind = (id) => presets.find((q) => q.id === id) || null;
+const libFolders = () => LIB.folderList(presets, libMeta);
+const libTouch = (pr) => { pr.mod = Date.now(); };
+function libChanged() { writePresets(); renderPresets(); }
+
+function libRender() {
+  if (libDlg.hidden) return;
+  const folders = libFolders();
+  if (lb.folder && !folders.includes(lb.folder)) lb.folder = '';
+  const tags = LIB.tagCounts(presets);
+  if (lb.tag && !tags.some(([t]) => t === lb.tag)) lb.tag = '';
+  if (lb.pick && !libFind(lb.pick)) lb.pick = null;
+  const shown = LIB.filter(presets, lb);
+  $('#libCount').textContent = shown.length === presets.length ? `${presets.length} look${presets.length === 1 ? '' : 's'}` : `${shown.length} of ${presets.length} looks`;
+  // tags: one click shows every look with it, from any folder
+  const tg = $('#libTags');
+  tg.innerHTML = '';
+  for (const [t, n] of tags.slice(0, 40)) {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.tag = t; b.setAttribute('aria-pressed', String(lb.tag === t));
+    b.innerHTML = `${escapeHTML(t)} <b>${n}</b>`;
+    b.addEventListener('click', () => { lb.tag = lb.tag === t ? '' : t; libRender(); });
+    tg.appendChild(b);
+  }
+  // folders
+  libTree.innerHTML = '';
+  const node = (path, label, depth, n) => {
+    const d = document.createElement('div');
+    d.className = 'cx-node'; d.style.setProperty('--d', depth); d.dataset.folder = path;
+    const cur = !lb.tag && lb.folder === path;
+    d.innerHTML = `<button class="cx-fold" role="treeitem" aria-current="${cur}"><span>${escapeHTML(label)}</span><b>${n}</b></button>` +
+      (cur && path ? '<button class="lb-fb" data-f="ren" title="Rename this folder" aria-label="Rename this folder">✎</button><button class="lb-fb" data-f="del" title="Take this folder away (its looks move up a level)" aria-label="Take this folder away">×</button>' : '');
+    d.querySelector('.cx-fold').addEventListener('click', () => { lb.folder = path; lb.tag = ''; libFolderFormClose(); libRender(); });
+    const ren = d.querySelector('[data-f=ren]'), del = d.querySelector('[data-f=del]');
+    if (ren) ren.addEventListener('click', () => libFolderFormOpen('rename'));
+    if (del) del.addEventListener('click', () => {
+      if (!del.classList.contains('sure')) { del.classList.add('sure'); del.textContent = 'Take away?'; return; }
+      libFolderDelete(path);
+    });
+    // a look dragged here moves in
+    d.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('text/pl-preset')) { e.preventDefault(); d.classList.add('drop'); } });
+    d.addEventListener('dragleave', () => d.classList.remove('drop'));
+    d.addEventListener('drop', (e) => {
+      e.preventDefault(); d.classList.remove('drop');
+      const pr = libFind(e.dataTransfer.getData('text/pl-preset'));
+      if (pr && pr.folder !== path) { pr.folder = path; libTouch(pr); libChanged(); toast(`Moved “${pr.name}” to ${path || 'the top'}.`); }
+    });
+    libTree.appendChild(d);
+  };
+  node('', 'All looks', 0, presets.length);
+  for (const f of folders) node(f, f.split('/').pop(), f.split('/').length, presets.filter((q) => LIB.inFolder(q, f)).length);
+  // the looks
+  libGrid.innerHTML = '';
+  for (const pr of shown) {
+    const b = document.createElement('button');
+    b.className = 'nat-tile'; b.dataset.id = pr.id; b.draggable = true;
+    b.setAttribute('aria-selected', String(pr.id === lb.pick));
+    b.title = `${pr.name}${pr.folder ? ' · ' + pr.folder : ''}. Click to pick it, double-click to load it.`;
+    b.innerHTML = (pr.thumb ? `<img src="${pr.thumb}" alt="" draggable="false">` : '<span class="lb-none">No picture</span>') +
+      (pr.data && pr.data.ap ? '<span class="cx-fxb">AUTO</span>' : '') +
+      (pr.tags.length ? `<span class="cx-tl">${escapeHTML(pr.tags.join(' · '))}</span>` : '') + `<span>${escapeHTML(pr.name)}</span>`;
+    b.addEventListener('click', () => { lb.pick = pr.id; libRender(); });
+    b.addEventListener('dblclick', () => libLoad(pr.id));
+    b.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/pl-preset', pr.id); e.dataTransfer.effectAllowed = 'move'; });
+    libGrid.appendChild(b);
+  }
+  const none = $('#libNone');
+  none.hidden = shown.length > 0;
+  none.textContent = !presets.length ? 'Nothing saved yet. Set up a look you like, close this window and press Save current look (or press Save current look here… above).'
+    : lb.q || lb.tag ? 'No looks match. Try fewer words, or pick All looks.' : 'This folder is empty. Drag looks onto it, or press Save current look here….';
+  libSideRender(folders, tags);
+  libSyncShow();
+}
+function libSideRender(folders, tags) {
+  const pr = lb.pick && libFind(lb.pick);
+  libSide.hidden = !pr;
+  if (!pr) return;
+  const pic = $('#libPic');
+  if (pr.thumb) pic.src = pr.thumb; else pic.removeAttribute('src');
+  if (document.activeElement !== $('#libName')) $('#libName').value = pr.name;
+  const sel = $('#libFolderSel');
+  sel.innerHTML = '<option value="">(the top, no folder)</option>' + folders.map((f) => `<option value="${escapeHTML(f)}">${escapeHTML(f)}</option>`).join('');
+  sel.value = pr.folder;
+  const list = $('#libTagList');
+  list.innerHTML = '';
+  for (const t of pr.tags) {
+    const c = document.createElement('span');
+    c.className = 'cx-chip';
+    c.innerHTML = `${escapeHTML(t)}<button aria-label="Take the tag ${escapeHTML(t)} off" title="Take off">×</button>`;
+    c.querySelector('button').addEventListener('click', () => { pr.tags = pr.tags.filter((x) => x !== t); libTouch(pr); libChanged(); });
+    list.appendChild(c);
+  }
+  $('#libTagSuggest').innerHTML = tags.filter(([t]) => !pr.tags.includes(t)).map(([t]) => `<option value="${escapeHTML(t)}">`).join('');
+  const del = $('#libDel');
+  del.classList.remove('sure'); del.textContent = 'Delete';
+  const when = pr.saved ? new Date(pr.saved).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+  $('#libFacts').textContent = [when && `Saved ${when}`, pr.data && pr.data.ap && 'Starts Autopilot when loaded', pr.id === activePresetId && 'The look you loaded last'].filter(Boolean).join(' · ');
+}
+function libLoad(id) {
+  const pr = libFind(id);
+  if (!pr) return;
+  closeLib();
+  loadPreset(pr);
+}
+function openLib() {
+  if (!libDlg.hidden) return;
+  lb.back = document.activeElement;
+  libDlg.hidden = false;
+  document.documentElement.style.overflow = 'hidden';
+  if (activePresetId && libFind(activePresetId) && !lb.pick) lb.pick = activePresetId;
+  libRender();
+  libDlg.scrollTop = 0;
+  $('#libClose').focus({ preventScroll: true });
+  if (libSync.on && adminKey && Date.now() - libSync.last > 60000) libSyncSoon(400);
+}
+function closeLib() {
+  if (libDlg.hidden) return;
+  libDlg.hidden = true;
+  libSaveFormClose();
+  libFolderFormClose();
+  document.documentElement.style.overflow = '';
+  if (lb.back && lb.back.focus) lb.back.focus();
+}
+$('#libOpen').addEventListener('click', openLib);
+$('#libClose').addEventListener('click', closeLib);
+libDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !e.target.closest('form')) closeLib();
+  e.stopPropagation(); // keep the keys from firing while browsing
+});
+$('#libSearch').addEventListener('input', (e) => { lb.q = e.target.value; libRender(); });
+$('#libSort').addEventListener('change', (e) => { lb.sort = e.target.value; libRender(); });
+
+// ---- the picked look
+$('#libName').addEventListener('change', (e) => {
+  const pr = libFind(lb.pick), name = e.target.value.trim().slice(0, LIB.NAME_MAX);
+  if (!pr || !name || name === pr.name) { if (pr) e.target.value = pr.name; return; }
+  pr.name = name; libTouch(pr); libChanged();
+});
+$('#libFolderSel').addEventListener('change', (e) => {
+  const pr = libFind(lb.pick);
+  if (!pr) return;
+  pr.folder = LIB.cleanPath(e.target.value); libTouch(pr); libChanged();
+});
+$('#libTagIn').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const pr = libFind(lb.pick), add = LIB.cleanTags(e.target.value);
+  e.target.value = '';
+  if (!pr || !add.length) return;
+  pr.tags = LIB.cleanTags([...pr.tags, ...add]); libTouch(pr); libChanged();
+  $('#libTagIn').focus();
+});
+$('#libLoad').addEventListener('click', () => libLoad(lb.pick));
+$('#libOver').addEventListener('click', async () => { const pr = libFind(lb.pick); if (pr) await savePreset(pr.name, { id: pr.id }); });
+$('#libDel').addEventListener('click', (e) => {
+  const b = e.currentTarget;
+  if (!b.classList.contains('sure')) { b.classList.add('sure'); b.textContent = 'Really delete?'; return; }
+  const id = lb.pick;
+  lb.pick = null;
+  presetDelete(id);
+});
+
+// ---- Save current look here…
+function libSaveFormClose() { $('#libSaveForm').hidden = true; }
+$('#libSave').addEventListener('click', () => {
+  const f = $('#libSaveForm');
+  f.hidden = false;
+  $('#libSaveLbl').textContent = lb.folder && !lb.tag ? `Name this look (it goes into ${lb.folder})` : 'Name this look';
+  $('#libSaveName').value = nextPresetName();
+  $('#libSaveName').focus(); $('#libSaveName').select();
+});
+$('#libSaveCancel').addEventListener('click', libSaveFormClose);
+$('#libSaveName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); libSaveFormClose(); } });
+$('#libSaveForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('#libSaveName').value;
+  libSaveFormClose();
+  const pr = await savePreset(name, { folder: lb.tag ? '' : lb.folder });
+  if (pr) { lb.pick = pr.id; libRender(); }
+});
+
+// ---- folders
+function libFolderFormClose() { $('#libFolderForm').hidden = true; $('#libNewFolder').hidden = false; lb.folderMode = null; }
+function libFolderFormOpen(mode) {
+  lb.folderMode = mode;
+  const inp = $('#libFolderName'), at = lb.tag ? '' : lb.folder;
+  $('#libFolderForm').hidden = false; $('#libNewFolder').hidden = true;
+  $('#libFolderGo').textContent = mode === 'rename' ? 'Rename' : 'Make it';
+  inp.value = mode === 'rename' ? at.split('/').pop() : '';
+  $('#libFolderWhere').textContent = mode === 'rename' ? `New name for ${at}` : at ? `Inside ${at}` : 'At the top';
+  inp.focus(); inp.select();
+}
+$('#libNewFolder').addEventListener('click', () => libFolderFormOpen('new'));
+$('#libFolderCancel').addEventListener('click', libFolderFormClose);
+$('#libFolderName').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); libFolderFormClose(); } });
+// Folders at and under `from` become `to` (rename), or go (to === null: their looks move up to the folder above)
+function libFolderMove(from, to) {
+  const now = Date.now(), up = from.split('/').slice(0, -1).join('/');
+  for (const pr of presets) {
+    if (!LIB.inFolder(pr, from)) continue;
+    pr.folder = to === null ? up : LIB.cleanPath(to + pr.folder.slice(from.length));
+    libTouch(pr);
+  }
+  for (const f of libFolders()) {
+    if (f !== from && !f.startsWith(from + '/')) continue;
+    libMeta.goneFolders[f] = now;
+    if (to !== null) libMeta.folders[LIB.cleanPath(to + f.slice(from.length))] = now + 1;
+  }
+  libMeta.goneFolders[from] = now;
+  if (to !== null) libMeta.folders[to] = now + 1;
+}
+function libFolderDelete(path) {
+  libFolderMove(path, null);
+  lb.folder = path.split('/').slice(0, -1).join('/');
+  libChanged();
+  toast(`Took the folder ${path} away. Its looks moved up a level.`);
+}
+$('#libFolderForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const mode = lb.folderMode, at = lb.tag ? '' : lb.folder;
+  const name = LIB.cleanPath($('#libFolderName').value.replace(/\//g, ' '));
+  libFolderFormClose();
+  if (!name) return;
+  if (mode === 'rename' && at) {
+    const to = [...at.split('/').slice(0, -1), name].join('/');
+    if (to === at) return;
+    if (libFolders().includes(to)) { toast(`There’s already a folder called ${to}.`); return; }
+    libFolderMove(at, to);
+    lb.folder = to;
+  } else {
+    const path = LIB.cleanPath(at ? `${at}/${name}` : name);
+    libMeta.folders[path] = Date.now();
+    lb.folder = path; lb.tag = '';
+  }
+  libChanged();
+});
+
+// ---- Sync and files
+$('#libMore').addEventListener('click', (e) => {
+  const p = $('#libMorePanel');
+  p.hidden = !p.hidden;
+  e.currentTarget.setAttribute('aria-expanded', String(!p.hidden));
+  libSyncShow();
+});
+$('#libExport').addEventListener('click', () => {
+  if (!presets.length) { toast('Nothing to save yet: the library is empty.'); return; }
+  const file = { kind: 'phosphor-loop-library', v: 1, saved: Date.now(), presets, folders: libFolders() };
+  const blob = new Blob([JSON.stringify(file)], { type: 'application/json' }), name = `phosphor-loop-library-${stamp()}.json`;
+  if (APP) { appSave(name, blob); return; }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast(`Saved ${name} to your Downloads folder, with all ${presets.length} looks.`, 6000);
+});
+// A library file's looks join this library; a look changed more recently in the file replaces the one here
+function libImport(file) {
+  const list = Array.isArray(file) ? file : file && Array.isArray(file.presets) ? file.presets : null;
+  if (!list) return null;
+  const now = Date.now(), before = new Map(presets.map((q) => [q.id, q]));
+  const r = LIB.mergeLists(presets, list);
+  // What came in counts as changed now, so an old deletion of the same look can't take it away again
+  for (const pr of r.list) if (before.get(pr.id) !== pr) pr.mod = now;
+  presets = r.list;
+  for (const f of Array.isArray(file.folders) ? file.folders : []) { const c = LIB.cleanPath(f); if (c) libMeta.folders[c] = now; }
+  libChanged();
+  return r;
+}
+$('#libImport').addEventListener('click', () => $('#libFile').click());
+$('#libFile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  let r = null;
+  try { r = libImport(JSON.parse(await f.text())); } catch (_) {}
+  toast(!r ? 'That isn’t a Phosphor Loop library file.' : r.added + r.updated === 0 ? 'Every look in that file is already here.'
+    : `Added ${r.added} look${r.added === 1 ? '' : 's'}${r.updated ? ` and updated ${r.updated}` : ''} from the file.`, 6000);
+});
+
+// ---- the same library on every device (with the admin's GitHub key)
+function libSyncSay(text) { libSync.text = text; const el = $('#libSyncSay'); if (el) el.textContent = text; }
+function libSyncShow() {
+  $('#libSyncBox').hidden = !adminKey;
+  $('#libSyncOn').setAttribute('aria-pressed', String(libSync.on));
+  $('#libSyncNow').disabled = libSync.busy;
+  if (!libSync.busy && !libSync.text) libSyncSay(libSync.on ? 'On. It syncs when the page opens and a few seconds after each change.' : 'Off. This device’s looks stay on this device.');
+}
+function libSyncSoon(ms = 4000) {
+  if (!libSync.on || !adminKey) return;
+  clearTimeout(libSync.timer);
+  libSync.timer = setTimeout(() => libSyncRun(false), ms);
+}
+function libTrouble(e) {
+  const st = e && e.status;
+  if (st === 401) return 'GitHub didn’t accept the key. It may have run out: make a new one and unlock again (open the site with #admin on the end).';
+  if (st === 403 || st === 404) return 'The key can’t save to the site. On GitHub, give it phosphor-loop with Contents set to Read and write.';
+  if (st === 409 || st === 422) return 'Another device was syncing at the same moment. It will try again shortly.';
+  return 'Couldn’t reach GitHub. It will try again when something changes, or press Sync now.';
+}
+async function libSyncRun(manual) {
+  if (!adminKey || (!libSync.on && !manual)) return false;
+  if (!libReady || !libDbOK) { libSyncSay('Syncing needs this browser to let the page keep things (not a private window).'); return false; }
+  if (libSync.busy) { libSync.again = true; return false; }
+  libSync.busy = true;
+  clearTimeout(libSync.timer);
+  libSyncSay('Syncing…');
+  libSyncShow();
+  let ok = false;
+  const J = async (path, opts) => { const r = await gh(path, opts); if (!r.ok) throw r; return r.json(); };
+  const at = (name) => `/contents/${LIB_DIR}/${name}`;
+  try {
+    // The side branch, made from the site as it is the first time
+    let r = await gh(`/git/ref/heads/${LIB_BRANCH}`);
+    if (r.status === 404) {
+      const main = await J('/git/ref/heads/main');
+      await J('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${LIB_BRANCH}`, sha: main.object.sha }) });
+    } else if (!r.ok) throw r;
+    r = await gh(`/contents/${LIB_DIR}?ref=${LIB_BRANCH}`);
+    if (!r.ok && r.status !== 404) throw r;
+    const files = r.ok ? await r.json() : [], remote = {};
+    let metaSha = null;
+    for (const f of Array.isArray(files) ? files : []) {
+      const m = /^([a-z0-9]{1,40})\.json$/i.exec(f.name);
+      if (f.name === '_meta.json') metaSha = f.sha; else if (m) remote[m[1]] = f.sha;
+    }
+    const read = async (name) => { const j = await J(`${at(name)}?ref=${LIB_BRANCH}`); return { sha: j.sha, val: JSON.parse(b64dec(j.content || '')) }; };
+    const theirMeta = metaSha ? (await read('_meta.json')).val : null;
+    const meta = LIB.mergeMeta(libMeta, theirMeta, Date.now());
+    const plan = LIB.planSync({ local: presets, state: libState, remote, gone: meta.gone });
+    const total = plan.down.length + plan.up.length + plan.check.length + plan.delRemote.length;
+    let done = 0, changed = plan.delLocal.length > 0, got = 0, sent = 0;
+    const step = () => libSyncSay(`Syncing… ${++done} of ${total}`);
+    const put = async (pr, sha) => {
+      const body = { message: `Preset "${pr.name}"`, branch: LIB_BRANCH, content: b64enc(JSON.stringify(pr)) };
+      if (sha) body.sha = sha;
+      const j = await J(at(`${pr.id}.json`), { method: 'PUT', body: JSON.stringify(body) });
+      libState[pr.id] = { sha: j.content.sha, mod: pr.mod };
+      sent++;
+    };
+    const take = (val, sha) => {
+      const pr = LIB.cleanPreset(val);
+      if (!pr) return;
+      const i = presets.findIndex((q) => q.id === pr.id);
+      if (i >= 0) presets[i] = pr; else presets.push(pr);
+      libState[pr.id] = { sha, mod: pr.mod };
+      changed = true; got++;
+    };
+    const drop = async (id, sha) => {
+      const d = await gh(at(`${id}.json`), { method: 'DELETE', body: JSON.stringify({ message: 'Preset deleted', branch: LIB_BRANCH, sha }) });
+      if (!d.ok && d.status !== 404) throw d;
+      delete libState[id];
+    };
+    for (const id of plan.down) { const f = await read(`${id}.json`); take(f.val, f.sha); step(); }
+    for (const id of plan.check) {
+      const f = await read(`${id}.json`), mine = libFind(id);
+      if (!mine || LIB.settle(mine, f.val) === 'down') take(f.val, f.sha); else await put(mine, f.sha);
+      step();
+    }
+    for (const id of plan.up) { const pr = libFind(id); if (pr) await put(pr, remote[id]); step(); }
+    // Deleted here, still on GitHub: it goes, unless another device changed it after the deletion (then it comes back)
+    for (const id of plan.delRemote) {
+      const f = await read(`${id}.json`);
+      if ((f.val && f.val.mod || 0) > meta.gone[id]) take(f.val, f.sha); else await drop(id, f.sha);
+      step();
+    }
+    if (plan.delLocal.length) {
+      presets = presets.filter((q) => !plan.delLocal.includes(q.id));
+      for (const id of plan.delLocal) { delete libState[id]; if (activePresetId === id) activePresetId = null; if (lb.pick === id) lb.pick = null; }
+    }
+    libMeta = LIB.mergeMeta(libMeta, meta, Date.now());
+    if (!theirMeta || !LIB.sameMeta(theirMeta, libMeta)) {
+      const body = { message: 'Preset library folders', branch: LIB_BRANCH, content: b64enc(JSON.stringify(libMeta)) };
+      if (metaSha) body.sha = metaSha;
+      await J(at('_meta.json'), { method: 'PUT', body: JSON.stringify(body) });
+    }
+    writePresets(false);
+    if (changed || theirMeta) renderPresets();
+    libSync.last = Date.now();
+    ok = true;
+    const bits = [got && `${got} came in`, sent && `${sent} sent`, plan.delLocal.length && `${plan.delLocal.length} taken away`].filter(Boolean).join(', ');
+    libSyncSay(`In sync: ${presets.length} look${presets.length === 1 ? '' : 's'}${bits ? ` (${bits})` : ''}. Last synced ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`);
+  } catch (e) {
+    writePresets(false);
+    libSyncSay(libTrouble(e));
+    if (e && (e.status === 409 || e.status === 422)) libSync.again = true;
+  } finally {
+    libSync.busy = false;
+    libSyncShow();
+    if (libSync.again) { libSync.again = false; libSyncSoon(2500); }
+  }
+  return ok;
+}
+$('#libSyncOn').addEventListener('click', () => {
+  libSync.on = !libSync.on;
+  lsSet(LIB_SYNC_KEY, libSync.on ? '1' : '0');
+  libSync.text = '';
+  libSyncShow();
+  if (libSync.on) libSyncRun(true);
+});
+$('#libSyncNow').addEventListener('click', () => libSyncRun(true));
+
+libUp = true;
+// ---- starting up: the library as IndexedDB has it (it has the pictures and the room); the first time, what the old
+// place held moves in. Whichever was saved last is the one to believe.
+(async () => {
+  let rec = null;
+  if (libDbOK) { try { rec = await LIB.get('library'); } catch (_) { libDbOK = false; } }
+  const lsStamp = +lsGet(LIB_STAMP_KEY) || 0;
+  if (rec && Array.isArray(rec.presets) && (rec.stamp || 0) >= lsStamp) {
+    const mine = LIB.cleanList(rec.presets);
+    // ...unless something was saved in the moment before this finished: then both
+    presets = libWroteEarly ? LIB.mergeLists(mine, presets).list : mine;
+    libMeta = libWroteEarly ? LIB.mergeMeta(rec.meta, libMeta, 0) : LIB.cleanMeta(rec.meta);
+    libState = rec.state && typeof rec.state === 'object' ? rec.state : {};
+    renderPresets();
+  } else if (rec && rec.state && typeof rec.state === 'object') libState = rec.state;
+  libReady = true;
+  if (libDbOK && (!rec || libWroteEarly || (rec.stamp || 0) < lsStamp)) writePresets(false);
+  if (libSync.on && adminKey) libSyncSoon(2500);
+})();
+// For tests/library_check.py
+window.__plLib = { lb, sync: libSync, get presets() { return presets; }, get meta() { return libMeta; }, get ready() { return libReady; }, get state() { return libState; },
+  run: (manual) => libSyncRun(manual), open: openLib, close: closeLib, save: savePreset, import: libImport,
+  key(k) { adminKey = k; lsSet(ADMIN_KEY, k); renderShared(); libSyncShow(); } };
 
 /* ================= folding sections ================= */
 // Every section heading folds its section away. What's folded is remembered in this browser.
@@ -11984,7 +12469,7 @@ function sndLinesTick(dt) {
   const an = snd.analyser;
   if (frozen) return;
   sndLineOn = false;
-  if (!an || !snd.map.lines || typeof an.getFloatTimeDomainData !== 'function' || !activeKeys().some((k) => reacts(k) && usesLines(loops[k].tgt))) return;
+  if (!an || typeof an.getFloatTimeDomainData !== 'function' || !activeKeys().some((k) => reacts(k) && (snd.map.hills || (snd.map.lines && usesLines(loops[k].tgt))))) return;
   const len = Math.min(4096, an.timeSize || an.fftSize || 2048);
   if (!sndTD || sndTD.length !== len) { sndTD = new Float32Array(len); sndLP = new Float32Array(len); }
   an.getFloatTimeDomainData(sndTD);
@@ -12038,9 +12523,148 @@ window.__plSnd = { snd, get line() { return Array.from(sndLine); }, get on() { r
   } };
 // How far the sound pushes loop k's lines (picture units at Input size 100), 0 when they stay plain
 function sndLineAmp(k) {
-  if (!sndLineOn || !reacts(k) || !usesLines(loops[k].tgt)) return 0;
+  if (!sndLineOn || !snd.map.lines || !reacts(k) || !usesLines(loops[k].tgt)) return 0;
   return 0.045 * sndPower() * (reduceMotion ? 0.5 : 1);
 }
+/* ---- sound pictures: Ripple tank, Build and drop, Scan-line hills (React to sound › What the music moves) ----
+   Three ways the music reshapes a reacting loop's finished picture, on its way to the mix (sfxPass, after the loop's
+   final pass; FS_SNDWARP and FS_SNDHILLS in js/shaders.js). They work the same in the effect stack and Classic.
+   Ripple tank: every hit (kick, snare, hat: the hit finder's `last`) drops a ring where it lands; a hit with weight
+     in the bass makes a big slow ring, one up high a small quick one.
+   Build and drop: `sfx.bd` listens to the song's shape. wind: the mids and highs of the last few seconds against
+     10-30 seconds ago, more hits a second than lately, or the bass gone for a while (a build-up); float: the bass has
+     dropped out; rel: the bass came back after at least 1.5 s away (the drop). In the loop they pull Zoom and Spin
+     (runLoop), and on the way out they twist, sway and punch the picture.
+   Scan-line hills: the picture as lines lifted by its brightness, wobbled by the sound wave Sound on lines uses. */
+const SFX_RIP = 10;
+const sfx = { rip: [], ripV: new Float32Array(SFX_RIP * 4), ripA: new Float32Array(SFX_RIP), hitAt: -1, flat: new Float32Array(SND_N),
+  bd: { ref: 0, lowS: 0, lowF: 0, hist: [], histT: 0, rate: 0, wind: 0, float: 0, rel: 0, outFor: 0, dir: 1, state: 'idle' } };
+let sndWarpProg = null, sndHillsProg = null;
+const sfxGain = () => Math.min(1.5, sndPower() / 1.55) * (reduceMotion ? 0.5 : 1);
+function sfxRipple(bass, strength) {
+  const E = snd.env, all = E.low + E.mid + E.high + 0.01;
+  // 0: the deepest hit, 1: the highest
+  const pitch = bass ? clamp(0.3 * (E.mid + E.high) / all, 0, 0.3) : 0.55 + 0.45 * E.high / (E.mid + E.high + 0.01);
+  const mixp = (a, b) => a + (b - a) * pitch;
+  if (sfx.rip.length >= SFX_RIP) sfx.rip.shift();
+  sfx.rip.push({ x: (Math.random() - 0.5) * simAspect * 0.9, y: (Math.random() - 0.5) * 0.9, born: simT,
+    speed: mixp(0.2, 0.7), wl: mixp(0.17, 0.045), life: mixp(3.8, 1.3), amp: mixp(0.03, 0.011) * clamp(strength, 0.35, 1) });
+}
+function sfxTick(dt) {
+  if (frozen) return;
+  const an = snd.analyser, F = snd.hit.finder;
+  // ---- ripples
+  if (an && F && snd.map.ripple && F.last > 0 && F.last !== sfx.hitAt && sfx.hitAt !== -1) sfxRipple(F.beat >= 0.6, F.beat);
+  sfx.hitAt = F ? F.last : -1;
+  sfx.rip = sfx.rip.filter((r) => simT - r.born < r.life && simT >= r.born).slice(-SFX_RIP);
+  sfx.ripA.fill(0);
+  sfx.rip.forEach((r, i) => {
+    const age = simT - r.born, q = 1 - age / r.life;
+    sfx.ripV.set([r.x, r.y, r.speed * age, r.wl], i * 4);
+    sfx.ripA[i] = r.amp * Math.min(1, age / 0.08) * q * Math.sqrt(q);
+  });
+  // ---- build and drop
+  const B = sfx.bd, ease = (v, to, up, down) => v + (to - v) * (1 - Math.exp(-dt / (to > v ? up : down)));
+  if (!an || !snd.map.build || !snd.raw) {
+    B.wind = ease(B.wind, 0, 0.4, 0.4); B.float = ease(B.float, 0, 0.4, 0.4); B.rel *= Math.exp(-dt / 0.9);
+    B.outFor = 0; B.hist.length = 0; B.state = 'idle';
+    return;
+  }
+  const low = snd.raw.low, rest = snd.raw.mid + snd.raw.high;
+  B.lowS = ease(B.lowS, low, 0.8, 0.8); B.lowF = ease(B.lowF, low, 0.05, 0.2);
+  B.ref = Math.max(B.lowS, B.ref * Math.exp(-dt / 30));     // the fullest the bass has been lately
+  const playing = snd.avg.mid + snd.avg.high + snd.avg.low > 0.003, hasBass = B.ref > 0.004;
+  // The bass is out: well under its usual level for a while, though the music plays on
+  const out = playing && hasBass && B.lowS < 0.28 * B.ref;
+  if (out) B.outFor += dt;
+  else if (hasBass && B.lowF > 0.5 * B.ref) {
+    if (B.outFor > 1.5) { B.rel = 1; B.dir = -B.dir; B.hist.length = 0; }   // the drop
+    B.outFor = 0;
+  }
+  if (!playing) B.outFor = 0;
+  // The last 30 seconds of mids and highs, twice a second: a build-up is the last 3 s well above 8 to 30 s ago
+  B.histT += dt;
+  if (B.histT >= 0.5) { B.histT = 0; B.hist.push(snd.avg.mid + snd.avg.high); if (B.hist.length > 60) B.hist.shift(); }
+  let rise = 0;
+  if (B.hist.length >= 22) {
+    const n = B.hist.length, mean = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += B.hist[i]; return t / Math.max(1, b - a); };
+    const older = mean(0, n - 16), recent = mean(n - 6, n);
+    rise = clamp((recent / Math.max(older, 0.002) - 1.1) / 0.6, 0, 1);
+  }
+  // ... or the hits coming faster than they have been (a snare roll)
+  const now = F && F.times.length ? F.times.length / 4 : 0;
+  B.rate = B.rate ? ease(B.rate, now, 15, 15) : now;
+  const roll = B.rate > 0.5 ? clamp((now / B.rate - 1.25) / 0.8, 0, 1) * 0.7 : 0;
+  const want = !playing || B.rel > 0.3 ? 0 : clamp(Math.max(rise, roll) + (out ? Math.min(0.85, B.outFor / 10) : 0), 0, 1);
+  B.wind = ease(B.wind, want, 2.5, 0.35);
+  B.float = ease(B.float, out && B.outFor > 0.4 ? 1 : 0, 0.7, 0.2);
+  B.rel *= Math.exp(-dt / 0.9);
+  B.state = B.rel > 0.15 ? 'drop' : B.float > 0.5 ? 'float' : B.wind > 0.25 ? 'build' : 'steady';
+}
+// What Build and drop adds to loop k's Zoom and Spin, and how much of the loop's own it leaves while floating
+function sfxPull(k) {
+  if (!reacts(k) || !snd.map.build) return null;
+  const B = sfx.bd, g = sfxGain();
+  if (B.wind + B.float + B.rel < 0.003) return null;
+  return { keep: 1 - 0.7 * B.float, z: g * (-28 * B.wind + 75 * B.rel), s: g * B.dir * (45 * B.wind - 35 * B.rel) };
+}
+// Loop k's picture after the sound pictures, drawn into a pair of pictures of its own (made when first needed, let go
+// when none is on). `L.sfxTex` is what the mix takes, or null for the loop's picture as it is.
+function sfxPass(k, dt) {
+  const L = loops[k], B = sfx.bd, on = L.rt && loopOn(k) && reacts(k);
+  L.hillsK = (L.hillsK || 0) + ((on && snd.map.hills ? 1 : 0) - (L.hillsK || 0)) * (1 - Math.exp(-dt * 4));
+  const g = sfxGain();
+  const build = on && snd.map.build && B.wind + B.float + B.rel > 0.003;
+  const ripple = on && snd.map.ripple && sfx.rip.length > 0;
+  const hills = on && L.hillsK > 0.004;
+  L.sfxTex = null;
+  if (L.sfx && (!(build || ripple || hills) || L.sfx.w !== simW || L.sfx.h !== simH)) { L.sfx.rt.forEach(dropTarget); L.sfx = null; }
+  if (!(build || ripple || hills)) return;
+  if (!L.sfx) L.sfx = { rt: [makeTarget(), makeTarget()], w: simW, h: simH };
+  let src = mixTex(k);
+  gl.viewport(0, 0, simW, simH);
+  gl.activeTexture(gl.TEXTURE0);
+  if (build || ripple) {
+    if (!sndWarpProg) sndWarpProg = program(FS_SNDWARP);
+    const P = sndWarpProg;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, L.sfx.rt[0].fbo);
+    gl.useProgram(P.p);
+    gl.bindTexture(gl.TEXTURE_2D, src);
+    set2f(P, 'uSim', simW, simH);
+    set1f(P, 'uTime', simT + 11.0 * LOOP_OFF[k]);
+    set1f(P, 'uRipK', ripple ? g : 0);
+    if (ripple) {
+      const a = U(P, 'uRip[0]'), b = U(P, 'uRipA[0]');
+      if (a) gl.uniform4fv(a, sfx.ripV);
+      if (b) gl.uniform1fv(b, sfx.ripA);
+    }
+    const q = build ? g : 0;
+    set3f(P, 'uBuild', Math.min(1, B.wind * q), Math.min(1, B.float * q), Math.min(1, B.rel * q));
+    set1f(P, 'uTwist', B.dir * 1.3 * B.wind * q);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    src = L.sfx.rt[0].tex;
+  }
+  if (hills) {
+    if (!sndHillsProg) sndHillsProg = program(FS_SNDHILLS);
+    const P = sndHillsProg, lines = clamp(Math.round(simH / 9), 36, 96);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, L.sfx.rt[1].fbo);
+    gl.useProgram(P.p);
+    gl.bindTexture(gl.TEXTURE_2D, src);
+    set2f(P, 'uSim', simW, simH);
+    set1f(P, 'uK', L.hillsK);
+    set1f(P, 'uLines', lines);
+    // The hills stand a little taller on the bass
+    set1f(P, 'uHeight', (4.6 + 1.6 * g * snd.env.low) / lines);
+    set1f(P, 'uWave', 0.95 * g / lines);
+    const ls = U(P, 'uSnd[0]');
+    if (ls) gl.uniform4fv(ls, sndLineOn ? sndLine : sfx.flat);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    src = L.sfx.rt[1].tex;
+  }
+  L.sfxTex = src;
+}
+// For tests/sound_pictures_check.py
+window.__plSfx = { sfx, drop: sfxRipple, tex: (k) => !!loops[k].sfxTex, hills: (k) => loops[k].hillsK || 0 };
 const FLOW_K = 0.0016;   // how far Flow at 100 carries the picture in one frame
 const LOOK_K = 0.05;     // how far Look-up at 100 lets each spot read from where its color points, in one frame
 // Chromatic aberration: how far apart red and blue are pulled at 100, laid over once (a share of the picture's height;
@@ -12767,6 +13391,9 @@ function runLoop(k, xf, brush, f) {
     // With Sound on lines the lines already move with the bass, so they swell half as much
     if (m.lines && sndLineOn && usesLines(t)) sizeBoost *= 0.5;
   }
+  // Build and drop: winds the loop tighter in a build-up, lets it drift while the bass is out, lets go on the drop
+  const pull = sfxPull(k);
+  if (pull) { z = z * pull.keep + pull.z; s = s * pull.keep + pull.s; }
   // Lopsided effects (Off-center, Wind): the music's hits jolt them, with React to sound's switch
   const hitK = reacts(k) && sndMapNow().asym ? sndPower() : 0;
   const newHit = snd.beats !== L.offBeats;
@@ -14837,9 +15464,8 @@ function seqSaveLook(bl, name) {
   const data = { v: 1, A: JSON.parse(JSON.stringify(bl.look)),
     mix: { view: 0, xab: 0, xba: 0, showA: 100, showB: 0 }, grade: { ...GRADE_DEF } };
   const existing = presets.find((p) => p.name.toLowerCase() === name.toLowerCase());
-  if (existing) { existing.data = data; existing.saved = Date.now(); }
-  else presets.push({ id: 'p' + Date.now().toString(36) + randId(4), name, thumb: '', data, saved: Date.now() });
-  if (presets.length > 60) presets = presets.slice(-60);
+  if (existing) { existing.data = data; existing.saved = existing.mod = Date.now(); }
+  else if (presets.length < LIB.MAX) presets.push({ id: 'p' + Date.now().toString(36) + randId(4), name, thumb: '', data, saved: Date.now(), mod: Date.now(), folder: '', tags: [] });
   const ok = writePresets();
   renderPresets();
   if (!bl.label) seqChange(() => { bl.label = name; });
@@ -16185,6 +16811,7 @@ function frame() {
   packAdj();
   analyzeSound(dt, now);
   sndLinesTick(dt);
+  sfxTick(dt);
   drawMeter();
   seqTick(now);
   shapesTick(now, dt);
@@ -16244,13 +16871,13 @@ function frame() {
     cuePlay(performance.now());
   }
 
-  for (const key of KEYS) finalPass(key);
+  for (const key of KEYS) { finalPass(key); sfxPass(key, dt); }
   gl.bindFramebuffer(gl.FRAMEBUFFER, comp.fbo);
   gl.viewport(0, 0, simW, simH);
   gl.useProgram(compProg.p);
   for (const key of KEYS) {
     gl.activeTexture(gl.TEXTURE0 + LOOP_NUM[key]);
-    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? mixTex(key) : shownTex('A'));
+    gl.bindTexture(gl.TEXTURE_2D, loops[key].rt && loopOn(key) ? loops[key].sfxTex || mixTex(key) : shownTex('A'));
   }
   set2f(compProg, 'uSim', simW, simH);
   set1f(compProg, 'uWA', wA);
@@ -16310,7 +16937,8 @@ function frame() {
     thumbReq = null;
     try {
       const c = document.createElement('canvas');
-      c.width = 160; c.height = Math.max(40, Math.round(160 / simAspect));
+      c.width = thumbW; c.height = Math.max(40, Math.round(thumbW / simAspect));
+      thumbW = 160;
       c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
       done(c.toDataURL('image/jpeg', 0.72));
     } catch (_) { done(''); }
