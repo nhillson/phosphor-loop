@@ -920,6 +920,12 @@
             <span class="hint">Only the parts of the picture that are changing get to stay. Anything that holds still fades, so you see a shimmer of moving outlines.</span>
           </div>
           <div class="ctl">
+            <div class="ctl-head"><label for="grain">Grain</label><output id="grainOut" for="grain"></output></div>
+            <input type="range" id="grain" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Off</span><span>Dense</span></div>
+            <span class="hint">The finest specks in the picture grow faster than the trails fade, each color on its own, until a dense colored grain spreads over the screen. Longer Trails let it spread further.</span>
+          </div>
+          <div class="ctl">
             <div class="ctl-head"><label for="julia">Fractal fold</label><output id="juliaOut" for="julia"></output></div>
             <input type="range" id="julia" min="0" max="100" step="1" value="0">
             <div class="ends"><span>Off</span><span>All fractal</span></div>

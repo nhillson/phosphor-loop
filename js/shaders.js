@@ -163,6 +163,12 @@ const FB_COLOR_A = {
     fb *= 1.0 - uRestless + uRestless * smoothstep(0.004, 0.06, luma(d));
   }`,
   grow: '  if (uGrow > 0.0) fb = growAt(fb, cb, st);',
+  // Grain: the finest detail is pushed up faster than the trails fade, each color on its own, so it spreads into a
+  // dense coloured pattern. A faint speckle starts it off on graphics too clean to have any of their own.
+  grain: `  if (uGrain > 0.0) {
+    vec2 gq = gl_FragCoord.xy + fract(uTime * 7.31) * 113.0;
+    fb += (fb - cb) * uGrain + (vec3(hash(gq), hash(gq + 17.3), hash(gq + 41.7)) - 0.5) * 0.004;
+  }`,
   // Cross-feed: the other loop's last frame is poured in through this loop's zoom, spin and warp
   '#xfeed': '  if (uXfeed > 0.0) fb = mix(fb, texture(uOther, st).rgb, uXfeed * 0.5);',
   dye: '  if (uDye > 0.0) fb = dyeBy(fb, pf, asp);',
@@ -217,6 +223,7 @@ uniform vec3 uWind;               // Wind: which way it blows (x, y) and how far
 uniform float uChroma, uChromaTurn;   // Color chase: how far each color is pushed by another this frame, and a slow turn
 uniform vec4 uAberr;              // Chromatic aberration: its way (xy), how far red and blue part this frame (z), 1 for Lens (w)
 uniform vec2 uAberrAt;            // ... and Lens's middle
+uniform float uGrain;             // Grain: how much the finest detail is pushed up this frame (see app.js)
 uniform float uRestless;          // Restless: how much of what holds still fades this frame
 uniform float uJulia;             // Fractal fold: how much of the fold (0 none, 1 all of it)
 uniform vec2 uJuliaC;             // Fractal fold: the fractal's constant, which drifts slowly

@@ -30,6 +30,7 @@ const LOOP_KINDS = {
   breathe:  L('Breathe', ['breathe'], IN),
   chroma:   L('Color chase', ['chroma'], IO, { fx: 'chroma' }),
   restless: L('Restless', ['restless'], IN),
+  grain:    L('Grain', ['grain'], IN, { start: { grain: 30 } }),
   grow:     L('Grow', ['grow'], IN),
   dye:      L('Dyed by', ['dye'], IN),
   color:    L('Color shift', ['color'], IN, { start: { color: 30 } }),
@@ -63,7 +64,7 @@ const byName = (a, b) => labelOf(a).localeCompare(labelOf(b));
 const MENU = [
   ['Movement', ['zoom', 'mirror', 'warp', 'flow', 'melt', 'wind', 'offc', 'split', 'julia', 'crystal', 'lookup', 'chase', 'breathe', 'push',
     'p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].sort(byName)],
-  ['Color and texture', ['color', 'poster', 'halftone', 'aberr', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief',
+  ['Color and texture', ['color', 'poster', 'halftone', 'aberr', 'chroma', 'restless', 'grain', 'grow', 'dye', 'grade', 'relief',
     ...Object.keys(PATCH_KINDS).filter((k) => !['p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].includes(k))].sort(byName)],
   ['Time', ['time', 'scan', 'corr']],
   ['Whole picture', ['type', 'cloud']],

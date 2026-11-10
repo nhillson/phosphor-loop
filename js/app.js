@@ -171,7 +171,7 @@ function loopDefaults() {
   return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
-           lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, julia: 0, crystal: 0,
+           lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
            offc: 0, wind: 0, windDir: 0, aberr: 0, aberrShape: 0, aberrFinal: true, scan: 0, scanSpeed: 1, corr: 0, corrShape: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
@@ -181,7 +181,7 @@ const halftoneCell = (v) => 3 + 21 * clamp(v, 0, 100) / 100;
 // The sliders under Effects › Feeds on itself
 // Time warp's ways across the picture (FS_TIMEWARP's uShape)
 const TIME_SHAPES = 7;
-const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal'];
+const SELF = ['lookup', 'chase', 'breathe', 'chroma', 'restless', 'julia', 'crystal', 'grain'];
 // The sliders under Effects › Lopsided: Off-center and Wind, which break the picture's symmetry
 const ASYM = ['offc', 'wind'];
 // The sliders under Effects › Slit-scan: Photo finish and Corridor
@@ -988,7 +988,7 @@ function sliderText(k, v) {
     case 'showA': case 'showB': case 'showC': case 'showD': return v === 0 ? 'HIDDEN' : String(v);
     case 'blend': return v === 50 ? 'EVEN' : v < 50 ? `MAIN ${100 - v}` : `2ND ${v}`;
     case 'color': case 'warp': case 'flow': case 'melt': case 'push': case 'dye': case 'split': case 'grow': case 'xab': case 'xba': case 'xc': case 'xd': case 'trails':
-    case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal':
+    case 'lookup': case 'chase': case 'breathe': case 'chroma': case 'restless': case 'julia': case 'crystal': case 'grain':
     case 'offc': case 'wind': case 'scan': case 'corr': case 'aberr': return v === 0 ? 'OFF' : String(v);
     case 'poster': return v === 0 ? 'OFF' : `${Math.round(posterSteps(v))} STEPS`;
     case 'halftone': return v === 0 ? 'OFF' : `${Math.round(halftoneCell(v))} PX`;
@@ -2454,6 +2454,7 @@ const PINS = {
   breathe: { name: 'Breathe', fields: ['breathe'] },
   chroma: { name: 'Color chase', fields: ['chroma'] },
   restless: { name: 'Restless', fields: ['restless'] },
+  grain: { name: 'Grain', fields: ['grain'] },
   julia: { name: 'Fractal fold', fields: ['julia'] },
   crystal: { name: 'Crystal', fields: ['crystal'] },
   offc: { name: 'Off-center', fields: ['offc'] },
@@ -3402,11 +3403,13 @@ function apRealInput() {
 const apOdds = (w) => Math.min(0.9, 0.05 + 0.85 * w);
 const apSwitch = (w) => Math.min(1, 0.2 + 1.2 * w);
 // Feeds on itself, for a new look: each of the seven on its own roll, somewhere in its own useful range
-const SELF_RANGE = { lookup: [25, 80], chase: [35, 90], breathe: [35, 90], chroma: [25, 80], restless: [30, 85], julia: [35, 100], crystal: [30, 85] };
+const SELF_RANGE = { lookup: [25, 80], chase: [35, 90], breathe: [35, 90], chroma: [25, 80], restless: [30, 85], julia: [35, 100], crystal: [30, 85], grain: [20, 60] };
+// Grain soon covers the whole picture, so Autopilot brings it in a quarter as often as the others
+const SELF_ODDS = { grain: 0.25 };
 function apSelf(sc, w) {
   for (const key of SELF) {
     const [lo, hi] = SELF_RANGE[key];
-    sc[key] = Math.random() < apOdds(w) ? Math.round(rnd(lo, lo + (hi - lo) * (0.4 + 0.6 * w))) : 0;
+    sc[key] = Math.random() < apOdds(w) * (SELF_ODDS[key] ?? 1) ? Math.round(rnd(lo, lo + (hi - lo) * (0.4 + 0.6 * w))) : 0;
   }
 }
 // The other effects, each on its own roll, somewhere in its own useful range (How wild stretches how strong).
@@ -13492,6 +13495,13 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   aberrUniforms(fbProg, k, t, !fxIn(k, t, 'aberr') ? 0 : Math.pow(calmCap(clamp(c.aberr, 0, 100), 60) / 100, 1.3) * ABERR_K * f);
   set1f(fbProg, 'uRestless', 1 - Math.pow(1 - 0.3 * clamp(c.restless, 0, 100) / 100, f));
+  // Grain: the finest detail (down to single pixels, each color on its own) is made to grow faster than the trails
+  // fade, by up to 9% a frame at 60 frames a second, so it spreads into a dense coloured pattern; the same per
+  // second at any frame rate. Turned down, the trails fade it away again.
+  const grn = fxIn(k, t, 'grain') ? clamp(c.grain, 0, 100) / 100 : 0;
+  // Zoom and Spin soften the finest detail a little each frame they move the picture, more often at high frame
+  // rates, so a part of the push comes every frame whatever the rate, to keep up
+  set1f(fbProg, 'uGrain', grn > 0.005 ? Math.max(0, (Math.pow(1 + 0.09 * grn, f) / Math.max(Math.pow(decay60, f), 1e-3) - 1) / 2) + 0.04 * grn : 0);
   set1f(fbProg, 'uJulia', clamp(c.julia, 0, 100) / 100);
   const ja = 2.2 + 0.9 * Math.sin(simT * 0.021 + (2.0 * LOOP_OFF[k]));
   set2f(fbProg, 'uJuliaC', 0.7885 * Math.cos(ja), 0.7885 * Math.sin(ja));
@@ -13508,7 +13518,13 @@ function runLoop(k, xf, brush, f) {
   setLoopGradeUniforms(f, k);
   set1f(fbProg, 'uAspText', textAspect);
   mirrorUniforms(fbProg, k, fxIn(k, t, 'mirror'));
-  set1f(fbProg, 'uBlur', clamp(c.blur, -0.3, 1));
+  // Soften / sharpen each frame, set as its amount at 60 frames a second, so it's the same per second at any frame
+  // rate. Sharpening (below 0) is also kept under what the trails let fade: on a fast graphics card (144 frames a
+  // second) with long trails it used to outgrow the fade and the screen filled with fine coloured grain
+  const bl60 = clamp(c.blur, -0.3, 1);
+  let blF = bl60 >= 0 ? 1 - Math.pow(1 - Math.min(bl60, 0.999), f) : -(Math.pow(1 - bl60, f) - 1);
+  if (blF < 0) blF = Math.max(blF, -Math.max(0, (0.995 / Math.max(Math.pow(decay60, f), 1e-3) - 1) / 2));
+  set1f(fbProg, 'uBlur', blF);
   set1f(fbProg, 'uEdge', t.edge);
   set2f(fbProg, 'uShift', sx * f, sy * f);
   set1f(fbProg, 'uGain', c.gain * gainBoost);
@@ -13710,7 +13726,7 @@ const SEQ_SLIDERS = [
   ['Loop', [['show', 'Show'], ['feed', 'Feed into other loop'], ['blend', 'Blend'], ['size', 'Input size']]],
   ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
     ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
-    ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'],
+    ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['grain', 'Grain'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'],
     ['offc', 'Off-center'], ['wind', 'Wind'], ['aberr', 'Chromatic aberration'], ['scan', 'Photo finish'], ['corr', 'Corridor'], ['mirror', 'Mirror']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],
     ['gRed', 'Red'], ['gGreen', 'Green'], ['gBlue', 'Blue'], ['gSepia', 'Sepia']]],
