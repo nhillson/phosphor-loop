@@ -55,14 +55,15 @@ function labelOf(k) { return (LOOP_KINDS[k] || WHOLE_KINDS[k] || PATCH_KINDS[k] 
 const PATCH_SKIP = new Set(['mirror', 'move', 'poster']);
 const PATCH_NAME = { warp: 'Liquid warp', ripples: 'Raindrops', shape: 'Polygon', hue: 'Hue shift', tone: 'Brightness & contrast', dots: 'Dot grid' };
 const PATCH_KINDS = {};
-for (const [k, K] of Object.entries(PP.KINDS)) if (!PATCH_SKIP.has(k)) PATCH_KINDS['p:' + k] = { ...K, label: PATCH_NAME[k] || K.label };
+// Patch's patterns (Stripes, Moiré, Spiral...) are left out too: they only painted a made-up picture over yours.
+for (const [k, K] of Object.entries(PP.KINDS)) if (!PATCH_SKIP.has(k) && K.g !== 'pattern') PATCH_KINDS['p:' + k] = { ...K, label: PATCH_NAME[k] || K.label };
 // The add menu: everything together by what it does, A to Z. Patch's movements are under Movement; its softening,
-// edges, colors and patterns (laid over the picture) under Color, texture and patterns.
+// edges and colors under Color and texture.
 const byName = (a, b) => labelOf(a).localeCompare(labelOf(b));
 const MENU = [
   ['Movement', ['zoom', 'mirror', 'warp', 'flow', 'melt', 'wind', 'offc', 'split', 'julia', 'crystal', 'lookup', 'chase', 'breathe', 'push',
     'p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].sort(byName)],
-  ['Color, texture and patterns', ['color', 'poster', 'halftone', 'aberr', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief',
+  ['Color and texture', ['color', 'poster', 'halftone', 'aberr', 'chroma', 'restless', 'grow', 'dye', 'grade', 'relief',
     ...Object.keys(PATCH_KINDS).filter((k) => !['p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].includes(k))].sort(byName)],
   ['Time', ['time', 'scan', 'corr']],
   ['Whole picture', ['type', 'cloud']],

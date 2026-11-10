@@ -224,7 +224,7 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    how each was made in `genart/CREDITS.txt`; `gen`, `gens` (a LiveSource video player per loop), `genPick`, `genTick` in js/app.js).
    It has no picture slot of its own (16-texture limit): its frames go through the Picture's slot (`loopUsesGen`, `SRC_ID.genart = 4`).
    The service worker leaves the .webm files to the network (Range requests). `python3 tests/genart_check.py` (about 2.5 minutes).
-4z4. **Patch's layers** (the Patch input was removed; its kinds live on as effect stack items `p:<kind>`):
+4z4. **Patch's layers** (the Patch input was removed; its effects and colors live on as effect stack items `p:<kind>`; its patterns (Stripes, Moiré, Spiral...) were removed from the stack at Nick's request, as they only painted over the picture: `K.g !== 'pattern'` in js/stack.js, old looks drop them):
    `js/patch.js` holds the layer kinds `KINDS` (patterns ids 0-14, effects 100-110, colors 200-204), movers (`value`: slow/fast wave,
    music, bass, beat; `speed` faders run a per-layer clock, `speedRate`) and the one-pass-per-layer shader `FS`; js/app.js keeps only
    `patchEnv`, `patchClock`, `patchUP` for the stack. Old looks whose input was Patch fall back to Wave (`patchLoop`). js/patch.js is
@@ -268,7 +268,7 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    (`stackProg` through `sceneReady`; the loop keeps `L.fbLast` meanwhile). **Taste**: profiles and sessions carry `mode: 'stack'` and
    are shown/followed only in their layout (`tasteMode`, `tpMode`; switching layout waits for a session to finish); looks keep their
    stack in votes (`tasteLook`), words `sk:` (effect@zone), `so:` (order), `sl:` (with the input), `sm:` (movers), `sa:` (whole picture).
-   Add menu: Movement / Color, texture and patterns / Time / Whole picture, A to Z (`STK.MENU`; some Patch kinds renamed, `PATCH_NAME`).
+   Add menu: Movement / Color and texture / Time / Whole picture, A to Z (`STK.MENU`; some Patch kinds renamed, `PATCH_NAME`).
    `python3 tests/stack_check.py` (about 9 minutes; reaches in through `window.__plStack`). Cue mode's scout and live previews stay Classic.
 4z9. **Phones: a steady picture size while scrolling** (`viewH`, `touchUI`, `lvhProbe` before `fit()` in js/app.js): on touch screens the
    narrow layout's picture height comes from the tallest the window gets at this width (100lvh, the address bar hidden), so the

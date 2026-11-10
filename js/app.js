@@ -9047,12 +9047,12 @@ const RECIPES = [
     sw: 'conic-gradient(from 20deg,#06210f 0 70%,#3dff70 72%,#02060a 73%),radial-gradient(circle at 60% 40%,#fd0000 0 6%,#fdf802 7% 13%,#01c501 14% 24%,transparent 25%)',
     patch: { A: { in1: 'radar', radarWind: false, size: 100, zoom: 0, spin: 0, trails: 60, color: 0, blur: 0 } } },
   { name: 'Liquid marble', after: 'With the effect stack, open any card to change it, give a fader a mover (a wave, the music, the bass), or add effects of your own.',
-    text: 'Marble veins soaking into a turning Shape, a Swirl that slowly tightens and loosens, and Gradient colors over it all, with soft echoes spinning out.',
-    how: 'EFFECT STACK · MARBLE · SWIRL · GRADIENT COLORS · ZOOM 12 · SPIN 8 · TRAILS 82',
+    text: 'A turning Shape pulled into liquid swirls by a Swirl that slowly tightens and loosens, with Gradient colors over it all and soft echoes spinning out.',
+    how: 'EFFECT STACK · SWIRL · GRADIENT COLORS · ZOOM 12 · SPIN 8 · TRAILS 82',
     sw: 'radial-gradient(ellipse at 30% 40%,#c04dff 0 6%,transparent 18%),repeating-linear-gradient(115deg,#07040c 0 9px,#2fd0ff 9px 10px,#07040c 10px 17px,#ff9a3d 17px 18px)',
     patch: { A: { in1: 'shape', size: 80, zoom: 12, spin: 8, trails: 82, color: 2, blur: 0, stack: window.PhosphorStack.cleanList([
       { kind: 'zoom', zone: 'in' }, { kind: 'color', zone: 'in' },
-      { kind: 'p:marble', zone: 'in', p: { scale: 45, veins: 60, speed: 25 }, blend: 1, opacity: 60, amt: 25 },
+      { kind: 'p:warp', zone: 'in', p: { amount: 35, size: 45, speed: 25 }, amt: 25 },
       { kind: 'p:swirl', zone: 'out', p: { amount: 62, radius: 60 }, mv: { amount: { m: 'slow', a: 15 } } },
       { kind: 'p:colors', zone: 'out', p: { pal: 6, shift: 10, spread: 55, speed: 15 } }], false) } } },
   { name: 'Dust portrait', after: 'Drag on the picture to tear it, double-click to blow it apart. Pick another nature picture with ◀ ▶ under Picture, or Camera under Dots of.',
@@ -15988,12 +15988,11 @@ stkList.addEventListener('pointercancel', () => dragEnd(false));
 // ---- Autopilot's stacks
 // Each new look Autopilot (or Surprise) makes comes with a stack: the effects the look turns on, in their old places
 // and zones, then (more as How wild goes up) a few of them swapped round inside the loop, now and then one moved
-// across to the other side, sometimes a Patch effect or a faint pattern, and movers: what React to sound moved in
+// across to the other side, sometimes a Patch effect, and movers: what React to sound moved in
 // Classic, and now and then one more. A look brought back from one you liked keeps its stack, nearly as it was.
 // Effects still fading out of the look before stay until they've gone (stackSync takes them out), and Patch effects
 // it lets go of fade out (stackCarry), so nothing jumps.
 const AP_PATCH_FX = ['p:kaleido', 'p:swirl', 'p:tile', 'p:polar', 'p:ripple', 'p:warp', 'p:edges', 'p:colors', 'p:hue', 'p:pixel', 'p:tone', 'p:blur'];
-const AP_PATCH_PAT = ['p:stripes', 'p:rings', 'p:noise', 'p:hex', 'p:spiral', 'p:moire', 'p:silk', 'p:marble'];
 function apStackFor(k, sc) {
   const w = apSet.wild / 100, L = loops[k];
   const cur = Array.isArray(L.tgt.stack) ? L.tgt.stack : [];
@@ -16031,10 +16030,10 @@ function apStackFor(k, sc) {
     list = [...ins, ...list.filter((it) => it.zone !== 'in')];
   }
   if (!fav) {
-    // Now and then a Patch effect or a faint pattern
+    // Now and then a Patch effect
     let n = Math.random() < 0.2 + 0.35 * w ? (Math.random() < 0.3 * w ? 2 : 1) : 0;
     while (n-- > 0) {
-      const pat = Math.random() < 0.15, kind = pick(pat ? AP_PATCH_PAT : AP_PATCH_FX);
+      const pat = false, kind = pick(AP_PATCH_FX);
       const zone = pat || Math.random() < 0.7 ? 'out' : 'in';
       const it = STK.newItem(kind, zone, { auto: true, fadeIn: true });
       for (const q of STK.PATCH_KINDS[kind].p) {
