@@ -35,19 +35,19 @@ const KINDS = {
   kaleido:  { id: 101, g: FX, label: 'Kaleido',  p: [P('sides', 'Sides', 30), P('zoom', 'Zoom', 50, { mid: true }), P('speed', 'Spin', 20)] },
   mirror:   { id: 102, g: FX, label: 'Mirror',   p: [P('mode', 'Fold', 0, { opts: ['Left/right', 'Top/bottom', 'Both'] })] },
   tile:     { id: 103, g: FX, label: 'Tile',     p: [P('count', 'Tiles', 25), P('flip', 'Edges', 0, { opts: ['Mirrored', 'Repeated'] }), P('speed', 'Scroll', 0)] },
-  warp:     { id: 104, g: FX, label: 'Warp',     p: [P('amount', 'Amount', 40), P('size', 'Size', 40), SPEED] },
-  swirl:    { id: 105, g: FX, label: 'Swirl',    p: [P('amount', 'Amount', 70, { mid: true }), P('radius', 'Reach', 50)] },
-  ripple:   { id: 106, g: FX, label: 'Ripple',   p: [P('amount', 'Amount', 30), P('count', 'Waves', 40), SPEED] },
-  polar:    { id: 107, g: FX, label: 'Wrap round', p: [P('amount', 'Amount', 100), P('repeat', 'Repeats', 10)] },
+  warp:     { id: 104, g: FX, label: 'Warp',     p: [P('amount', 'Bend', 40), P('size', 'Size', 40), SPEED] },
+  swirl:    { id: 105, g: FX, label: 'Swirl',    p: [P('amount', 'Twist', 70, { mid: true }), P('radius', 'Reach', 50)] },
+  ripple:   { id: 106, g: FX, label: 'Ripple',   p: [P('amount', 'Wave height', 30), P('count', 'Waves', 40), SPEED] },
+  polar:    { id: 107, g: FX, label: 'Wrap round', p: [P('amount', 'Strength', 100), P('repeat', 'Repeats', 10)] },
   pixel:    { id: 108, g: FX, label: 'Pixelate', p: [P('size', 'Block size', 25)] },
-  blur:     { id: 109, g: FX, label: 'Blur',     p: [P('amount', 'Amount', 30)] },
+  blur:     { id: 109, g: FX, label: 'Blur',     p: [P('amount', 'Softness', 30)] },
   edges:    { id: 110, g: FX, label: 'Edges',    p: [P('amount', 'Strength', 60), P('keep', 'Keep picture', 0)] },
   // Colors
   colors:   { id: 200, g: COL, label: 'Gradient colors', p: [P('pal', 'Palette', 0, { opts: ['Rainbow', 'Sunset', 'Ocean', 'Neon', 'Fire', 'Ice', 'Purple haze', 'Gold'] }), P('shift', 'Shift', 0), P('spread', 'Spread', 50), P('speed', 'Cycle', 20)] },
-  hue:      { id: 201, g: COL, label: 'Hue shift', p: [P('amount', 'Amount', 0), P('speed', 'Cycle', 20)] },
+  hue:      { id: 201, g: COL, label: 'Hue shift', p: [P('amount', 'Shift', 0), P('speed', 'Cycle', 20)] },
   tone:     { id: 202, g: COL, label: 'Brightness & contrast', p: [P('bright', 'Brightness', 50, { mid: true }), P('contrast', 'Contrast', 50, { mid: true }), P('sat', 'Saturation', 50, { mid: true })] },
   poster:   { id: 203, g: COL, label: 'Posterize', p: [P('steps', 'Steps', 30)] },
-  invert:   { id: 204, g: COL, label: 'Invert',   p: [P('amount', 'Amount', 100)] },
+  invert:   { id: 204, g: COL, label: 'Invert',   p: [P('amount', 'Strength', 100)] },
 };
 const GROUPS = [[PAT, 'Patterns'], [FX, 'Effects'], [COL, 'Colors']];
 const BLENDS = ['Add', 'Screen', 'Multiply', 'Difference', 'Lighten', 'Darken', 'Replace', 'Mask'];

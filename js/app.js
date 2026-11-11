@@ -16311,7 +16311,9 @@ function stackMoverRow(it, key, label) {
 }
 function stackPatchBody(it) {
   const K = STK.PATCH_KINDS[it.kind];
-  let h = `<div class="pl-f"><div class="pl-fh"><span>Amount${it.zone === 'in' ? ' (each frame)' : ''}</span></div>${stackFader('Amount', 'amt', '', it.amt ?? 100)}</div>`;
+  // Mix: how much of this effect's result is laid over the picture (inside the loop, how far it goes each frame). It isn't
+  // called Amount: some of the effects have a fader of their own for how strong they are
+  let h = `<div class="pl-f" title="How much of this effect is laid over the picture${it.zone === 'in' ? ', each frame' : ''}"><div class="pl-fh"><span>Mix${it.zone === 'in' ? ' (each frame)' : ''}</span></div>${stackFader('Mix', 'amt', '', it.amt ?? 100)}</div>`;
   if (K.g === 'pattern') {
     h += `<div class="pl-c"><span>Blend</span><select data-act="blend">${PATCH.BLENDS.map((b, j) => `<option value="${j}"${j === (it.blend || 0) ? ' selected' : ''}>${b}</option>`).join('')}</select></div>`;
     h += `<div class="pl-f"><div class="pl-fh"><span>Opacity</span></div>${stackFader('Opacity', 'opacity', '', it.opacity ?? 100)}</div>`;
