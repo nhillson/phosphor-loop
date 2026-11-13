@@ -169,13 +169,35 @@ const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
   return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture',
-           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
+           zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, posterTheme: 'own', halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
            offc: 0, wind: 0, windDir: 0, aberr: 0, aberrShape: 0, aberrFinal: true, scan: 0, scanSpeed: 1, corr: 0, corrShape: 0 };
 }
 // Posterize: how many steps each color is snapped to, from 16 just past Off down to 2 at the top of the slider
 const posterSteps = (v) => 16 * Math.pow(2 / 16, clamp(v, 0, 100) / 100);
+// Posterize's color themes (Posterize › Colors): five colors each, dark to light. The bands are counted by
+// brightness and the darkest band gets the first color, the lightest the last. 'own' keeps the picture's own colors.
+const POSTER_THEMES = [
+  ['own', 'Own colors', null],
+  ['bw', 'Black & white', ['#000000', '#404040', '#808080', '#c0c0c0', '#ffffff']],
+  ['purple', 'Purple haze', ['#0b0014', '#3a0a5e', '#8b1ab8', '#e05ce6', '#ffd6ff']],
+  ['sunset', 'Sunset', ['#1a0526', '#6b0f4f', '#d6304a', '#ff8c3a', '#ffe28a']],
+  ['ocean', 'Ocean', ['#00111f', '#003b5c', '#0a7c9c', '#4fd1c5', '#e0fff9']],
+  ['neon', 'Neon', ['#120024', '#7a00ff', '#ff2fb3', '#00f0ff', '#faffd1']],
+  ['fire', 'Fire', ['#000000', '#5c0000', '#d91e00', '#ff9500', '#fff4b0']],
+  ['ice', 'Ice', ['#020814', '#1b2f5e', '#4f7fc4', '#a9d6f5', '#ffffff']],
+  ['forest', 'Forest', ['#071a0b', '#1f4d22', '#4f8a2b', '#b5c94a', '#f2f0c2']],
+  ['retro', 'Retro green', ['#0f380f', '#306230', '#5f8720', '#8bac0f', '#c4dc6b']],
+  ['pop', 'Pop art', ['#111111', '#0057b8', '#e4002b', '#ffd100', '#ffffff']],
+  ['sepia', 'Sepia', ['#1b0f06', '#4a2f1a', '#8c6239', '#c9a26b', '#f5e6c8']],
+  ['acid', 'Acid', ['#0a0a0a', '#2d0a4e', '#00b36b', '#b6ff00', '#f4ffd6']],
+];
+const POSTER_PAL = {};
+for (const [id, , cols] of POSTER_THEMES) {
+  if (cols) POSTER_PAL[id] = new Float32Array(cols.flatMap((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)));
+}
+const posterThemeName = (id) => (POSTER_THEMES.find((th) => th[0] === id) || POSTER_THEMES[0])[1];
 // Halftone's slider: how far apart its dots are, in Standard-size pixels (3 to 24)
 const halftoneCell = (v) => 3 + 21 * clamp(v, 0, 100) / 100;
 // The sliders under Effects › Feeds on itself
@@ -1296,6 +1318,23 @@ $$('#posterWhere button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`POSTERIZE ${edit}`, t.posterIn ? 'WITHIN LOOPS' : 'FINAL PASS');
 }));
+// Posterize's colors: a swatch for each theme (and the picture's own colors). Picking one with Posterize off turns it on.
+$('#posterTheme').innerHTML = POSTER_THEMES.map(([id, name, cols]) =>
+  `<button type="button" data-theme="${id}" title="${name}" aria-label="${name}" aria-pressed="false" style="background: ${cols ? `linear-gradient(90deg, ${cols.join(', ')})` : 'linear-gradient(90deg, #f33, #fd3, #3d5, #3af, #b4f)'}"></button>`).join('');
+$$('#posterTheme button').forEach((b) => b.addEventListener('click', () => {
+  const t = loops[edit].tgt;
+  t.posterTheme = b.dataset.theme;
+  if (!(t.poster > 0)) t.poster = 50;
+  syncUI();
+  showOSD(`POSTERIZE ${edit}`, posterThemeName(t.posterTheme).toUpperCase());
+}));
+// Sets Posterize's color theme on a graphics program for loop settings t
+function posterPal(prog, t) {
+  const pal = POSTER_PAL[t && t.posterTheme];
+  const l = U(prog, 'uPal[0]');
+  if (l && pal) gl.uniform3fv(l, pal);
+  set1f(prog, 'uPalOn', pal ? 1 : 0);
+}
 // A fractal's camera always glides: it wanders and rolls through (Runner, Crawler and Mix it up were removed;
 // looks saved with them glide too)
 const TIME_SHAPE_NAME = ['TOP TO BOTTOM', 'SIDE TO SIDE', 'FROM THE MIDDLE', 'DIAGONAL', 'RINGS', 'SWEEP', 'BY BRIGHTNESS'];
@@ -1496,6 +1535,8 @@ function syncUI() {
   $$('.scan-speed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.sspeed === (t.scanSpeed ?? 1))));
   $$('#corrShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.cshape === (t.corrShape ?? 0))));
   $$('#posterWhere button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.pin === '1') === !!t.posterIn)));
+  $$('#posterTheme button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.theme === (t.posterTheme || 'own'))));
+  if ($('#posterThemeName')) $('#posterThemeName').textContent = posterThemeName(t.posterTheme || 'own');
   // Only the real switches: each Spread out column's copy is brought up to date for its own loop (mirrorRefresh)
   $$('.where[data-where]').filter(notCopy).forEach((g) => g.querySelectorAll('button').forEach((b) =>
     b.setAttribute('aria-pressed', String((b.dataset.final === '1') === !!t[g.dataset.where]))));
@@ -1559,6 +1600,7 @@ function patchLoop(k, p, force) {
   // Posterize and Halftone stay through every new look (Autopilot, Surprise), and so does where each effect works
   // (Final Pass or Within Loops); a preset, recipe or Neutral sets them
   if (!force && !('poster' in p)) n.poster = L.tgt.poster || 0;
+  if (!force && !('posterTheme' in p)) n.posterTheme = L.tgt.posterTheme || 'own';
   if (!force && !('halftone' in p)) n.halftone = L.tgt.halftone || 0;
   if (!force) for (const w of Object.values(FINAL_FX)) if (!(w in p)) n[w] = !!L.tgt[w];
   // Soft trails stays through every new look too; a preset, recipe or Neutral sets it (on, unless saved off)
@@ -12834,6 +12876,7 @@ function finalPass(k) {
   set1f(finalProg, 'uChromaTurn', simT * 0.4 + (1.0 * LOOP_OFF[k]));
   aberrUniforms(finalProg, k, t, aberr);
   set1f(finalProg, 'uN', steps);
+  posterPal(finalProg, t);
   set1f(finalProg, 'uHalftone', dots);
   // Posterize has no steps of its own to remember on its first frame
   set1f(finalProg, 'uFresh', pz.stepped ? 0 : 1);
@@ -13514,6 +13557,7 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uGrowTurn', Math.random() * 6.2831853);
   // Color filters set to work inside this loop (see "color filters")
   set1f(fbProg, 'uPoster', fxIn(k, t, 'poster') && c.poster > 0.5 ? posterSteps(c.poster) : 0);
+  posterPal(fbProg, t);
   set1f(fbProg, 'uHalftone', fxIn(k, t, 'halftone') && c.halftone > 0.5 ? halftoneCell(c.halftone) : 0);
   setLoopGradeUniforms(f, k);
   set1f(fbProg, 'uAspText', textAspect);
@@ -16179,6 +16223,7 @@ function stackFinalOne(k, kind, src, dst, e, so) {
   aberrUniforms(finalProg, k, L.tgt, kind === 'aberr' ? aberrOnce(e.aberr) : 0);
   const steps = kind === 'poster' && e.poster > 0.5 ? posterSteps(e.poster) : 0;
   set1f(finalProg, 'uN', steps);
+  posterPal(finalProg, L.tgt);
   set1f(finalProg, 'uHalftone', kind === 'halftone' && e.halftone > 0.5 ? halftoneCell(e.halftone) : 0);
   set1f(finalProg, 'uFresh', kind === 'poster' && so.stepped ? 0 : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 3);

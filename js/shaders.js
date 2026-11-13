@@ -26,6 +26,25 @@ vec3 posterize(vec3 c, float n, float down) {
   float t = mix(0.5, 1.0, down);
   return (i + smoothstep(t - 0.15 - 0.15 * down, t + 0.15 - 0.15 * down, x - i)) / m;
 }
+// Posterize's color themes (Posterize › Colors): the bands are counted by brightness instead of red, green and blue
+// apart, and band t (0 dark to 1 light) is painted the color that far along the theme's five colors, dark to light.
+float palY(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec3 palAt(vec3 p[5], float t) {
+  float x = clamp(t, 0.0, 1.0) * 4.0;
+  vec3 c = mix(p[0], p[1], clamp(x, 0.0, 1.0));
+  c = mix(c, p[2], clamp(x - 1.0, 0.0, 1.0));
+  c = mix(c, p[3], clamp(x - 2.0, 0.0, 1.0));
+  return mix(c, p[4], clamp(x - 3.0, 0.0, 1.0));
+}
+// Within a loop: the band below, as posterize does, then the theme's color for it, brought to that band's own
+// brightness so the loop can only ever get darker through it and trails still fade away a step at a time
+vec3 posterizePal(vec3 c, float n, vec3 p[5]) {
+  float m = max(n - 1.0, 1.0);
+  float x = clamp(palY(c), 0.0, 1.0) * m, i = floor(x);
+  float t = (i + smoothstep(0.7, 1.0, x - i)) / m;
+  vec3 col = palAt(p, t);
+  return clamp(col * (t / max(palY(col), 0.004)), 0.0, 1.0);
+}
 // Halftone: red, green and blue each become a screen of round dots, like newspaper printing, each screen turned to
 // its own angle so the three don't line up. A dot's area matches how bright its color is there, so the picture keeps
 // its brightness. q is the spot in Standard-size pixels and cell the gap between dots in them.
@@ -176,7 +195,7 @@ const FB_COLOR_A = {
 };
 const FB_COLOR_B = {
   grade: '  if (uGradeK > 0.0) outc = mix(outc, gradeCol(outc, uGradeTone, uGradeColor, uGradeRGB), uGradeK);',
-  poster: '  if (uPoster > 0.0) outc = posterize(outc, uPoster, 1.0);',
+  poster: '  if (uPoster > 0.0) outc = uPalOn > 0.5 ? posterizePal(outc, uPoster, uPal) : posterize(outc, uPoster, 1.0);',
   // Halftone here only darkens the gaps between its dots and never lights them up, or the loop would feed on its
   // own full-bright dots and burn to white. It goes part of the way each frame, so trails fade as dots that shrink
   // instead of vanishing at once
@@ -254,6 +273,8 @@ uniform vec3 uBrushCol;
 // Color filters set to work inside the loop (see "color filters" in app.js): Posterize's steps (0: not here) and
 // how far the Color grading goes this frame (0: not here), with the grading itself
 uniform float uPoster, uGradeK, uHalftone;
+uniform vec3 uPal[5];   // Posterize's color theme, dark to light (uPalOn 0: its own colors)
+uniform float uPalOn;
 uniform vec4 uGradeTone;
 uniform vec2 uGradeColor;
 uniform vec3 uGradeRGB;
@@ -1318,6 +1339,8 @@ uniform float uPxK, uTime;
 uniform float uMirror, uMirrorFrom, uMirrorT, uMirrorStyle, uMirrorTurn;   // Mirror (uMirror 0 and uMirrorT 1: none)
 uniform float uSplit, uWarp, uChroma, uChromaTurn;
 uniform float uN, uFresh, uHalftone;
+uniform vec3 uPal[5];   // Posterize's color theme, dark to light (uPalOn 0: its own colors)
+uniform float uPalOn;
 uniform vec4 uAberr;   // Chromatic aberration (see aberrOff): way, how far apart, Lens
 uniform vec2 uAberrAt;
 out vec4 o;
@@ -1376,6 +1399,18 @@ void main() {
     c = 0.5 * c + 0.125 * (texture(uNow, st + vec2(px.x, 0.0)).rgb + texture(uNow, st - vec2(px.x, 0.0)).rgb +
                            texture(uNow, st + vec2(0.0, px.y)).rgb + texture(uNow, st - vec2(0.0, px.y)).rgb);
     float m = max(uN - 1.0, 1.0);
+    if (uPalOn > 0.5) {
+      // A color theme: bands by brightness, each painted its theme color. The band drawn here last frame is found
+      // by its color, and kept while within 0.75 of a step, as below.
+      float y = clamp(palY(c), 0.0, 1.0) * m, band = floor(y + 0.5);
+      if (uFresh < 0.5) {
+        vec3 was = texture(uLast, uv).rgb;
+        float lo = floor(y), hi = lo + 1.0;
+        if (y - lo < 0.75 && distance(palAt(uPal, lo / m), was) < 0.03) band = lo;
+        else if (hi - y < 0.75 && distance(palAt(uPal, hi / m), was) < 0.03) band = hi;
+      }
+      c = palAt(uPal, band / m);
+    } else {
     vec3 x = clamp(c, 0.0, 1.0) * m, lv = floor(x + 0.5);
     if (uFresh < 0.5) {
       vec3 was = floor(texture(uLast, uv).rgb * m + 0.5);
@@ -1383,6 +1418,7 @@ void main() {
       lv = mix(lv, was, vec3(lessThan(abs(x - was), vec3(0.75))));
     }
     c = lv / m;
+    }
   }
   if (uHalftone > 0.0) c = halftone(c, gl_FragCoord.xy / uPxK, uHalftone);
   o = vec4(c, now.a);
