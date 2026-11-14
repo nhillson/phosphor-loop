@@ -33,7 +33,7 @@ out vec2 vUv; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2), float(gl_Verte
 const FS = `#version 300 es
 precision highp float;
 uniform sampler2D uSrc, uOrig;
-uniform float uAmt, uEffect;
+uniform float uAmt, uEffect, uSeedBands;
 uniform vec2 uC, uCenter, uRot, uFlowUV;
 uniform float uAspect, uScale, uTiles, uDepth, uMaxIt, uKind, uMirror, uFlip, uSeed, uT, uItRef;
 in vec2 vUv; out vec4 o;
@@ -68,9 +68,9 @@ void main(){
   vec2 q=tileUV(vec2(t.x, t.y+(uMirror>.5 ? mod(layer,2.) : 0.)));
   if(uFlip>.5) q.x=1.-q.x;
   vec3 col=textureLod(uSrc, q, 0.).rgb;
-  // A picture that's still black (this loop at its very start) gets faint bands of its own, so it can begin
-  float l=dot(col, vec3(.299,.587,.114));
-  if(l<.04) col=mix(col, hue(layer*.13+angle*uTiles+uSeed+uT*.02)*.35, .8);
+  // Wrapping a loop round itself (uSeedBands): where it's black, faint bands of its own, or it would have nothing to
+  // wrap and stay black. For every other source and the whole-picture effect, dark parts of the picture stay dark.
+  if(uSeedBands>.5 && dot(col, vec3(.299,.587,.114))<.04) col=mix(col, hue(layer*.13+angle*uTiles+uSeed+uT*.02)*.35, .8);
   // Depth: deeper layers shaded away, so the outer ones stand in front
   // (counted from the outermost layer on screen, so zooming in doesn't darken everything)
   float sh=pow(1.-.9*uDepth, max(0., it-uItRef)*.25+radius*.25);
@@ -99,7 +99,8 @@ function create(gl) {
   function state() { return { out: null, t: Math.random() * 100, ph: Math.random() * 6.283, flow: [0, 0], kick: 0, kickV: 0, swell: 0, seed: Math.random() }; }
   function release(st) { if (st && st.out) { gl.deleteTexture(st.out.t); gl.deleteFramebuffer(st.out.f); st.out = null; } }
 
-  // One frame at outW x outH from src (or null). opt: { flip, music: { on, lvl, hit }, effect: over src by amt }
+  // One frame at outW x outH from src (or null). opt: { flip, music: { on, lvl, hit }, effect: over src by amt,
+  // seedBands: the source is a loop that's still all black, so draw faint bands of its own }
   function run(st, src, outW, outH, s, dt, opt = {}) {
     const vaoWas = gl.getParameter(gl.VERTEX_ARRAY_BINDING), blendWas = gl.isEnabled(gl.BLEND);
     dt = Math.min(0.25, Math.max(1 / 240, dt || 1 / 60));
@@ -169,7 +170,7 @@ function create(gl) {
     gl.uniform1f(u.uMirror, s.fwMirror ? 1 : 0); gl.uniform1f(u.uFlip, opt.flip ? 1 : 0);
     gl.uniform1f(u.uSeed, st.seed); gl.uniform1f(u.uT, st.t); gl.uniform1f(u.uItRef, st.itRef);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, src || black); gl.uniform1i(u.uOrig, 1);
-    gl.uniform1f(u.uEffect, opt.effect ? 1 : 0); gl.uniform1f(u.uAmt, Math.max(0, Math.min(1, opt.amt ?? 1)));
+    gl.uniform1f(u.uEffect, opt.effect ? 1 : 0); gl.uniform1f(u.uSeedBands, opt.seedBands ? 1 : 0); gl.uniform1f(u.uAmt, Math.max(0, Math.min(1, opt.amt ?? 1)));
     gl.activeTexture(gl.TEXTURE0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(vaoWas);

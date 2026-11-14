@@ -6203,7 +6203,7 @@ function openVideo(url, name, { quiet = false, to = vid, spare = false } = {}) {
       if (to === vid) snipCloseForm();
       vidPanelSync();
       if (quiet) settleDevices();   // plays only while a loop uses it
-      else { feedInto('video', to.key); toast(`Feeding ${name} into loop ${to.key}.`); }
+      else { const via = feedsVia(to.key, 'video'); feedInto('video', to.key); toast(via ? `Using ${name} in loop ${to.key}.` : `Feeding ${name} into loop ${to.key}.`); }
       resolve(true);
     }, { once: true });
     v.addEventListener('error', () => {
@@ -11819,7 +11819,9 @@ function drawFw(k, t, dt, selfTex, otherTex) {
   else if (of === 'self') tex = selfTex;
   else tex = otherTex;
   if (!fwSt[k]) fwSt[k] = eng.state();
-  return eng.run(fwSt[k], tex, simW, simH, fwrap, dt, { flip, music: { on: reacts(k), lvl: brushMus.lvl, hit: brushMus.hit } });
+  // This loop wrapped round itself would have nothing to wrap where it's black, so only then do the black parts
+  // get faint bands of their own; for every other source dark stays dark
+  return eng.run(fwSt[k], tex, simW, simH, fwrap, dt, { flip, seedBands: of === 'self', music: { on: reacts(k), lvl: brushMus.lvl, hit: brushMus.hit } });
 }
 // Wrap the whole picture: the finished picture wrapped round the fractal at the screen's size, over it by Amount
 function fwFinal(tex, dt, force) {
