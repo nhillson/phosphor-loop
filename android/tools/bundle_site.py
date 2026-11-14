@@ -35,6 +35,7 @@ FILES = {
     'js/shapes.js': 'application/javascript',
     'js/typeart.js': 'application/javascript',
     'js/pointcloud.js': 'application/javascript',
+    'js/brushes.js': 'application/javascript',
     'js/app.js': 'application/javascript',
     'js/audio/hits.js': 'application/javascript',
     'js/audio/beat-clock.js': 'application/javascript',

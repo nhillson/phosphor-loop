@@ -47,6 +47,7 @@ const WHOLE_KINDS = {
   relief: { label: '3D lighting', zones: ['all'], group: 'reliefGroup' },
   type:   { label: 'Type art', zones: ['in', 'all'], group: 'typeGroup' },
   cloud:  { label: 'Point cloud', zones: ['all'], group: 'cloudGroup' },
+  brush:  { label: 'Brushes', zones: ['all'], group: 'brushGroup' },
 };
 // The order the loop's own effects worked in before (Classic). New ones slot in by it.
 const CLASSIC = Object.keys(LOOP_KINDS);
@@ -67,7 +68,7 @@ const MENU = [
   ['Color and texture', ['color', 'poster', 'halftone', 'aberr', 'chroma', 'restless', 'grain', 'grow', 'dye', 'grade', 'relief',
     ...Object.keys(PATCH_KINDS).filter((k) => !['p:kaleido', 'p:tile', 'p:warp', 'p:swirl', 'p:ripple', 'p:polar'].includes(k))].sort(byName)],
   ['Time', ['time', 'scan', 'corr']],
-  ['Whole picture', ['type', 'cloud']],
+  ['Whole picture', ['type', 'cloud', 'brush']],
 ];
 const ZONE_NAME = { in: 'Inside the loop', out: 'On the way out', all: 'Whole picture' };
 

@@ -426,6 +426,7 @@
             <button data-src="life" aria-pressed="false" title="Conway’s Game of Life: glowing cells that are born, live and die by a few simple rules">Life</button>
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
             <button data-src="cloud" aria-pressed="false" title="A picture, video, the camera or the other loop turned into a cloud of glowing 3D dots that wind, your finger and explosions can blow about">Point cloud</button>
+            <button data-src="brush" aria-pressed="false" title="Thousands of little brushes that wander on swirling currents, each leaving a stroke behind it">Brushes</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -529,6 +530,21 @@
               </div>
             </div>
             <span class="hint">Bright parts stand out towards you. Wind, Dissolve, the colours and what dragging on the picture does are set in the Point cloud card of the Effect stack (under Whole picture; in the Classic layout, the Point cloud section), shared with the whole-picture dots.</span>
+          </div>
+
+          <div class="dev" id="row-brush" hidden>
+            <div class="ctl">
+              <span class="lbl" id="brushOfLbl" title="What steers the brushes and gives them their colors">Brushes follow</span>
+              <div class="seg seg-3" id="brushOf" role="group" aria-labelledby="brushOfLbl">
+                <button data-v="self" aria-pressed="true" title="This loop’s own picture: the feedback combs itself into strokes">This loop</button>
+                <button data-v="loop" aria-pressed="false" title="The other loop’s picture">Other loop</button>
+                <button data-v="picture" aria-pressed="false" title="This loop’s picture: a nature picture or your own (the Picture controls show below)">Picture</button>
+                <button data-v="video" aria-pressed="false" title="This loop’s video">Video</button>
+                <button data-v="camera" aria-pressed="false" title="The camera, live">Camera</button>
+                <button data-v="none" aria-pressed="false" title="Nothing: the brushes follow swirling currents and bring colors of their own">Nothing</button>
+              </div>
+            </div>
+            <span class="hint">The brushes run along the bright and dark edges of what they follow and pick their colors up from it. How they move, their colors and the music are set in the Brushes card of the Effect stack (under Whole picture; in the Classic layout, the Brushes section), shared with the whole-picture strokes.</span>
           </div>
 
           <div class="dev" id="row-text" hidden>
@@ -1169,8 +1185,8 @@
           <span class="hint">When music is playing under React to sound, each new look cuts in on a beat instead of fading in slowly.</span>
         </div>
         <div class="ctl">
-          <div class="chips"><button class="chip" id="apType" aria-pressed="false"><span class="led"></span>Use Type art</button><button class="chip" id="apCloud" aria-pressed="false"><span class="led"></span>Use Point cloud</button></div>
-          <span class="hint">Autopilot brings Type art in with some new looks (its own pick of characters, font, color and size, fading in) and takes it out again with others. Off, it leaves Type art as you set it. Use Point cloud does the same with the whole picture as dots (a recipe of its own picking, fading in).</span>
+          <div class="chips"><button class="chip" id="apType" aria-pressed="false"><span class="led"></span>Use Type art</button><button class="chip" id="apCloud" aria-pressed="false"><span class="led"></span>Use Point cloud</button><button class="chip" id="apBrush" aria-pressed="false"><span class="led"></span>Use Brushes</button></div>
+          <span class="hint">Autopilot brings Type art in with some new looks (its own pick of characters, font, color and size, fading in) and takes it out again with others. Off, it leaves Type art as you set it. Use Point cloud does the same with the whole picture as dots (a recipe of its own picking, fading in), and Use Brushes with the whole picture as strokes.</span>
         </div>
         <div class="ctl">
           <span class="lbl" id="apInputsLbl">Inputs Autopilot can use</span>
@@ -1578,6 +1594,97 @@
           <span class="hint">The view turns gently from side to side, so you see the cloud is 3D.</span>
         </div>
         <div class="dev-actions"><button class="btn small" id="cloudReset">Back to normal</button></div>
+      </section>
+
+      <section class="group" id="brushGroup" aria-labelledby="h-brush">
+        <h2 id="h-brush">Brushes</h2>
+        <p class="hint">Thousands of little brushes wander over the picture, each leaving a stroke behind it. Swirling currents and the picture’s own edges steer them, and in Picture colors each one picks its color up from what it passes over. Amount redraws the whole finished picture in strokes; the Brushes input draws one loop’s input. Both use the settings here. Presets keep them and Neutral turns Amount off.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bAmt">Whole picture as strokes</label><output id="bAmtOut" for="bAmt"></output></div>
+          <input type="range" id="bAmt" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>Only strokes</span></div>
+          <span class="hint">Redraws the whole finished picture with the brushes. Off leaves it alone; in between, the strokes lie over the picture.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl">Recipes</span>
+          <div class="chips" id="brushRecipes"></div>
+        </div>
+        <div class="ctl">
+          <div class="chips">
+            <button class="chip" id="brushMusic" aria-pressed="true"><span class="led"></span>Moves with the music</button>
+            <button class="chip" id="brushOnly" aria-pressed="false"><span class="led"></span>Only music</button>
+          </div>
+          <span class="hint">Moves with the music: hits swing the currents round and make the brushes surge, and louder music runs them faster (with React to sound on). Only music: the music is all that moves them. In silence they stand still and stop drawing; the louder it gets, the faster they go.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="brushSteerLbl">Steered by</span>
+          <div class="seg seg-3" id="brushSteer" role="group" aria-labelledby="brushSteerLbl">
+            <button data-v="0" title="Made-up swirling currents that slowly change">Currents</button>
+            <button data-v="1" title="The picture’s edges: the brushes run along its bright and dark outlines">The picture</button>
+            <button data-v="2" title="The picture’s edges where it has them, the currents everywhere else">Both</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bSpeed">Speed</label><output id="bSpeedOut" for="bSpeed"></output></div>
+          <input type="range" id="bSpeed" min="0" max="100" step="1" value="35">
+          <div class="ends"><span>Crawl</span><span>Race</span></div>
+          <span class="hint">How fast the brushes move.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bSwirl">Swirliness</label><output id="bSwirlOut" for="bSwirl"></output></div>
+          <input type="range" id="bSwirl" min="0" max="100" step="1" value="40">
+          <div class="ends"><span>Broad sweeps</span><span>Tight curls</span></div>
+          <span class="hint">How tightly the currents curl.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bChange">Currents change</label><output id="bChangeOut" for="bChange"></output></div>
+          <input type="range" id="bChange" min="0" max="100" step="1" value="25">
+          <div class="ends"><span>Slowly</span><span>Quickly</span></div>
+          <span class="hint">How quickly the currents shift about.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bWidth">Stroke width</label><output id="bWidthOut" for="bWidth"></output></div>
+          <input type="range" id="bWidth" min="1" max="40" step="1" value="8">
+          <div class="ends"><span>Fine</span><span>Fat</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bLength">Stroke length</label><output id="bLengthOut" for="bLength"></output></div>
+          <input type="range" id="bLength" min="5" max="100" step="1" value="45">
+          <div class="ends"><span>Dabs</span><span>Long trails</span></div>
+          <span class="hint">How long each brush keeps going before it lifts off and starts somewhere new.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bDry">Strokes stay</label><output id="bDryOut" for="bDry"></output></div>
+          <input type="range" id="bDry" min="0" max="100" step="1" value="75">
+          <div class="ends"><span>Briefly</span><span>For good</span></div>
+          <span class="hint">How long strokes stay before fading (into black for the input, back into the picture for the whole picture).</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bOpacity">Strength</label><output id="bOpacityOut" for="bOpacity"></output></div>
+          <input type="range" id="bOpacity" min="5" max="100" step="1" value="60">
+          <div class="ends"><span>Faint</span><span>Solid</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bBristle">Bristles</label><output id="bBristleOut" for="bBristle"></output></div>
+          <input type="range" id="bBristle" min="0" max="100" step="1" value="50">
+          <div class="ends"><span>Smooth</span><span>Combed</span></div>
+          <span class="hint">Streaks along each stroke, as a brush’s bristles leave.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="brushColorLbl">Colors</span>
+          <div class="seg seg-3" id="brushColor" role="group" aria-labelledby="brushColorLbl">
+            <button data-v="0" title="Picked up from the picture under each brush">Picture</button><button data-v="1">Rainbow</button><button data-v="2">Purple</button><button data-v="3">Fire</button><button data-v="4">Ice</button><button data-v="5">White</button>
+          </div>
+          <div class="chips"><button class="chip" id="brushGlow" aria-pressed="false"><span class="led"></span>Glowing strokes</button></div>
+          <span class="hint">Glowing strokes add up into light where they cross, instead of lying over each other.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="brushCountLbl">How many brushes</span>
+          <div class="seg seg-4" id="brushCount" role="group" aria-labelledby="brushCountLbl">
+            <button data-v="0" title="About 4 thousand">Few</button><button data-v="1" title="About 16 thousand">Some</button><button data-v="2" title="About 40 thousand">Lots</button><button data-v="3" title="About 90 thousand: for a strong graphics card">Masses</button>
+          </div>
+        </div>
+        <div class="dev-actions"><button class="btn small" id="brushRestart">Start afresh</button><button class="btn small" id="brushReset">Back to normal</button></div>
       </section>
 
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>
@@ -2131,6 +2238,7 @@
 <script src="js/shapes.js"></script>
 <script src="js/typeart.js"></script>
 <script src="js/pointcloud.js"></script>
+<script src="js/brushes.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/library.js"></script>
 <script src="js/patch.js"></script>

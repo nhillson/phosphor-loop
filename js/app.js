@@ -159,16 +159,16 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, cloud: 37 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, cloud: 37, brush: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', cloud: 'Point cloud',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', cloud: 'Point cloud', brush: 'Brushes',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture',
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture', brushOf: 'self',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, posterTheme: 'own', halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
@@ -798,7 +798,7 @@ function vidFor(k) {
   for (const j of KEYS) if (vids[j].on) return vids[j];
   return own || vid;
 }
-const loopUsesVid = (k) => { const t = loops[k].tgt; return t.in1 === 'video' || t.in2 === 'video' || ((t.in1 === 'cloud' || t.in2 === 'cloud') && t.cloudOf === 'video'); };
+const loopUsesVid = (k) => { const t = loops[k].tgt; return t.in1 === 'video' || t.in2 === 'video' || ((t.in1 === 'cloud' || t.in2 === 'cloud') && t.cloudOf === 'video') || ((t.in1 === 'brush' || t.in2 === 'brush') && t.brushOf === 'video'); };
 // Whether any loop on screen shows this player's video (its own loop, or one borrowing it)
 const vidInUse = (s) => activeKeys().some((k) => loopUsesVid(k) && vidFor(k) === s);
 // The video a recording or Save clip means: the edited loop's when it shows, or else the first one shown
@@ -1095,7 +1095,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['cloud', 'Point cloud'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1348,7 +1348,7 @@ $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
 }));
 if (!twProg) $('#timeCtl').hidden = true;
 
-function uses(src) { return activeKeys().some((k) => { const t = loops[k].tgt; return t.in1 === src || t.in2 === src || ((t.in1 === 'cloud' || t.in2 === 'cloud') && (t.cloudOf || 'picture') === src); }); }
+function uses(src) { return activeKeys().some((k) => { const t = loops[k].tgt; return t.in1 === src || t.in2 === src || ((t.in1 === 'cloud' || t.in2 === 'cloud') && (t.cloudOf || 'picture') === src) || ((t.in1 === 'brush' || t.in2 === 'brush') && t.brushOf === src); }); }
 
 // Pick an input for the loop being edited. Devices start right here, inside the click, so the
 // browser treats the camera or screen request as something the person asked for.
@@ -1367,6 +1367,7 @@ function chooseSource(slot, src) {
   if (src === 'text' && txt.str === TEXT_DEFAULT) toast('Type your own words in the Your text box under the inputs.');
   if (src === 'genart') genEnsure(gens[edit]);
   if (src === 'cloud') cloudSourceStart(loops[edit].tgt.cloudOf || 'picture');
+  if (src === 'brush') brushSourceStart(loops[edit].tgt.brushOf || 'self');
   if (src !== 'none' && src !== 'picture' && src !== 'genart' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
@@ -1452,7 +1453,7 @@ function topoTrace(t) {
 }
 function readsOther(k) {
   const L = loops[k];
-  return [L.tgt.in1, L.tgt.in2].includes('loop') || ([L.tgt.in1, L.tgt.in2].includes('cloud') && L.tgt.cloudOf === 'loop') || topoTrace(L.tgt) === 'loop' || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
+  return [L.tgt.in1, L.tgt.in2].includes('loop') || ([L.tgt.in1, L.tgt.in2].includes('cloud') && L.tgt.cloudOf === 'loop') || ([L.tgt.in1, L.tgt.in2].includes('brush') && L.tgt.brushOf === 'loop') || topoTrace(L.tgt) === 'loop' || L.tgt.push > 0 || L.cur.push > 0.5 || L.tgt.dye > 0 || L.cur.dye > 0.5;
 }
 // A feed pours into the other loop, so if that loop isn't on screen, raising the slider slides
 // What you see to Both. (Only for the slider itself.)
@@ -1522,8 +1523,10 @@ function syncUI() {
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   const cloudHere = usesHere('cloud') ? (t.cloudOf || 'picture') : null;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'cloud']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere;
+  const brushHere = usesHere('brush') ? t.brushOf : null;
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'cloud', 'brush']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere && s !== brushHere;
   $$('#cloudOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.cloudOf || 'picture'))));
+  $$('#brushOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.brushOf || 'self'))));
   if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
   syncTopoUI(t);
   syncLifeUI(t);
@@ -1609,13 +1612,14 @@ function patchLoop(k, p, force) {
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
-    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf']) n[q] = p[q] ?? L.tgt[q]; }
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'brushOf']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
   // A new stack: the Patch effects of the one before fade out rather than vanish (see stackCarry)
   if (!force && stackMode && Array.isArray(n.stack) && Array.isArray(L.tgt.stack)) n.stack = stackCarry(k, L.tgt.stack, n.stack);
   if (!['picture', 'video', 'camera', 'loop'].includes(n.cloudOf)) n.cloudOf = 'picture';
+  if (!['self', 'loop', 'picture', 'video', 'camera', 'none'].includes(n.brushOf)) n.brushOf = 'self';
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
   // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
@@ -1645,7 +1649,7 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'cloud', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'cloud', 'brush', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3,
@@ -2378,7 +2382,7 @@ function neutral() {
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
     ...effectsOff(),
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' || src === 'cloud' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'patch' || src === 'cloud' || src === 'brush' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound, stack: [],
   };
@@ -2394,6 +2398,7 @@ function neutral() {
   setRelief(RELIEF_DEF);
   setType({ ...typeArt, tAmt: 0 });
   setCloud({ ...cloud, cAmt: 0 });
+  setBrush({ ...brush, bAmt: 0 });
   stackSetAll([]);
   [cam, scr, pho, ...Object.values(vids)].forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
@@ -2433,7 +2438,7 @@ function neutralLoop(k) {
   patchLoop(k, {
     ...effectsOff(),
     in1: src, in2: 'none', blend: 50, motion: false,
-    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'loop'].includes(src) ? 100 : 50,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'patch', 'cloud', 'brush', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic, stack: [],
   }, true);
@@ -2444,6 +2449,7 @@ function neutralLoop(k) {
   setRelief(RELIEF_DEF);
   setType({ ...typeArt, tAmt: 0 });
   setCloud({ ...cloud, cAmt: 0 });
+  setBrush({ ...brush, bAmt: 0 });
   stackSetAll([]);
   stackRender(true);
   // Nothing fed into this loop from the others
@@ -2474,7 +2480,7 @@ window.__plNeutralLoop = neutralLoop;
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'brushOf', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2581,11 +2587,11 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
-const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cloud: false, cue: false, cuePreviews: true, cueLive: false, cueFade: false, cueFadeSecs: 2,
+const AP_DEFAULTS = { every: 44, fade: 63, wild: 50, mix: 50, taste: 50, beat: false, check: true, hints: true, fsKeep: false, touch: 'pin', off: [], type: false, cloud: false, brush: false, cue: false, cuePreviews: true, cueLive: false, cueFade: false, cueFadeSecs: 2,
   runs: ['A', 'B', 'C', 'D'], turns: true };
 // Loops Autopilot runs (under Autopilot, "Loops Autopilot runs"): at least one of A to D. The others are yours:
 // Autopilot never changes them, and moving their controls neither pins anything nor stops it.
@@ -2635,6 +2641,7 @@ try {
     apSet.beat = s.beat === true;
     apSet.type = s.type === true;
     apSet.cloud = s.cloud === true;
+    apSet.brush = s.brush === true;
     apSet.cue = s.cue === true;
     apSet.cuePreviews = s.cuePreviews !== false;
     apSet.cueLive = s.cueLive === true;
@@ -3352,7 +3359,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'cloud', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'cloud', 'brush', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3552,6 +3559,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (sc.in1 === 'radar') sc.size = Math.round(rnd(75, 100));
     if (sc.in1 === 'cloud') sc.size = Math.round(rnd(80, 100));
+    if (sc.in1 === 'brush') sc.size = 100;
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
@@ -3560,6 +3568,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
     if ((sc.in1 === 'cloud' || sc.in2 === 'cloud') && !isPinned('in1', k)) sc.cloudOf = cloudApOf(k);
+    if ((sc.in1 === 'brush' || sc.in2 === 'brush') && !isPinned('in1', k)) sc.brushOf = brushApOf();
     if (sc.in1 === 'spectro' || sc.in2 === 'spectro') {
       if (!isPinned('in1', k)) sc.specRound = Math.random() < 0.5;
       if (sc.in1 === 'spectro') sc.size = Math.round(rnd(75, 100));
@@ -3620,7 +3629,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'patch', 'cloudOf', 'brushOf', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -3826,6 +3835,7 @@ function apStep(now, onBeat) {
   apClip(came);
   apTypeArt(came, now);
   apCloud(came, now);
+  apBrush(came, now);
   syncUI();
   apStatus();
 }
@@ -4595,6 +4605,7 @@ function tasteFeats(L) {
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
   if (L.in1 === 'cloud' || L.in2 === 'cloud') f.push('cloud:' + (L.cloudOf || 'picture'));
+  if (L.in1 === 'brush' || L.in2 === 'brush') f.push('brush:' + (L.brushOf || 'self'));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -5358,6 +5369,7 @@ function syncApUI() {
   $('#apBeat').setAttribute('aria-pressed', String(apSet.beat));
   $('#apType').setAttribute('aria-pressed', String(apSet.type));
   $('#apCloud').setAttribute('aria-pressed', String(apSet.cloud));
+  $('#apBrush').setAttribute('aria-pressed', String(apSet.brush));
   $('#apCheck').setAttribute('aria-pressed', String(apSet.check));
   $('#apHints').setAttribute('aria-pressed', String(apSet.hints));
   $('#apFsKeep').setAttribute('aria-pressed', String(apSet.fsKeep));
@@ -9115,6 +9127,18 @@ const RECIPES = [
     sw: 'radial-gradient(circle,#fff 0 2%,#ff5fc8 6%,#3bd1ff 14%,#8b1ab8 26%,#05030c 55%)',
     patch: { A: { in1: 'shape', form: 3, size: 60, zoom: 14, spin: 8, trails: 88, color: 12, blur: 0 } },
     cloud: { ...window.PhosphorPointCloud.RECIPES.Galaxy, cAmt: 100 } },
+  { name: 'Brush storm', after: 'Turn on React to sound and try Only music under Brushes: the music becomes the only thing that moves them.',
+    text: 'Thousands of little brushes comb the feedback into swirling strokes, picking their colors up from the loop as they go.',
+    how: 'BRUSHES FOLLOWING THIS LOOP · TRAILS 55 · ZOOM IN 6',
+    sw: 'repeating-linear-gradient(35deg,#0b0612 0 4px,#8b1ab8 4px 6px,#0b0612 6px 9px,#ff9a3d 9px 10px),radial-gradient(circle,#2fd0ff 0 20%,transparent 60%)',
+    patch: { A: { in1: 'brush', brushOf: 'self', size: 100, zoom: 6, spin: 3, trails: 55, color: 6, blur: 0 } },
+    brush: { ...window.PhosphorBrushes.RECIPES['Starry swirls'], bAmt: 0 } },
+  { name: 'Brushed picture', after: 'Pick another nature picture with ◀ ▶ under Picture, or try other recipes under Brushes.',
+    text: 'The finished picture redrawn live in thick combed strokes that follow its own outlines.',
+    how: 'PICTURE · WHOLE PICTURE AS STROKES',
+    sw: 'repeating-linear-gradient(60deg,#2a5a3a 0 5px,#d8c070 5px 7px,#2a5a3a 7px 11px,#6aa0d0 11px 12px)',
+    patch: { A: { in1: 'picture', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+    brush: { ...window.PhosphorBrushes.RECIPES.Combed, bAmt: 100, bWidth: 10 } },
   { name: 'Terrain flight', after: 'It wanders from canyon to ridges to plains about once a minute.',
     text: 'A flight over land made of triangles, every edge a glowing wire: teal valleys, gold peaks and a low sun under a starry nebula.',
     how: 'TERRAIN · EVERYTHING ELSE OFF',
@@ -9159,6 +9183,7 @@ function applyRecipe(r) {
   ADJ_SRC.forEach((src) => { adj[src] = { ...adjDefaults(), ...((p.adj && p.adj[src]) || {}) }; });
   syncAdjUI();
   if (r.cloud) setCloud({ ...CLOUD_DEF, ...r.cloud });
+  if (r.brush) setBrush({ ...BRUSH_DEF, ...r.brush });
   closeGuide();
   setEdit('A');
   // Start any device right here, inside the click, so the browser lets it ask for permission
@@ -9269,13 +9294,14 @@ function snapshot() {
     relief: { ...relief },
     type: { ...typeArt },
     cloud: { ...cloud },
+    brush: { ...brush },
     ...(stackAll ? { stackAll: clone(stackAll) } : {}),
   };
 }
 // While Autopilot runs, a preset also keeps Autopilot's settings and pins, so loading it starts Autopilot again
 function apSnapshot() {
   return { every: apSet.every, fade: apSet.fade, wild: apSet.wild, mix: apSet.mix, taste: apSet.taste, beat: apSet.beat, check: apSet.check,
-    hints: apSet.hints, touch: apSet.touch, type: apSet.type, cloud: apSet.cloud,
+    hints: apSet.hints, touch: apSet.touch, type: apSet.type, cloud: apSet.cloud, brush: apSet.brush,
     off: [...apSet.off], pins: [...ap.pins], lim: cleanLim(apSet.lim), weights: cleanWeights(apSet.weights) };
 }
 function markPreset(id) {
@@ -9412,6 +9438,8 @@ function loadPreset(pr, quiet) {
   setType(d.type);
   // Presets saved before the Point cloud existed load with the whole-picture dots off
   setCloud(d.cloud || { ...cloud, cAmt: 0 });
+  // Presets saved before the Brushes existed load with the whole-picture strokes off
+  setBrush(d.brush || { ...brush, bAmt: 0 });
   // The effect stacks it was saved with; a preset from before them gets stacks made from its settings
   stackAfterLoad(d);
   // Start any camera, screen or phone the preset uses, right here inside the click
@@ -9436,6 +9464,7 @@ function loadPreset(pr, quiet) {
     apSet.beat = a.beat === true;
     apSet.type = a.type === true;
     apSet.cloud = a.cloud === true;
+    apSet.brush = a.brush === true;
     // Presets saved before Check each look (or Learn from hints) existed have it on
     apSet.check = a.check !== false;
     apSet.hints = a.hints !== false;
@@ -11473,6 +11502,182 @@ $('#apCloud').addEventListener('click', () => {
   toast(apSet.cloud ? 'Autopilot will turn the picture into dots with some new looks, and back with others.' : 'Autopilot leaves the Point cloud alone now.');
 });
 window.__plCloud = { cloud, setCloud, cloudSt, boom: cloudBoomAt, ready: () => !!cloudEng, failed: () => cloudFailed, ptr: cloudPtr, snap: () => snapshot(), load: (d) => loadPreset({ name: 'test', data: d }, true) };
+
+/* ================= brushes ================= */
+// Thousands of little brushes that wander and leave strokes (js/brushes.js). Two ways in, sharing the Brushes section's
+// settings (brush), as the Point cloud does: the Brushes input draws a loop's input from nothing, steered by and taking
+// colors from what Follows says (the loop's own picture, so the feedback combs itself; the other loop; a picture; the
+// video; the camera; or Nothing: currents and colors of their own), read through the slot a 3D world would use; and
+// Whole picture as strokes (bAmt) redraws the finished picture, after the Point cloud and before Type art.
+// The music (React to sound on, and Moves with the music): hits spin the currents and the brushes surge, louder runs
+// them faster. Only music: the music is all that moves them; silence stops them.
+const PBR = window.PhosphorBrushes;
+const BRUSH_OF = ['self', 'loop', 'picture', 'video', 'camera', 'none'];
+const BRUSH_KEY = 'phosphor-brush-v1';
+const BRUSH_DEF = { ...PBR.DEFAULTS };
+const BRUSH_NUM = ['bAmt', 'bSpeed', 'bSwirl', 'bChange', 'bWidth', 'bLength', 'bDry', 'bOpacity', 'bBristle'];
+const BRUSH_SEG = { bSteer: '#brushSteer', bCount: '#brushCount', bColor: '#brushColor' };
+const BRUSH_CHIP = { bGlow: '#brushGlow', bMusic: '#brushMusic', bOnly: '#brushOnly' };
+const brush = { ...BRUSH_DEF };
+const brushEls = {};
+for (const k of BRUSH_NUM) brushEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
+function brushText(k, v) {
+  if (k === 'bAmt') return v === 0 ? 'OFF' : `${v}%`;
+  if (k === 'bDry') return v >= 100 ? 'NEVER' : String(v);
+  return String(v);
+}
+function cleanBrush(c) {
+  const out = { ...BRUSH_DEF };
+  if (!c || typeof c !== 'object') return out;
+  for (const k of BRUSH_NUM) { const { el } = brushEls[k]; if (Number.isFinite(c[k])) out[k] = clamp(Math.round(c[k]), +el.min, +el.max); }
+  if (Number.isInteger(c.bSteer)) out.bSteer = clamp(c.bSteer, 0, 2);
+  if (Number.isInteger(c.bCount)) out.bCount = clamp(c.bCount, 0, PBR.COUNT.length - 1);
+  if (Number.isInteger(c.bColor)) out.bColor = clamp(c.bColor, 0, PBR.COLORS.length - 1);
+  out.bGlow = c.bGlow === true;
+  out.bMusic = c.bMusic !== false;
+  out.bOnly = c.bOnly === true;
+  return out;
+}
+function syncBrushUI() {
+  for (const [k, { el, out }] of Object.entries(brushEls)) { el.value = brush[k]; fillTrack(el); out.textContent = brushText(k, brush[k]); }
+  for (const [k, sel] of Object.entries(BRUSH_SEG)) $$(sel + ' button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === String(brush[k]))));
+  for (const [k, sel] of Object.entries(BRUSH_CHIP)) $(sel).setAttribute('aria-pressed', String(!!brush[k]));
+}
+function saveBrush() { try { localStorage.setItem(BRUSH_KEY, JSON.stringify(brush)); } catch (_) {} }
+const brushGlide = { on: false, from: 0, to: 0, t0: 0, dur: 1, ui: 0 };
+function setBrush(c) { brushGlide.on = false; Object.assign(brush, cleanBrush(c)); syncBrushUI(); saveBrush(); }
+for (const [k, { el, out }] of Object.entries(brushEls)) {
+  el.addEventListener('input', () => { brushGlide.on = false; brush[k] = +el.value; fillTrack(el); out.textContent = brushText(k, brush[k]); saveBrush(); });
+  el.addEventListener('dblclick', () => setBrush({ ...brush, [k]: BRUSH_DEF[k] }));
+}
+for (const [k, sel] of Object.entries(BRUSH_SEG)) $$(sel + ' button').forEach((b) => b.addEventListener('click', () => setBrush({ ...brush, [k]: +b.dataset.v })));
+$('#brushGlow').addEventListener('click', () => setBrush({ ...brush, bGlow: !brush.bGlow }));
+$('#brushMusic').addEventListener('click', () => {
+  setBrush({ ...brush, bMusic: !brush.bMusic });
+  toast(brush.bMusic ? 'The music moves the brushes (with React to sound on).' : 'The music leaves the brushes alone now.');
+});
+$('#brushOnly').addEventListener('click', () => {
+  setBrush({ ...brush, bOnly: !brush.bOnly });
+  if (brush.bOnly && !snd.analyser) toast('Only music: the brushes move only with sound. Turn on React to sound (Computer sound or Microphone) to start them.');
+  else toast(brush.bOnly ? 'Only music: the music is all that moves the brushes. In silence they stand still.' : 'The brushes move by themselves again.');
+});
+$('#brushReset').addEventListener('click', () => setBrush({ ...BRUSH_DEF, bAmt: brush.bAmt }));
+$('#brushRestart').addEventListener('click', () => brushAll((st) => brushEng.rebuild(st)));
+// A recipe sets the motion and look; with no brushes on screen yet it also turns them on over the whole picture
+for (const name of Object.keys(PBR.RECIPES)) {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = name;
+  b.addEventListener('click', () => {
+    setBrush({ ...brush, ...PBR.RECIPES[name], bAmt: brushOnScreen() ? brush.bAmt : 100 });
+    showOSD('BRUSHES', name.toUpperCase());
+  });
+  $('#brushRecipes').append(b);
+}
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(BRUSH_KEY) || 'null'); } catch (_) {} setBrush(saved); }
+// Follows: what the Brushes input of the loop being edited is steered by and takes its colors from
+$$('#brushOf button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.brushOf = b.dataset.v;
+  brushSourceStart(b.dataset.v);
+  settleDevices();
+  syncUI();
+  showOSD(`BRUSHES ${edit}`, b.textContent.toUpperCase());
+}));
+function brushSourceStart(of) {
+  if (of === 'camera' && !cam.on) startCamera();
+  if (of === 'video' && !anyVid()) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
+}
+// What Autopilot gives a new Brushes input to follow: mostly its own loop
+function brushApOf() {
+  const o = ['self', 'self', 'self', 'loop', 'picture', 'none'];
+  if (cam.on && apAllowed('camera')) o.push('camera');
+  return pick(o);
+}
+let brushEng = null, brushFailed = false;
+function brushEngine() {
+  if (brushEng || brushFailed) return brushEng;
+  try { brushEng = PBR.create(gl); } catch (err) {
+    console.warn('Brushes could not start:', err);
+    brushFailed = true;
+    toast('The brushes can’t run on this graphics card.');
+  }
+  return brushEng;
+}
+const brushSt = { final: null, A: null, B: null, C: null, D: null };
+function brushAll(fn) { if (brushEng) for (const st of Object.values(brushSt)) if (st) fn(st); }
+const brushUses = (k) => { const t = loops[k].tgt; return t.in1 === 'brush' || t.in2 === 'brush'; };
+function brushOnScreen() { return brush.bAmt > 0 || activeKeys().some((k) => brushUses(k) && wOf(mix.cur, k) > 0.01); }
+// The music this frame, worked out once in brushTick: how loud (against its loudest lately) and any hit
+const brushMus = { lvl: 0, hit: 0, ref: 0.02, beats: 0, hitAt: 0 };
+const brushMusic = (k) => ({ on: brush.bMusic && (k === 'final' ? activeKeys().some((j) => reacts(j)) : reacts(k)), lvl: brushMus.lvl, hit: brushMus.hit });
+// The Brushes input: loop k's canvas, drawn at the loop's size
+function drawBrush(k, t, dt, selfTex, otherTex) {
+  const eng = brushEngine();
+  if (!eng) return null;
+  const of = BRUSH_OF.includes(t.brushOf) ? t.brushOf : 'self';
+  let tex = null, aspect = simW / simH, flip = false;
+  if (of === 'self') tex = selfTex;
+  else if (of === 'loop') tex = otherTex;
+  else if (of === 'picture') { const p = picOf(k); tex = p.tex; aspect = p.aspect; }
+  else if (of === 'video') { const v = vidFor(k); if (v.on && v.frames) { tex = v.cur; aspect = v.aspect; } }
+  else if (of === 'camera') { if (cam.on && cam.frames) { tex = cam.cur; aspect = cam.aspect; flip = cam.flip; } }
+  if (!brushSt[k]) brushSt[k] = eng.state();
+  return eng.run(brushSt[k], tex, aspect, simW, simH, brush, dt, { music: brushMusic(k), flip, dark: of === 'self' || of === 'loop' });
+}
+// Whole picture as strokes: the finished picture redrawn by the brushes, at the screen's own size, over it by Amount
+function brushFinal(tex, dt, force) {
+  if (!(brush.bAmt > 0) || force === false) { if (brushSt.final && brushEng) { brushEng.release(brushSt.final); brushSt.final = null; } return tex; }
+  const eng = brushEngine();
+  if (!eng) return tex;
+  if (!brushSt.final) brushSt.final = eng.state();
+  return eng.run(brushSt.final, tex, simW / simH, canvas.width, canvas.height, brush, dt, { effect: true, orig: tex, amt: brush.bAmt / 100, music: brushMusic('final') });
+}
+// Each frame: Autopilot's fade, the music, and letting go of the brushes of loops that stopped using them
+function brushTick(now, dt) {
+  if (brushGlide.on) {
+    const u = clamp((now - brushGlide.t0) / brushGlide.dur, 0, 1), e = u * u * (3 - 2 * u);
+    brush.bAmt = Math.round(brushGlide.from + (brushGlide.to - brushGlide.from) * e);
+    if (u >= 1) { brushGlide.on = false; syncBrushUI(); saveBrush(); }
+    else if (now - brushGlide.ui > 250) { brushGlide.ui = now; const c = brushEls.bAmt; c.el.value = brush.bAmt; fillTrack(c.el); c.out.textContent = brushText('bAmt', brush.bAmt); }
+  }
+  brushMus.hit = 0;
+  if (snd.analyser && snd.raw) {
+    const r = snd.raw, loud = Math.sqrt(r.low * 0.5 + r.mid * 0.35 + r.high * 0.15);
+    brushMus.ref = Math.max(brushMus.ref * Math.exp(-(dt || 1 / 60) / 8), loud, 0.02);
+    const q = loud < 0.004 ? 0 : clamp(loud / brushMus.ref, 0, 1);
+    brushMus.lvl = Math.pow(q, 1.5) * sndPower() / 1.55;
+    if (snd.beats !== brushMus.beats) {
+      brushMus.beats = snd.beats;
+      const a = sndPower() * snd.env.beat;
+      if (a > 0.3 && now - brushMus.hitAt > 250) { brushMus.hitAt = now; brushMus.hit = Math.min(1.5, a); }
+    }
+  } else brushMus.lvl = 0;
+  if (!brushEng) return;
+  for (const k of KEYS) if (brushSt[k] && !(brushUses(k) && loopOn(k))) { brushEng.release(brushSt[k]); brushSt[k] = null; }
+}
+// Autopilot's whole-picture strokes (Use Brushes, under Autopilot; off at first), as Use Point cloud
+function apBrush(came, now) {
+  if (!apSet.brush || !came || brushFailed) return;
+  const wild = apSet.wild / 100, isOn = brush.bAmt > 0;
+  if (Math.random() >= 0.15 + 0.25 * wild) { if (isOn) brushFadeTo(0, now); return; }
+  if (!isOn || Math.random() < 0.5) {
+    const ri = (a, b) => Math.round(rnd(a, b));
+    Object.assign(brush, cleanBrush({ ...brush, ...PBR.RECIPES[pick(Object.keys(PBR.RECIPES))], bAmt: brush.bAmt,
+      bColor: Math.random() < 0.65 ? 0 : ri(1, PBR.COLORS.length - 1), bOnly: brush.bOnly, bMusic: brush.bMusic, bCount: brush.bCount }));
+  }
+  brushFadeTo(Math.round(rnd(55 + 25 * wild, 100)), now);
+}
+function brushFadeTo(to, now) {
+  Object.assign(brushGlide, { on: true, from: brush.bAmt, to, t0: now, dur: (ap.quick ? 1.5 : apFadeSec()) * 1000 });
+  syncBrushUI();
+}
+$('#apBrush').addEventListener('click', () => {
+  apSet.brush = !apSet.brush;
+  saveAp();
+  syncApUI();
+  toast(apSet.brush ? 'Autopilot will bring the brushes over the picture with some new looks, and take them off with others.' : 'Autopilot leaves the Brushes alone now.');
+});
+window.__plBrush = { brush, setBrush, brushSt, mus: brushMus, ready: () => !!brushEng, failed: () => brushFailed };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a
@@ -13471,12 +13676,16 @@ function runLoop(k, xf, brush, f) {
   const cloudTex = t.in1 === 'cloud' || t.in2 === 'cloud' ? drawCloud(k, t, scale, f / 60, shownTex(otherLoop(k))) : null;
   if (t.in1 === 'cloud') flyTex1 = cloudTex;
   if (t.in2 === 'cloud') flyTex2 = cloudTex;
+  // The Brushes' canvas likewise (following this loop's own picture, the other loop's, or another picture)
+  const brushTex = t.in1 === 'brush' || t.in2 === 'brush' ? drawBrush(k, t, f / 60, shownTex(k), shownTex(otherLoop(k))) : null;
+  if (t.in1 === 'brush') flyTex1 = brushTex;
+  if (t.in2 === 'brush') flyTex2 = brushTex;
   // Life's board is read through the picture slot its input would use for a 3D world (it has no slot of its own:
   // see UNITS). Traced by Topo map, it's read from the first, as a traced 3D world is.
   const traced = topoTrace(t);
   const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
   const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
-  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'cloud' && !cloudTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
+  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'cloud' && !cloudTex) || (n === 'brush' && !brushTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -15969,6 +16178,7 @@ function wholeActive(kind) {
   if (kind === 'relief') return relief.rDepth > 0;
   if (kind === 'type') return typeArt.tAmt > 0;
   if (kind === 'cloud') return cloud.cAmt > 0 || activeKeys().some((k) => cloudUses(k));
+  if (kind === 'brush') return brush.bAmt > 0 || activeKeys().some((k) => brushUses(k));
   return false;
 }
 // Where a loop's effect worked in Classic
@@ -16003,6 +16213,7 @@ function stackAllList() {
     if (gradeOn() && !grade.gInside) stackAll.push(STK.newItem('grade', 'all', { auto: true }));
     if (relief.rDepth > 0) stackAll.push(STK.newItem('relief', 'all', { auto: true }));
     if (wholeActive('cloud')) stackAll.push(STK.newItem('cloud', 'all', { auto: true }));
+    if (wholeActive('brush')) stackAll.push(STK.newItem('brush', 'all', { auto: true }));
     if (typeArt.tAmt > 0 && !typeArt.tInside) stackAll.push(STK.newItem('type', 'all', { auto: true }));
   }
   return stackAll;
@@ -16054,7 +16265,7 @@ function stackSync(now) {
   }
   let all = stackAllList();
   const wasAll = all;
-  for (const kind of ['grade', 'relief', 'type', 'cloud']) {
+  for (const kind of ['grade', 'relief', 'type', 'cloud', 'brush']) {
     const it = stackFind(all, kind), act = wholeActive(kind);
     if (act && !anyWhere(kind)) {
       // Type art and Color grading set to work inside the loops in Classic come into each loop
@@ -16290,10 +16501,11 @@ function stackWholePass(src, kind) {
   return dst.tex;
 }
 function stackWhole(tex, dt) {
-  let out = tex, typed = false, dotted = false;
+  let out = tex, typed = false, dotted = false, brushed = false;
   for (const it of stackAllList()) {
     if (!it.on) continue;
     if (it.kind === 'cloud') { out = cloudFinal(out, dt, true); dotted = true; }
+    else if (it.kind === 'brush') { out = brushFinal(out, dt, true); brushed = true; }
     else if (it.kind === 'type') { out = typeFinal(out, true); typed = true; }
     else if (it.kind === 'grade') { if (gradeOn() && !seq.gradeOwned) out = stackWholePass(out, 'grade'); }
     else if (it.kind === 'relief') { if (reliefNow().rDepth > 0) out = stackWholePass(out, 'relief'); }
@@ -16304,6 +16516,7 @@ function stackWhole(tex, dt) {
     }
   }
   if (!dotted) cloudFinal(tex, dt, false);
+  if (!brushed) brushFinal(tex, dt, false);
   if (!typed) typeFinal(tex, false);
   return out;
 }
@@ -16343,7 +16556,7 @@ function stackRows(kind) {
 }
 // The Classic hints that talk about Final Pass and Within Loops have no place in the stack
 for (const id of ['#gradeWhere', '#typeWhere']) { const n = $(id) && $(id).nextElementSibling; if (n && n.classList.contains('hint')) n.classList.add('stk-classic-hint'); }
-for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup', 'cloudGroup']) $('#' + id).classList.add('classic-only');
+for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup', 'cloudGroup', 'brushGroup']) $('#' + id).classList.add('classic-only');
 const MV_OPTS = (cur) => STK.MOVERS.map(([v, l]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${v ? '∿ ' : ''}${escapeHTML(l)}</option>`).join('');
 const KEY_NAME = { zoom: 'Zoom', spin: 'Spin' };
 function stackFader(label, act, k, v, min = 0, max = 100) {
@@ -16485,6 +16698,7 @@ function stackStart(kind, zone) {
   } else if (kind === 'type' && !(typeArt.tAmt > 0)) setType({ ...typeArt, tAmt: 60 });
   else if (kind === 'relief' && !(relief.rDepth > 0)) setRelief({ ...relief, rDepth: 50 });
   else if (kind === 'cloud' && !(cloud.cAmt > 0)) setCloud({ ...cloud, cAmt: 80 });
+  else if (kind === 'brush' && !(brush.bAmt > 0)) setBrush({ ...brush, bAmt: 85 });
 }
 function stackStop(it, k) {
   if (STK.isLoopKind(it.kind)) {
@@ -16499,6 +16713,7 @@ function stackStop(it, k) {
   if (it.kind === 'type') setType({ ...typeArt, tAmt: 0 });
   else if (it.kind === 'relief') setRelief({ ...relief, rDepth: 0 });
   else if (it.kind === 'cloud') setCloud({ ...cloud, cAmt: 0 });
+  else if (it.kind === 'brush') setBrush({ ...brush, bAmt: 0 });
   else if (it.kind === 'grade') setGrade(GRADE_DEF);
 }
 stkAdd.addEventListener('change', () => {
@@ -16870,6 +17085,7 @@ function frame() {
   movesTick(now);
   typeTick(now);
   cloudTick(now);
+  brushTick(now, dt);
   vcrTick();
   packAdj();
   analyzeSound(dt, now);
@@ -16958,7 +17174,7 @@ function frame() {
   eyeTick(now, dt, wA, wB);
   const shown = drawShapes(now) || comp;
   // Whole picture as dots, then Type art set to Final Pass types the finished picture, shapes and all
-  const finalTex = stackMode ? stackWhole(shown.tex, dt) : typeFinal(cloudFinal(shown.tex, dt));
+  const finalTex = stackMode ? stackWhole(shown.tex, dt) : typeFinal(brushFinal(cloudFinal(shown.tex, dt), dt));
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
