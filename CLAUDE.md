@@ -185,6 +185,15 @@ file don't rebuild the app.
    every frame in the loop's pass (next to Color chase's `c0`), so they drift apart echo after echo. Lens spreads from the middle
    (follows Off-center's `offAt`). Stack kind `aberr` (zones out, in). Autopilot, Surprise, taste, pins, limits and the sequencer
    include it. Check with `--shot "Prism lens"` and `--shot "Rainbow tunnel"`.
+4z15. **Brushes** (js/brushes.js = `window.PhosphorBrushes`, inspired by Math Chaos Patterns; glue under "brushes" in js/app.js: settings `brush`
+   (`phosphor-brush-v1`, in presets as `brush`), the **Brushes input** (`src 'brush'`, read through the 3D world slot as the Point cloud is,
+   `SRC_ID.brush = 37`; `brushOf` self / loop / picture / video / camera / none, `drawBrush`), **Whole picture as strokes** (`bAmt`, `brushFinal`
+   after the Point cloud, stack kind `brush`), Autopilot's Use Brushes (`apSet.brush`, `apBrush`). Brushes are ping-ponged pixels (pos: xy, age,
+   life; col: rgb, heading); strokes are 6-corner bands from the last place to this one; the canvas dries to black (input) or back to the
+   picture (effect). Shapes `bShape` (Currents, Cells, Burst, Spiral, Rings, Formula), `bSense` (slime-mould sensing of the canvas: + Gather,
+   − Avoid), two-tone palettes by age (colors 6–9). Music: `brushTick` works out `brushMus.lvl` (loudness against its loudest lately) and hits;
+   **Only music** (`bOnly`) makes the music the brushes' clock (silence: no movement, no ageing, no strokes). Check with `--shot "Brush garden"`
+   (add `|click=#brushRecipes button:nth-child(N)` for other recipes), `--shot "Brush storm"`, `--shot "Brushed picture"`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
