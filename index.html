@@ -559,70 +559,7 @@
                 <button data-v="loop" aria-pressed="false" title="The other loop’s picture">Other loop</button>
               </div>
             </div>
-            <div class="ctl">
-              <span class="lbl">Recipes</span>
-              <div class="chips" id="fwRecipes"></div>
-            </div>
-            <div class="ctl">
-              <span class="lbl" id="fwKindLbl">Fractal</span>
-              <div class="seg seg-2" id="fwKind" role="group" aria-labelledby="fwKindLbl">
-                <button data-v="0" title="A Julia set: its shape keeps changing as it drifts">Julia</button>
-                <button data-v="1" title="The Mandelbrot set, looking into Seahorse valley">Mandelbrot</button>
-              </div>
-            </div>
-            <div class="ctl" id="fwShapeRow">
-              <span class="lbl" id="fwShapeLbl">Shape</span>
-              <div class="seg seg-3" id="fwShape" role="group" aria-labelledby="fwShapeLbl">
-                <button data-v="0" title="Wanders through every shape there is, slowly">Wandering</button>
-                <button data-v="1" title="Spirals inside spirals">Spirals</button>
-                <button data-v="2" title="Branching like coral or lightning">Dendrite</button>
-                <button data-v="3" title="Douady’s rabbit: three-lobed knots">Rabbit</button>
-                <button data-v="4" title="Lacy, many-armed">Snowflake</button>
-              </div>
-            </div>
-            <div class="ctl">
-              <div class="ctl-head"><label for="fwFlow">Flow</label><output id="fwFlowOut" for="fwFlow"></output></div>
-              <input type="range" id="fwFlow" min="-100" max="100" step="1" value="30">
-              <div class="ends"><span>Out</span><span>In</span></div>
-              <span class="hint">The picture streams down into the fractal layer by layer, like an endless zoom (or back out of it).</span>
-            </div>
-            <div class="ctl">
-              <div class="ctl-head"><label for="fwDrift">Shape change</label><output id="fwDriftOut" for="fwDrift"></output></div>
-              <input type="range" id="fwDrift" min="0" max="100" step="1" value="25">
-              <div class="ends"><span>Slow</span><span>Fast</span></div>
-              <span class="hint">How quickly the fractal’s shape changes.</span>
-            </div>
-            <div class="ctl">
-              <div class="ctl-head"><label for="fwZoom">Zoom</label><output id="fwZoomOut" for="fwZoom"></output></div>
-              <input type="range" id="fwZoom" min="0" max="100" step="1" value="20">
-              <div class="ends"><span>Whole set</span><span>Close up</span></div>
-            </div>
-            <div class="ctl">
-              <div class="ctl-head"><label for="fwSpin">Turn</label><output id="fwSpinOut" for="fwSpin"></output></div>
-              <input type="range" id="fwSpin" min="-100" max="100" step="1" value="10">
-              <div class="ends"><span>Left</span><span>Right</span></div>
-            </div>
-            <div class="ctl">
-              <div class="ctl-head"><label for="fwTiles">Pictures round each layer</label><output id="fwTilesOut" for="fwTiles"></output></div>
-              <input type="range" id="fwTiles" min="1" max="8" step="1" value="2">
-            </div>
-            <div class="ctl">
-              <div class="ctl-head"><label for="fwDepth">Depth</label><output id="fwDepthOut" for="fwDepth"></output></div>
-              <input type="range" id="fwDepth" min="0" max="100" step="1" value="40">
-              <div class="ends"><span>Flat</span><span>Deep</span></div>
-              <span class="hint">Shades the layers further in, so the outer ones stand in front.</span>
-            </div>
-            <div class="ctl">
-              <span class="lbl" id="fwDetailLbl">Detail</span>
-              <div class="seg seg-4" id="fwDetail" role="group" aria-labelledby="fwDetailLbl">
-                <button data-v="0" title="Light work for any computer">Low</button><button data-v="1">Medium</button><button data-v="2">High</button><button data-v="3" title="For a strong graphics card">Highest</button>
-              </div>
-            </div>
-            <div class="chips">
-              <button class="chip" id="fwMirror" aria-pressed="true" title="Neighbouring pictures are mirrored so their edges always meet, with no seams"><span class="led"></span>Mirror the tiles</button>
-              <button class="chip" id="fwMusic" aria-pressed="true"><span class="led"></span>Moves with the music</button>
-            </div>
-            <span class="hint">These settings are shared by every loop that uses Fractal wrap. Moves with the music: hits jolt the shape along and the bass swells it (with React to sound on).</span>
+            <span class="hint">How it moves (shape, Flow, Zoom, Depth…) is set in the Fractal wrap card of the Effect stack (under Whole picture; in the Classic layout, the Fractal wrap section), shared with the whole-picture wrap.</span>
           </div>
 
           <div class="dev" id="row-text" hidden>
@@ -1781,6 +1718,81 @@
           </div>
         </div>
         <div class="dev-actions"><button class="btn small" id="brushRestart">Start afresh</button><button class="btn small" id="brushReset">Back to normal</button></div>
+      </section>
+
+      <section class="group" id="fwGroup" aria-labelledby="h-fw">
+        <h2 id="h-fw">Fractal wrap</h2>
+        <p class="hint">Wraps a picture round a fractal, layer inside layer. Amount does it to the whole finished picture; the Fractal wrap input does it to one loop’s input. Both use the settings here.</p>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwAmt">Wrap the whole picture</label><output id="fwAmtOut" for="fwAmt"></output></div>
+          <input type="range" id="fwAmt" min="0" max="100" step="1" value="0">
+          <div class="ends"><span>Off</span><span>All wrapped</span></div>
+          <span class="hint">Wraps the whole finished picture round the fractal. In between, the wrap lies over the picture. The middle of the fractal shows the picture as it is.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl">Recipes</span>
+          <div class="chips" id="fwRecipes"></div>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="fwKindLbl">Fractal</span>
+          <div class="seg seg-2" id="fwKind" role="group" aria-labelledby="fwKindLbl">
+            <button data-v="0" title="A Julia set: its shape keeps changing as it drifts">Julia</button>
+            <button data-v="1" title="The Mandelbrot set, looking into Seahorse valley">Mandelbrot</button>
+          </div>
+        </div>
+        <div class="ctl" id="fwShapeRow">
+          <span class="lbl" id="fwShapeLbl">Shape</span>
+          <div class="seg seg-3" id="fwShape" role="group" aria-labelledby="fwShapeLbl">
+            <button data-v="0" title="Wanders through every shape there is, slowly">Wandering</button>
+            <button data-v="1" title="Spirals inside spirals">Spirals</button>
+            <button data-v="2" title="Branching like coral or lightning">Dendrite</button>
+            <button data-v="3" title="Douady’s rabbit: three-lobed knots">Rabbit</button>
+            <button data-v="4" title="Lacy, many-armed">Snowflake</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwFlow">Flow</label><output id="fwFlowOut" for="fwFlow"></output></div>
+          <input type="range" id="fwFlow" min="-100" max="100" step="1" value="30">
+          <div class="ends"><span>Out</span><span>In</span></div>
+          <span class="hint">The picture streams down into the fractal layer by layer, like an endless zoom (or back out of it).</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwDrift">Shape change</label><output id="fwDriftOut" for="fwDrift"></output></div>
+          <input type="range" id="fwDrift" min="0" max="100" step="1" value="25">
+          <div class="ends"><span>Slow</span><span>Fast</span></div>
+          <span class="hint">How quickly the fractal’s shape changes.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwZoom">Zoom</label><output id="fwZoomOut" for="fwZoom"></output></div>
+          <input type="range" id="fwZoom" min="0" max="100" step="1" value="20">
+          <div class="ends"><span>Whole set</span><span>Close up</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwSpin">Turn</label><output id="fwSpinOut" for="fwSpin"></output></div>
+          <input type="range" id="fwSpin" min="-100" max="100" step="1" value="10">
+          <div class="ends"><span>Left</span><span>Right</span></div>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwTiles">Pictures round each layer</label><output id="fwTilesOut" for="fwTiles"></output></div>
+          <input type="range" id="fwTiles" min="1" max="8" step="1" value="2">
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="fwDepth">Depth</label><output id="fwDepthOut" for="fwDepth"></output></div>
+          <input type="range" id="fwDepth" min="0" max="100" step="1" value="40">
+          <div class="ends"><span>Flat</span><span>Deep</span></div>
+          <span class="hint">Shades the layers further in, so the outer ones stand in front.</span>
+        </div>
+        <div class="ctl">
+          <span class="lbl" id="fwDetailLbl">Detail</span>
+          <div class="seg seg-4" id="fwDetail" role="group" aria-labelledby="fwDetailLbl">
+            <button data-v="0" title="Light work for any computer">Low</button><button data-v="1">Medium</button><button data-v="2">High</button><button data-v="3" title="For a strong graphics card">Highest</button>
+          </div>
+        </div>
+        <div class="chips">
+          <button class="chip" id="fwMirror" aria-pressed="true" title="Neighbouring pictures are mirrored so their edges always meet, with no seams"><span class="led"></span>Mirror the tiles</button>
+          <button class="chip" id="fwMusic" aria-pressed="true"><span class="led"></span>Moves with the music</button>
+        </div>
+        <span class="hint">Moves with the music: hits jolt the shape along and the bass swells it (with React to sound on). Presets keep these settings and Neutral turns Amount off.</span>
       </section>
 
       <section class="group" id="sharedGroup" aria-labelledby="h-shared" hidden>

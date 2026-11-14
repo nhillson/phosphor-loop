@@ -10,7 +10,7 @@
 // the tiles can flow down into the fractal layer by layer (Flow), which looks like an endless zoom. Music hits jolt c
 // and the bass swells the view.
 window.PhosphorFractalWrap = (() => {
-const DEFAULTS = { fwKind: 0, fwShape: 0, fwDrift: 25, fwZoom: 20, fwSpin: 10, fwFlow: 30, fwTiles: 2, fwDepth: 40, fwDetail: 1, fwMirror: true, fwMusic: true };
+const DEFAULTS = { fwAmt: 0, fwKind: 0, fwShape: 0, fwDrift: 25, fwZoom: 20, fwSpin: 10, fwFlow: 30, fwTiles: 2, fwDepth: 40, fwDetail: 1, fwMirror: true, fwMusic: true };
 // Julia shapes: paths for c to wander along (centre, radius across, radius up)
 const SHAPES = [
   { name: 'Wandering', c: [-0.75, 0.0], r: [0.0, 0.0] },          // round the edge of the Mandelbrot set's main body
@@ -32,7 +32,8 @@ const VS_TRI = `#version 300 es
 out vec2 vUv; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); vUv=p; gl_Position=vec4(p*2.-1.,0.,1.); }`;
 const FS = `#version 300 es
 precision highp float;
-uniform sampler2D uSrc;
+uniform sampler2D uSrc, uOrig;
+uniform float uAmt, uEffect;
 uniform vec2 uC, uCenter, uRot, uFlowUV;
 uniform float uAspect, uScale, uTiles, uDepth, uMaxIt, uKind, uMirror, uFlip, uSeed, uT, uItRef;
 in vec2 vUv; out vec4 o;
@@ -54,7 +55,8 @@ void main(){
     z=zn; it+=1.;
   }
   zMag=max(length(z), 1e-6);
-  if(!out_){ o=vec4(0.,0.,0.,1.); return; }
+  // Inside the set: black for the input; the picture as it is for the whole-picture effect
+  if(!out_){ o=vec4(uEffect>.5 ? texture(uOrig, vUv).rgb : vec3(0.), 1.); return; }
   // The method: angle round the last z across the picture, how far past the bailout it got down the picture
   float angle=atan(z.y, z.x)/(2.*PI)+.5;                       // 0 to 1 once round
   float radius=max(0., (LOG_ESCAPE-log(zMag))/(LOG_ESCAPE/2.));  // 0 at the bailout (400), 1 at its square root (20)
@@ -72,7 +74,9 @@ void main(){
   // Depth: deeper layers shaded away, so the outer ones stand in front
   // (counted from the outermost layer on screen, so zooming in doesn't darken everything)
   float sh=pow(1.-.9*uDepth, max(0., it-uItRef)*.25+radius*.25);
-  o=vec4(col*sh, 1.);
+  col*=sh;
+  if(uEffect>.5 && uAmt<.999) col=mix(texture(uOrig, vUv).rgb, col, uAmt);
+  o=vec4(col, 1.);
 }`;
 
 function create(gl) {
@@ -95,7 +99,7 @@ function create(gl) {
   function state() { return { out: null, t: Math.random() * 100, ph: Math.random() * 6.283, flow: [0, 0], kick: 0, kickV: 0, swell: 0, seed: Math.random() }; }
   function release(st) { if (st && st.out) { gl.deleteTexture(st.out.t); gl.deleteFramebuffer(st.out.f); st.out = null; } }
 
-  // One frame at outW x outH from src (or null). opt: { flip, music: { on, lvl, hit } }
+  // One frame at outW x outH from src (or null). opt: { flip, music: { on, lvl, hit }, effect: over src by amt }
   function run(st, src, outW, outH, s, dt, opt = {}) {
     const vaoWas = gl.getParameter(gl.VERTEX_ARRAY_BINDING), blendWas = gl.isEnabled(gl.BLEND);
     dt = Math.min(0.25, Math.max(1 / 240, dt || 1 / 60));
@@ -164,6 +168,9 @@ function create(gl) {
     gl.uniform1f(u.uMaxIt, DETAIL[s.fwDetail] || 96); gl.uniform1f(u.uKind, s.fwKind);
     gl.uniform1f(u.uMirror, s.fwMirror ? 1 : 0); gl.uniform1f(u.uFlip, opt.flip ? 1 : 0);
     gl.uniform1f(u.uSeed, st.seed); gl.uniform1f(u.uT, st.t); gl.uniform1f(u.uItRef, st.itRef);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, src || black); gl.uniform1i(u.uOrig, 1);
+    gl.uniform1f(u.uEffect, opt.effect ? 1 : 0); gl.uniform1f(u.uAmt, Math.max(0, Math.min(1, opt.amt ?? 1)));
+    gl.activeTexture(gl.TEXTURE0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(vaoWas);
     if (blendWas) gl.enable(gl.BLEND);

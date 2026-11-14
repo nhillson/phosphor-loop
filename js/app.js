@@ -2402,6 +2402,7 @@ function neutral() {
   setType({ ...typeArt, tAmt: 0 });
   setCloud({ ...cloud, cAmt: 0 });
   setBrush({ ...brush, bAmt: 0 });
+  setFw({ ...fwrap, fwAmt: 0 });
   stackSetAll([]);
   [cam, scr, pho, ...Object.values(vids)].forEach((x) => { x.hold = false; });
   $$('.hold-btn').forEach((b) => b.setAttribute('aria-pressed', 'false'));
@@ -2453,6 +2454,7 @@ function neutralLoop(k) {
   setType({ ...typeArt, tAmt: 0 });
   setCloud({ ...cloud, cAmt: 0 });
   setBrush({ ...brush, bAmt: 0 });
+  setFw({ ...fwrap, fwAmt: 0 });
   stackSetAll([]);
   stackRender(true);
   // Nothing fed into this loop from the others
@@ -5969,9 +5971,15 @@ vidPlay.addEventListener('click', () => {
   else { vid.userPaused = true; vid.video.pause(); }
   vidPlay.textContent = vid.video.paused ? 'Play' : 'Pause';
 });
+// A loop whose Point cloud, Brushes or Fractal wrap is made from this picture or video already shows it: picking a
+// new one only changes what they're made from, rather than switching the loop to the plain input
+function feedsVia(k, src) {
+  const t = loops[k].tgt, has = (n) => t.in1 === n || t.in2 === n;
+  return (has('cloud') && (t.cloudOf || 'picture') === src) || (has('brush') && t.brushOf === src) || (has('fwrap') && (t.fwOf || 'picture') === src);
+}
 function feedInto(src, k = edit) {
   const t = loops[k].tgt;
-  if (t.in1 !== src && t.in2 !== src) t.in1 = src;
+  if (t.in1 !== src && t.in2 !== src && !feedsVia(k, src)) t.in1 = src;
   settleDevices();
   syncUI();
   showOSD(`INPUT ${k}`, SRC_LABEL[src].toUpperCase());
@@ -9150,6 +9158,12 @@ const RECIPES = [
     sw: 'radial-gradient(circle,#000 0 8%,#3a7a4a 12%,#d8c070 18%,#2a5a8a 26%,#3a7a4a 34%,#d8c070 42%,#0b0612 60%)',
     patch: { A: { in1: 'fwrap', fwOf: 'picture', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
     fwrap: { ...window.PhosphorFractalWrap.RECIPES.Endless } },
+  { name: 'Wrapped feedback', after: 'Wrap the whole picture is in the Fractal wrap card of the Effect stack. Try its recipes, or lower Amount to lay the wrap over the picture.',
+    text: 'The whole feedback picture wrapped round a drifting Julia set, flowing down into it layer by layer.',
+    how: 'SHAPE · ZOOM IN 10 · TRAILS 85 · WRAP THE WHOLE PICTURE',
+    sw: 'radial-gradient(circle,#000 0 10%,#ff5fc8 14%,#3bd1ff 22%,#8b1ab8 30%,#ffd27a 38%,#05030c 60%)',
+    patch: { A: { in1: 'shape', form: 3, size: 70, zoom: 10, spin: 6, trails: 85, color: 10, blur: 0 } },
+    fwrap: { ...window.PhosphorFractalWrap.RECIPES.Endless, fwAmt: 100 } },
   { name: 'Brushed picture', after: 'Pick another nature picture with ◀ ▶ under Picture, or try other recipes under Brushes.',
     text: 'The finished picture redrawn live in thick combed strokes that follow its own outlines.',
     how: 'PICTURE · WHOLE PICTURE AS STROKES',
@@ -9206,6 +9220,7 @@ function applyRecipe(r) {
   setEdit('A');
   // Start any device right here, inside the click, so the browser lets it ask for permission
   const inp = p.A.in1;
+  if (inp === 'fwrap') fwSourceStart(p.A.fwOf || 'picture', 'A');
   if (inp === 'camera' && !cam.on) startCamera();
   if (inp === 'screen' && !scr.on) startScreen(true);
   if (inp === 'phone') startPhoneLink();
@@ -9459,7 +9474,8 @@ function loadPreset(pr, quiet) {
   setCloud(d.cloud || { ...cloud, cAmt: 0 });
   // Presets saved before the Brushes existed load with the whole-picture strokes off
   setBrush(d.brush || { ...brush, bAmt: 0 });
-  if (d.fwrap) setFw(d.fwrap);
+  // Presets saved before the whole-picture wrap existed load with it off
+  setFw(d.fwrap || { ...fwrap, fwAmt: 0 });
   // The effect stacks it was saved with; a preset from before them gets stacks made from its settings
   stackAfterLoad(d);
   // Start any camera, screen or phone the preset uses, right here inside the click
@@ -11710,7 +11726,7 @@ const PFW = window.PhosphorFractalWrap;
 const FW_OF = ['picture', 'video', 'camera', 'self', 'loop'];
 const FW_KEY = 'phosphor-fwrap-v1';
 const FW_DEF = { ...PFW.DEFAULTS };
-const FW_NUM = ['fwDrift', 'fwZoom', 'fwSpin', 'fwFlow', 'fwTiles', 'fwDepth'];
+const FW_NUM = ['fwAmt', 'fwDrift', 'fwZoom', 'fwSpin', 'fwFlow', 'fwTiles', 'fwDepth'];
 const FW_SEG = { fwKind: '#fwKind', fwShape: '#fwShape', fwDetail: '#fwDetail' };
 const fwrap = { ...FW_DEF };
 const fwEls = {};
@@ -11718,6 +11734,7 @@ for (const k of FW_NUM) fwEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
 function fwText(k, v) {
   if (k === 'fwFlow') return v === 0 ? 'STILL' : v > 0 ? `IN ${v}` : `OUT ${-v}`;
   if (k === 'fwSpin') return v === 0 ? 'OFF' : String(v);
+  if (k === 'fwAmt') return v === 0 ? 'OFF' : `${v}%`;
   return String(v);
 }
 function cleanFw(c) {
@@ -11765,8 +11782,11 @@ $$('#fwOf button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`FRACTAL WRAP ${edit}`, b.textContent.toUpperCase());
 }));
-function fwSourceStart(of) {
+function fwSourceStart(of, k = edit) {
   if (of === 'camera' && !cam.on) startCamera();
+  // Still on the test card: start with a nature picture (◀ ▶ under Picture picks another)
+  const P = pics[k];
+  if (of === 'picture' && P && (!P.media || P.media.kind === 'card')) natList().then(() => { const sh = natShown(); if (sh.length && (!P.media || P.media.kind === 'card')) natPick(pick(sh), true, P); }).catch(() => {});
   if (of === 'video' && !anyVid()) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
 }
 function fwApOf() {
@@ -11785,7 +11805,7 @@ function fwEngine() {
   }
   return fwEng;
 }
-const fwSt = { A: null, B: null, C: null, D: null };
+const fwSt = { final: null, A: null, B: null, C: null, D: null };
 const fwUses = (k) => { const t = loops[k].tgt; return t.in1 === 'fwrap' || t.in2 === 'fwrap'; };
 // The Fractal wrap input: loop k's picture, drawn at the loop's size. Input size zooms out (small) or in (big).
 function drawFw(k, t, dt, selfTex, otherTex) {
@@ -11800,6 +11820,15 @@ function drawFw(k, t, dt, selfTex, otherTex) {
   else tex = otherTex;
   if (!fwSt[k]) fwSt[k] = eng.state();
   return eng.run(fwSt[k], tex, simW, simH, fwrap, dt, { flip, music: { on: reacts(k), lvl: brushMus.lvl, hit: brushMus.hit } });
+}
+// Wrap the whole picture: the finished picture wrapped round the fractal at the screen's size, over it by Amount
+function fwFinal(tex, dt, force) {
+  if (!(fwrap.fwAmt > 0) || force === false) { if (fwSt.final && fwEng) { fwEng.release(fwSt.final); fwSt.final = null; } return tex; }
+  const eng = fwEngine();
+  if (!eng) return tex;
+  if (!fwSt.final) fwSt.final = eng.state();
+  return eng.run(fwSt.final, tex, canvas.width, canvas.height, fwrap, dt,
+    { effect: true, amt: fwrap.fwAmt / 100, music: { on: activeKeys().some((k) => reacts(k)), lvl: brushMus.lvl, hit: brushMus.hit } });
 }
 function fwTick() {
   if (!fwEng) return;
@@ -16311,6 +16340,7 @@ function wholeActive(kind) {
   if (kind === 'type') return typeArt.tAmt > 0;
   if (kind === 'cloud') return cloud.cAmt > 0 || activeKeys().some((k) => cloudUses(k));
   if (kind === 'brush') return brush.bAmt > 0 || activeKeys().some((k) => brushUses(k));
+  if (kind === 'fwrap') return fwrap.fwAmt > 0 || activeKeys().some((k) => fwUses(k));
   return false;
 }
 // Where a loop's effect worked in Classic
@@ -16346,6 +16376,7 @@ function stackAllList() {
     if (relief.rDepth > 0) stackAll.push(STK.newItem('relief', 'all', { auto: true }));
     if (wholeActive('cloud')) stackAll.push(STK.newItem('cloud', 'all', { auto: true }));
     if (wholeActive('brush')) stackAll.push(STK.newItem('brush', 'all', { auto: true }));
+    if (wholeActive('fwrap')) stackAll.push(STK.newItem('fwrap', 'all', { auto: true }));
     if (typeArt.tAmt > 0 && !typeArt.tInside) stackAll.push(STK.newItem('type', 'all', { auto: true }));
   }
   return stackAll;
@@ -16397,7 +16428,7 @@ function stackSync(now) {
   }
   let all = stackAllList();
   const wasAll = all;
-  for (const kind of ['grade', 'relief', 'type', 'cloud', 'brush']) {
+  for (const kind of ['grade', 'relief', 'type', 'cloud', 'brush', 'fwrap']) {
     const it = stackFind(all, kind), act = wholeActive(kind);
     if (act && !anyWhere(kind)) {
       // Type art and Color grading set to work inside the loops in Classic come into each loop
@@ -16633,11 +16664,12 @@ function stackWholePass(src, kind) {
   return dst.tex;
 }
 function stackWhole(tex, dt) {
-  let out = tex, typed = false, dotted = false, brushed = false;
+  let out = tex, typed = false, dotted = false, brushed = false, wrapped = false;
   for (const it of stackAllList()) {
     if (!it.on) continue;
     if (it.kind === 'cloud') { out = cloudFinal(out, dt, true); dotted = true; }
     else if (it.kind === 'brush') { out = brushFinal(out, dt, true); brushed = true; }
+    else if (it.kind === 'fwrap') { out = fwFinal(out, dt, true); wrapped = true; }
     else if (it.kind === 'type') { out = typeFinal(out, true); typed = true; }
     else if (it.kind === 'grade') { if (gradeOn() && !seq.gradeOwned) out = stackWholePass(out, 'grade'); }
     else if (it.kind === 'relief') { if (reliefNow().rDepth > 0) out = stackWholePass(out, 'relief'); }
@@ -16649,6 +16681,7 @@ function stackWhole(tex, dt) {
   }
   if (!dotted) cloudFinal(tex, dt, false);
   if (!brushed) brushFinal(tex, dt, false);
+  if (!wrapped) fwFinal(tex, dt, false);
   if (!typed) typeFinal(tex, false);
   return out;
 }
@@ -16688,7 +16721,7 @@ function stackRows(kind) {
 }
 // The Classic hints that talk about Final Pass and Within Loops have no place in the stack
 for (const id of ['#gradeWhere', '#typeWhere']) { const n = $(id) && $(id).nextElementSibling; if (n && n.classList.contains('hint')) n.classList.add('stk-classic-hint'); }
-for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup', 'cloudGroup', 'brushGroup']) $('#' + id).classList.add('classic-only');
+for (const id of ['gradeGroup', 'reliefGroup', 'typeGroup', 'cloudGroup', 'brushGroup', 'fwGroup']) $('#' + id).classList.add('classic-only');
 const MV_OPTS = (cur) => STK.MOVERS.map(([v, l]) => `<option value="${v}"${(cur || '') === v ? ' selected' : ''}>${v ? '∿ ' : ''}${escapeHTML(l)}</option>`).join('');
 const KEY_NAME = { zoom: 'Zoom', spin: 'Spin' };
 function stackFader(label, act, k, v, min = 0, max = 100) {
@@ -16831,6 +16864,7 @@ function stackStart(kind, zone) {
   else if (kind === 'relief' && !(relief.rDepth > 0)) setRelief({ ...relief, rDepth: 50 });
   else if (kind === 'cloud' && !(cloud.cAmt > 0)) setCloud({ ...cloud, cAmt: 80 });
   else if (kind === 'brush' && !(brush.bAmt > 0)) setBrush({ ...brush, bAmt: 85 });
+  else if (kind === 'fwrap' && !(fwrap.fwAmt > 0)) setFw({ ...fwrap, fwAmt: 100 });
 }
 function stackStop(it, k) {
   if (STK.isLoopKind(it.kind)) {
@@ -16846,6 +16880,7 @@ function stackStop(it, k) {
   else if (it.kind === 'relief') setRelief({ ...relief, rDepth: 0 });
   else if (it.kind === 'cloud') setCloud({ ...cloud, cAmt: 0 });
   else if (it.kind === 'brush') setBrush({ ...brush, bAmt: 0 });
+  else if (it.kind === 'fwrap') setFw({ ...fwrap, fwAmt: 0 });
   else if (it.kind === 'grade') setGrade(GRADE_DEF);
 }
 stkAdd.addEventListener('change', () => {
@@ -17307,7 +17342,7 @@ function frame() {
   eyeTick(now, dt, wA, wB);
   const shown = drawShapes(now) || comp;
   // Whole picture as dots, then Type art set to Final Pass types the finished picture, shapes and all
-  const finalTex = stackMode ? stackWhole(shown.tex, dt) : typeFinal(brushFinal(cloudFinal(shown.tex, dt), dt));
+  const finalTex = stackMode ? stackWhole(shown.tex, dt) : typeFinal(fwFinal(brushFinal(cloudFinal(shown.tex, dt), dt), dt));
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);

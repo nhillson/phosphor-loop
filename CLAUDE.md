@@ -200,7 +200,10 @@ file don't rebuild the app.
    `drawFw`); shared settings `fwrap` (`phosphor-fwrap-v1`, in presets) shown in the input's own row `#row-fwrap`: Julia (c wanders a path,
    `SHAPES`) or Mandelbrot (Seahorse valley), Flow (tiles slide down layer by layer), Zoom, Turn, Pictures round each layer, Depth (shaded from
    the outermost layer on screen, `uItRef` found on the CPU over a 9×7 grid), Detail (iterations), Mirror the tiles. Music: brushMus hits
-   jolt c, loudness swells. Check with `--shot "Fractal wrap"` (add `|click=#fwRecipes button:nth-child(N)` or `|click=#fwOf [data-v='self']`).
+   jolt c, loudness swells. **Wrap the whole picture** (`fwAmt`, `fwFinal` after Brushes, stack kind `fwrap`; the settings live in `#fwGroup`,
+   the stack card; the set's middle shows the picture as it is). Picking a picture or video for a loop whose Point cloud, Brushes or Fractal
+   wrap is made from it no longer switches the loop to the plain input (`feedsVia` in `feedInto`); a Fractal wrap of the test card starts
+   on a nature picture (`fwSourceStart`). Check with `--shot "Wrapped feedback"`, `--shot "Fractal wrap"` (add `|click=#fwRecipes button:nth-child(N)` or `|click=#fwOf [data-v='self']`).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
