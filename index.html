@@ -427,6 +427,7 @@
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
             <button data-src="cloud" aria-pressed="false" title="A picture, video, the camera or the other loop turned into a cloud of glowing 3D dots that wind, your finger and explosions can blow about">Point cloud</button>
             <button data-src="brush" aria-pressed="false" title="Thousands of little brushes that wander on swirling currents, each leaving a stroke behind it">Brushes</button>
+            <button data-src="fwrap" aria-pressed="false" title="A picture wrapped round a fractal, layer inside layer, flowing down into it as its shape changes">Fractal wrap</button>
             <button data-src="text" aria-pressed="false" title="Your own words: a name, a title, the venue">Text</button>
             <button data-src="spectro" aria-pressed="false" data-device title="A picture of the sound: the microphone or this computer’s music">Spectro&shy;graph</button>
             <button data-src="world" aria-pressed="false">3D world</button>
@@ -545,6 +546,83 @@
               </div>
             </div>
             <span class="hint">The brushes run along the bright and dark edges of what they follow and pick their colors up from it. How they move, their colors and the music are set in the Brushes card of the Effect stack (under Whole picture; in the Classic layout, the Brushes section), shared with the whole-picture strokes.</span>
+          </div>
+
+          <div class="dev" id="row-fwrap" hidden>
+            <div class="ctl">
+              <span class="lbl" id="fwOfLbl" title="The picture tiled round the fractal">Wrapped round it</span>
+              <div class="seg seg-3" id="fwOf" role="group" aria-labelledby="fwOfLbl">
+                <button data-v="picture" aria-pressed="true" title="This loop’s picture: a nature picture or your own (the Picture controls show below)">Picture</button>
+                <button data-v="video" aria-pressed="false" title="This loop’s video">Video</button>
+                <button data-v="camera" aria-pressed="false" title="The camera, live">Camera</button>
+                <button data-v="self" aria-pressed="false" title="This loop’s own picture: the feedback wraps round itself">This loop</button>
+                <button data-v="loop" aria-pressed="false" title="The other loop’s picture">Other loop</button>
+              </div>
+            </div>
+            <div class="ctl">
+              <span class="lbl">Recipes</span>
+              <div class="chips" id="fwRecipes"></div>
+            </div>
+            <div class="ctl">
+              <span class="lbl" id="fwKindLbl">Fractal</span>
+              <div class="seg seg-2" id="fwKind" role="group" aria-labelledby="fwKindLbl">
+                <button data-v="0" title="A Julia set: its shape keeps changing as it drifts">Julia</button>
+                <button data-v="1" title="The Mandelbrot set, looking into Seahorse valley">Mandelbrot</button>
+              </div>
+            </div>
+            <div class="ctl" id="fwShapeRow">
+              <span class="lbl" id="fwShapeLbl">Shape</span>
+              <div class="seg seg-3" id="fwShape" role="group" aria-labelledby="fwShapeLbl">
+                <button data-v="0" title="Wanders through every shape there is, slowly">Wandering</button>
+                <button data-v="1" title="Spirals inside spirals">Spirals</button>
+                <button data-v="2" title="Branching like coral or lightning">Dendrite</button>
+                <button data-v="3" title="Douady’s rabbit: three-lobed knots">Rabbit</button>
+                <button data-v="4" title="Lacy, many-armed">Snowflake</button>
+              </div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="fwFlow">Flow</label><output id="fwFlowOut" for="fwFlow"></output></div>
+              <input type="range" id="fwFlow" min="-100" max="100" step="1" value="30">
+              <div class="ends"><span>Out</span><span>In</span></div>
+              <span class="hint">The picture streams down into the fractal layer by layer, like an endless zoom (or back out of it).</span>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="fwDrift">Shape change</label><output id="fwDriftOut" for="fwDrift"></output></div>
+              <input type="range" id="fwDrift" min="0" max="100" step="1" value="25">
+              <div class="ends"><span>Slow</span><span>Fast</span></div>
+              <span class="hint">How quickly the fractal’s shape changes.</span>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="fwZoom">Zoom</label><output id="fwZoomOut" for="fwZoom"></output></div>
+              <input type="range" id="fwZoom" min="0" max="100" step="1" value="20">
+              <div class="ends"><span>Whole set</span><span>Close up</span></div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="fwSpin">Turn</label><output id="fwSpinOut" for="fwSpin"></output></div>
+              <input type="range" id="fwSpin" min="-100" max="100" step="1" value="10">
+              <div class="ends"><span>Left</span><span>Right</span></div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="fwTiles">Pictures round each layer</label><output id="fwTilesOut" for="fwTiles"></output></div>
+              <input type="range" id="fwTiles" min="1" max="8" step="1" value="2">
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="fwDepth">Depth</label><output id="fwDepthOut" for="fwDepth"></output></div>
+              <input type="range" id="fwDepth" min="0" max="100" step="1" value="40">
+              <div class="ends"><span>Flat</span><span>Deep</span></div>
+              <span class="hint">Shades the layers further in, so the outer ones stand in front.</span>
+            </div>
+            <div class="ctl">
+              <span class="lbl" id="fwDetailLbl">Detail</span>
+              <div class="seg seg-4" id="fwDetail" role="group" aria-labelledby="fwDetailLbl">
+                <button data-v="0" title="Light work for any computer">Low</button><button data-v="1">Medium</button><button data-v="2">High</button><button data-v="3" title="For a strong graphics card">Highest</button>
+              </div>
+            </div>
+            <div class="chips">
+              <button class="chip" id="fwMirror" aria-pressed="true" title="Neighbouring pictures are mirrored so their edges always meet, with no seams"><span class="led"></span>Mirror the tiles</button>
+              <button class="chip" id="fwMusic" aria-pressed="true"><span class="led"></span>Moves with the music</button>
+            </div>
+            <span class="hint">These settings are shared by every loop that uses Fractal wrap. Moves with the music: hits jolt the shape along and the bass swells it (with React to sound on).</span>
           </div>
 
           <div class="dev" id="row-text" hidden>
@@ -2257,6 +2335,7 @@
 <script src="js/typeart.js"></script>
 <script src="js/pointcloud.js"></script>
 <script src="js/brushes.js"></script>
+<script src="js/fractalwrap.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/library.js"></script>
 <script src="js/patch.js"></script>

@@ -194,6 +194,13 @@ file don't rebuild the app.
    − Avoid), two-tone palettes by age (colors 6–9). Music: `brushTick` works out `brushMus.lvl` (loudness against its loudest lately) and hits;
    **Only music** (`bOnly`) makes the music the brushes' clock (silence: no movement, no ageing, no strokes). Check with `--shot "Brush garden"`
    (add `|click=#brushRecipes button:nth-child(N)` for other recipes), `--shot "Brush storm"`, `--shot "Brushed picture"`.
+4z16. **Fractal wrap** (js/fractalwrap.js = `window.PhosphorFractalWrap`, after the "wrapping images around fractals" method: angle of the last
+   z inside the bailout (|z| > 400) across the picture, (log 400 − log|z|) / (log 400 / 2) down it; glue under "fractal wrap" in js/app.js).
+   An input (`src 'fwrap'`, read through the 3D world slot, `SRC_ID.fwrap = 37`; per-loop `fwOf` picture / video / camera / self / loop,
+   `drawFw`); shared settings `fwrap` (`phosphor-fwrap-v1`, in presets) shown in the input's own row `#row-fwrap`: Julia (c wanders a path,
+   `SHAPES`) or Mandelbrot (Seahorse valley), Flow (tiles slide down layer by layer), Zoom, Turn, Pictures round each layer, Depth (shaded from
+   the outermost layer on screen, `uItRef` found on the CPU over a 9×7 grid), Detail (iterations), Mirror the tiles. Music: brushMus hits
+   jolt c, loudness swells. Check with `--shot "Fractal wrap"` (add `|click=#fwRecipes button:nth-child(N)` or `|click=#fwOf [data-v='self']`).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
