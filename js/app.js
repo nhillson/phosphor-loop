@@ -168,7 +168,7 @@ const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving p
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'picture',
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'tiles',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, posterTheme: 'own', halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
@@ -1348,7 +1348,7 @@ $$('#timeShape button').forEach((b) => b.addEventListener('click', () => {
 }));
 if (!twProg) $('#timeCtl').hidden = true;
 
-function uses(src) { return activeKeys().some((k) => { const t = loops[k].tgt; return t.in1 === src || t.in2 === src || ((t.in1 === 'cloud' || t.in2 === 'cloud') && (t.cloudOf || 'picture') === src) || ((t.in1 === 'brush' || t.in2 === 'brush') && t.brushOf === src) || ((t.in1 === 'fwrap' || t.in2 === 'fwrap') && (t.fwOf || 'picture') === src); }); }
+function uses(src) { return activeKeys().some((k) => { const t = loops[k].tgt; return t.in1 === src || t.in2 === src || ((t.in1 === 'cloud' || t.in2 === 'cloud') && (t.cloudOf || 'picture') === src) || ((t.in1 === 'brush' || t.in2 === 'brush') && t.brushOf === src) || ((t.in1 === 'fwrap' || t.in2 === 'fwrap') && t.fwOf === src); }); }
 
 // Pick an input for the loop being edited. Devices start right here, inside the click, so the
 // browser treats the camera or screen request as something the person asked for.
@@ -1368,7 +1368,7 @@ function chooseSource(slot, src) {
   if (src === 'genart') genEnsure(gens[edit]);
   if (src === 'cloud') cloudSourceStart(loops[edit].tgt.cloudOf || 'picture');
   if (src === 'brush') brushSourceStart(loops[edit].tgt.brushOf || 'self');
-  if (src === 'fwrap') fwSourceStart(loops[edit].tgt.fwOf || 'picture');
+  if (src === 'fwrap') fwSourceStart(loops[edit].tgt.fwOf || 'tiles');
   if (src !== 'none' && src !== 'picture' && src !== 'genart' && src !== 'video') hideTip();
   settleDevices();
   syncUI();
@@ -1524,9 +1524,9 @@ function syncUI() {
   $('#mirrorSpin').setAttribute('aria-pressed', String(!!t.mirrorSpin));
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   const cloudHere = usesHere('cloud') ? (t.cloudOf || 'picture') : null;
-  const brushHere = usesHere('brush') ? t.brushOf : null, fwHere = usesHere('fwrap') ? (t.fwOf || 'picture') : null;
+  const brushHere = usesHere('brush') ? t.brushOf : null, fwHere = usesHere('fwrap') ? (t.fwOf || 'tiles') : null;
   for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'cloud', 'brush', 'fwrap']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere && s !== brushHere && s !== fwHere;
-  $$('#fwOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.fwOf || 'picture'))));
+  $$('#fwOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.fwOf || 'tiles'))));
   $$('#cloudOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.cloudOf || 'picture'))));
   $$('#brushOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.brushOf || 'self'))));
   if (usesHere('genart')) { genEnsure(gens[edit]); genPanelSync(); }
@@ -1622,7 +1622,7 @@ function patchLoop(k, p, force) {
   if (!force && stackMode && Array.isArray(n.stack) && Array.isArray(L.tgt.stack)) n.stack = stackCarry(k, L.tgt.stack, n.stack);
   if (!['picture', 'video', 'camera', 'loop'].includes(n.cloudOf)) n.cloudOf = 'picture';
   if (!['self', 'loop', 'picture', 'video', 'camera', 'none'].includes(n.brushOf)) n.brushOf = 'self';
-  if (!['picture', 'video', 'camera', 'self', 'loop'].includes(n.fwOf)) n.fwOf = 'picture';
+  if (!['tiles', 'picture', 'video', 'camera', 'self', 'loop'].includes(n.fwOf)) n.fwOf = 'tiles';
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
   // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
@@ -4612,7 +4612,7 @@ function tasteFeats(L) {
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
   if (L.in1 === 'cloud' || L.in2 === 'cloud') f.push('cloud:' + (L.cloudOf || 'picture'));
   if (L.in1 === 'brush' || L.in2 === 'brush') f.push('brush:' + (L.brushOf || 'self'));
-  if (L.in1 === 'fwrap' || L.in2 === 'fwrap') f.push('fwrap:' + (L.fwOf || 'picture'));
+  if (L.in1 === 'fwrap' || L.in2 === 'fwrap') f.push('fwrap:' + (L.fwOf || 'tiles'));
   const sx = L.shiftX || 0, sy = L.shiftY || 0;
   f.push('drift:' + (Math.hypot(sx, sy) < 0.0004 ? 'none' : Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'left' : 'right') : (sy > 0 ? 'down' : 'up')));
   f.push('bright:' + tasteBand(L.gain ?? 1, [0.85, 1.15], ['dim', 'normal', 'bright']));
@@ -5975,7 +5975,7 @@ vidPlay.addEventListener('click', () => {
 // new one only changes what they're made from, rather than switching the loop to the plain input
 function feedsVia(k, src) {
   const t = loops[k].tgt, has = (n) => t.in1 === n || t.in2 === n;
-  return (has('cloud') && (t.cloudOf || 'picture') === src) || (has('brush') && t.brushOf === src) || (has('fwrap') && (t.fwOf || 'picture') === src);
+  return (has('cloud') && (t.cloudOf || 'picture') === src) || (has('brush') && t.brushOf === src) || (has('fwrap') && t.fwOf === src);
 }
 function feedInto(src, k = edit) {
   const t = loops[k].tgt;
@@ -9152,12 +9152,12 @@ const RECIPES = [
     sw: 'radial-gradient(circle,#ffd27a 0 6%,#3b8cff 18%,#0a1a40 40%,#000 70%)',
     patch: { A: { in1: 'brush', brushOf: 'none', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
     brush: { ...window.PhosphorBrushes.RECIPES.Urchin, bAmt: 0 } },
-  { name: 'Fractal wrap', after: 'Pick another nature picture with ◀ ▶ under Picture, or wrap the camera, a video or the loop itself under Wrapped round it. Try the recipes under Fractal wrap.',
-    text: 'A nature picture wrapped round a Julia set, layer inside layer, flowing down into it forever while its shape slowly changes.',
-    how: 'FRACTAL WRAP OF A PICTURE · EVERYTHING ELSE OFF',
+  { name: 'Fractal wrap', after: 'Load your own tile pictures in the Fractal wrap card (Effect stack › Whole picture), or wrap a picture, the camera, a video or the loop itself under Wrapped round it.',
+    text: 'A tile picture wrapped round a Julia set, as in Ivan Freyman’s FractalWrapper: band inside band, doubling as it goes in, glowing deep inside, its edge outlined.',
+    how: 'FRACTAL WRAP OF THE TILE PICTURE · EVERYTHING ELSE OFF',
     sw: 'radial-gradient(circle,#000 0 8%,#3a7a4a 12%,#d8c070 18%,#2a5a8a 26%,#3a7a4a 34%,#d8c070 42%,#0b0612 60%)',
-    patch: { A: { in1: 'fwrap', fwOf: 'picture', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
-    fwrap: { ...window.PhosphorFractalWrap.RECIPES.Endless } },
+    patch: { A: { in1: 'fwrap', fwOf: 'tiles', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+    fwrap: { ...window.PhosphorFractalWrap.RECIPES.Darth } },
   { name: 'Wrapped feedback', after: 'Wrap the whole picture is in the Fractal wrap card of the Effect stack. Try its recipes, or lower Amount to lay the wrap over the picture.',
     text: 'The whole feedback picture wrapped round a drifting Julia set, flowing down into it layer by layer.',
     how: 'SHAPE · ZOOM IN 10 · TRAILS 85 · WRAP THE WHOLE PICTURE',
@@ -9220,7 +9220,7 @@ function applyRecipe(r) {
   setEdit('A');
   // Start any device right here, inside the click, so the browser lets it ask for permission
   const inp = p.A.in1;
-  if (inp === 'fwrap') fwSourceStart(p.A.fwOf || 'picture', 'A');
+  if (inp === 'fwrap') fwSourceStart(p.A.fwOf || 'tiles', 'A');
   if (inp === 'camera' && !cam.on) startCamera();
   if (inp === 'screen' && !scr.on) startScreen(true);
   if (inp === 'phone') startPhoneLink();
@@ -11719,15 +11719,20 @@ $('#apBrush').addEventListener('click', () => {
 window.__plBrush = { brush, setBrush, brushSt, mus: brushMus, ready: () => !!brushEng, failed: () => brushFailed };
 
 /* ================= fractal wrap ================= */
-// A picture wrapped round a Julia or Mandelbrot set's iteration bands (js/fractalwrap.js), as an input: read through the
-// slot a 3D world would use, as the Point cloud and Brushes are. What's wrapped is per loop (fwOf: picture, video,
-// camera, this loop, the other loop); how it moves is shared (fwrap, kept in presets), set in the input's own row.
+// Pictures wrapped round a Julia or Mandelbrot set's iteration bands (js/fractalwrap.js, after Ivan Freyman's
+// FractalWrapper), as an input (read through the slot a 3D world would use, as the Point cloud and Brushes are) and over
+// the whole picture (fwAmt). What a loop's input wraps is per loop (fwOf): Tile pictures (the shared tile pair below,
+// made for this as his are), or a picture, the video, the camera, this loop or the other loop, made into a tile on the
+// spot. How it looks is shared (fwrap, kept in presets) in the Fractal wrap card. Tile pictures are kept in this
+// browser (IndexedDB phosphor-fwtiles), loaded from files: one picture and, if picked with it, its "…cap" partner.
 const PFW = window.PhosphorFractalWrap;
-const FW_OF = ['picture', 'video', 'camera', 'self', 'loop'];
+const FW_OF = ['tiles', 'picture', 'video', 'camera', 'self', 'loop'];
 const FW_KEY = 'phosphor-fwrap-v1';
-const FW_DEF = { ...PFW.DEFAULTS };
-const FW_NUM = ['fwAmt', 'fwDrift', 'fwZoom', 'fwSpin', 'fwFlow', 'fwTiles', 'fwDepth'];
-const FW_SEG = { fwKind: '#fwKind', fwShape: '#fwShape', fwDetail: '#fwDetail' };
+const FW_DEF = { ...PFW.DEFAULTS, fwEffOf: 0, fwTile: 'Phosphor bulb' };
+const FW_NUM = ['fwAmt', 'fwDrift', 'fwZoom', 'fwSpin', 'fwFlow', 'fwMin', 'fwGlowIn', 'fwEdgeW'];
+const FW_SEG = { fwKind: '#fwKind', fwShape: '#fwShape', fwDetail: '#fwDetail', fwGlowCol: '#fwGlowCol', fwEdgeCol: '#fwEdgeCol', fwEffOf: '#fwEffOf' };
+const FW_CHIP = { fwCut: '#fwCut', fwGlow: '#fwGlow', fwEdge: '#fwEdge', fwSmooth: '#fwSmooth', fwMusic: '#fwMusic' };
+const FW_SEG_MAX = { fwKind: 1, fwShape: PFW.SHAPES.length - 1, fwDetail: PFW.DETAIL.length - 1, fwGlowCol: PFW.GLOW_NAMES.length - 1, fwEdgeCol: PFW.EDGE_NAMES.length - 1, fwEffOf: 1 };
 const fwrap = { ...FW_DEF };
 const fwEls = {};
 for (const k of FW_NUM) fwEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
@@ -11741,39 +11746,129 @@ function cleanFw(c) {
   const out = { ...FW_DEF };
   if (!c || typeof c !== 'object') return out;
   for (const k of FW_NUM) { const { el } = fwEls[k]; if (Number.isFinite(c[k])) out[k] = clamp(Math.round(c[k]), +el.min, +el.max); }
-  if (Number.isInteger(c.fwKind)) out.fwKind = clamp(c.fwKind, 0, 1);
-  if (Number.isInteger(c.fwShape)) out.fwShape = clamp(c.fwShape, 0, PFW.SHAPES.length - 1);
-  if (Number.isInteger(c.fwDetail)) out.fwDetail = clamp(c.fwDetail, 0, PFW.DETAIL.length - 1);
-  out.fwMirror = c.fwMirror !== false;
-  out.fwMusic = c.fwMusic !== false;
+  for (const [k, mx] of Object.entries(FW_SEG_MAX)) if (Number.isInteger(c[k])) out[k] = clamp(c[k], 0, mx);
+  for (const k of Object.keys(FW_CHIP)) if (typeof c[k] === 'boolean') out[k] = c[k];
+  if (typeof c.fwTile === 'string' && c.fwTile) out.fwTile = c.fwTile.slice(0, 120);
   return out;
 }
 function syncFwUI() {
   for (const [k, { el, out }] of Object.entries(fwEls)) { el.value = fwrap[k]; fillTrack(el); out.textContent = fwText(k, fwrap[k]); }
   for (const [k, sel] of Object.entries(FW_SEG)) $$(sel + ' button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === String(fwrap[k]))));
-  $('#fwMirror').setAttribute('aria-pressed', String(fwrap.fwMirror));
-  $('#fwMusic').setAttribute('aria-pressed', String(fwrap.fwMusic));
+  for (const [k, sel] of Object.entries(FW_CHIP)) $(sel).setAttribute('aria-pressed', String(!!fwrap[k]));
   $('#fwShapeRow').hidden = fwrap.fwKind !== 0;
+  $$('#fwTileList button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.name === fwrap.fwTile)));
 }
 function saveFw() { try { localStorage.setItem(FW_KEY, JSON.stringify(fwrap)); } catch (_) {} }
-function setFw(c) { Object.assign(fwrap, cleanFw(c)); syncFwUI(); saveFw(); }
+function setFw(c) {
+  const tileWas = fwrap.fwTile;
+  Object.assign(fwrap, cleanFw(c)); syncFwUI(); saveFw();
+  if (fwrap.fwTile !== tileWas) fwTileUse(fwrap.fwTile, true);
+}
 for (const [k, { el, out }] of Object.entries(fwEls)) {
   el.addEventListener('input', () => { fwrap[k] = +el.value; fillTrack(el); out.textContent = fwText(k, fwrap[k]); saveFw(); });
   el.addEventListener('dblclick', () => setFw({ ...fwrap, [k]: FW_DEF[k] }));
 }
 for (const [k, sel] of Object.entries(FW_SEG)) $$(sel + ' button').forEach((b) => b.addEventListener('click', () => setFw({ ...fwrap, [k]: +b.dataset.v })));
-$('#fwMirror').addEventListener('click', () => setFw({ ...fwrap, fwMirror: !fwrap.fwMirror }));
-$('#fwMusic').addEventListener('click', () => {
-  setFw({ ...fwrap, fwMusic: !fwrap.fwMusic });
-  toast(fwrap.fwMusic ? 'Music hits jolt the fractal and the bass swells it (with React to sound on).' : 'The music leaves the fractal alone now.');
-});
+for (const [k, sel] of Object.entries(FW_CHIP)) $(sel).addEventListener('click', () => setFw({ ...fwrap, [k]: !fwrap[k] }));
 for (const name of Object.keys(PFW.RECIPES)) {
   const b = document.createElement('button');
   b.className = 'chip'; b.textContent = name;
   b.addEventListener('click', () => { setFw({ ...fwrap, ...PFW.RECIPES[name] }); showOSD('FRACTAL WRAP', name.toUpperCase()); });
   $('#fwRecipes').append(b);
 }
-{ let saved = null; try { saved = JSON.parse(localStorage.getItem(FW_KEY) || 'null'); } catch (_) {} setFw(saved); }
+
+// ---- tile pictures ----
+const FW_DB = 'phosphor-fwtiles', FW_MAX_W = 2400;
+function fwDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(FW_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('tiles', { keyPath: 'name' });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function fwDbDo(mode, fn) {
+  const db = await fwDb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('tiles', mode), st = tx.objectStore('tiles'), q = fn(st);
+    tx.oncomplete = () => { db.close(); res(q && q.result); }; tx.onerror = () => { db.close(); rej(tx.error); };
+  });
+}
+const fwTiles = { names: [] };
+async function fwTileListLoad() {
+  try { fwTiles.names = ((await fwDbDo('readonly', (st) => st.getAllKeys())) || []).map(String).sort((a, b) => a.localeCompare(b)); } catch (_) { fwTiles.names = []; }
+  fwTileListDraw();
+}
+function fwTileListDraw() {
+  const box = $('#fwTileList');
+  box.textContent = '';
+  for (const name of ['Phosphor bulb', ...fwTiles.names]) {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.name = name; b.textContent = name;
+    b.title = name === 'Phosphor bulb' ? 'Phosphor’s own simple tile' : `${name} (right-click to remove it from this browser)`;
+    b.addEventListener('click', () => setFw({ ...fwrap, fwTile: name }));
+    if (name !== 'Phosphor bulb') b.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      if (!confirm(`Remove the tile “${name}” from this browser? (Your files aren’t touched.)`)) return;
+      try { await fwDbDo('readwrite', (st) => st.delete(name)); } catch (_) {}
+      if (fwrap.fwTile === name) setFw({ ...fwrap, fwTile: 'Phosphor bulb' });
+      fwTileListLoad();
+    });
+    box.append(b);
+  }
+  syncFwUI();
+}
+// Big tiles are drawn smaller (2400 across at most): the screen never shows more detail than that
+async function fwBitmap(blob) {
+  const b = await createImageBitmap(blob);
+  if (b.width <= FW_MAX_W) return b;
+  const h = Math.round(b.height * FW_MAX_W / b.width);
+  const r = await createImageBitmap(blob, { resizeWidth: FW_MAX_W, resizeHeight: h, resizeQuality: 'high' });
+  b.close();
+  return r;
+}
+let fwTileToken = 0;
+async function fwTileUse(name, quiet) {
+  const eng = fwEngine();
+  if (!eng) return;
+  const my = ++fwTileToken;
+  if (name === 'Phosphor bulb' || !name) { const d = PFW.defaultTiles(); eng.setTiles(d.main, d.cap, d.name); return; }
+  try {
+    const rec = await fwDbDo('readonly', (st) => st.get(name));
+    if (!rec) { if (!quiet) toast(`The tile “${name}” isn’t in this browser any more.`); const d = PFW.defaultTiles(); eng.setTiles(d.main, d.cap, d.name); return; }
+    const main = await fwBitmap(rec.main), cap = rec.cap ? await fwBitmap(rec.cap) : null;
+    if (my !== fwTileToken) return;
+    eng.setTiles(main, cap, name);
+  } catch (err) { console.warn('Fractal wrap tile:', err); if (!quiet) toast('That tile picture couldn’t be read.'); }
+}
+// Picking files: each picture whose name doesn't end in "cap" is a tile; a picked file with the same name plus "cap"
+// (any case, with or without a space or _ before it) is its cap, as in FractalWrapper
+const fwBase = (n) => n.replace(/\.[^.]+$/, '');
+const fwIsCap = (n) => /cap$/i.test(fwBase(n));
+const fwCapKey = (n) => fwBase(n).replace(/[\s_-]*cap$/i, '').toLowerCase();
+$('#fwLoad').addEventListener('click', () => $('#fwTileFile').click());
+$('#fwTileFile').addEventListener('change', async (e) => {
+  const files = [...e.target.files].filter((f) => f.type.startsWith('image/'));
+  e.target.value = '';
+  if (!files.length) return;
+  const caps = new Map(files.filter((f) => fwIsCap(f.name)).map((f) => [fwCapKey(f.name), f]));
+  let mains = files.filter((f) => !fwIsCap(f.name));
+  if (!mains.length) mains = files;   // only cap files picked: use them as tiles
+  let last = null;
+  for (const f of mains) {
+    const name = fwBase(f.name).slice(0, 80);
+    const cap = caps.get(fwBase(f.name).toLowerCase()) || null;
+    try { await fwDbDo('readwrite', (st) => st.put({ name, main: f, cap, added: Date.now() })); last = name; } catch (err) { console.warn(err); }
+  }
+  await fwTileListLoad();
+  if (last) {
+    setFw({ ...fwrap, fwTile: last });
+    const n = mains.length, withCap = mains.filter((f) => caps.has(fwBase(f.name).toLowerCase())).length;
+    toast(n === 1 ? `Wrapping “${last}”${withCap ? ' with its cap' : ''}.` : `Added ${n} tiles (${withCap} with caps). Wrapping “${last}”.`);
+  }
+});
+
+{ let saved = null; try { saved = JSON.parse(localStorage.getItem(FW_KEY) || 'null'); } catch (_) {} Object.assign(fwrap, cleanFw(saved)); syncFwUI(); }
+fwTileListLoad();
 $$('#fwOf button').forEach((b) => b.addEventListener('click', () => {
   takeOver('in1');
   loops[edit].tgt.fwOf = b.dataset.v;
@@ -11790,7 +11885,7 @@ function fwSourceStart(of, k = edit) {
   if (of === 'video' && !anyVid()) { if (clipsWanted()) openClips('video'); else $('#vidFile').click(); }
 }
 function fwApOf() {
-  const o = ['picture', 'picture', 'picture', 'self', 'loop'];
+  const o = ['tiles', 'tiles', 'picture', 'self', 'loop'];
   if (vidFor(edit).on && apAllowed('video')) o.push('video');
   if (cam.on && apAllowed('camera')) o.push('camera');
   return pick(o);
@@ -11802,41 +11897,44 @@ function fwEngine() {
     console.warn('Fractal wrap could not start:', err);
     fwFailed = true;
     toast('The fractal wrap can’t run on this graphics card.');
+    return null;
   }
+  fwTileUse(fwrap.fwTile, true);
   return fwEng;
 }
 const fwSt = { final: null, A: null, B: null, C: null, D: null };
 const fwUses = (k) => { const t = loops[k].tgt; return t.in1 === 'fwrap' || t.in2 === 'fwrap'; };
-// The Fractal wrap input: loop k's picture, drawn at the loop's size. Input size zooms out (small) or in (big).
+// The Fractal wrap input: loop k's, drawn at the loop's size
 function drawFw(k, t, dt, selfTex, otherTex) {
   const eng = fwEngine();
   if (!eng) return null;
-  const of = FW_OF.includes(t.fwOf) ? t.fwOf : 'picture';
-  let tex = null, flip = false;
-  if (of === 'picture') tex = picOf(k).tex;
-  else if (of === 'video') { const v = vidFor(k); if (v.on && v.frames) tex = v.cur; }
-  else if (of === 'camera') { if (cam.on && cam.frames) { tex = cam.cur; flip = cam.flip; } }
+  const of = FW_OF.includes(t.fwOf) ? t.fwOf : 'tiles';
+  let tex = null, asp = simW / simH, flipX = false;
+  if (of === 'picture') { const p = picOf(k); tex = p.tex; asp = p.aspect; }
+  else if (of === 'video') { const v = vidFor(k); if (v.on && v.frames) { tex = v.cur; asp = v.aspect; } }
+  else if (of === 'camera') { if (cam.on && cam.frames) { tex = cam.cur; asp = cam.aspect; flipX = cam.flip; } }
   else if (of === 'self') tex = selfTex;
-  else tex = otherTex;
+  else if (of === 'loop') tex = otherTex;
   if (!fwSt[k]) fwSt[k] = eng.state();
-  // This loop wrapped round itself would have nothing to wrap where it's black, so only then do the black parts
-  // get faint bands of their own; for every other source dark stays dark
-  return eng.run(fwSt[k], tex, simW, simH, fwrap, dt, { flip, seedBands: of === 'self', music: { on: reacts(k), lvl: brushMus.lvl, hit: brushMus.hit } });
+  // A source that isn't ready yet (no video, camera off) shows the tile pictures meanwhile.
+  // This loop wrapped round itself would have nothing to wrap where it's black, so only it gets faint bands there.
+  return eng.run(fwSt[k], tex, asp, simW, simH, fwrap, dt, { flipX, selfBands: of === 'self', music: { on: reacts(k), lvl: brushMus.lvl, hit: brushMus.hit } });
 }
-// Wrap the whole picture: the finished picture wrapped round the fractal at the screen's size, over it by Amount
+// Wrap the whole picture: the finished picture (made into a tile), or the tile pictures, wrapped round the fractal at the
+// screen's size, over the picture by Amount; inside the set and outside its outer band the picture shows as it is
 function fwFinal(tex, dt, force) {
   if (!(fwrap.fwAmt > 0) || force === false) { if (fwSt.final && fwEng) { fwEng.release(fwSt.final); fwSt.final = null; } return tex; }
   const eng = fwEngine();
   if (!eng) return tex;
   if (!fwSt.final) fwSt.final = eng.state();
-  return eng.run(fwSt.final, tex, canvas.width, canvas.height, fwrap, dt,
-    { effect: true, amt: fwrap.fwAmt / 100, music: { on: activeKeys().some((k) => reacts(k)), lvl: brushMus.lvl, hit: brushMus.hit } });
+  return eng.run(fwSt.final, fwrap.fwEffOf === 1 ? null : tex, simW / simH, canvas.width, canvas.height, fwrap, dt,
+    { effect: true, orig: tex, amt: fwrap.fwAmt / 100, music: { on: activeKeys().some((k) => reacts(k)), lvl: brushMus.lvl, hit: brushMus.hit } });
 }
 function fwTick() {
   if (!fwEng) return;
   for (const k of KEYS) if (fwSt[k] && !(fwUses(k) && loopOn(k))) { fwEng.release(fwSt[k]); fwSt[k] = null; }
 }
-window.__plFw = { fwrap, setFw, fwSt, ready: () => !!fwEng, failed: () => fwFailed };
+window.__plFw = { fwrap, setFw, fwSt, tiles: fwTiles, ready: () => !!fwEng, failed: () => fwFailed, tileName: () => fwEng && fwEng.tileName() };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
 // loop, on what the loop keeps, so it feeds on the filtered picture every frame. Inside, the grading goes about a

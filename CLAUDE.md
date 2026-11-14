@@ -194,16 +194,22 @@ file don't rebuild the app.
    − Avoid), two-tone palettes by age (colors 6–9). Music: `brushTick` works out `brushMus.lvl` (loudness against its loudest lately) and hits;
    **Only music** (`bOnly`) makes the music the brushes' clock (silence: no movement, no ageing, no strokes). Check with `--shot "Brush garden"`
    (add `|click=#brushRecipes button:nth-child(N)` for other recipes), `--shot "Brush storm"`, `--shot "Brushed picture"`.
-4z16. **Fractal wrap** (js/fractalwrap.js = `window.PhosphorFractalWrap`, after the "wrapping images around fractals" method: angle of the last
-   z inside the bailout (|z| > 400) across the picture, (log 400 − log|z|) / (log 400 / 2) down it; glue under "fractal wrap" in js/app.js).
-   An input (`src 'fwrap'`, read through the 3D world slot, `SRC_ID.fwrap = 37`; per-loop `fwOf` picture / video / camera / self / loop,
-   `drawFw`); shared settings `fwrap` (`phosphor-fwrap-v1`, in presets) shown in the input's own row `#row-fwrap`: Julia (c wanders a path,
-   `SHAPES`) or Mandelbrot (Seahorse valley), Flow (tiles slide down layer by layer), Zoom, Turn, Pictures round each layer, Depth (shaded from
-   the outermost layer on screen, `uItRef` found on the CPU over a 9×7 grid), Detail (iterations), Mirror the tiles. Music: brushMus hits
-   jolt c, loudness swells. **Wrap the whole picture** (`fwAmt`, `fwFinal` after Brushes, stack kind `fwrap`; the settings live in `#fwGroup`,
-   the stack card; the set's middle shows the picture as it is). Picking a picture or video for a loop whose Point cloud, Brushes or Fractal
-   wrap is made from it no longer switches the loop to the plain input (`feedsVia` in `feedInto`); a Fractal wrap of the test card starts
-   on a nature picture (`fwSourceStart`). Check with `--shot "Wrapped feedback"`, `--shot "Fractal wrap"` (add `|click=#fwRecipes button:nth-child(N)` or `|click=#fwOf [data-v='self']`).
+4z16. **Fractal wrap** (js/fractalwrap.js = `window.PhosphorFractalWrap`, after Ivan Freyman's FractalWrapper (bryceguy72, FreymanArt.com;
+   public domain, credit asked; his julia.frag is the model): |z|² > 400 escape, angle of the escaped z across the tile (quarter-tile phase up
+   to 3:1, the iterate before for wider tiles), (log 400 − log|z|)/(log 400 / 2) down it, tile top at each band's outer edge; Min layers
+   (`fwMin`, his minIterations: nearer escapes black, or the picture in the effect), the cap tile on the band at exactly Min layers, Glow
+   (`fwGlow`, mix to a color from Min layers in by `fwGlowIn`), Outline (`fwEdge`, his DEM: |z| ln|z| / |dz| under a threshold times the half
+   width), Smooth edges (`fwSmooth`, 2×2 samples). His view is "zoom 3" = half width 3 (Zoom 0), imaginary axis upside down. Shapes: his
+   Darth (c = i), ET (0.3321), Terminator (−2.3733) plus Spine, Spiral ring, Rabbit, Spirals, Wandering. **Tile pictures**: 2:1 (or 4:1) tiles
+   made for wrapping (subject right, stem narrowing down on the left) plus an optional "…cap" partner, loaded with `#fwTileFile` (pairs by
+   name, `fwCapKey`), kept in IndexedDB `phosphor-fwtiles` › `tiles` {name, main, cap}, picked by `fwrap.fwTile` ('Phosphor bulb' =
+   `defaultTiles()` drawn in a canvas); uploaded unflipped, at most 2400 across. Any other source is made into a tile in the shader
+   (`autoTile`: the middle as the subject, the bottom edge stretched into the stem, cut out by the border color with `fwCut`). The input
+   (`src 'fwrap'`, 3D world slot, `SRC_ID.fwrap = 37`; per-loop `fwOf` tiles / picture / video / camera / self / loop, `drawFw`) and **Wrap the
+   whole picture** (`fwAmt`, `fwFinal` after Brushes, stack kind `fwrap`, `fwEffOf` 0 the picture / 1 the tile). Settings `fwrap`
+   (`phosphor-fwrap-v1`, in presets) live in `#fwGroup` (the stack card). Picking a picture or video for a loop whose Point cloud, Brushes or
+   Fractal wrap is made from it doesn't switch the loop to the plain input (`feedsVia` in `feedInto`). Check with `--shot "Fractal wrap"`,
+   `--shot "Wrapped feedback"`; tile loading by setting `#fwTileFile`'s files from a page script and waiting for `__plFw.tileName()`.
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
