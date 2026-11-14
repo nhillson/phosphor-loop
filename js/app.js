@@ -9215,7 +9215,7 @@ function applyRecipe(r) {
   syncAdjUI();
   if (r.cloud) setCloud({ ...CLOUD_DEF, ...r.cloud });
   if (r.brush) setBrush({ ...BRUSH_DEF, ...r.brush });
-  if (r.fwrap) setFw({ ...FW_DEF, ...r.fwrap });
+  if (r.fwrap) setFw({ ...FW_DEF, fwTile: fwrap.fwTile, ...r.fwrap });
   closeGuide();
   setEdit('A');
   // Start any device right here, inside the click, so the browser lets it ask for permission
@@ -11748,7 +11748,8 @@ function cleanFw(c) {
   for (const k of FW_NUM) { const { el } = fwEls[k]; if (Number.isFinite(c[k])) out[k] = clamp(Math.round(c[k]), +el.min, +el.max); }
   for (const [k, mx] of Object.entries(FW_SEG_MAX)) if (Number.isInteger(c[k])) out[k] = clamp(c[k], 0, mx);
   for (const k of Object.keys(FW_CHIP)) if (typeof c[k] === 'boolean') out[k] = c[k];
-  if (typeof c.fwTile === 'string' && c.fwTile) out.fwTile = c.fwTile.slice(0, 120);
+  // The tile picture stays as it is unless the settings name one (a recipe, Neutral or an older preset never change it)
+  out.fwTile = typeof c.fwTile === 'string' && c.fwTile ? c.fwTile.slice(0, 120) : fwrap.fwTile;
   return out;
 }
 function syncFwUI() {
