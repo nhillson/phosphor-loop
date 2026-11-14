@@ -9133,6 +9133,12 @@ const RECIPES = [
     sw: 'repeating-linear-gradient(35deg,#0b0612 0 4px,#8b1ab8 4px 6px,#0b0612 6px 9px,#ff9a3d 9px 10px),radial-gradient(circle,#2fd0ff 0 20%,transparent 60%)',
     patch: { A: { in1: 'brush', brushOf: 'self', size: 100, zoom: 6, spin: 3, trails: 55, color: 6, blur: 0 } },
     brush: { ...window.PhosphorBrushes.RECIPES['Starry swirls'], bAmt: 0 } },
+  { name: 'Brush garden', after: 'Try the other recipes under Brushes (Dandelion, Cells, Veins, Fur, Spiral shell, Rings, Formula), or turn on React to sound and Only music.',
+    text: 'Two hundred thousand hair-fine brushes burst out from the middle and bunch into glowing spines, like a sea urchin growing.',
+    how: 'BRUSHES FOLLOWING NOTHING · URCHIN · EVERYTHING ELSE OFF',
+    sw: 'radial-gradient(circle,#ffd27a 0 6%,#3b8cff 18%,#0a1a40 40%,#000 70%)',
+    patch: { A: { in1: 'brush', brushOf: 'none', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+    brush: { ...window.PhosphorBrushes.RECIPES.Urchin, bAmt: 0 } },
   { name: 'Brushed picture', after: 'Pick another nature picture with ◀ ▶ under Picture, or try other recipes under Brushes.',
     text: 'The finished picture redrawn live in thick combed strokes that follow its own outlines.',
     how: 'PICTURE · WHOLE PICTURE AS STROKES',
@@ -11515,8 +11521,8 @@ const PBR = window.PhosphorBrushes;
 const BRUSH_OF = ['self', 'loop', 'picture', 'video', 'camera', 'none'];
 const BRUSH_KEY = 'phosphor-brush-v1';
 const BRUSH_DEF = { ...PBR.DEFAULTS };
-const BRUSH_NUM = ['bAmt', 'bSpeed', 'bSwirl', 'bChange', 'bWidth', 'bLength', 'bDry', 'bOpacity', 'bBristle'];
-const BRUSH_SEG = { bSteer: '#brushSteer', bCount: '#brushCount', bColor: '#brushColor' };
+const BRUSH_NUM = ['bAmt', 'bSense', 'bSpeed', 'bSwirl', 'bChange', 'bWidth', 'bLength', 'bDry', 'bOpacity', 'bBristle'];
+const BRUSH_SEG = { bShape: '#brushShape', bSteer: '#brushSteer', bCount: '#brushCount', bColor: '#brushColor' };
 const BRUSH_CHIP = { bGlow: '#brushGlow', bMusic: '#brushMusic', bOnly: '#brushOnly' };
 const brush = { ...BRUSH_DEF };
 const brushEls = {};
@@ -11524,6 +11530,7 @@ for (const k of BRUSH_NUM) brushEls[k] = { el: $('#' + k), out: $('#' + k + 'Out
 function brushText(k, v) {
   if (k === 'bAmt') return v === 0 ? 'OFF' : `${v}%`;
   if (k === 'bDry') return v >= 100 ? 'NEVER' : String(v);
+  if (k === 'bSense') return v === 0 ? 'OFF' : v > 0 ? `GATHER ${v}` : `AVOID ${-v}`;
   return String(v);
 }
 function cleanBrush(c) {
@@ -11531,6 +11538,7 @@ function cleanBrush(c) {
   if (!c || typeof c !== 'object') return out;
   for (const k of BRUSH_NUM) { const { el } = brushEls[k]; if (Number.isFinite(c[k])) out[k] = clamp(Math.round(c[k]), +el.min, +el.max); }
   if (Number.isInteger(c.bSteer)) out.bSteer = clamp(c.bSteer, 0, 2);
+  if (Number.isInteger(c.bShape)) out.bShape = clamp(c.bShape, 0, PBR.SHAPES.length - 1);
   if (Number.isInteger(c.bCount)) out.bCount = clamp(c.bCount, 0, PBR.COUNT.length - 1);
   if (Number.isInteger(c.bColor)) out.bColor = clamp(c.bColor, 0, PBR.COLORS.length - 1);
   out.bGlow = c.bGlow === true;
@@ -11569,6 +11577,7 @@ for (const name of Object.keys(PBR.RECIPES)) {
   b.className = 'chip'; b.textContent = name;
   b.addEventListener('click', () => {
     setBrush({ ...brush, ...PBR.RECIPES[name], bAmt: brushOnScreen() ? brush.bAmt : 100 });
+    brushAll((st) => brushEng.rebuild(st));
     showOSD('BRUSHES', name.toUpperCase());
   });
   $('#brushRecipes').append(b);
@@ -11663,7 +11672,7 @@ function apBrush(came, now) {
   if (!isOn || Math.random() < 0.5) {
     const ri = (a, b) => Math.round(rnd(a, b));
     Object.assign(brush, cleanBrush({ ...brush, ...PBR.RECIPES[pick(Object.keys(PBR.RECIPES))], bAmt: brush.bAmt,
-      bColor: Math.random() < 0.65 ? 0 : ri(1, PBR.COLORS.length - 1), bOnly: brush.bOnly, bMusic: brush.bMusic, bCount: brush.bCount }));
+      bOnly: brush.bOnly, bMusic: brush.bMusic, ...(Math.random() < 0.3 ? { bColor: 0 } : {}) }));
   }
   brushFadeTo(Math.round(rnd(55 + 25 * wild, 100)), now);
 }

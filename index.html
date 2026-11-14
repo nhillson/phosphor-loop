@@ -1617,6 +1617,24 @@
           <span class="hint">Moves with the music: hits swing the currents round and make the brushes surge, and louder music runs them faster (with React to sound on). Only music: the music is all that moves them. In silence they stand still and stop drawing; the louder it gets, the faster they go.</span>
         </div>
         <div class="ctl">
+          <span class="lbl" id="brushShapeLbl">Shape</span>
+          <div class="seg seg-3" id="brushShape" role="group" aria-labelledby="brushShapeLbl">
+            <button data-v="0" title="Swirling currents that slowly change: marbling, fur and veins">Currents</button>
+            <button data-v="1" title="The brushes push away from drifting seeds and heap up into the walls between them">Cells</button>
+            <button data-v="2" title="Out from the middle, like an urchin or a dandelion">Burst</button>
+            <button data-v="3" title="Round and in towards the middle, like a shell">Spiral</button>
+            <button data-v="4" title="Round and round the middle, rippling">Rings</button>
+            <button data-v="5" title="A flow made of sines, like a strange attractor: butterflies, knots and loops that slowly change">Formula</button>
+          </div>
+          <span class="hint">The shape the brushes grow into, where the picture doesn’t steer them.</span>
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="bSense">Follow their own strokes</label><output id="bSenseOut" for="bSense"></output></div>
+          <input type="range" id="bSense" min="-100" max="100" step="1" value="0">
+          <div class="ends"><span>Avoid</span><span>Gather</span></div>
+          <span class="hint">Each brush feels the strokes just ahead of it. Gather: they run together into veins and bundles, like roots. Avoid: they keep apart and fill the space into cells and mazes. In the middle they ignore each other.</span>
+        </div>
+        <div class="ctl">
           <span class="lbl" id="brushSteerLbl">Steered by</span>
           <div class="seg seg-3" id="brushSteer" role="group" aria-labelledby="brushSteerLbl">
             <button data-v="0" title="Made-up swirling currents that slowly change">Currents</button>
@@ -1673,15 +1691,15 @@
         <div class="ctl">
           <span class="lbl" id="brushColorLbl">Colors</span>
           <div class="seg seg-3" id="brushColor" role="group" aria-labelledby="brushColorLbl">
-            <button data-v="0" title="Picked up from the picture under each brush">Picture</button><button data-v="1">Rainbow</button><button data-v="2">Purple</button><button data-v="3">Fire</button><button data-v="4">Ice</button><button data-v="5">White</button>
+            <button data-v="0" title="Picked up from the picture under each brush">Picture</button><button data-v="1">Rainbow</button><button data-v="2">Purple</button><button data-v="3">Fire</button><button data-v="4">Ice</button><button data-v="5">White</button><button data-v="6" title="Blue strokes with orange tips">Ember &amp; ice</button><button data-v="7" title="Deep purple to pink to cream">Orchid</button><button data-v="8" title="Dark green to pale green">Moss</button><button data-v="9" title="Deep teal to cyan to white">Lagoon</button>
           </div>
           <div class="chips"><button class="chip" id="brushGlow" aria-pressed="false"><span class="led"></span>Glowing strokes</button></div>
-          <span class="hint">Glowing strokes add up into light where they cross, instead of lying over each other.</span>
+          <span class="hint">The last four change along each stroke, dark where it starts and bright at its tip. Glowing strokes add up into light where they cross, instead of lying over each other.</span>
         </div>
         <div class="ctl">
           <span class="lbl" id="brushCountLbl">How many brushes</span>
-          <div class="seg seg-4" id="brushCount" role="group" aria-labelledby="brushCountLbl">
-            <button data-v="0" title="About 4 thousand">Few</button><button data-v="1" title="About 16 thousand">Some</button><button data-v="2" title="About 40 thousand">Lots</button><button data-v="3" title="About 90 thousand: for a strong graphics card">Masses</button>
+          <div class="seg seg-3" id="brushCount" role="group" aria-labelledby="brushCountLbl">
+            <button data-v="0" title="About 4 thousand">Few</button><button data-v="1" title="About 16 thousand">Some</button><button data-v="2" title="About 40 thousand">Lots</button><button data-v="3" title="About 90 thousand">Masses</button><button data-v="4" title="About 200 thousand: for a strong graphics card">Swarm</button>
           </div>
         </div>
         <div class="dev-actions"><button class="btn small" id="brushRestart">Start afresh</button><button class="btn small" id="brushReset">Back to normal</button></div>
