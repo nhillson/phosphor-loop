@@ -347,3 +347,10 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    opening in a column: 0/10 clicks showed); the column under the mouse (`mirrorHoverK`) keeps its make-up unless the change is its own
    click (`mirrorForceK`); copies at most every 120 ms; a click inside an effect card is passed to the real card found by `data-id`, not by
    place. tests/loops_check.py now presses from a page script. Checked with a churn test: 10/10 column card clicks showing next frame.
+4z17. **Ferrofluid** (input `ferro`, `SRC_ID.ferro = 36`, `seedFerro` in js/shaders.js, drawn in the loop's own pass like Doppler radar; loop key
+   `ferroStyle` 0 Spiky ball / 1 Spike pool / 2 Flat blobs, buttons `#ferroStyle` in `#row-ferro`). Ball and pool: the ray is walked in 44 even
+   steps through the shell the spikes live in, then 5 halvings (`ferroF` = height above the liquid; spikes on a six-sided grid, `ferroHex`,
+   the ball's laid out round the point facing the camera, seam at the back faded out). Blobs: seven metaballs. `ferroEnv` = six colored lamps
+   it mirrors, turning with `uFerro.w`. Music: `ferroTick` eases `ferroMus.bass` (snd.env.low) and `.high` (mostly snd.env.high) into `uFerro.yz`,
+   0 for a loop that doesn't react; the bass swells, the highs raise the spikes. It lies over the trails (`gSpecA`). Check with
+   `--shot "Magnet song"` (add `|click=#ferroStyle [data-v='1']` or `'2'` for the other styles).

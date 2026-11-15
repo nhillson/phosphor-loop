@@ -425,6 +425,7 @@
             <button data-src="topo" aria-pressed="false" title="Glowing contour lines, like a hiking map, over land that reshapes itself as the view drifts">Topo map</button>
             <button data-src="life" aria-pressed="false" title="Conway’s Game of Life: glowing cells that are born, live and die by a few simple rules">Life</button>
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
+            <button data-src="ferro" aria-pressed="false" title="Shiny black magnetic liquid: the bass swells it and the high sounds shoot its spikes out">Ferro&shy;fluid</button>
             <button data-src="cloud" aria-pressed="false" title="A picture, video, the camera or the other loop turned into a cloud of glowing 3D dots that wind, your finger and explosions can blow about">Point cloud</button>
             <button data-src="brush" aria-pressed="false" title="Thousands of little brushes that wander on swirling currents, each leaving a stroke behind it">Brushes</button>
             <button data-src="fwrap" aria-pressed="false" title="A picture wrapped round a fractal, layer inside layer, flowing down into it as its shape changes">Fractal wrap</button>
@@ -518,6 +519,18 @@
               </div>
             </div>
             <span class="hint">The beam goes round every 4 seconds and the storms drift and change as it sweeps. Input size shrinks the circle to show more of the map.</span>
+          </div>
+
+          <div class="dev" id="row-ferro" hidden>
+            <div class="ctl">
+              <span class="lbl" id="ferroStyleLbl" title="Spiky ball: a ball of the liquid growing spikes. Spike pool: a pool of spikes seen from above. Flat blobs: smooth drops that stretch, split and merge.">Style</span>
+              <div class="seg seg-3" id="ferroStyle" role="group" aria-labelledby="ferroStyleLbl">
+                <button data-v="0" aria-pressed="true">Spiky ball</button>
+                <button data-v="1" aria-pressed="false">Spike pool</button>
+                <button data-v="2" aria-pressed="false">Flat blobs</button>
+              </div>
+            </div>
+            <span class="hint">The bass swells it and the high sounds shoot the spikes out (switch on React to sound). With no music it breathes and drifts by itself.</span>
           </div>
 
           <div class="dev" id="row-cloud" hidden>

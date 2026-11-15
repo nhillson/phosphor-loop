@@ -274,6 +274,11 @@ TIPS
     Autopilot and Surprise me use them now and then, and the Fader limits
     menu lists them. Guide recipes: "Fractal garden", "Shattered mirror"
     and "Prism".
+  - Ferrofluid: shiny black magnetic liquid with colored lights sliding over
+    it. Style picks Spiky ball, Spike pool or Flat blobs. With React to sound
+    listening, the bass swells it and the high sounds shoot the spikes out;
+    with no music it breathes and drifts by itself. The liquid is black and
+    covers the trails behind it, so only its reflections feed the loop.
   - Topo map: glowing contour lines, like a hiking map, seen from straight
     above: cyan low down, gold higher up, rose on the peaks, every fifth line
     bolder. The land slowly reshapes itself while the view drifts across it.

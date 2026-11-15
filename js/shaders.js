@@ -254,6 +254,7 @@ uniform int uTopoSrc;     // Topo map, Height from the picture: the input it tra
 uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, ahead of the loop's own pass
 // That small softened brightness is read from uScene2 (see topoPre): this program already reads 16 pictures, the
 // most Windows graphics (Chrome and Edge there) allow in one program, so it can't have a 17th of its own
+uniform vec4 uFerro;        // Ferrofluid: its style (0 ball, 1 pool, 2 flat blobs), the bass, the highs, and how far its colors have turned
 uniform float uRadarWind;   // Doppler radar: 1 shows the wind (towards and away from the radar), 0 the rain
 uniform float uLifeT;    // Life: how far it is from one generation to the next (0 to 1), so cells glide in and out
 uniform float uSceneK;   // how much of each new frame of a 3D flight gets in (less as Trails rise, so it never whites out)
@@ -1086,6 +1087,155 @@ vec3 seedRadar(vec2 p, float t) {
   gSpecA = echo ? 0.85 : min(dot(c, vec3(0.3, 0.6, 0.1)) * 2.5, 0.85);
   return c;
 }
+// Ferrofluid: shiny black magnetic liquid with colored lights in it. Three styles (uFerro.x): 0 a ball of it growing
+// spikes, 1 a pool of spikes seen from above and to one side, 2 flat blobs that stretch, split and merge. The bass
+// (uFerro.y) swells it, the highs (uFerro.z) shoot the spikes out; with no music it breathes and drifts by itself.
+// The liquid itself is black and lies over the trails (gSpecA), so only its reflections add light to the loop.
+vec3 ferroHex(vec2 u) {
+  const vec2 s = vec2(1.0, 1.7320508);
+  vec4 hc = floor(vec4(u, u - vec2(0.5, 1.0)) / s.xyxy) + 0.5;
+  vec4 h = vec4(u - hc.xy * s, u - (hc.zw + 0.5) * s);
+  return dot(h.xy, h.xy) < dot(h.zw, h.zw) ? vec3(h.xy, hash(hc.xy)) : vec3(h.zw, hash(hc.zw + 7.31));
+}
+// One spike to a six-sided cell: sharp at its tip, easing into the valleys between; each sways a little by itself
+float ferroSpike(vec2 u, float t) {
+  vec3 hx = ferroHex(u);
+  float d = clamp(1.0 - length(hx.xy) * 2.0, 0.0, 1.0);
+  float own = 0.85 + 0.15 * sin(t * 1.3 + hx.z * TAU) + uFerro.z * 0.15 * sin(t * 9.0 + hx.z * 40.0);
+  return d * sqrt(d) * own;
+}
+// The lights around it, as the liquid mirrors them: soft colored lamps with hot middles, their colors slowly turning
+vec3 ferroEnv(vec3 r) {
+  float tn = uFerro.w;
+  vec3 c = vec3(0.012, 0.01, 0.02);
+  vec3 L[6] = vec3[6](vec3(-0.635, 0.53, 0.56), vec3(0.8, 0.23, 0.55), vec3(0.0, 0.95, 0.31),
+                      vec3(-0.33, -0.67, 0.67), vec3(0.8, 0.1, -0.6), vec3(-0.5, 0.5, -0.71));
+  for (int i = 0; i < 6; i++) {
+    float d = max(dot(r, L[i]), 0.0), d2 = d * d, d4 = d2 * d2, d8 = d4 * d4, d32 = d8 * d8 * d8 * d8;
+    float fi = float(i);
+    vec3 col = hsv(fract(tn + 0.77 + fi * 0.17), i == 2 ? 0.25 : 0.8, 1.0);
+    c += col * (0.8 * d4 * d2 + 2.2 * d32 * d32);
+  }
+  return c;
+}
+// How far p is above the liquid (below 0: inside it). The ball's spikes are laid out round the point facing us.
+float ferroF(vec3 p, float t, vec2 amp) {
+  float b = uFerro.y, hi = uFerro.z;
+  if (uFerro.x < 0.5) {
+    float r = length(p);
+    vec3 d = p / max(r, 1e-4);
+    float th = acos(clamp(d.z, -1.0, 1.0));
+    vec2 uv = rot(t * 0.05) * (d.xy / max(length(d.xy), 1e-4) * th * 2.7) + vec2(t * 0.06, 0.0);
+    float wob = 0.02 * (1.0 + b) * sin(d.x * 3.0 + t * 0.7) * sin(d.y * 2.5 - t * 0.5);
+    float a = amp.y * (0.75 + 0.25 * sin(th * 3.0 - t * 1.5)) * smoothstep(2.6, 2.0, th);
+    return r - amp.x - wob - a * ferroSpike(uv, t);
+  }
+  vec2 g = p.xz + vec2(0.0, t * 0.06);
+  float m = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    vec2 c = vec2(1.3 * sin(t * (0.17 + 0.05 * fi) + fi * 2.1), -0.5 + 1.1 * cos(t * (0.13 + 0.04 * fi) + fi * 1.3));
+    vec2 e = p.xz - c;
+    m += exp(-dot(e, e) / 0.4);
+  }
+  m = min(m, 1.0);
+  float ring = 0.5 + 0.5 * cos(length(p.xz - vec2(0.0, -0.4)) * 5.0 - t * 2.5);
+  float a = 0.035 + 0.01 * sin(t * 0.6) + 0.13 * m + b * 0.1 * ring + hi * (0.08 + 0.2 * m);
+  return p.y - a * ferroSpike(g * 3.2, t);
+}
+vec3 seedFerro(vec2 p, float t) {
+  float sc = uScale / 2.5, b = uFerro.y, hi = uFerro.z;
+  vec2 q = p / sc;
+  gSpecA = 0.0;
+  if (uFerro.x > 1.5) {
+    // Flat blobs: seven drops that pull into each other; the highs put a fine shiver on their edges
+    vec2 w = q + hi * 0.008 * vec2(sin(q.y * 70.0 + t * 9.0), cos(q.x * 70.0 - t * 8.0));
+    float f = 0.0;
+    vec2 g = vec2(0.0);
+    for (int i = 0; i < 7; i++) {
+      float fi = float(i);
+      vec2 c = vec2(0.46 * sin(t * (0.11 + 0.03 * fi) + fi * 2.4), 0.3 * cos(t * (0.13 + 0.025 * fi) + fi * 1.7));
+      float r = (0.075 + 0.02 * sin(fi * 5.0 + t * 0.3)) * (1.0 + 0.45 * b);
+      vec2 d = w - c;
+      float d2 = dot(d, d) + 1e-5;
+      f += r * r / d2;
+      g -= 2.0 * r * r * d / (d2 * d2);
+    }
+    float gl = max(length(g), 1e-4), sd = (f - 1.0) / gl, px = 1.0 / (uSim.y * sc);
+    float al = clamp(sd / px + 0.5, 0.0, 1.0);
+    if (al <= 0.0) return vec3(0.0);
+    float tilt = 1.0 - smoothstep(0.0, 1.5, f - 1.0);
+    tilt *= tilt;
+    vec3 n = normalize(vec3(-g / gl * tilt, sqrt(max(1.0 - tilt * tilt, 0.0)) + 0.06));
+    // Lit from the camera's side and a little above, so the rims carry the lamps' colors all the way round
+    vec3 r = reflect(normalize(vec3(-0.25 * q, -1.0)), n);
+    r = normalize(vec3(r.xy, abs(r.z) + 0.35));
+    float rim = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.0);
+    gSpecA = 0.92 * al;
+    return (ferroEnv(r) * (0.35 + 1.4 * rim) + hsv(fract(uFerro.w + 0.77 + 0.5 * atan(n.y, n.x) / TAU), 0.75, 1.0) * 0.5 * rim) * al;
+  }
+  bool ball = uFerro.x < 0.5;
+  vec3 ro, rd;
+  float t0, t1;
+  vec2 amp;
+  bool solid = false;   // the ray ends inside the liquid whatever the spikes do
+  if (ball) {
+    float R = 0.23 * (1.0 + 0.2 * b), aMax = 0.075 + 0.02 * sin(t * 0.6) + 0.11 * hi + 0.02 * b;
+    amp = vec2(R, aMax);
+    float wob = 0.02 * (1.0 + b), Ro = R + wob + aMax * 1.15, Ri = R - wob;
+    // Tipped a little, and nodding slowly, so the spikes' middle isn't dead ahead
+    mat2 tx = rot(0.35 + 0.15 * sin(t * 0.2)), ty = rot(0.3 * sin(t * 0.13));
+    ro = vec3(0.0, 0.0, 1.5);
+    rd = normalize(vec3(q, -1.5));
+    ro.yz = tx * ro.yz; rd.yz = tx * rd.yz;
+    ro.xz = ty * ro.xz; rd.xz = ty * rd.xz;
+    float bq = dot(ro, rd), co = dot(ro, ro) - Ro * Ro, h = bq * bq - co;
+    if (h <= 0.0) return vec3(0.0);
+    h = sqrt(h);
+    t0 = -bq - h; t1 = -bq + h;
+    float hin = bq * bq - (dot(ro, ro) - Ri * Ri);
+    if (hin > 0.0) { t1 = -bq - sqrt(hin); solid = true; }
+  } else {
+    amp = vec2(0.0);
+    float hMax = (0.045 + 0.13 + 0.1 * b + 0.28 * hi) * 1.15;
+    ro = vec3(0.0, 1.15, 1.7);
+    vec3 fw = normalize(vec3(0.0, -0.25, -0.5) - ro), rt = normalize(cross(fw, vec3(0.0, 1.0, 0.0))), up = cross(rt, fw);
+    rd = normalize(fw * 1.5 + rt * q.x + up * q.y);
+    if (rd.y > -0.02) return vec3(0.0);
+    t0 = (hMax - ro.y) / rd.y; t1 = -ro.y / rd.y;
+    if (t0 > 9.0) return vec3(0.0);
+    solid = true;
+  }
+  // Walk the ray through the shell the spikes live in, then close in on where it goes under
+  const int N = 44;
+  float dt = (t1 - t0) / float(N), ta = t0, tb = t0;
+  bool hit = false;
+  for (int i = 0; i < N; i++) {
+    tb = ta + dt;
+    if (ferroF(ro + rd * tb, t, amp) < 0.0) { hit = true; break; }
+    ta = tb;
+  }
+  if (!hit) {
+    if (!solid) return vec3(0.0);
+    ta = t1 - dt; tb = t1;
+  }
+  for (int i = 0; i < 5; i++) {
+    float tm = 0.5 * (ta + tb);
+    if (ferroF(ro + rd * tm, t, amp) < 0.0) tb = tm; else ta = tm;
+  }
+  vec3 pos = ro + rd * tb;
+  const vec2 e = vec2(1.0, -1.0) * 0.0025;
+  vec3 n = normalize(e.xyy * ferroF(pos + e.xyy, t, amp) + e.yyx * ferroF(pos + e.yyx, t, amp) +
+                     e.yxy * ferroF(pos + e.yxy, t, amp) + e.xxx * ferroF(pos + e.xxx, t, amp));
+  if (dot(n, rd) > 0.0) n = normalize(n - rd * dot(n, rd) * 1.05);
+  float ndv = clamp(-dot(n, rd), 0.0, 1.0), fr = 0.4 + 0.6 * pow(1.0 - ndv, 4.0);
+  vec3 c = ferroEnv(reflect(rd, n)) * fr + hsv(fract(uFerro.w + 0.77), 0.7, 1.0) * 0.2 * pow(1.0 - ndv, 3.0);
+  if (ball) { gSpecA = 0.92; return c; }
+  // The pool: far spikes sink into the dark, and the flat liquid between spikes lets the trails show through
+  float fog = exp(-max(tb - 1.6, 0.0) * 0.45), tall = smoothstep(0.012, 0.09, pos.y);
+  gSpecA = 0.85 * tall * fog;
+  return c * fog * mix(0.2, 1.0, tall);
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -1099,6 +1249,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 33) return seedTopo(p, uTime);
   if (id == 34) return seedLife(p, scene);
   if (id == 35) return seedRadar(p, uTime);
+  if (id == 36) return seedFerro(p, uTime);
   // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31), the fractal flights (25 to 30) and a Patch's layers (37),
   // each drawn just before this pass (see draw3D, drawPatch) filling the screen
   if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32) || id == 37) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
