@@ -287,7 +287,10 @@ TIPS
     into a ring of dots (a lot runs them together into cells), Morph sets how much it changes by itself, and New
     pattern rolls the dice on all of them. With React to sound listening,
     the bass pulls the dots into bright knots and the high sounds make it
-    more organic. The Guide's "Dot mandala" recipe sets it up.
+    more organic. Drift the faders slowly moves Corners averaged, Hop and
+    Fractal corners about by themselves, as fast as Drift speed says; grab
+    one any time and it carries on from where you let go. The Guide's
+    "Dot mandala" recipe sets it up.
   - Topo map: glowing contour lines, like a hiking map, seen from straight
     above: cyan low down, gold higher up, rose on the peaks, every fifth line
     bolder. The land slowly reshapes itself while the view drifts across it.

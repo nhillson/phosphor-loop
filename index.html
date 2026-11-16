@@ -560,6 +560,14 @@
               <div class="ends"><span>Still</span><span>Restless</span></div>
             </div>
             <div class="ctl">
+              <button class="btn" id="chaosDrift" aria-pressed="false" title="Slowly moves Corners averaged, Hop and Fractal corners about by themselves, so the pattern never settles. Grab a fader any time: it carries on from where you leave it."><span class="led"></span>Drift the faders</button>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="chaosSpeed" title="How fast Drift the faders moves them: from a few minutes to cross a fader, to a few seconds">Drift speed</label><output id="chaosSpeedOut" for="chaosSpeed"></output></div>
+              <input type="range" id="chaosSpeed" min="0" max="100" step="1" value="40">
+              <div class="ends"><span>Glacial</span><span>Quick</span></div>
+            </div>
+            <div class="ctl">
               <span class="lbl" id="chaosColorLbl" title="Neon, Lime and Phosphor color each spot by how many dots land there. Corners gives every dot the color of the corner it last hopped towards.">Colors</span>
               <div class="seg seg-4" id="chaosColor" role="group" aria-labelledby="chaosColorLbl">
                 <button data-v="0" aria-pressed="true">Neon</button>

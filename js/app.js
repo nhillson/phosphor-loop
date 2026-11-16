@@ -1232,19 +1232,60 @@ function ferroTick(dt) {
 // Chaos game: its faders, colors and dice belong to the loop being edited (they're part of its look, as Ferrofluid's
 // Style is), so each loop can run its own pattern
 const PCH = window.PhosphorChaos;
-const CHAOS_NUM = ['chaosSides', 'chaosMix', 'chaosJump', 'chaosDeep', 'chaosMove'];
+const CHAOS_NUM = ['chaosSides', 'chaosMix', 'chaosJump', 'chaosDeep', 'chaosMove', 'chaosSpeed'];
 const chaosEls = {};
 for (const q of CHAOS_NUM) chaosEls[q] = { el: $('#' + q), out: $('#' + q + 'Out') };
 function chaosText(q, v) {
   if (q === 'chaosMix') return (1 + 5 * Math.pow(v / 100, 1.3)).toFixed(1);   // how many corners that is
   if (q === 'chaosDeep') return v === 0 ? 'PLAIN' : String(v);
   if (q === 'chaosMove') return v === 0 ? 'STILL' : String(v);
+  if (q === 'chaosSpeed') { const s = 70 / (0.4 * Math.pow(60, v / 100)); return s >= 90 ? `${Math.round(s / 60)} MIN` : `${Math.round(s)} S`; }   // about how long to cross a fader
   return String(v);
 }
 function syncChaosUI(t) {
   for (const q of CHAOS_NUM) { const c = chaosEls[q], v = Math.round(t[q] ?? PCH.DEFAULTS[q]); c.el.value = v; fillTrack(c.el); c.out.textContent = chaosText(q, v); }
   $$('#chaosColor button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosColor | 0))));
+  $('#chaosDrift').setAttribute('aria-pressed', String(!!t.chaosDrift));
 }
+// Drift the faders: Corners averaged, Hop and Fractal corners each wander to a spot picked at random, then on to
+// another, easing in and out, at Drift speed. A fader you're holding is left alone and carries on from where you let go.
+const CHAOS_DRIFT = { chaosMix: [0, 100], chaosJump: [30, 75], chaosDeep: [0, 100] };
+const chaosDriftSt = {};
+let chaosHeld = null, chaosDriftUI = 0;
+for (const q of Object.keys(CHAOS_DRIFT)) chaosEls[q].el.addEventListener('pointerdown', () => { chaosHeld = q; });
+for (const ev of ['pointerup', 'pointercancel']) window.addEventListener(ev, () => { chaosHeld = null; });
+function chaosDriftTick(dt) {
+  dt = Math.min(0.25, Math.max(0, dt || 0));
+  for (const k of KEYS) {
+    const t = loops[k].tgt;
+    if (!t.chaosDrift || !chaosUses(k) || !loopOn(k)) { delete chaosDriftSt[k]; continue; }
+    const S = chaosDriftSt[k] || (chaosDriftSt[k] = {});
+    // From about 4 minutes to cross a fader (Glacial) to about 4 seconds (Quick)
+    const rate = 0.4 * Math.pow(60, clamp(t.chaosSpeed ?? 40, 0, 100) / 100) * (reduceMotion ? 0.5 : 1);
+    for (const [q, [lo, hi]] of Object.entries(CHAOS_DRIFT)) {
+      const d = S[q] || (S[q] = { to: null, v: 0 });
+      let x = +t[q]; if (!Number.isFinite(x)) x = PCH.DEFAULTS[q];
+      if (k === edit && chaosHeld === q) { d.to = null; d.v = 0; continue; }
+      if (d.to === null || Math.abs(d.to - x) < 1) { do { d.to = lo + Math.random() * (hi - lo); } while (Math.abs(d.to - x) < 15); }
+      // Its speed eases up after a turn and down as it nears the spot, so it never jerks
+      const want = Math.sign(d.to - x) * rate * Math.min(1, Math.abs(d.to - x) / 8 + 0.15);
+      d.v += (want - d.v) * (1 - Math.exp(-dt * 1.5));
+      t[q] = clamp(x + d.v * dt, 0, 100);
+    }
+  }
+  const now = performance.now();
+  if (now - chaosDriftUI > 150 && chaosDriftSt[edit] && !$('#row-chaos').hidden) {
+    chaosDriftUI = now;
+    for (const q of Object.keys(CHAOS_DRIFT)) if (chaosHeld !== q) { const c = chaosEls[q], v = Math.round(loops[edit].tgt[q]); if (+c.el.value !== v) { c.el.value = v; fillTrack(c.el); c.out.textContent = chaosText(q, v); } }
+  }
+}
+$('#chaosDrift').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosDrift = !t.chaosDrift;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosDrift ? 'DRIFT ON' : 'DRIFT OFF');
+});
 for (const q of CHAOS_NUM) {
   const c = chaosEls[q];
   c.el.addEventListener('input', () => { takeOver('in1'); loops[edit].tgt[q] = +c.el.value; fillTrack(c.el); c.out.textContent = chaosText(q, +c.el.value); });
@@ -12027,11 +12068,12 @@ function drawChaos(k, t, dt) {
   const hears = reacts(k);
   return eng.run(chaosSt[k], simW, simH, t, dt, { music: { on: hears, bass: ferroMus.bass, high: ferroMus.high, hit: brushMus.hit } });
 }
-function chaosTick() {
+function chaosTick(dt) {
+  chaosDriftTick(dt);
   if (!chaosEng) return;
   for (const k of KEYS) if (chaosSt[k] && !(chaosUses(k) && loopOn(k))) { chaosEng.release(chaosSt[k]); chaosSt[k] = null; }
 }
-window.__plChaos = { st: chaosSt, ready: () => !!chaosEng, failed: () => chaosFailed };
+window.__plChaos = { st: chaosSt, drift: chaosDriftSt, ready: () => !!chaosEng, failed: () => chaosFailed };
 window.__plFw = { fwrap, setFw, fwSt, tiles: fwTiles, ready: () => !!fwEng, failed: () => fwFailed, tileName: () => fwEng && fwEng.tileName() };
 /* ================= color filters ================= */
 // Posterize (each loop's own) and Color grading can each work on screen, over the finished picture, or inside the
@@ -17460,7 +17502,7 @@ function frame() {
   cloudTick(now);
   brushTick(now, dt);
   fwTick();
-  chaosTick();
+  chaosTick(dt);
   vcrTick();
   packAdj();
   analyzeSound(dt, now);

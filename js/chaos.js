@@ -11,8 +11,9 @@
 // averaged, some dots use one and some the other, so it's two sharp pictures mixed, never a smear). The dots are added up in a picture of
 // their own that fades over about a quarter of a second, and how many landed on each spot picks its color.
 window.PhosphorChaos = (() => {
-// A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100
-const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0 };
+// A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100. Drift (the app's doing,
+// see chaosDrift in js/app.js) moves Corners averaged, Hop and Fractal corners about by themselves, at chaosSpeed.
+const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, chaosDrift: false, chaosSpeed: 40 };
 const COLORS = ['Neon', 'Lime', 'Corners', 'Phosphor'];
 const MAX_K = 6, MAX_N = 12;
 const num = (v, d, a, b) => { v = +v; return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
@@ -20,7 +21,8 @@ function clean(s) {
   s = s || {};
   return { chaosSides: Math.round(num(s.chaosSides, DEFAULTS.chaosSides, 3, MAX_N)), chaosMix: num(s.chaosMix, DEFAULTS.chaosMix, 0, 100),
     chaosJump: num(s.chaosJump, DEFAULTS.chaosJump, 0, 100), chaosDeep: num(s.chaosDeep, DEFAULTS.chaosDeep, 0, 100),
-    chaosMove: num(s.chaosMove, DEFAULTS.chaosMove, 0, 100), chaosColor: Math.round(num(s.chaosColor, 0, 0, COLORS.length - 1)) };
+    chaosMove: num(s.chaosMove, DEFAULTS.chaosMove, 0, 100), chaosColor: Math.round(num(s.chaosColor, 0, 0, COLORS.length - 1)),
+    chaosDrift: !!s.chaosDrift, chaosSpeed: num(s.chaosSpeed, DEFAULTS.chaosSpeed, 0, 100) };
 }
 // A pattern picked at random (the dice button, Surprise me and Autopilot)
 function look() {
