@@ -4667,7 +4667,7 @@ function tasteFeats(L) {
   if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
   if (L.in1 === 'ferro' || L.in2 === 'ferro') f.push('ferro:' + (L.ferroStyle | 0));
-  if (L.in1 === 'chaos' || L.in2 === 'chaos') f.push('chaos:' + (L.chaosSides | 0) + ((L.chaosMix ?? 45) < 25 ? 'g' : (L.chaosMix ?? 45) < 60 ? 'm' : 'o') + (L.chaosColor | 0));
+  if (L.in1 === 'chaos' || L.in2 === 'chaos') f.push('chaos:' + (L.chaosSides | 0) + ((L.chaosMix ?? 50) < 25 ? 'g' : (L.chaosMix ?? 50) < 60 ? 'm' : 'o') + (L.chaosColor | 0));
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
   if (L.in1 === 'cloud' || L.in2 === 'cloud') f.push('cloud:' + (L.cloudOf || 'picture'));
   if (L.in1 === 'brush' || L.in2 === 'brush') f.push('brush:' + (L.brushOf || 'self'));
@@ -9185,9 +9185,9 @@ const RECIPES = [
     patch: { A: { in1: 'ferro', ferroStyle: 0, size: 100, zoom: 8, spin: 0, trails: 70, color: 0, blur: 0 } } },
   { name: 'Dot mandala', after: 'Under Chaos game, slide Corners averaged from Geometric to Organic, or press New pattern for one you haven’t seen. Play music with React to sound listening and the bass pulls the dots into bright knots.',
     text: 'The chaos game: dots hopping towards corners picked at random draw a mandala of rings and cells that slowly morphs, with soft echoes behind it.',
-    how: 'CHAOS GAME · 6 CORNERS · TRAILS 45 · ZOOM 4',
+    how: 'CHAOS GAME · 12 CORNERS · TRAILS 25',
     sw: 'radial-gradient(circle at 50% 50%,#33ffcc 0 4%,transparent 6%),repeating-radial-gradient(circle at 50% 50%,#05040a 0 6%,#247aeb 7% 9%,#05040a 10% 13%,#c7260d 14% 15%)',
-    patch: { A: { in1: 'chaos', chaosSides: 6, chaosMix: 45, chaosJump: 50, chaosDeep: 45, chaosMove: 40, chaosColor: 0, size: 100, zoom: 4, spin: 0, trails: 45, color: 0, blur: 0 } } },
+    patch: { A: { in1: 'chaos', chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, size: 100, zoom: 0, spin: 0, trails: 25, color: 0, blur: 0 } } },
   { name: 'Liquid marble', after: 'With the effect stack, open any card to change it, give a fader a mover (a wave, the music, the bass), or add effects of your own.',
     text: 'A turning Shape pulled into liquid swirls by a Swirl that slowly tightens and loosens, with Gradient colors over it all and soft echoes spinning out.',
     how: 'EFFECT STACK · SWIRL · GRADIENT COLORS · ZOOM 12 · SPIN 8 · TRAILS 82',

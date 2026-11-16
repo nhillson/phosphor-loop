@@ -7,11 +7,12 @@
 //
 // Nothing is remembered between frames except the glow: every dot is worked out from scratch in the vertex shader
 // (its own number picks its random corners for a run of hops from the middle), so the corners, the hop and the
-// number averaged can all glide and the whole picture morphs with them. The dots are added up in a picture of
+// little polygons can all glide and the whole picture morphs with them (between two whole numbers of corners
+// averaged, some dots use one and some the other, so it's two sharp pictures mixed, never a smear). The dots are added up in a picture of
 // their own that fades over about a quarter of a second, and how many landed on each spot picks its color.
 window.PhosphorChaos = (() => {
 // A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100
-const DEFAULTS = { chaosSides: 6, chaosMix: 45, chaosJump: 50, chaosDeep: 45, chaosMove: 40, chaosColor: 0 };
+const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0 };
 const COLORS = ['Neon', 'Lime', 'Corners', 'Phosphor'];
 const MAX_K = 6, MAX_N = 12;
 const num = (v, d, a, b) => { v = +v; return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
@@ -24,8 +25,8 @@ function clean(s) {
 // A pattern picked at random (the dice button, Surprise me and Autopilot)
 function look() {
   const r = (a, b) => Math.round(a + Math.random() * (b - a));
-  return { chaosSides: [3, 4, 5, 5, 6, 6, 7, 8, 8, 10, 12][r(0, 10)], chaosMix: Math.random() < 0.3 ? r(0, 25) : r(25, 100), chaosJump: r(30, 75),
-    chaosDeep: Math.random() < 0.2 ? 0 : r(20, 90), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1) };
+  return { chaosSides: [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)], chaosMix: Math.random() < 0.25 ? r(0, 25) : r(25, 100), chaosJump: r(35, 70),
+    chaosDeep: Math.random() < 0.25 ? 0 : r(15, 100), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1) };
 }
 
 const VS_TRI = `#version 300 es
@@ -35,9 +36,10 @@ void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); gl_Po
 const VS_DOT = `#version 300 es
 precision highp float;
 precision highp int;
-uniform vec2 uV[${MAX_N}];   // the polygon's corners, already turned
-uniform vec2 uSub, uSub2;    // the little polygons on each corner, and the smaller ones on theirs: size and turn
-uniform float uN, uK, uJump, uFit, uAsp, uSize;
+uniform vec2 uV[${MAX_N}];   // the polygon's corners (on a circle of 1), already turned
+uniform vec2 uSub, uSub2;    // which way the little polygons on each corner are turned, and the smaller ones on theirs
+uniform float uN, uK, uDeep, uDeep2, uSame, uFit, uAsp, uSize;
+uniform vec2 uLeft;          // what's left of a dot's own place after a hop, for floor(uK) corners and for one more
 uniform int uSteps;
 uniform uint uSeed;
 out vec3 vCol;
@@ -45,19 +47,24 @@ uint pcg(uint v){ uint s=v*747796405u+2891336453u; uint w=((s>>((s>>28u)+4u))^s)
 vec2 mul(vec2 a, vec2 b){ return vec2(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x); }
 void main(){
   uint n=uint(uN), h=pcg(uint(gl_VertexID)*2654435761u ^ uSeed);
-  int kc=int(ceil(uK-1e-4)); float lastW=uK-float(kc-1);
+  // Each dot averages a whole number of corners: between two whole numbers some dots use one and some the other,
+  // so the picture is always two sharp pictures mixed, never a smear
+  float kf=floor(uK+1e-4), more=step(float(h>>8)/16777216., uK-kf);
+  int kc=int(kf+more);
+  float left=mix(uLeft.x, uLeft.y, more), s1=uDeep/float(kc), s2=s1*s1*uDeep2, R=1./(1.+s1+s2);
   vec2 p=vec2(0.), first=vec2(0.);
   for(int s=0;s<uSteps;s++){
-    vec2 t=vec2(0.); float ws=0.;
+    vec2 t=vec2(0.); uint g=0u;
     for(int j=0;j<${MAX_K};j++){
       if(j>=kc) break;
       h=pcg(h+uint(j)+1u);
-      vec2 a=uV[h%n], c=a+mul(uSub,uV[(h/n)%n])+mul(uSub2,uV[(h/(n*n))%n]);
-      float w=(j==kc-1)?lastW:1.;
-      t+=w*c; ws+=w;
+      // Now and then the same corner again: it spreads the dots out to the rim instead of heaping them in the middle
+      if(j==0 || float(h>>8)/16777216.>=uSame) g=pcg(h^0x68bc21ebu);
+      vec2 a=uV[g%n];
+      t+=a+s1*mul(uSub,uV[(g/n)%n])+s2*mul(uSub2,uV[(g/(n*n))%n]);
       if(j==0) first=a;
     }
-    p=mix(p, t/ws, uJump);
+    p=mix(t*(R/float(kc)), p, left);
   }
   vCol=vec3(1., first);
   gl_Position=vec4(p.x*uFit/uAsp, p.y*uFit, 0., 1.);
@@ -131,11 +138,11 @@ function create(gl) {
   }
   // Dots are added up in a picture that can hold more than 255 a spot, where the graphics card can draw to one
   const deep = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
-  const dot = program(VS_DOT, FS_DOT, ['uV', 'uSub', 'uSub2', 'uN', 'uK', 'uJump', 'uFit', 'uAsp', 'uSize', 'uSteps', 'uSeed', 'uSoft', 'uW']);
+  const dot = program(VS_DOT, FS_DOT, ['uV', 'uSub', 'uSub2', 'uN', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uLeft', 'uFit', 'uAsp', 'uSize', 'uSteps', 'uSeed', 'uSoft', 'uW']);
   const fade = program(VS_TRI, FS_FADE, ['uKeep']);
   const show = program(VS_TRI, FS_SHOW, ['uAcc', 'uNorm', 'uPal', 'uGain', 'uShift']);
   const vao = gl.createVertexArray();
-  const FIT = 0.95, RATE = 9e6, TAU = 0.25;   // how much of the height it fills; dots a second; the glow's fade (seconds)
+  const FIT = 0.95, RATE = 9e6, TAU = 0.25, SAME = 0.3;   // how much of the height it fills; dots a second; the glow's fade (seconds)
 
   function target(w, h, deepOne) {
     const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -196,16 +203,14 @@ function create(gl) {
     // pentagon's 0.38 and so on). That's the middle of the Hop fader. Softer keeps more of the dot's own place (the
     // dots smear into each other), sharper less (tight separate dots).
     let touch = 1; for (let i = 1; i <= Math.floor(N / 4); i++) touch += Math.cos(2 * Math.PI * i / N);
-    let left = (0.5 / touch / Math.pow(K, 1.6)) * Math.pow(2, (0.5 - c.jump) * 3) * (1 + 0.14 * mv * Math.sin(st.t * 0.127)) * (1 - 0.22 * st.bass);
-    left = Math.max(0.05, Math.min(0.8, left));
-    const jump = 1 - left;
-    const size1 = (0.5 * c.deep / K) * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1));
-    const size2 = size1 * size1 * Math.min(1, Math.max(0, (c.deep - 0.3) / 0.3));
-    const R = 1 / (1 + size1 + size1 * size2);
+    const hop = Math.pow(2, (0.5 - c.jump) * 3) * (1 + 0.14 * mv * Math.sin(st.t * 0.127)) * (1 - 0.22 * st.bass);
+    const leftFor = (k) => Math.max(0.03, Math.min(0.8, (0.5 / touch / Math.pow(k, 1.6)) * hop));
+    const k0 = Math.floor(K + 1e-4), left0 = leftFor(k0), left1 = leftFor(Math.min(MAX_K, k0 + 1));
+    const deep1 = 0.16 * c.deep * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1)), deep2 = Math.min(1, Math.max(0, (c.deep - 0.3) / 0.3));
     const V = new Float32Array(MAX_N * 2);
-    for (let i = 0; i < N; i++) { const a = turn + Math.PI / 2 + (i / N) * 2 * Math.PI; V[i * 2] = Math.cos(a) * R; V[i * 2 + 1] = Math.sin(a) * R; }
+    for (let i = 0; i < N; i++) { const a = turn + Math.PI / 2 + (i / N) * 2 * Math.PI; V[i * 2] = Math.cos(a); V[i * 2 + 1] = Math.sin(a); }
     // Enough hops that where a dot started no longer shows
-    const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(left))));
+    const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(left0))));
     // As many dots a second whatever the frame rate, so the picture is as thick at 30 frames a second as at 60
     const px = Math.max(1, Math.round(outH / 620)), soft = px > 1;
     const n = Math.round(Math.max(60000, Math.min(deep ? 240000 : 200000, RATE * dt)));
@@ -225,9 +230,10 @@ function create(gl) {
     gl.blendFunc(gl.ONE, gl.ONE);
     gl.useProgram(dot.p);
     gl.uniform2fv(dot.u.uV, V);
-    gl.uniform2f(dot.u.uSub, Math.cos(subTurn) * size1, Math.sin(subTurn) * size1);
-    gl.uniform2f(dot.u.uSub2, Math.cos(2.3 * subTurn) * size1 * size2, Math.sin(2.3 * subTurn) * size1 * size2);
-    gl.uniform1f(dot.u.uN, N); gl.uniform1f(dot.u.uK, K); gl.uniform1f(dot.u.uJump, jump);
+    gl.uniform2f(dot.u.uSub, Math.cos(subTurn), Math.sin(subTurn));
+    gl.uniform2f(dot.u.uSub2, Math.cos(2.3 * subTurn), Math.sin(2.3 * subTurn));
+    gl.uniform1f(dot.u.uN, N); gl.uniform1f(dot.u.uK, K); gl.uniform2f(dot.u.uLeft, left0, left1);
+    gl.uniform1f(dot.u.uDeep, deep1); gl.uniform1f(dot.u.uDeep2, deep2); gl.uniform1f(dot.u.uSame, SAME);
     gl.uniform1f(dot.u.uFit, FIT); gl.uniform1f(dot.u.uAsp, outW / outH); gl.uniform1f(dot.u.uSize, px);
     gl.uniform1i(dot.u.uSteps, steps); gl.uniform1ui(dot.u.uSeed, (st.frame = (st.frame + 1) >>> 0) * 0x9E3779B9 >>> 0);
     gl.uniform1f(dot.u.uSoft, soft ? 1 : 0); gl.uniform1f(dot.u.uW, deep ? 1 : 2 / 255);
