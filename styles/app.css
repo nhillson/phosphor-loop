@@ -1298,7 +1298,7 @@ button.seq-card { cursor: pointer; }
 /* ===== Effect stack (see "effect stack" in js/app.js) ===== */
 body:not(.stk) .stk-only, body.stk .classic-only { display: none !important; }
 body.stk .where-mini, body.stk #gradeWhere, body.stk #typeWhere, body.stk .stk-classic-hint { display: none !important; }
-body.stk #sndMap .chip:not([data-map="lines"]):not([data-map="ripple"]):not([data-map="build"]):not([data-map="hills"]) { display: none; }
+body.stk #sndMap .chip[data-map="flash"] { display: none; }
 .stk-top { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 2px 0 6px; }
 .stk-top .hint { flex: 1; }
 .stk-fixed { margin-bottom: 6px; }

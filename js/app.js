@@ -16652,9 +16652,9 @@ const stackOpen = new Set(), stackTouch = {};
 const { feedbackFS, feedbackParts } = window.PhosphorShaders;
 const fbClassic = fbProg;
 const fbCache = new Map([[feedbackParts(null).sig, fbClassic]]);
-const STACK_SND_OFF = { kick: false, size: false, spin: false, color: false, warp: false, flash: false, asym: false };
-// What the music moves: React to sound's list in Classic; in the stack only Sound on lines (movers do the rest)
-function sndMapNow() { return stackMode ? { ...STACK_SND_OFF, lines: snd.map.lines } : snd.map; }
+// What the music moves: React to sound's list, in Classic and the stack alike (Nick wanted them back with the stack),
+// except Flash, which stays Classic only; the stack's movers add on top
+function sndMapNow() { return stackMode ? { ...snd.map, flash: false } : snd.map; }
 
 // ---- the lists
 function stackFind(list, kind, zone) { return list.find((it) => it.kind === kind && (!zone || it.zone === zone)) || null; }
