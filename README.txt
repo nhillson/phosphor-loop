@@ -279,6 +279,16 @@ TIPS
     listening, the bass swells it and the high sounds shoot the spikes out;
     with no music it breathes and drifts by itself. The liquid is black and
     covers the trails behind it, so only its reflections feed the loop.
+  - Machinery: Machinery under Inputs builds a machine out of blocks that
+    keeps rebuilding itself. Big modules ride to new places and dock against
+    each other, now and then one backs out and rolls over, arms push out on
+    rams, and pistons, rods, shuttles, flaps and cages work away on them.
+    Nothing fades in or out and nothing passes through anything else. Colors
+    picks one of twelve sets (Orchid, Phosphor, Brass, Ice, Ember, Moss, Neon,
+    Blueprint, Steel, Sunset, Candy, Mono), Speed goes from still to three
+    times as fast, and New machine builds a different one. With React to
+    sound listening, the bass hurries it along. Try the Guide's "Clockwork"
+    recipe.
   - Chaos game: dots hop towards corners picked at random and draw a mandala.
     With 3 Corners and Corners averaged at Geometric it's the famous
     Sierpinski triangle; slide towards Organic and each hop goes towards the

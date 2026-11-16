@@ -427,6 +427,7 @@
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
             <button data-src="ferro" aria-pressed="false" title="Shiny black magnetic liquid: the bass swells it and the high sounds shoot its spikes out">Ferro&shy;fluid</button>
             <button data-src="chaos" aria-pressed="false" title="The chaos game: dots hopping towards corners picked at random draw a mandala that slowly morphs, from sharp and geometric to cells like something grown">Chaos game</button>
+            <button data-src="machine" aria-pressed="false" title="A machine built of blocks that keeps rebuilding itself: modules slide and dock, arms push out, pistons and shuttles work away. Nothing fades and nothing passes through anything else.">Machin&shy;ery</button>
             <button data-src="cloud" aria-pressed="false" title="A picture, video, the camera or the other loop turned into a cloud of glowing 3D dots that wind, your finger and explosions can blow about">Point cloud</button>
             <button data-src="brush" aria-pressed="false" title="Thousands of little brushes that wander on swirling currents, each leaving a stroke behind it">Brushes</button>
             <button data-src="fwrap" aria-pressed="false" title="A picture wrapped round a fractal, layer inside layer, flowing down into it as its shape changes">Fractal wrap</button>
@@ -577,6 +578,20 @@
               <button class="btn" id="chaosRoll" title="Rolls the dice on every setting above for a pattern you haven't seen">New pattern</button>
             </div>
             <span class="hint">The bass pulls the dots into bright knots and the high sounds make it more organic (switch on React to sound). With no music it morphs by itself.</span>
+          </div>
+
+          <div class="dev" id="row-machine" hidden>
+            <div class="ctl">
+              <div class="poster-colors"><span id="machColorLbl" title="Each strip shows a set of colors: the two sides of the blocks, their tops, and the small highlights">Colors: <b id="machColorName">Orchid</b></span><div class="chaos-colors" id="machColor" role="group" aria-labelledby="machColorLbl"></div></div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="machSpeed" title="How fast the machine works: all the way left holds it still, the middle is normal, all the way right is three times as fast">Speed</label><output id="machSpeedOut" for="machSpeed"></output></div>
+              <input type="range" id="machSpeed" min="0" max="100" step="1" value="50">
+            </div>
+            <div class="ctl">
+              <button class="btn" id="machRoll" title="Builds a different machine, in the colors you picked">New machine</button>
+            </div>
+            <span class="hint">The bass hurries the machine along (switch on React to sound). With no music it works away by itself.</span>
           </div>
 
           <div class="dev" id="row-cloud" hidden>
@@ -2441,6 +2456,7 @@
 <script src="js/brushes.js"></script>
 <script src="js/fractalwrap.js"></script>
 <script src="js/chaos.js"></script>
+<script src="js/machinery.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/library.js"></script>
 <script src="js/patch.js"></script>

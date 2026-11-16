@@ -159,16 +159,16 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, ferro: 36, cloud: 37, brush: 37, fwrap: 37, chaos: 37 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, ferro: 36, cloud: 37, brush: 37, fwrap: 37, chaos: 37, machine: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', chaos: 'Chaos game', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', chaos: 'Chaos game', machine: 'Machinery', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, ferroStyle: 0, ...window.PhosphorChaos.DEFAULTS, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'tiles',
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, ferroStyle: 0, ...window.PhosphorChaos.DEFAULTS, ...window.PhosphorMachinery.DEFAULTS, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'tiles',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, posterTheme: 'own', halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
@@ -1095,7 +1095,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['chaos', 'Chaos game'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['chaos', 'Chaos game'], ['machine', 'Machinery'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1319,6 +1319,29 @@ $('#chaosRoll').addEventListener('click', () => {
   Object.assign(loops[edit].tgt, PCH.look());
   syncUI();
   showOSD('CHAOS GAME', 'NEW PATTERN');
+});
+// Machinery: its colors, speed and dice belong to the loop being edited too
+const PMA = window.PhosphorMachinery;
+PMA.COLORS.forEach((name, i) => { const b = document.createElement('button'); b.dataset.v = i; b.title = name; b.setAttribute('aria-label', name); b.setAttribute('aria-pressed', 'false'); b.style.background = PMA.preview(i); $('#machColor').appendChild(b); });
+const machSpeedText = (v) => (v === 0 ? 'STILL' : PMA.speedOf(v).toFixed(1) + '×');
+function syncMachUI(t) {
+  const el = $('#machSpeed'), v = Math.round(t.machSpeed ?? PMA.DEFAULTS.machSpeed);
+  el.value = v; fillTrack(el); $('#machSpeedOut').textContent = machSpeedText(v);
+  $$('#machColor button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.machColor | 0))));
+  $('#machColorName').textContent = PMA.COLORS[t.machColor | 0] || PMA.COLORS[0];
+}
+$('#machSpeed').addEventListener('input', (e) => { takeOver('in1'); loops[edit].tgt.machSpeed = +e.target.value; fillTrack(e.target); $('#machSpeedOut').textContent = machSpeedText(+e.target.value); });
+$$('#machColor button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.machColor = +b.dataset.v;
+  syncUI();
+  showOSD('MACHINERY', PMA.COLORS[+b.dataset.v].toUpperCase());
+}));
+$('#machRoll').addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.machSeed = PMA.look().machSeed;      // a different machine, in the colors you picked
+  syncUI();
+  showOSD('MACHINERY', 'NEW MACHINE');
 });
 // A random Life look for Surprise and Autopilot: mostly medium, now and then big or small cells, slow or fast
 function lifeLook() {
@@ -1633,7 +1656,7 @@ function syncUI() {
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   const cloudHere = usesHere('cloud') ? (t.cloudOf || 'picture') : null;
   const brushHere = usesHere('brush') ? t.brushOf : null, fwHere = usesHere('fwrap') ? (t.fwOf || 'tiles') : null;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'ferro', 'chaos', 'cloud', 'brush', 'fwrap']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere && s !== brushHere && s !== fwHere;
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'cloud', 'brush', 'fwrap']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere && s !== brushHere && s !== fwHere;
   $$('#fwOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.fwOf || 'tiles'))));
   $$('#cloudOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.cloudOf || 'picture'))));
   $$('#brushOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.brushOf || 'self'))));
@@ -1643,6 +1666,7 @@ function syncUI() {
   $$('#radarShows button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.radarWind)));
   $$('#ferroStyle button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.ferroStyle | 0))));
   syncChaosUI(t);
+  syncMachUI(t);
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
@@ -1724,7 +1748,7 @@ function patchLoop(k, p, force) {
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
-    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(PCH.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf']) n[q] = p[q] ?? L.tgt[q]; }
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(PCH.DEFAULTS), ...Object.keys(PMA.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
@@ -1734,6 +1758,7 @@ function patchLoop(k, p, force) {
   if (!['self', 'loop', 'picture', 'video', 'camera', 'none'].includes(n.brushOf)) n.brushOf = 'self';
   if (!['tiles', 'picture', 'video', 'camera', 'self', 'loop'].includes(n.fwOf)) n.fwOf = 'tiles';
   Object.assign(n, PCH.clean(n));
+  Object.assign(n, PMA.clean(n));
   Object.assign(L.tgt, n);
   L.base = { ...L.tgt };
   // Each whole new look gets a number, so More like this and Not this know when it's the same look rated twice
@@ -1763,7 +1788,7 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
     in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, ferroStyle: Math.floor(Math.random() * 3), ...PCH.look(),
@@ -2496,7 +2521,7 @@ function neutral() {
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
     ...effectsOff(),
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'ferro' || src === 'chaos' || src === 'patch' || src === 'cloud' || src === 'brush' || src === 'fwrap' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'ferro' || src === 'chaos' || src === 'machine' || src === 'patch' || src === 'cloud' || src === 'brush' || src === 'fwrap' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound, stack: [],
   };
@@ -2553,7 +2578,7 @@ function neutralLoop(k) {
   patchLoop(k, {
     ...effectsOff(),
     in1: src, in2: 'none', blend: 50, motion: false,
-    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'patch', 'cloud', 'brush', 'fwrap', 'loop'].includes(src) ? 100 : 50,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'patch', 'cloud', 'brush', 'fwrap', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic, stack: [],
   }, true);
@@ -2596,7 +2621,7 @@ window.__plNeutralLoop = neutralLoop;
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(window.PhosphorChaos.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(window.PhosphorChaos.DEFAULTS), ...Object.keys(window.PhosphorMachinery.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2703,7 +2728,7 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['chaos', 'Chaos game'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['chaos', 'Chaos game'], ['machine', 'Machinery'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -3475,7 +3500,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3680,6 +3705,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'cloud') sc.size = Math.round(rnd(80, 100));
     if (sc.in1 === 'brush' || sc.in1 === 'fwrap') sc.size = 100;
     if (sc.in1 === 'chaos') sc.size = Math.round(rnd(80, 100));
+    if (sc.in1 === 'machine') sc.size = Math.round(rnd(85, 100));
     if (['camera', 'screen', 'phone', 'video'].includes(sc.in1)) {
       sc.size = Math.round(rnd(60, 100));
       if (!isPinned('in1', k)) sc.motion = Math.random() < 0.35;
@@ -3689,6 +3715,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
     if ((sc.in1 === 'ferro' || sc.in2 === 'ferro') && !isPinned('in1', k)) sc.ferroStyle = Math.floor(Math.random() * 3);
     if ((sc.in1 === 'chaos' || sc.in2 === 'chaos') && !isPinned('in1', k)) Object.assign(sc, PCH.look());
+    if ((sc.in1 === 'machine' || sc.in2 === 'machine') && !isPinned('in1', k)) Object.assign(sc, PMA.look());
     if ((sc.in1 === 'cloud' || sc.in2 === 'cloud') && !isPinned('in1', k)) sc.cloudOf = cloudApOf(k);
     if ((sc.in1 === 'brush' || sc.in2 === 'brush') && !isPinned('in1', k)) sc.brushOf = brushApOf();
     if ((sc.in1 === 'fwrap' || sc.in2 === 'fwrap') && !isPinned('in1', k)) sc.fwOf = fwApOf();
@@ -3752,7 +3779,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(PCH.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(PCH.DEFAULTS), ...Object.keys(PMA.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -4728,6 +4755,7 @@ function tasteFeats(L) {
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
   if (L.in1 === 'ferro' || L.in2 === 'ferro') f.push('ferro:' + (L.ferroStyle | 0));
   if (L.in1 === 'chaos' || L.in2 === 'chaos') f.push('chaos:' + (L.chaosSides | 0) + ((L.chaosMix ?? 50) < 25 ? 'g' : (L.chaosMix ?? 50) < 60 ? 'm' : 'o') + (L.chaosColor | 0));
+  if (L.in1 === 'machine' || L.in2 === 'machine') f.push('machine:' + (L.machColor | 0));
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
   if (L.in1 === 'cloud' || L.in2 === 'cloud') f.push('cloud:' + (L.cloudOf || 'picture'));
   if (L.in1 === 'brush' || L.in2 === 'brush') f.push('brush:' + (L.brushOf || 'self'));
@@ -9248,6 +9276,11 @@ const RECIPES = [
     how: 'CHAOS GAME · 12 CORNERS · TRAILS 25',
     sw: 'radial-gradient(circle at 50% 50%,#33ffcc 0 4%,transparent 6%),repeating-radial-gradient(circle at 50% 50%,#05040a 0 6%,#247aeb 7% 9%,#05040a 10% 13%,#c7260d 14% 15%)',
     patch: { A: { in1: 'chaos', chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, size: 100, zoom: 0, spin: 0, trails: 25, color: 0, blur: 0 } } },
+  { name: 'Clockwork', after: 'Under Machinery, pick a set of colors, slide Speed, or press New machine for a different build. With React to sound listening, the bass hurries it along.',
+    text: 'A machine of blocks that keeps rebuilding itself: modules ride to new places and dock, arms push out, pistons and shuttles work away, and nothing ever passes through anything else. Soft echoes trail behind.',
+    how: 'MACHINERY · ORCHID · TRAILS 30',
+    sw: 'linear-gradient(135deg,#05040a 0 22%,#6c6796 22% 40%,#9c5a86 40% 60%,#d9a9cf 60% 78%,#05040a 78%)',
+    patch: { A: { in1: 'machine', machColor: 0, machSpeed: 50, machSeed: 3, size: 100, zoom: 0, spin: 0, trails: 30, color: 0, blur: 0 } } },
   { name: 'Liquid marble', after: 'With the effect stack, open any card to change it, give a fader a mover (a wave, the music, the bass), or add effects of your own.',
     text: 'A turning Shape pulled into liquid swirls by a Swirl that slowly tightens and loosens, with Gradient colors over it all and soft echoes spinning out.',
     how: 'EFFECT STACK · SWIRL · GRADIENT COLORS · ZOOM 12 · SPIN 8 · TRAILS 82',
@@ -12092,6 +12125,33 @@ function chaosTick(dt) {
   if (!chaosEng) return;
   for (const k of KEYS) if (chaosSt[k] && !(chaosUses(k) && loopOn(k))) { chaosEng.release(chaosSt[k]); chaosSt[k] = null; }
 }
+// ---- machinery ----
+// The Machinery input (js/machinery.js): each loop's own machine, drawn at the loop's size and read through the 3D
+// world slot, as the Chaos game's pattern is. With React to sound the bass hurries it along.
+let machEng = null, machFailed = false;
+function machEngine() {
+  if (machEng || machFailed) return machEng;
+  try { machEng = PMA.create(gl); } catch (err) {
+    console.warn('Machinery could not start:', err);
+    machFailed = true;
+    toast('Machinery can’t run on this graphics card.');
+    return null;
+  }
+  return machEng;
+}
+const machSt = { A: null, B: null, C: null, D: null };
+const machUses = (k) => { const t = loops[k].tgt; return t.in1 === 'machine' || t.in2 === 'machine'; };
+function drawMach(k, t, dt) {
+  const eng = machEngine();
+  if (!eng) return null;
+  if (!machSt[k]) machSt[k] = eng.state();
+  return eng.run(machSt[k], simW, simH, t, dt, { music: { on: reacts(k), bass: ferroMus.bass } });
+}
+function machTick() {
+  if (!machEng) return;
+  for (const k of KEYS) if (machSt[k] && !(machUses(k) && loopOn(k))) { machEng.release(machSt[k]); machSt[k] = null; }
+}
+window.__plMach = { st: machSt, ready: () => !!machEng, failed: () => machFailed };
 window.__plChaos = { st: chaosSt, drift: chaosDriftSt, ready: () => !!chaosEng, failed: () => chaosFailed };
 window.__plFw = { fwrap, setFw, fwSt, tiles: fwTiles, ready: () => !!fwEng, failed: () => fwFailed, tileName: () => fwEng && fwEng.tileName() };
 /* ================= color filters ================= */
@@ -14104,12 +14164,16 @@ function runLoop(k, xf, brush, f) {
   const chaosTex = t.in1 === 'chaos' || t.in2 === 'chaos' ? drawChaos(k, t, f / 60) : null;
   if (t.in1 === 'chaos') flyTex1 = chaosTex;
   if (t.in2 === 'chaos') flyTex2 = chaosTex;
+  // The Machinery's machine likewise
+  const machTex = t.in1 === 'machine' || t.in2 === 'machine' ? drawMach(k, t, f / 60) : null;
+  if (t.in1 === 'machine') flyTex1 = machTex;
+  if (t.in2 === 'machine') flyTex2 = machTex;
   // Life's board is read through the picture slot its input would use for a 3D world (it has no slot of its own:
   // see UNITS). Traced by Topo map, it's read from the first, as a traced 3D world is.
   const traced = topoTrace(t);
   const lifeIn1 = t.in1 === 'life' || traced === 'life', lifeIn2 = t.in2 === 'life' && traced !== 'life';
   const lifeTex = lifeIn1 || lifeIn2 ? lifeTick(k, f / 60) : null;
-  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'cloud' && !cloudTex) || (n === 'brush' && !brushTex) || (n === 'fwrap' && !fwTex) || (n === 'chaos' && !chaosTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
+  const srcOf = (n) => ((n === 'life' && !lifeTex) || (n === 'cloud' && !cloudTex) || (n === 'brush' && !brushTex) || (n === 'fwrap' && !fwTex) || (n === 'chaos' && !chaosTex) || (n === 'machine' && !machTex) ? SRC_ID.none : resolveSrc(n, t.motion, k));
 
   const src = L.rt[L.front], dst = L.rt[1 - L.front];
   gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -17522,6 +17586,7 @@ function frame() {
   brushTick(now, dt);
   fwTick();
   chaosTick(dt);
+  machTick();
   vcrTick();
   packAdj();
   analyzeSound(dt, now);

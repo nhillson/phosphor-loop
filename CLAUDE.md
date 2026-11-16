@@ -221,6 +221,16 @@ file don't rebuild the app.
    fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
    `brushMus.hit` shoves the turning. Very slow in this workspace (about 2 frames a second). Check with `--shot "Dot mandala"`
    (add `|chaosSides=12|chaosMix=70|click=#chaosColor [data-v='1']` or `|click=#chaosRoll` for others).
+4z19. **Machinery** (input `machine`, js/machinery.js = `window.PhosphorMachinery`, read through the 3D world slot as the Chaos game is,
+   `SRC_ID.machine = 37`; glue under "machinery" in js/app.js: `drawMach`, `machTick`, `machSt`, `syncMachUI`; controls in `#row-machine`).
+   Loop keys (part of the look): `machColor` = index into `PMA.PALETTES` (12, strips in `#machColor`), `machSpeed` 0-100 (`speedOf`: 0 still,
+   50 normal, 100 three times), `machSeed` (which machine; New machine, Surprise and Autopilot roll it with `PMA.look()`). An isometric
+   machine of boxes drawn with a depth buffer of its own (4x smoothed where it works, copied into a plain picture): about 7 modules ride
+   to new places and dock, back out and roll over a quarter turn, arms push out on rams, pistons / rods / shuttles / flaps / cages work on
+   them. **Nothing may pass through anything else** (Nick's rule): every part books its cells and its path on a quarter-unit grid
+   (`Sim`: `feasible`, `reserve`, `settle`, `tryTurn`); the simulation remembers (it isn't worked out afresh from the time).
+   `node tests/machinery_check.cjs 3,5,8 12000` runs machines without a picture and fails on any overlap. Music: `ferroMus.bass` speeds it
+   up for a loop that reacts. Check with `--shot "Clockwork"` (add `|click=#machColor [data-v='2']` or `|click=#machRoll` for others).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
