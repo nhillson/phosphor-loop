@@ -216,7 +216,7 @@ file don't rebuild the app.
    past it, so it's two sharp pictures mixed; a pick repeats the one before 3 times in 10, `SAME`, which spreads the dots to the rim), `chaosJump` (Hop: what's left of the dot's own place is 0.5 / touch(N) / K^1.6 at 50, touch = the
    polygon's kissing sum), `chaosDeep` (little polygons on each corner, size 0.16·deep / K, and smaller ones on theirs from 30 up),
    `chaosMove` (Morph), `chaosColor` 0 Neon / 1 Lime / 2 Corners / 3 Phosphor; **Drift the faders** (`chaosDrift`, `chaosSpeed`; `chaosDriftTick` in js/app.js walks
-   `tgt.chaosMix` / `chaosJump` (30-75) / `chaosDeep` to random spots, 0.4·60^(speed/100) fader steps a second, skipping a fader being held, `chaosHeld`); `PCH.look()` = New pattern, Surprise and Autopilot. Every dot is
+   `tgt.chaosMix` / `chaosJump` (30-75) / `chaosDeep` to random spots, 0.4·60^(speed/100) fader steps a second, skipping a fader being held, `chaosHeld`); Autopilot's looks always have it on, at the loop's own speed (`apFinish`); `PCH.look()` = New pattern, Surprise and Autopilot. Every dot is
    worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, added up in an RGBA16F picture that
    fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
    `brushMus.hit` shoves the turning. Very slow in this workspace (about 2 frames a second). Check with `--shot "Dot mandala"`

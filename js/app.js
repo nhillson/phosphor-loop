@@ -3649,6 +3649,8 @@ function apFinish(sc, k, keep) {
   // Pinned inputs go in first, so the size below suits the input really used
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
+  // Autopilot's Chaos game always drifts its faders, at the Drift speed that loop is set to
+  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; }
   if (!keep || keep !== sc.in1) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
     if ((sc.in1 === 'bars' || sc.in1 === 'picture' || sc.in1 === 'genart') && sc.size == null) sc.size = 50;

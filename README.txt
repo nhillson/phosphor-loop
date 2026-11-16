@@ -289,7 +289,8 @@ TIPS
     the bass pulls the dots into bright knots and the high sounds make it
     more organic. Drift the faders slowly moves Corners averaged, Hop and
     Fractal corners about by themselves, as fast as Drift speed says; grab
-    one any time and it carries on from where you let go. The Guide's
+    one any time and it carries on from where you let go. Autopilot always
+    switches it on when it brings the Chaos game in, at that loop's Drift speed. The Guide's
     "Dot mandala" recipe sets it up.
   - Topo map: glowing contour lines, like a hiking map, seen from straight
     above: cyan low down, gold higher up, rose on the peaks, every fifth line
