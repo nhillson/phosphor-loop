@@ -426,6 +426,7 @@
             <button data-src="life" aria-pressed="false" title="Conway’s Game of Life: glowing cells that are born, live and die by a few simple rules">Life</button>
             <button data-src="radar" aria-pressed="false" title="A Doppler weather radar screen: a sweeping beam over drifting storms">Radar</button>
             <button data-src="ferro" aria-pressed="false" title="Shiny black magnetic liquid: the bass swells it and the high sounds shoot its spikes out">Ferro&shy;fluid</button>
+            <button data-src="chaos" aria-pressed="false" title="The chaos game: dots hopping towards corners picked at random draw a mandala that slowly morphs, from sharp and geometric to cells like something grown">Chaos game</button>
             <button data-src="cloud" aria-pressed="false" title="A picture, video, the camera or the other loop turned into a cloud of glowing 3D dots that wind, your finger and explosions can blow about">Point cloud</button>
             <button data-src="brush" aria-pressed="false" title="Thousands of little brushes that wander on swirling currents, each leaving a stroke behind it">Brushes</button>
             <button data-src="fwrap" aria-pressed="false" title="A picture wrapped round a fractal, layer inside layer, flowing down into it as its shape changes">Fractal wrap</button>
@@ -531,6 +532,46 @@
               </div>
             </div>
             <span class="hint">The bass swells it and the high sounds shoot the spikes out (switch on React to sound). With no music it breathes and drifts by itself.</span>
+          </div>
+
+          <div class="dev" id="row-chaos" hidden>
+            <div class="ctl">
+              <div class="ctl-head"><label for="chaosSides" title="How many corners the shape has: 3 is the famous triangle, 6 a honeycomb, 12 a fine mandala">Corners</label><output id="chaosSidesOut" for="chaosSides"></output></div>
+              <input type="range" id="chaosSides" min="3" max="12" step="1" value="6">
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="chaosMix" title="How many corners each hop is averaged over. One gives sharp, geometric fractals; more turns the picture into rings and cells, like something grown.">Corners averaged</label><output id="chaosMixOut" for="chaosMix"></output></div>
+              <input type="range" id="chaosMix" min="0" max="100" step="1" value="45">
+              <div class="ends"><span>Geometric</span><span>Organic</span></div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="chaosJump" title="How far each hop goes. Soft lets the dots smear into each other; sharp pulls them into tight separate dots.">Hop</label><output id="chaosJumpOut" for="chaosJump"></output></div>
+              <input type="range" id="chaosJump" min="0" max="100" step="1" value="50">
+              <div class="ends"><span>Soft</span><span>Sharp</span></div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="chaosDeep" title="Every corner carries a little copy of the whole shape, and each of its corners a smaller one still. More makes every dot a cluster of dots.">Fractal corners</label><output id="chaosDeepOut" for="chaosDeep"></output></div>
+              <input type="range" id="chaosDeep" min="0" max="100" step="1" value="45">
+              <div class="ends"><span>Plain</span><span>Lots</span></div>
+            </div>
+            <div class="ctl">
+              <div class="ctl-head"><label for="chaosMove" title="How much the pattern changes by itself: it turns, the little shapes turn the other way, and the hop and the number of corners averaged slowly breathe">Morph</label><output id="chaosMoveOut" for="chaosMove"></output></div>
+              <input type="range" id="chaosMove" min="0" max="100" step="1" value="40">
+              <div class="ends"><span>Still</span><span>Restless</span></div>
+            </div>
+            <div class="ctl">
+              <span class="lbl" id="chaosColorLbl" title="Neon, Lime and Phosphor color each spot by how many dots land there. Corners gives every dot the color of the corner it last hopped towards.">Colors</span>
+              <div class="seg seg-4" id="chaosColor" role="group" aria-labelledby="chaosColorLbl">
+                <button data-v="0" aria-pressed="true">Neon</button>
+                <button data-v="1" aria-pressed="false">Lime</button>
+                <button data-v="2" aria-pressed="false">Corners</button>
+                <button data-v="3" aria-pressed="false">Phosphor</button>
+              </div>
+            </div>
+            <div class="ctl">
+              <button class="btn" id="chaosRoll" title="Rolls the dice on every setting above for a pattern you haven't seen">New pattern</button>
+            </div>
+            <span class="hint">The bass pulls the dots into bright knots and the high sounds make it more organic (switch on React to sound). With no music it morphs by itself.</span>
           </div>
 
           <div class="dev" id="row-cloud" hidden>
@@ -2394,6 +2435,7 @@
 <script src="js/pointcloud.js"></script>
 <script src="js/brushes.js"></script>
 <script src="js/fractalwrap.js"></script>
+<script src="js/chaos.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/library.js"></script>
 <script src="js/patch.js"></script>

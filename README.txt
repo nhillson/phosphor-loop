@@ -279,6 +279,15 @@ TIPS
     listening, the bass swells it and the high sounds shoot the spikes out;
     with no music it breathes and drifts by itself. The liquid is black and
     covers the trails behind it, so only its reflections feed the loop.
+  - Chaos game: dots hop towards corners picked at random and draw a mandala.
+    With 3 Corners and Corners averaged at Geometric it's the famous
+    Sierpinski triangle; slide towards Organic and each hop goes towards the
+    average of several corners, so the picture turns into rings and cells.
+    Hop goes from soft smears to sharp dots, Fractal corners makes every dot
+    a cluster of dots, Morph sets how much it changes by itself, and New
+    pattern rolls the dice on all of them. With React to sound listening,
+    the bass pulls the dots into bright knots and the high sounds make it
+    more organic. The Guide's "Dot mandala" recipe sets it up.
   - Topo map: glowing contour lines, like a hiking map, seen from straight
     above: cyan low down, gold higher up, rose on the peaks, every fifth line
     bolder. The land slowly reshapes itself while the view drifts across it.

@@ -210,6 +210,16 @@ file don't rebuild the app.
    (`phosphor-fwrap-v1`, in presets) live in `#fwGroup` (the stack card). Picking a picture or video for a loop whose Point cloud, Brushes or
    Fractal wrap is made from it doesn't switch the loop to the plain input (`feedsVia` in `feedInto`). Check with `--shot "Fractal wrap"`,
    `--shot "Wrapped feedback"`; tile loading by setting `#fwTileFile`'s files from a page script and waiting for `__plFw.tileName()`.
+4z18. **Chaos game** (input `chaos`, js/chaos.js = `window.PhosphorChaos`, read through the 3D world slot as the Brushes are, `SRC_ID.chaos = 37`;
+   glue under "chaos game" in js/app.js: `drawChaos`, `chaosTick`, `chaosSt`, `syncChaosUI`; controls in `#row-chaos`). Loop keys (part of the
+   look, like `ferroStyle`): `chaosSides` 3-12, `chaosMix` (corners averaged, K = 1 + 5·(mix/100)^1.3, the last corner counting for the part
+   past a whole number so it glides), `chaosJump` (Hop: what's left of the dot's own place is 0.5 / touch(N) / K^1.6 at 50, touch = the
+   polygon's kissing sum), `chaosDeep` (little polygons on each corner, size 0.5·deep / K, and smaller ones on theirs from 30 up),
+   `chaosMove` (Morph), `chaosColor` 0 Neon / 1 Lime / 2 Corners / 3 Phosphor; `PCH.look()` = New pattern, Surprise and Autopilot. Every dot is
+   worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, added up in an RGBA16F picture that
+   fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
+   `brushMus.hit` shoves the turning. Very slow in this workspace (about 2 frames a second). Check with `--shot "Dot mandala"`
+   (add `|chaosSides=12|chaosMix=70|click=#chaosColor [data-v='1']` or `|click=#chaosRoll` for others).
 5. **Only test what the change touches.** A wording change needs only the safety check.
 6. **Don't wait for the site to go live.** Say "live in about a minute". If confirmation is really needed,
    make one check of the deploy run (the workspace can't fetch github.io itself):
