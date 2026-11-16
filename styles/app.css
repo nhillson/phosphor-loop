@@ -605,6 +605,10 @@
   .poster-themes { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 4px; }
   .poster-themes button { height: 18px; min-height: 18px; padding: 0; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; }
   .poster-themes button[aria-pressed="true"] { outline: 2px solid var(--amber); outline-offset: 1px; border-color: #fff; }
+  /* Chaos game › Colors: a strip per set of colors */
+  .chaos-colors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 4px; width: 100%; }
+  .chaos-colors button { height: 22px; min-height: 22px; padding: 0; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; }
+  .chaos-colors button[aria-pressed="true"] { outline: 2px solid var(--amber); outline-offset: 1px; border-color: #fff; }
   .ctl-head output { font-family: var(--f-osd); font-size: 19px; line-height: 1; color: var(--amber-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); letter-spacing: .02em; }
   .ctl select { margin-top: 4px; }

@@ -287,8 +287,10 @@ TIPS
     into a ring of dots (a lot runs them together into cells), Morph sets how much it changes by itself, and New
     pattern rolls the dice on all of them. With React to sound listening,
     the bass pulls the dots into bright knots and the high sounds make it
-    more organic. Drift the faders slowly moves Corners averaged, Hop and
-    Fractal corners about by themselves, as fast as Drift speed says; grab
+    more organic. Drift the faders slowly moves Corners averaged, Hop,
+    Fractal corners and Morph about by themselves, as fast as Drift speed
+    says, and Corners too (a corner at a time) unless you switch off Corners
+    drift too. Colors has twelve sets, each shown as a strip of its colors; grab
     one any time and it carries on from where you let go. Autopilot always
     switches it on when it brings the Chaos game in, at that loop's Drift speed. The Guide's
     "Dot mandala" recipe sets it up.

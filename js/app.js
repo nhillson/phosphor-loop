@@ -1242,14 +1242,18 @@ function chaosText(q, v) {
   if (q === 'chaosSpeed') { const s = 70 / (0.4 * Math.pow(60, v / 100)); return s >= 90 ? `${Math.round(s / 60)} MIN` : `${Math.round(s)} S`; }   // about how long to cross a fader
   return String(v);
 }
+// Colors: a strip of each set's colors to press
+PCH.COLORS.forEach((name, i) => { const b = document.createElement('button'); b.dataset.v = i; b.title = name; b.setAttribute('aria-label', name); b.setAttribute('aria-pressed', 'false'); b.style.background = PCH.preview(i); $('#chaosColor').appendChild(b); });
 function syncChaosUI(t) {
   for (const q of CHAOS_NUM) { const c = chaosEls[q], v = Math.round(t[q] ?? PCH.DEFAULTS[q]); c.el.value = v; fillTrack(c.el); c.out.textContent = chaosText(q, v); }
   $$('#chaosColor button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosColor | 0))));
+  $('#chaosColorName').textContent = PCH.COLORS[t.chaosColor | 0] || PCH.COLORS[0];
   $('#chaosDrift').setAttribute('aria-pressed', String(!!t.chaosDrift));
+  $('#chaosDriftSides').setAttribute('aria-pressed', String(t.chaosDriftSides !== false));
 }
-// Drift the faders: Corners averaged, Hop and Fractal corners each wander to a spot picked at random, then on to
-// another, easing in and out, at Drift speed. A fader you're holding is left alone and carries on from where you let go.
-const CHAOS_DRIFT = { chaosMix: [0, 100], chaosJump: [30, 75], chaosDeep: [0, 100] };
+// Drift the faders: Corners averaged, Hop, Fractal corners and Morph each wander to a spot picked at random, then on
+// to another, easing in and out, at Drift speed; Corners too (a corner at a time, much more slowly) unless its switch is off. A fader you're holding is left alone and carries on from where you let go.
+const CHAOS_DRIFT = { chaosMix: [0, 100, 1, 15], chaosJump: [30, 75, 1, 15], chaosDeep: [0, 100, 1, 15], chaosMove: [15, 85, 1, 15], chaosSides: [3, 12, 0.04, 2] };   // lowest, highest, speed, shortest trip
 const chaosDriftSt = {};
 let chaosHeld = null, chaosDriftUI = 0;
 for (const q of Object.keys(CHAOS_DRIFT)) chaosEls[q].el.addEventListener('pointerdown', () => { chaosHeld = q; });
@@ -1262,15 +1266,21 @@ function chaosDriftTick(dt) {
     const S = chaosDriftSt[k] || (chaosDriftSt[k] = {});
     // From about 4 minutes to cross a fader (Glacial) to about 4 seconds (Quick)
     const rate = 0.4 * Math.pow(60, clamp(t.chaosSpeed ?? 40, 0, 100) / 100) * (reduceMotion ? 0.5 : 1);
-    for (const [q, [lo, hi]] of Object.entries(CHAOS_DRIFT)) {
-      const d = S[q] || (S[q] = { to: null, v: 0 });
+    for (const [q, [lo, hi, sp, far]] of Object.entries(CHAOS_DRIFT)) {
+      const whole = q === 'chaosSides';
+      const d = S[q] || (S[q] = { to: null, v: 0, x: null });
+      if (whole && t.chaosDriftSides === false) { d.to = null; d.v = 0; d.x = null; continue; }
       let x = +t[q]; if (!Number.isFinite(x)) x = PCH.DEFAULTS[q];
+      // Corners is a whole number: its walk is kept apart (d.x) and the fader shows the nearest; moved by hand, the walk goes on from there
+      if (whole) { if (d.x === null || Math.round(d.x) !== Math.round(x)) { d.x = x; d.to = null; } x = d.x; }
       if (k === edit && chaosHeld === q) { d.to = null; d.v = 0; continue; }
-      if (d.to === null || Math.abs(d.to - x) < 1) { do { d.to = lo + Math.random() * (hi - lo); } while (Math.abs(d.to - x) < 15); }
+      const near = (hi - lo) / 100;
+      if (d.to === null || Math.abs(d.to - x) < near) { do { d.to = lo + Math.random() * (hi - lo); } while (Math.abs(d.to - x) < far); }
       // Its speed eases up after a turn and down as it nears the spot, so it never jerks
-      const want = Math.sign(d.to - x) * rate * Math.min(1, Math.abs(d.to - x) / 8 + 0.15);
+      const want = Math.sign(d.to - x) * rate * sp * Math.min(1, Math.abs(d.to - x) / (8 * near) + 0.15);
       d.v += (want - d.v) * (1 - Math.exp(-dt * 1.5));
-      t[q] = clamp(x + d.v * dt, 0, 100);
+      x = clamp(x + d.v * dt, lo, hi);
+      if (whole) { d.x = x; t[q] = Math.round(x); } else t[q] = x;
     }
   }
   const now = performance.now();
@@ -1279,6 +1289,13 @@ function chaosDriftTick(dt) {
     for (const q of Object.keys(CHAOS_DRIFT)) if (chaosHeld !== q) { const c = chaosEls[q], v = Math.round(loops[edit].tgt[q]); if (+c.el.value !== v) { c.el.value = v; fillTrack(c.el); c.out.textContent = chaosText(q, v); } }
   }
 }
+$('#chaosDriftSides').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosDriftSides = t.chaosDriftSides === false;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosDriftSides ? 'CORNERS DRIFT' : 'CORNERS STAY');
+});
 $('#chaosDrift').addEventListener('click', () => {
   takeOver('in1');
   const t = loops[edit].tgt;
@@ -3650,7 +3667,7 @@ function apFinish(sc, k, keep) {
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
   // Autopilot's Chaos game always drifts its faders, at the Drift speed that loop is set to
-  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; }
+  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); }
   if (!keep || keep !== sc.in1) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
     if ((sc.in1 === 'bars' || sc.in1 === 'picture' || sc.in1 === 'genart') && sc.size == null) sc.size = 50;

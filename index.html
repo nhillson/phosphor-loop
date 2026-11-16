@@ -560,7 +560,10 @@
               <div class="ends"><span>Still</span><span>Restless</span></div>
             </div>
             <div class="ctl">
-              <button class="btn" id="chaosDrift" aria-pressed="false" title="Slowly moves Corners averaged, Hop and Fractal corners about by themselves, so the pattern never settles. Grab a fader any time: it carries on from where you leave it."><span class="led"></span>Drift the faders</button>
+              <button class="btn" id="chaosDrift" aria-pressed="false" title="Slowly moves Corners averaged, Hop, Fractal corners and Morph about by themselves (and Corners, if its switch is on), so the pattern never settles. Grab a fader any time: it carries on from where you leave it."><span class="led"></span>Drift the faders</button>
+            </div>
+            <div class="ctl">
+              <button class="btn" id="chaosDriftSides" aria-pressed="true" title="While Drift the faders is on, lets Corners drift too: one corner more or fewer every so often, each change taking a second or two. Off keeps the number of corners where you put it."><span class="led"></span>Corners drift too</button>
             </div>
             <div class="ctl">
               <div class="ctl-head"><label for="chaosSpeed" title="How fast Drift the faders moves them: from a few minutes to cross a fader, to a few seconds">Drift speed</label><output id="chaosSpeedOut" for="chaosSpeed"></output></div>
@@ -568,13 +571,7 @@
               <div class="ends"><span>Glacial</span><span>Quick</span></div>
             </div>
             <div class="ctl">
-              <span class="lbl" id="chaosColorLbl" title="Neon, Lime and Phosphor color each spot by how many dots land there. Corners gives every dot the color of the corner it last hopped towards.">Colors</span>
-              <div class="seg seg-4" id="chaosColor" role="group" aria-labelledby="chaosColorLbl">
-                <button data-v="0" aria-pressed="true">Neon</button>
-                <button data-v="1" aria-pressed="false">Lime</button>
-                <button data-v="2" aria-pressed="false">Corners</button>
-                <button data-v="3" aria-pressed="false">Phosphor</button>
-              </div>
+              <div class="poster-colors"><span id="chaosColorLbl" title="Each strip shows a set of colors, from where few dots land (left) to where the most do (right). Corners gives every dot the color of the corner it last hopped towards; Rainbow is the Point cloud’s sliding rainbow.">Colors: <b id="chaosColorName">Neon</b></span><div class="chaos-colors" id="chaosColor" role="group" aria-labelledby="chaosColorLbl"></div></div>
             </div>
             <div class="ctl">
               <button class="btn" id="chaosRoll" title="Rolls the dice on every setting above for a pattern you haven't seen">New pattern</button>
