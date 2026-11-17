@@ -249,6 +249,8 @@ uniform vec2 uJuliaC;             // Fractal fold: the fractal's constant, which
 uniform float uCrystal;           // Crystal: how far each piece turns and zooms this frame
 uniform vec4 uCells[5];           // Crystal: the centres of its ten pieces, two to a slot
 uniform float uGrow, uGrowR, uGrowTurn;   // Grow: how fast patterns grow this frame, how far apart their stripes sit (pixels), and a turn that changes every frame
+uniform float uGrowShape, uGrowStretch, uGrowSplit;   // Grow: spots (-1) to holes (1), how stretched (0-1), how far the colors split (0-1)
+uniform vec3 uGrowDir;    // Grow: the stretch's direction, and 0 fixed / 1 swirl / 2 burst
 uniform float uAspText;   // the Text input's picture: how wide it is for its height
 uniform int uTopoSrc;     // Topo map, Height from the picture: the input it traces (-1: it draws its own land)
 uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, ahead of the loop's own pass
@@ -497,28 +499,65 @@ vec3 dyeBy(vec3 c, vec2 p, float asp) {
 vec3 growAt(vec3 c, vec3 near, vec2 st) {
   vec2 px = uPxK / uSim;
   float lc = luma(c);
-  float la = luma(mix(c, near, 0.8));
+  vec3 a3 = mix(c, near, 0.8);
+  float la = luma(a3);
+  // Stretch: the ring is drawn out into an oval along a direction (uGrowDir.xy; .z 1 = round the middle, a swirl;
+  // 2 = out from the middle, a burst), so the patterns line up into stripes, grain and fingerprints
+  vec2 d = uGrowDir.xy;
+  if (uGrowDir.z > 0.5) {
+    vec2 q = (st - 0.5) * uSim + vec2(1e-3, 0.0);
+    d = normalize(uGrowDir.z > 1.5 ? q : vec2(-q.y, q.x));
+  }
+  // The stripes run across the way the ring is drawn out, so it's drawn out at right angles to the way they should run
+  vec2 dn = d;
+  d = vec2(-d.y, d.x);
+  float sAlong = 1.0 + 1.4 * uGrowStretch, sAcross = 1.0 / (1.0 + 0.5 * uGrowStretch);
   // The ring: two circles of samples, turned a different way every frame so no direction is favoured
-  float li = 0.0;
+  vec3 ro = vec3(0.0), ri = vec3(0.0);
   for (int i = 0; i < 8; i++) {
     float a = uGrowTurn + float(i) * 0.7853982;
-    li += luma(texture(uPrev, st + vec2(cos(a), sin(a)) * uGrowR * px).rgb);
+    vec2 u = vec2(cos(a), sin(a));
+    vec2 o = d * (dot(u, d) * sAlong) + dn * (dot(u, dn) * sAcross);
+    ro += texture(uPrev, st + o * uGrowR * px).rgb;
   }
   for (int i = 0; i < 6; i++) {
     float a = 0.5 - uGrowTurn * 1.3 + float(i) * 1.0471976;
-    li += 0.75 * luma(texture(uPrev, st + vec2(cos(a), sin(a)) * (uGrowR * 0.6) * px).rgb);
+    vec2 u = vec2(cos(a), sin(a));
+    vec2 o = d * (dot(u, d) * sAlong) + dn * (dot(u, dn) * sAcross);
+    ri += texture(uPrev, st + o * (uGrowR * 0.6) * px).rgb;
   }
-  li /= 12.5;
-  float x = la - li;
+  // Shape: towards Spots, light has to beat its ring by more to grow, so only lone bright dots hold on. Towards Holes,
+  // light grows faster than dark does, so the lit parts swell and join up round small dark pores (and an even patch
+  // still doesn't drift, so it doesn't wash out to white)
+  float k = 1.0 - 0.35 * min(uGrowShape, 0.0) - 0.05 * max(uGrowShape, 0.0);
+  float hs = max(uGrowShape, 0.0);
+  vec2 gUD = vec2(1.0 + 0.72 * hs, 1.0 - 0.33 * hs);   // how fast brighter and darker go
+  float li = luma(ro + 0.75 * ri) / 12.5;
+  float x = la - li * k;
   // A whisper of noise where there is already some light, so patterns can start up in smooth, even patches
-  x += (hash(gl_FragCoord.xy * 0.731 + fract(uGrowTurn * 0.159) * 97.0) - 0.5) * 0.02 * smoothstep(0.02, 0.25, la);
-  float lt = clamp(lc + uGrow * tanh(x * 12.0), 0.0, 1.0);
+  float nz = 0.02 * smoothstep(0.02, 0.25, la);
+  vec2 hp = gl_FragCoord.xy * 0.731 + fract(uGrowTurn * 0.159) * 97.0;
+  x += (hash(hp) - 0.5) * nz;
+  float tx = tanh(x * 12.0);
+  float lt = clamp(lc + uGrow * tx * (tx > 0.0 ? gUD.x : gUD.y), 0.0, 1.0);
   // Only the brightness changes, never the color: a spot keeps its own color, and a dark spot that lights up
   // takes the color of what's around it (white only where there is no color at all)
   float ln = luma(near);
   vec3 hue = mix(near / max(ln, 1e-4), c / max(lc, 1e-4), smoothstep(0.02, 0.08, lc));
   hue = mix(vec3(1.0), hue, smoothstep(0.0, 0.015, max(lc, ln)));
-  return clamp(hue * lt, 0.0, 1.0);
+  vec3 one = clamp(hue * lt, 0.0, 1.0);
+  if (uGrowSplit < 0.005) return one;
+  // Color split: red, green and blue each grow a pattern of their own. Red's ring leans on its inner circle (finer),
+  // blue's on its outer one (bigger), and red needs to win by more than blue does, so the three patterns sit at
+  // different sizes and shapes and cross over each other in rainbow fringes
+  float s = uGrowSplit;
+  vec3 wo = 1.0 + s * vec3(-0.6, 0.0, 0.8), wi = 1.0 + s * vec3(0.8, 0.0, -0.6);
+  vec3 rv = (wo * ro + 0.75 * wi * ri) / (8.0 * wo + 4.5 * wi);
+  vec3 kv = k + 0.18 * s * vec3(1.0, 0.0, -1.0);
+  vec3 xv = a3 - rv * kv + (vec3(hash(hp), hash(hp + 17.3), hash(hp + 41.9)) - 0.5) * nz;
+  vec3 tv = tanh(xv * 12.0);
+  vec3 each = clamp(c + uGrow * tv * mix(vec3(gUD.y), vec3(gUD.x), step(0.0, tv)), 0.0, 1.0);
+  return mix(one, each, s);
 }
 // Look-up: each spot copies from a spot its own color points at. How red it is says how far to the side, how green
 // how far up or down, and how blue and how bright it is turn that direction round, so every shade reads from its

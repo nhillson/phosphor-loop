@@ -170,7 +170,7 @@ const DEVICE = ['camera', 'screen', 'phone'];
 function loopDefaults() {
   return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, ferroStyle: 0, ...window.PhosphorChaos.DEFAULTS, ...window.PhosphorMachinery.DEFAULTS, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'tiles',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, posterTheme: 'own', halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
-           grow: 0, growSize: 1, time: 0, timeShape: 0, cam: 'glide',
+           grow: 0, growSize: 1, growShape: 0, growStretch: 0, growDir: 3, growSplit: 0, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
            offc: 0, wind: 0, windDir: 0, aberr: 0, aberrShape: 0, aberrFinal: true, scan: 0, scanSpeed: 1, corr: 0, corrShape: 0 };
 }
@@ -210,8 +210,10 @@ const ASYM = ['offc', 'wind'];
 const SLIT = ['scan', 'corr'];
 // Chromatic aberration (Effects, under Halftone): red, green and blue pulled apart (aberrShape 0 Lens, 1 Sideways, 2 Turning)
 const LENS = ['aberr'];
-const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM, ...SLIT, ...LENS];
-const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', 'time', ...SELF, ...ASYM, ...SLIT, ...LENS];
+// Grow's own faders beside its strength: Shape (spots -100 to holes 100), Stretch, Color split
+const GROW_MORE = ['growShape', 'growStretch', 'growSplit'];
+const LOOP_SMOOTH = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'flow', 'melt', 'push', 'dye', 'split', 'grow', ...GROW_MORE, 'time', 'blur', 'shiftX', 'shiftY', 'gain', 'blend', 'size', ...SELF, ...ASYM, ...SLIT, ...LENS];
+const LOOP_SLIDERS = ['zoom', 'spin', 'trails', 'color', 'poster', 'halftone', 'warp', 'blend', 'size', 'flow', 'melt', 'push', 'dye', 'split', 'grow', ...GROW_MORE, 'time', ...SELF, ...ASYM, ...SLIT, ...LENS];
 // Up to four loops. A and B are always there; C, then D, are added under Loops › How many loops.
 const KEYS = ['A', 'B', 'C', 'D'];
 const LOOP_NUM = { A: 0, B: 1, C: 2, D: 3 };
@@ -237,7 +239,7 @@ const FEED_TO = { xba: 'A', xab: 'B', xc: 'C', xd: 'D' };
 const SHOW = { A: 'showA', B: 'showB', C: 'showC', D: 'showD' };
 const MIX_SLIDERS = ['showA', 'showB', 'showC', 'showD', 'xab', 'xba', 'xc', 'xd'];
 // Autopilot pins and limits what used to be one fader between A and B ("view"), so the A and B faders share that pin
-const pinKeyOf = (p) => (p === 'showA' || p === 'showB' ? 'view' : p);
+const pinKeyOf = (p) => (p === 'showA' || p === 'showB' ? 'view' : GROW_MORE.includes(p) ? 'grow' : p);
 // What loop B holds when a look only uses loop A, so sliding over to B always shows something.
 const B_PARTNER = { in1: 'shape', form: 5, zoom: -22, spin: -16, trails: 90, color: 24, warp: 8, mirror: 4, edge: 1, blur: 0.1 };
 // What loops C and D start with when they're switched on
@@ -1014,6 +1016,9 @@ function sliderText(k, v) {
     case 'halftone': return v === 0 ? 'OFF' : `${Math.round(halftoneCell(v))} PX`;
     // How far back the far edge reaches
     case 'time': return v === 0 ? 'OFF' : `${twSpan(v).toFixed(1)} SEC`;
+    case 'growShape': return v === 0 ? 'MAZES' : v < 0 ? `SPOTS ${-v}` : `HOLES ${v}`;
+    case 'growStretch': return v === 0 ? 'ROUND' : String(v);
+    case 'growSplit': return v === 0 ? 'OFF' : String(v);
     default: return String(v);
   }
 }
@@ -1485,6 +1490,28 @@ $$('#growSize button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD(`GROW ${edit}`, GROW_SIZE_NAME[t.growSize]);
 }));
+// Which way Grow's stretched stripes run: Across, Up and down, Turning (comes slowly round), Rings (round the middle),
+// Rays (out from the middle). Picking one with Stretch at 0 stretches it, so the button always shows something.
+const GROW_DIR_NAME = ['ACROSS', 'UP AND DOWN', 'TURNING', 'RINGS', 'RAYS'];
+$$('#growDir button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('grow');
+  const t = loops[edit].tgt;
+  t.growDir = +b.dataset.gdir;
+  if (!(t.grow > 0)) t.grow = 60;
+  if (!(t.growStretch > 0)) t.growStretch = 60;
+  syncUI();
+  showOSD(`GROW ${edit} STRETCH`, GROW_DIR_NAME[t.growDir]);
+}));
+// A new look's Grow: its size, and now and then a shape, a stretch and a color split (How wild w makes them likelier)
+function growLook(w = 0.5) {
+  return {
+    growSize: Math.floor(Math.random() * 3),
+    growShape: Math.random() < 0.35 ? 0 : Math.round(rnd(-85, 55)),
+    growStretch: Math.random() < 0.3 + 0.3 * w ? Math.round(rnd(30, 95)) : 0,
+    growDir: Math.floor(Math.random() * 5),
+    growSplit: Math.random() < 0.2 + 0.3 * w ? Math.round(rnd(30, 100)) : 0,
+  };
+}
 // Mirror, Warp, Split lines and Color chase work within the loop (feeding back every frame) or in the final pass
 // (laid over the finished picture once; see finalPass)
 $$('.where[data-where]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
@@ -1726,6 +1753,7 @@ function syncUI() {
   syncMachUI(t);
   syncTextUI();
   $$('#growSize button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gsize === (t.growSize ?? 1))));
+  $$('#growDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.gdir === (t.growDir ?? 3))));
   $$('#windDir button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.wdir === (t.windDir ?? 0))));
   $$('#aberrShape button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.ashape === (t.aberrShape ?? 0))));
   $$('.scan-speed button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.sspeed === (t.scanSpeed ?? 1))));
@@ -1858,7 +1886,7 @@ function randomLoop() {
     melt: Math.random() < 0.25 ? Math.round(rnd(25, 75)) : 0,
     push: Math.random() < 0.2 ? Math.round(rnd(30, 75)) : 0,
     dye: Math.random() < 0.2 ? Math.round(rnd(25, 70)) : 0,
-    grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, growSize: Math.floor(Math.random() * 3),
+    grow: Math.random() < 0.18 ? Math.round(rnd(40, 85)) : 0, ...growLook(),
     time: Math.random() < 0.18 ? Math.round(rnd(35, 90)) : 0, timeShape: Math.floor(Math.random() * TIME_SHAPES),
     ...surpriseSelf(),
     offc: Math.random() < 0.15 ? Math.round(rnd(35, 80)) : 0,
@@ -2692,7 +2720,7 @@ const PINS = {
   dye: { name: 'Dyed by the other loop', fields: ['dye'] },
   mirror: { name: 'Mirror', fields: ['mirror'] },
   split: { name: 'Split lines', fields: ['split'] },
-  grow: { name: 'Grow', fields: ['grow', 'growSize'] },
+  grow: { name: 'Grow', fields: ['grow', 'growSize', ...GROW_MORE, 'growDir'] },
   time: { name: 'Time warp', fields: ['time', 'timeShape'] },
   lookup: { name: 'Look-up', fields: ['lookup'] },
   chase: { name: 'Chase', fields: ['chase'] },
@@ -2721,7 +2749,7 @@ const PINS = {
 // only the sliders whose range is narrowed.
 const LIM_LOOP = ['blend', 'size', 'zoom', 'spin', 'trails', 'color', 'warp', 'flow', 'melt', 'push', 'dye', 'grow', 'mirror', 'split', 'time', ...SELF, ...ASYM, ...SLIT, ...LENS];
 const LIM_MIX = ['view', 'xab', 'xba'];
-const limScale = (k) => (k === 'zoom' || k === 'spin' ? [-100, 100] : k === 'mirror' ? [0, 8] : [0, 100]);
+const limScale = (k) => (k === 'zoom' || k === 'spin' || k === 'growShape' ? [-100, 100] : k === 'mirror' ? [0, 8] : [0, 100]);
 // Mirror has only five stops (Off, 2, 4, 6, 8), so its limits move two at a time, and both of its handles are
 // stops Autopilot may use: lowest 2 and highest 6 means 2, 4 or 6
 const limGrain = (k) => (k === 'mirror' ? 2 : 1);
@@ -3183,6 +3211,8 @@ function coolLoop(k) {
   const feed = FEED_INTO[k];
   if (mix.tgt[feed] > 4 && apOwnsMix(feed)) lower(mix.tgt, feed, mix.tgt[feed] * 0.6, ap.pins.has(feed));
   if (t.grow > 30) lower(t, 'grow', t.grow - 12, isPinned('grow', k));
+  // Grow's Holes end lights nearly everything: back towards mazes
+  if (t.grow > 0 && t.growShape > 0) lower(t, 'growShape', Math.max(0, t.growShape - 25), isPinned('grow', k));
   if (IMAGE_INPUTS.includes(t.in1) && t.size > 40) lower(t, 'size', Math.max(40, t.size - 8), isPinned('size', k));
   return did;
 }
@@ -3679,7 +3709,8 @@ function apFx(sc, w) {
     if (sc[key] > 0) continue;
     sc[key] = Math.random() < apOdds(w) ? Math.round(val(w)) : 0;
   }
-  if (sc.grow && sc.growSize == null) sc.growSize = Math.floor(Math.random() * 3);
+  if (sc.grow && sc.growSize == null) Object.assign(sc, growLook(w));
+  else if (sc.grow && sc.growShape == null) { const g = growLook(w); delete g.growSize; Object.assign(sc, g); }
   if (sc.time && sc.timeShape == null) sc.timeShape = Math.floor(Math.random() * TIME_SHAPES);
   if (sc.wind && sc.windDir == null) sc.windDir = Math.floor(Math.random() * WIND_DIRS.length);
   // Chromatic aberration: a new look picks its shape, and now and then works it within the loop
@@ -3719,7 +3750,7 @@ function apSceneRaw(k) {
       in1, form: 2 + Math.floor(Math.random() * 4), zoom,
       spin: Math.round(rnd(-1, 1) * (10 + 70 * w)), trails: Math.round(rnd(84, 96)), color: Math.round(rnd(2, 8 + 48 * w)),
       warp: Math.round(Math.random() < 0.9 - 0.6 * w ? rnd(0, 5 + 20 * w) : rnd(15, 15 + 60 * w)),
-      growSize: Math.floor(Math.random() * 3), timeShape: Math.floor(Math.random() * TIME_SHAPES), windDir: Math.floor(Math.random() * 9),
+      ...growLook(w), timeShape: Math.floor(Math.random() * TIME_SHAPES), windDir: Math.floor(Math.random() * 9),
       mirror: pick([0, 0, 2, 4, 6, 8]), blur: +rnd(-0.05, 0.3).toFixed(2),
       edge: zoom < 0 && Math.random() < 0.6 ? 1 : 0,
     };
@@ -4798,7 +4829,8 @@ function tasteFeats(L) {
   if (!is3D(L.in1)) f.push('size:' + tasteBand(L.size ?? 100, [45, 85], ['small', 'mid', 'full']));
   f.push('blur:' + tasteBand(L.blur ?? 0, [-0.03, 0.15], ['sharp', 'soft', 'hazy']));
   if (L.in1 === 'wave' || L.in1 === 'shape') f.push(`form:${src}:${L.form}`);
-  if (b.fx.includes('grow')) f.push('growsize:' + (L.growSize ?? 1));
+  if (b.fx.includes('grow')) f.push('growsize:' + (L.growSize ?? 1), 'growshape:' + tasteBand(L.growShape ?? 0, [-30, 30], ['spots', 'mazes', 'holes']),
+    'growstretch:' + ((L.growStretch ?? 0) > 20 ? 'dir' + (L.growDir ?? 3) : 'round'), 'growsplit:' + ((L.growSplit ?? 0) > 20 ? 'on' : 'off'));
   if (b.fx.includes('time')) f.push('timeshape:' + (L.timeShape ?? 0));
   if (b.fx.includes('wind')) f.push('winddir:' + (L.windDir ?? 0));
   if (b.fx.includes('aberr')) f.push('ashape:' + (L.aberrShape ?? 0), 'awhere:' + (L.aberrFinal === false ? 'in' : 'out'));
@@ -14284,6 +14316,11 @@ function runLoop(k, xf, brush, f) {
   set1f(fbProg, 'uGrow', Math.min(0.2, Math.pow(clamp(c.grow, 0, 100) / 100, 1.2) * GROW_K * f));
   set1f(fbProg, 'uGrowR', GROW_R[t.growSize] ?? GROW_R[1]);
   set1f(fbProg, 'uGrowTurn', Math.random() * 6.2831853);
+  set1f(fbProg, 'uGrowShape', clamp(c.growShape ?? 0, -100, 100) / 100);
+  set1f(fbProg, 'uGrowStretch', clamp(c.growStretch ?? 0, 0, 100) / 100);
+  set1f(fbProg, 'uGrowSplit', clamp(c.growSplit ?? 0, 0, 100) / 100);
+  { const gd = t.growDir ?? 3, ga = gd === 1 ? Math.PI / 2 : gd === 2 ? simT * 0.08 + 2.0 * LOOP_OFF[k] : 0;
+    set3f(fbProg, 'uGrowDir', Math.cos(ga), Math.sin(ga), gd === 3 ? 1 : gd === 4 ? 2 : 0); }
   // Color filters set to work inside this loop (see "color filters")
   set1f(fbProg, 'uPoster', fxIn(k, t, 'poster') && c.poster > 0.5 ? posterSteps(c.poster) : 0);
   posterPal(fbProg, t);
@@ -14502,7 +14539,7 @@ const SEQ_TRACK = [
 const SEQ_SLIDERS = [
   ['Loop', [['show', 'Show'], ['feed', 'Feed into other loop'], ['blend', 'Blend'], ['size', 'Input size']]],
   ['Effects', [['zoom', 'Zoom'], ['spin', 'Spin'], ['trails', 'Trails'], ['color', 'Color shift'], ['poster', 'Posterize'], ['halftone', 'Halftone'], ['warp', 'Warp'], ['flow', 'Flow'],
-    ['melt', 'Melt'], ['grow', 'Grow'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
+    ['melt', 'Melt'], ['grow', 'Grow'], ['growShape', 'Grow shape'], ['growStretch', 'Grow stretch'], ['growSplit', 'Grow color split'], ['split', 'Split lines'], ['time', 'Time warp'], ['lookup', 'Look-up'], ['chase', 'Chase'],
     ['breathe', 'Breathe'], ['chroma', 'Color chase'], ['restless', 'Restless'], ['grain', 'Grain'], ['julia', 'Fractal fold'], ['crystal', 'Crystal'],
     ['offc', 'Off-center'], ['wind', 'Wind'], ['aberr', 'Chromatic aberration'], ['scan', 'Photo finish'], ['corr', 'Corridor'], ['mirror', 'Mirror']]],
   ['Color grading', [['gExposure', 'Exposure'], ['gContrast', 'Contrast'], ['gGamma', 'Midtones'], ['gSat', 'Saturation'], ['gHue', 'Hue'],

@@ -909,6 +909,22 @@
               <button data-gsize="1" aria-pressed="true">Medium</button>
               <button data-gsize="2" aria-pressed="false">Big</button>
             </div>
+            <div class="ctl-head"><label for="growShape" title="How hard light has to work to grow. Left: only lone bright dots hold on, like leopard spots. Middle: mazes and stripes. Right: the light spreads everywhere but small dark pores, like a sponge.">Shape</label><output id="growShapeOut" for="growShape"></output></div>
+            <input type="range" id="growShape" class="bipolar" min="-100" max="100" step="1" value="0">
+            <div class="ends"><span>Spots</span><span>Mazes</span><span>Holes</span></div>
+            <div class="ctl-head"><label for="growStretch" title="Draws the patterns out in one direction, so they line up into zebra stripes, wood grain or fingerprints. The buttons pick which way the stripes run: across, up and down, slowly turning, in rings round the middle, or in rays out from it.">Stretch</label><output id="growStretchOut" for="growStretch"></output></div>
+            <input type="range" id="growStretch" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Round</span><span>Stretched</span></div>
+            <div class="seg seg-5" id="growDir" role="group" aria-label="Which way Grow's patterns stretch">
+              <button data-gdir="0" aria-pressed="false" title="Stripes running across">↔</button>
+              <button data-gdir="1" aria-pressed="false" title="Stripes running up and down">↕</button>
+              <button data-gdir="2" aria-pressed="false" title="Turning slowly">⟳</button>
+              <button data-gdir="3" aria-pressed="true" title="Rings round the middle, like a fingerprint’s whorl">Rings</button>
+              <button data-gdir="4" aria-pressed="false" title="Rays bursting out from the middle">Rays</button>
+            </div>
+            <div class="ctl-head"><label for="growSplit" title="Red, green and blue each grow a pattern of their own, at slightly different sizes, so they cross over each other in rainbow fringes.">Color split</label><output id="growSplitOut" for="growSplit"></output></div>
+            <input type="range" id="growSplit" min="0" max="100" step="1" value="0">
+            <div class="ends"><span>Together</span><span>Each color</span></div>
             <span class="hint">The picture grows patterns out of itself, like coral, zebra stripes or fingerprints. They start at its outlines and spread through everything lit. Keep Trails high.</span>
           </div>
           <div class="ctl">
@@ -2113,7 +2129,7 @@
             <dt>Melt</dt><dd>The picture pushes itself around. How bright each spot is decides which way it slides, and edges curl along themselves, so the echoes keep folding into each other like marbling. Low is a gentle drip; high is wild. Works best with Trails high.</dd>
             <dt>Pushed by the other loop</dt><dd>Like Melt, but the other loop does the pushing. Its bright parts decide which way this loop slides and its outlines drag this loop’s trails along them, so the other loop’s shapes show up as currents and swirls. It works even while the other loop is hidden. Works best with Trails high.</dd>
             <dt>Dyed by the other loop</dt><dd>The other loop soaks color into this one. Wherever it’s bright, this loop’s colors keep turning round the rainbow, so its shapes show up here as shifting rainbow bands. Grey and white parts pick up color too.</dd>
-            <dt>Grow</dt><dd>The picture grows patterns out of itself, the way stripes and spots form on animals: coral, zebra stripes, fingerprints, mazes. They start at outlines and spread through anything lit, and keep re-forming as the loop zooms and spins. Fine, Medium and Big set how far apart the stripes sit. Low is a fine texture, high takes over the whole picture. Keep Trails high.</dd>
+            <dt>Grow</dt><dd>The picture grows patterns out of itself, the way stripes and spots form on animals: coral, zebra stripes, fingerprints, mazes. They start at outlines and spread through anything lit, and keep re-forming as the loop zooms and spins. Fine, Medium and Big set how far apart the stripes sit. Shape changes what grows: spots on the left, mazes in the middle, a sponge of dark holes on the right. Stretch lines the patterns up into stripes, grain and fingerprints, running across, up and down, slowly turning, in rings round the middle or in rays out from it. Color split lets red, green and blue each grow their own pattern, crossing in rainbow fringes. Low is a fine texture, high takes over the whole picture. Keep Trails high.</dd>
             <dt>Mirror</dt><dd>A kaleidoscope with 2 to 8 sides. Transition sets how a new mirror comes in, over 3 seconds, whether you press it or Autopilot, Surprise or a recipe picks it: Melt blends the old mirror into the new one, Iris grows or shrinks the number of sides (from or to Off it melts), Ripple spreads the new mirror out from the middle, and Cut switches at once. Spin also turns the pattern once round as it changes. Autopilot always uses your Transition; loading a preset switches straight to its mirror.</dd>
             <dt>Split lines</dt><dd>Every other line of the picture slides left and the lines between slide right, so echoes tear apart like a scrambled TV.</dd>
             <dt>Time warp</dt><dd>Each part of the picture shows a different moment. With Top to bottom the top is right now and the bottom is up to about a second and a half ago; Side to side runs from left to right; From the middle has now in the middle and the past round the edges. Diagonal runs corner to corner; Rings spreads bands of now and the past out from the middle; Sweep turns slowly round like a clock hand, with the past trailing behind it; By brightness shows the bright parts as they are now and the dark parts from the past. Anything moving stretches into ribbons and waves, and turning patterns twist. The number shows how far back the far edge reaches. Wonderful with the camera or phone: wave your arms.</dd>
