@@ -159,9 +159,9 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, ribbit: 31, terrain: 32, topo: 33, life: 34, radar: 35, ferro: 36, cloud: 37, brush: 37, fwrap: 37, chaos: 37, machine: 37 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, model: 31, terrain: 32, topo: 33, life: 34, radar: 35, ferro: 36, cloud: 37, brush: 37, fwrap: 37, chaos: 37, machine: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', ribbit: 'Mount Ribbit', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', chaos: 'Chaos game', machine: 'Machinery', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', model: 'Model', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', chaos: 'Chaos game', machine: 'Machinery', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
@@ -272,7 +272,7 @@ const STARTERS = [
   { name: 'Nebula', A: { in1: 'nebula', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'City', A: { in1: 'city', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Terrain', A: { in1: 'terrain', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
-  { name: 'Mount Ribbit', A: { in1: 'ribbit', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
+  { name: 'Model', A: { in1: 'model', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Sponge', A: { in1: 'sponge', size: 100, zoom: 0, spin: 0, trails: 0, color: 0, blur: 0 } },
   { name: 'Coral', A: { in1: 'wave', form: 3, zoom: 14, trails: 92, color: 24, warp: 6, mirror: 6, blur: 0.1, grow: 60, growSize: 1 } },
   { name: 'Ribbons', A: { in1: 'bars', size: 50, zoom: 28, spin: 60, trails: 88, color: 14, warp: 18, blur: 0.1, time: 85, timeShape: 2 } }
@@ -372,8 +372,6 @@ const wOf = (m, k) => (loopOn(k) ? clamp(m[SHOW[k]], 0, 100) / 100 : 0);
 // or builds a 3D world up. A rating stands for the look on screen until this changes, and the rating buttons stay lit.
 let lookOnScreen = 0;
 let edit = 'A';
-// Mount Ribbit's walking keys held down, a jump asked for, and Walk by itself (see ribKey)
-const rib = { held: new Set(), jump: false, auto: lsGet('phosphor-ribbit-walk') !== '0' };
 let activePresetId = null;
 let frozen = false;
 let staticAmt = 0;
@@ -461,8 +459,8 @@ const SCENES = {
   // A calm drift, so the kick only nudges it along a little
   city:      { fs: FS_CITY,      label: 'City',       speed: 2.2,   period: 3072,          offB: 1536, kick: 0.35 },
   terrain:   { fs: FS_TERRAIN,   label: 'Terrain',    speed: 3.0,   period: 960,           offB: 480, res: 0.75 },
-  // Walking, not flying: drawn by its own renderer (js/ribbit.js) with a hiker for each loop; see drawExt
-  ribbit:    { ext: window.PhosphorRibbit || null, label: 'Mount Ribbit', speed: 1, period: 1e9, offB: 0, kick: 0.5 },
+  // Your own 3D model (from Blender, as a .glb): drawn by three.js (js/model.js) with a wandering camera for each loop; see drawExt
+  model:     { ext: window.PhosphorModel || null, label: 'Model', speed: 1, period: 1e9, offB: 0, kick: 0.5 },
   // The fractal flights (under their own Fractals button): no set path, a wandering camera for each loop
   // instead (see makeDrone). Their speed is the camera's pace; how close it may dive (near) suits each one's detail.
   sponge:     { fs: FS_SPONGE,     label: 'Menger sponge', group: 'fractal', speed: 1, period: 1e9, offB: 0, fly: { de: FR.sponge, lure: FR.spongeLure, near: 0.0025 } },
@@ -472,7 +470,7 @@ const SCENES = {
   julia3d:    { fs: FS_JULIA,      label: 'Julia',         group: 'fractal', speed: 1, period: 1e9, offB: 0, fly: { de: FR.julia, near: 0.004 } },
   kaleido:    { fs: FS_KALEIDO,    label: 'Kaleidoscope',  group: 'fractal', speed: 1, period: 1e9, offB: 0, fly: { de: FR.kaleido, near: 0.008 } },
 };
-if (!SCENES.ribbit.ext) delete SCENES.ribbit;
+if (!SCENES.model.ext) delete SCENES.model;
 // Which button a 3D input sits under: "3D world" or "Fractals"
 const sceneGroup = (src) => (SCENES[src] ? SCENES[src].group || 'world' : null);
 // Each loop's wandering camera in a fractal, made when that loop first flies there (and again after a break,
@@ -499,7 +497,7 @@ const HINT_3D = {
   nebula: 'A flight through glowing clouds of gas and dark dust, lit by a nearby star.',
   city: 'A slow drift sideways along a wet street at night, past shops, lamps and cars, with the skyline behind. The windows and lamps glow brighter with the music.',
   terrain: 'A flight over endless land made of triangles, every edge drawn as a glowing wire: teal valleys, gold peaks, and a low sun under a starry nebula. It wanders between a winding canyon, rows of sharp ridges and open plains with flat-topped mesas. The land swells with the bass.',
-  ribbit: 'A hike on Mount Ribbit, a frog king the size of a mountain sitting on a lily pad above the clouds. Gravity pulls towards whatever the hiker stands on, so he walks up the belly, over the eyes, onto the crown and upside down under the pad. W A S D walk, Shift runs, J jumps. With Walk by itself on, he tours the 14 flags on his own, and carries on 10 seconds after you let go of the keys. He hurries along with the bass.',
+  model: 'Your own 3D model, made in Blender or any 3D app, with a camera that wanders round it, swoops in close and rolls. Its animations play on a loop. To add one, in Blender use File › Export › glTF 2.0 and pick glTF Binary (.glb), then press Add a model… or drop the .glb on the picture. The camera hurries along with the bass.',
   sponge: 'A cube with a cross-shaped hole through it, and the same hole through every smaller cube, without end. The camera threads the holes and tunnels.',
   mandelbulb: 'The Mandelbrot set worked out in 3D: a glowing coral-like bulb with buds on buds on buds.',
   mandelbox: 'Space folded inside a box over and over: a carved block full of arches, ribs and pits, with glowing seams.',
@@ -1125,11 +1123,68 @@ for (const [name, sc] of Object.entries(SCENES)) {
   });
   $(PICKER[g]).appendChild(b);
 }
-// Mount Ribbit's Walk by itself switch (kept in this browser)
-$('#ribbitAuto').addEventListener('click', () => { rib.auto = !rib.auto; lsSet('phosphor-ribbit-walk', rib.auto ? '1' : '0'); syncUI(); });
-// Mount Ribbit builds its frog in the background a little after the page opens, so it is ready the moment it's
-// picked (Autopilot's Check each look would otherwise see only sky while it builds)
-if (SCENES.ribbit) setTimeout(() => { if (SCENES.ribbit.ext.state === 'idle') SCENES.ribbit.ext.build(); }, 5000);
+/* ---- the Model input (js/model.js): your models from Blender, Add a model…, and the camera ---- */
+const MODEL = window.PhosphorModel || null;
+const modelArmed = { id: null, at: 0 };
+function modelRowSync() {
+  if (!MODEL) return;
+  const list = $('#modelList'), cur = MODEL.current(), all = MODEL.list();
+  const items = [{ id: 'sample', name: 'Sample' }, ...all];
+  list.textContent = '';
+  for (const m of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.dataset.model = m.id;
+    b.setAttribute('aria-pressed', String(m.id === cur || (cur !== 'sample' && !all.some((x) => x.id === cur) && m.id === 'sample')));
+    b.title = m.id === 'sample' ? 'A shiny knot with gems circling it, for when you haven’t added a model' : `${m.name} (${(m.size / 1048576).toFixed(1)} MB). Click to show it.`;
+    const led = document.createElement('span'); led.className = 'led';
+    b.append(led, document.createTextNode(m.name));
+    if (m.id !== 'sample') {
+      const x = document.createElement('span');
+      x.className = 'model-x'; x.textContent = '✕'; x.title = `Remove ${m.name} from this browser`; x.dataset.drop = m.id;
+      b.append(x);
+    }
+    list.appendChild(b);
+  }
+  const hasCam = MODEL.hasCamera();
+  $('#modelCam').hidden = !hasCam;
+  $$('#modelCam button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cam === (hasCam ? MODEL.camMode() : 'wander'))));
+  $('#modelBusy').hidden = MODEL.state !== 'building';
+}
+// A .glb (or self-contained .gltf) goes into the Model input of loop k, and is kept in this browser
+function modelAdd(file, k = edit) {
+  if (!MODEL || !SCENES.model) { toast('Models can’t be shown on this computer.'); return; }
+  toast(`Opening ${file.name}…`, 3000);
+  MODEL.add(file).then((r) => {
+    feedInto('model', k);
+    lastWorld.world = 'model';
+    const extra = [r.anims ? `${r.anims} animation${r.anims > 1 ? 's' : ''} playing` : '', r.hasCamera ? 'its camera is under Camera' : ''].filter(Boolean).join(', ');
+    toast(`Showing ${r.name} in loop ${k}${extra ? ` (${extra})` : ''}.${r.kept ? '' : ' It couldn’t be kept in this browser (too big?), so it goes when the page closes.'}`, 6000);
+  }).catch((e) => toast(e.message || 'That model couldn’t be opened.', 8000));
+}
+if (MODEL) {
+  MODEL.onChange(modelRowSync);
+  $('#modelAdd').addEventListener('click', () => $('#modelFile').click());
+  $('#modelFile').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) modelAdd(f); });
+  $('#modelList').addEventListener('click', (e) => {
+    const x = e.target.closest('[data-drop]');
+    if (x) {
+      e.stopPropagation();
+      const m = MODEL.list().find((q) => q.id === x.dataset.drop);
+      if (!m) return;
+      // Removing takes a second click within 4 seconds
+      if (modelArmed.id !== m.id || performance.now() - modelArmed.at > 4000) { modelArmed.id = m.id; modelArmed.at = performance.now(); toast(`Click ✕ again to remove ${m.name} from this browser.`, 4000); return; }
+      modelArmed.id = null;
+      MODEL.remove(m.id).then(() => toast(`Removed ${m.name}.`));
+      return;
+    }
+    const b = e.target.closest('[data-model]');
+    if (b) MODEL.pick(b.dataset.model);
+  });
+  $$('#modelCam button').forEach((b) => b.addEventListener('click', () => MODEL.setCam(b.dataset.cam)));
+  modelRowSync();
+}
 // A world that fails its first compilation is removed from the pickers.
 function hideFailedWorlds() {
   $$('#worlds button, #fractals button').forEach((b) => { b.hidden = !worldOK(b.dataset.world); });
@@ -1685,8 +1740,7 @@ function syncUI() {
   $('#row-3d').hidden = !fly;
   if (fly) $('#hint3d').textContent = HINT_3D[fly];
   $$('#worlds button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.world === fly)));
-  $('#ribbitRow').hidden = fly !== 'ribbit';
-  $('#ribbitAuto').setAttribute('aria-pressed', String(rib.auto));
+  $('#modelRow').hidden = fly !== 'model';
   const frac = [t.in1, t.in2].find((s) => sceneGroup(s) === 'fractal');
   $('#row-fractal').hidden = !frac;
   if (frac) $('#hintFractal').textContent = HINT_3D[frac];
@@ -6276,6 +6330,8 @@ async function asVideoFile(file) {
 function loadFile(file, handle = null, k = edit) {
   if (!file) return;
   if (!loops[k]) k = edit;
+  // A 3D model (from Blender: glTF Binary) goes into the Model input
+  if (/\.(glb|gltf)$/i.test(file.name || '') || /gltf/i.test(file.type || '')) { modelAdd(file, k); return; }
   const type = file.type || '';
   // A moving picture (a GIF and the like) goes in as a video, so it moves; a still one carries on as a picture
   if ((type.startsWith('image/') || !type) && !file.picChecked) {
@@ -9246,11 +9302,11 @@ const RECIPES = [
     sw: 'linear-gradient(90deg,#ffae3b 0 40%,#4fd1c5)',
     patch: { A: { in1: 'bars', size: 50, zoom: 10, spin: 0, trails: 88, color: 8 },
              B: { in1: 'loop', size: 42, zoom: 30, spin: 35, trails: 93, color: 18, mirror: 2 }, view: 50 } },
-  { name: 'Frog hike', after: 'W A S D walk the hiker, J jumps. Let go and he walks by himself.',
-    text: 'Mount Ribbit with light trails: every step smears the frog king, his crown and the clouds into soft streaks of colour.',
-    how: 'MOUNT RIBBIT · TRAILS 55 · COLOR 6',
-    sw: 'radial-gradient(circle at 50% 42%,#9bd34a 0 26%,#3c8d5a 27% 52%,#f6c38c 53%)',
-    patch: { A: { in1: 'ribbit', size: 100, zoom: 0, spin: 0, trails: 55, color: 6, blur: 0 } } },
+  { name: 'Model in light', after: 'Under 3D world › Model, press Add a model… to put your own Blender model (.glb) in.',
+    text: 'Your 3D model with light trails: the camera circles and swoops round it, smearing it into soft streaks of colour.',
+    how: 'MODEL · TRAILS 55 · COLOR 6',
+    sw: 'radial-gradient(circle at 50% 45%,#d23cff 0 18%,#8b1ab8 19% 44%,#2ee6ff 45% 48%,#0b0710 49%)',
+    patch: { A: { in1: 'model', size: 100, zoom: 0, spin: 0, trails: 55, color: 6, blur: 0 } } },
   { name: 'Contour drift', after: 'Under Topo map, switch Height from to The picture to trace another input’s brightness instead.',
     text: 'A hiking map come to life: glowing contour lines over hills that rise, sink and slide past, leaving soft echoes behind.',
     how: 'TOPO MAP · TRAILS 80 · COLOR 4',
@@ -10406,7 +10462,6 @@ function onKey(e) {
   const tag = e.target && e.target.tagName;
   if (tag === 'SELECT' || tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return;
   const onControl = tag === 'BUTTON' || tag === 'INPUT';
-  if (ribKey(e, true)) return;
   if (cueKey(e)) { e.preventDefault(); return; }
   // In Cue mode Space cuts to the next look, even straight after clicking a preview or moving a fader
   // (Shift+Space freezes instead). Holding it down cuts only once.
@@ -12436,7 +12491,6 @@ function openOutput() {
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { toggleOutFS(); e.preventDefault(); }
     else onKey(e);
   });
-  w.addEventListener('keyup', (e) => ribKey(e, false));
   doc.addEventListener('fullscreenchange', () => {
     hint.classList.toggle('gone', !!doc.fullscreenElement);
     doc.body.classList.toggle('fs', !!doc.fullscreenElement);
@@ -13745,7 +13799,7 @@ function draw3D(k, name, slot, scale) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return rt.tex;
 }
-// Mount Ribbit draws each loop's hiker's view on a canvas of its own, which is copied in here (one picture per loop)
+// The Model input draws each loop's camera's view on a canvas of its own, which is copied in here (one picture per loop)
 const extTex = { A: null, B: null, C: null, D: null };
 function drawExt(k, sc, scale) {
   const X = sc.ext;
@@ -13784,30 +13838,6 @@ function patchEnv(k) {
   const a = sndPower() * 0.8, E = snd.env;
   return { low: E.low * a, mid: E.mid * a, high: E.high * a, beat: E.beat * a };
 }
-// The keys that walk Mount Ribbit's hiker (W A S D, Shift to run, J to jump). They steer the loop being edited if it
-// shows Mount Ribbit, otherwise the other loop. Walk by itself (on unless switched off) takes over 10 seconds after.
-const RIB_KEYS = { KeyW: 'fwd', KeyS: 'back', KeyA: 'left', KeyD: 'right', ShiftLeft: 'run', ShiftRight: 'run' };
-function ribKey(e, down) {
-  if (!SCENES.ribbit) return false;
-  const c = e.code;
-  if (!down) { rib.held.delete(c); return false; }
-  if (!(c in RIB_KEYS) && c !== 'KeyJ') return false;
-  if (e.metaKey || e.ctrlKey || e.altKey || !uses('ribbit')) return false;
-  if (c === 'KeyJ') { if (!e.repeat) rib.jump = true; } else rib.held.add(c);
-  return c !== 'ShiftLeft' && c !== 'ShiftRight';
-}
-function ribDriven() {
-  const has = (k) => loops[k].tgt.in1 === 'ribbit' || loops[k].tgt.in2 === 'ribbit';
-  return has(edit) ? edit : activeKeys().find(has) || otherLoop(edit);
-}
-function ribControls() {
-  const c = { fwd: false, back: false, left: false, right: false, run: false, jump: rib.jump };
-  for (const code of rib.held) c[RIB_KEYS[code]] = true;
-  rib.jump = false;
-  return c;
-}
-window.addEventListener('keyup', (e) => ribKey(e, false));
-window.addEventListener('blur', () => rib.held.clear());
 /* ================= the loops' probes (Chase, Breathe, Crystal) ================= */
 // Chase, Breathe and Crystal need to know what a loop's picture looks like: where it's brightest, how bright it
 // is overall and how fast it's changing. So while one of them is on, a tiny 32 x 18 map of the loop's brightness is
@@ -17616,10 +17646,10 @@ function frame() {
       sc.z = (sc.z + step) % sc.period;
       // A fractal's wandering cameras fly on, each loop's only while that loop shows it
       if (sc.fly) for (const k of extraKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) droneOf(sc, k).fly(step, { style: 'glide', drive: 0 });
-      // Mount Ribbit's hikers walk on, the same way
+      // A model's cameras wander on the same way, and its animations play once a frame
       if (sc.ext) {
-        const drive = ribDriven(), ctl = ribControls();
-        for (const k of activeKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) sc.ext.step(k, dt, dt > 0 ? step / dt : 1, k === drive ? ctl : null, rib.auto);
+        sc.ext.tick(dt);
+        for (const k of extraKeys()) if (loops[k].tgt.in1 === name || loops[k].tgt.in2 === name) sc.ext.step(k, dt, dt > 0 ? step / dt : 1);
       }
     }
     sceneGlow = glow;

@@ -1,0 +1,4 @@
+import { WebGLRenderer, Scene, PerspectiveCamera, Box3, Vector3, Sphere, AnimationMixer, Color, ACESFilmicToneMapping, SRGBColorSpace, PMREMGenerator, HemisphereLight, DirectionalLight, PointLight, AmbientLight, Group, Mesh, MeshStandardMaterial, TorusKnotGeometry, IcosahedronGeometry, BoxGeometry, Quaternion, Euler, MathUtils, LoopRepeat, Object3D } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+window.PhosphorThree = { WebGLRenderer, Scene, PerspectiveCamera, Box3, Vector3, Sphere, AnimationMixer, Color, ACESFilmicToneMapping, SRGBColorSpace, PMREMGenerator, HemisphereLight, DirectionalLight, PointLight, AmbientLight, Group, Mesh, MeshStandardMaterial, TorusKnotGeometry, IcosahedronGeometry, BoxGeometry, Quaternion, Euler, MathUtils, LoopRepeat, Object3D, GLTFLoader, RoomEnvironment };

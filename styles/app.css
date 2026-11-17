@@ -1331,3 +1331,8 @@ body.stk #sndMap .chip[data-map="flash"] { display: none; }
 .stk-mvrow.moving select { color: var(--amber-ink); border-color: var(--amber); }
 .stk-mvrow input[type="range"] { flex: 1; height: 20px; }
 .stk-add { width: 100%; }
+  /* the Model input's list of your models */
+  #modelList .chip { max-width: 100%; }
+  .model-x { margin-left: 2px; padding: 0 2px; opacity: .55; font-size: 12px; }
+  .model-x:hover { opacity: 1; color: var(--tally); }
+  #modelBusy { align-self: center; }

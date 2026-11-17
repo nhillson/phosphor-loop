@@ -1250,7 +1250,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 34) return seedLife(p, scene);
   if (id == 35) return seedRadar(p, uTime);
   if (id == 36) return seedFerro(p, uTime);
-  // The 3D worlds (Cubes to Nebula, City, and Mount Ribbit at 31), the fractal flights (25 to 30) and a Patch's layers (37),
+  // The 3D worlds (Cubes to Nebula, City, and the Model at 31), the fractal flights (25 to 30) and a Patch's layers (37),
   // each drawn just before this pass (see draw3D, drawPatch) filling the screen
   if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32) || id == 37) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;
   if (id == 4) return still(uPic, uAspPic, p, 4);

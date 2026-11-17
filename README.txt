@@ -583,17 +583,17 @@ TIPS
         wire: teal valleys, gold peaks, a low sun under a starry nebula. It
         wanders from a winding canyon to rows of sharp ridges to open plains
         with flat-topped mesas, about a minute each.
-      Mount Ribbit: a hike on a frog king the size of a mountain, sitting
-        on a lily pad above the clouds. Gravity pulls towards whatever the
-        hiker stands on, so he walks up the belly, over the eyes, onto the
-        crown and upside down under the pad. W A S D walk (W forward, S
-        back, A and D turn), Shift runs, J jumps. The keys steer the loop
-        you're editing (or the other one if only it shows Mount Ribbit).
-        Walk by itself (the switch under the world buttons, on unless you
-        switch it off) tours the 14 flags round his body, following a
-        trail of gold dots, and takes over again 10 seconds after you let
-        go of the keys. Each loop has its own hiker. He hurries along with
-        the bass. The Guide's "Frog hike" recipe adds light trails.
+      Model: your own 3D model, made in Blender or any 3D app. In Blender
+        use File > Export > glTF 2.0 and pick the format glTF Binary (.glb).
+        Then press "+ Add a model..." under the world buttons, or drop the
+        .glb on the picture (or on a loop's tab). Each loop's camera
+        wanders round it, swoops in close and rolls; if the file has its
+        own camera, Camera > "The file's own camera" uses that instead.
+        The model's animations play on a loop. Models you add are kept in
+        this browser, listed as buttons (click one to show it, its x twice
+        to remove it). With none added, a shiny Sample knot shows. The
+        camera hurries along with the bass. The Guide's "Model in light"
+        recipe adds light trails.
     "3D world" under "What feeds the loop" adds any of them to any look;
     pick which one in the row of buttons that opens underneath. Input size
     widens or narrows the view. With React to sound on, the flight surges
@@ -655,7 +655,6 @@ TIPS
     N neutral, R surprise,
     P autopilot, L next look, C clear, F full screen, V record (press
     again to stop and save; works in full screen too), G guide.
-    In Mount Ribbit: W A S D walk, Shift runs, J jumps.
   - Naming: before a picture or video saves, a box on the picture shows its
     usual name. Type a new one, or press Enter to keep it. "Don't save"
     throws it away, but only after a second click.
