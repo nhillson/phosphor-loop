@@ -1,7 +1,7 @@
 // The Model input (one of the 3D worlds): a 3D model made in Blender (or any 3D app), exported as glTF Binary (.glb).
 // three.js (vendor/three/three-gltf.js, loaded the first time a model is shown) draws it on a canvas of its own and
 // app.js copies that picture into the loop like any other 3D world's (drawExt). Each loop gets its own wandering
-// camera, or the file's own camera (Blender's) when it has one and that's picked. The file's animations all play,
+// camera, Still (stopped where it is), or the file's own camera (Blender's) when it has one. The file's animations all play,
 // looping. Models are kept in this browser (IndexedDB phosphor-models: `meta` {id, name, added, size} and `data`
 // {id, buf}); which one shows and the camera choice in localStorage phosphor-model. With none added, a sample shows.
 (() => {
@@ -225,7 +225,9 @@ function tick(dt) {
   if (cur.mixer) cur.mixer.update(dt);
   if (cur.update) cur.update(simT);
 }
+// Still: each loop's camera stays where its wander had got to (the model's animations still play)
 function step(k, dt, mult) {
+  if (settings.cam === 'still') return;
   camOf(k).t += dt * (mult || 1) * 0.6;
 }
 function render(k, w, h, scale, glow) {
@@ -295,7 +297,7 @@ async function pick(id) {
   if (state === 'ready') await loadCurrent();
   else build();
 }
-function setCam(mode) { settings.cam = mode === 'blender' ? 'blender' : 'wander'; saveSet(); emit(); }
+function setCam(mode) { settings.cam = ['blender', 'still'].includes(mode) ? mode : 'wander'; saveSet(); emit(); }
 
 loadIndex();
 window.PhosphorModel = {
@@ -319,5 +321,6 @@ window.PhosphorModel = {
   pick,
   onChange(f) { listeners.add(f); },
   sphere: () => (cur ? { c: cur.sphere.center.toArray(), r: cur.sphere.radius } : null),
+  camTime: (k) => (cams[k] ? cams[k].t : null),
 };
 })();

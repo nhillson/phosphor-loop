@@ -1147,9 +1147,11 @@ function modelRowSync() {
     }
     list.appendChild(b);
   }
-  const hasCam = MODEL.hasCamera();
-  $('#modelCam').hidden = !hasCam;
-  $$('#modelCam button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cam === (hasCam ? MODEL.camMode() : 'wander'))));
+  // The file's own camera is offered only when the file has one
+  const hasCam = MODEL.hasCamera(), mode = MODEL.camMode() === 'blender' && !hasCam ? 'wander' : MODEL.camMode();
+  $('#modelCamOwn').hidden = !hasCam;
+  $('#modelCamSeg').className = `seg ${hasCam ? 'seg-3' : 'seg-2'}`;
+  $$('#modelCam button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cam === mode)));
   $('#modelBusy').hidden = MODEL.state !== 'building';
 }
 // A .glb (or self-contained .gltf) goes into the Model input of loop k, and is kept in this browser
@@ -1159,7 +1161,7 @@ function modelAdd(file, k = edit) {
   MODEL.add(file).then((r) => {
     feedInto('model', k);
     lastWorld.world = 'model';
-    const extra = [r.anims ? `${r.anims} animation${r.anims > 1 ? 's' : ''} playing` : '', r.hasCamera ? 'its camera is under Camera' : ''].filter(Boolean).join(', ');
+    const extra = [r.anims ? `${r.anims} animation${r.anims > 1 ? 's' : ''} playing` : '', r.hasCamera ? 'its camera is under Camera › File’s camera' : ''].filter(Boolean).join(', ');
     toast(`Showing ${r.name} in loop ${k}${extra ? ` (${extra})` : ''}.${r.kept ? '' : ' It couldn’t be kept in this browser (too big?), so it goes when the page closes.'}`, 6000);
   }).catch((e) => toast(e.message || 'That model couldn’t be opened.', 8000));
 }

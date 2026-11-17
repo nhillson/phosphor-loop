@@ -379,7 +379,7 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    request, old looks with `ribbit` fall back to Wave). js/model.js = `window.PhosphorModel`: a .glb (Blender: File › Export › glTF 2.0,
    glTF Binary) drawn by three.js r170 (`vendor/three/three-gltf.js`, `window.PhosphorThree`, loaded on first use; rebuild steps in
    vendor/three/README.md) on its own canvas, copied in by `drawExt`. Each loop's camera wanders (`placeWander`, Input size is the lens),
-   or the file's own camera (`setCam('blender')`, shown only when the file has one). All animations loop (`tick` once a frame).
+   Still (`setCam('still')`: `step` stops moving the loops' cameras on), or the file's own camera (`setCam('blender')`, button `#modelCamOwn` shown only when the file has one). All animations loop (`tick` once a frame).
    Models kept in IndexedDB `phosphor-models` (meta / data); picked one and camera in `phosphor-model`; a Sample with none. UI `#modelRow`
    (glue "the Model input" in js/app.js: `modelRowSync`, `modelAdd`); a dropped .glb goes through `loadFile`. Draco-compressed files are
    turned away with a message. `python3 tests/model_check.py` (about 2 minutes; `tests/make_test_glb.py` makes the test cube).

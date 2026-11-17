@@ -587,8 +587,10 @@ TIPS
         use File > Export > glTF 2.0 and pick the format glTF Binary (.glb).
         Then press "+ Add a model..." under the world buttons, or drop the
         .glb on the picture (or on a loop's tab). Each loop's camera
-        wanders round it, swoops in close and rolls; if the file has its
-        own camera, Camera > "The file's own camera" uses that instead.
+        wanders round it, swoops in close and rolls. Camera > Still stops
+        it right where it is (let it wander to an angle you like, then
+        press Still; Input size still zooms). If the file has its own
+        camera, Camera > "File's camera" uses that instead.
         The model's animations play on a loop. Models you add are kept in
         this browser, listed as buttons (click one to show it, its x twice
         to remove it). With none added, a shiny Sample knot shows. The

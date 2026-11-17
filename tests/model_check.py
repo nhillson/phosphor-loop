@@ -84,6 +84,7 @@ def main():
         until("PhosphorModel.state === 'ready'", 'the model viewer did not get ready', 40)
         c.wait_frames(20, 'sample showing')
         ok(pg.evaluate("PhosphorModel.name()") == 'Sample', f"Sample did not show first ({pg.evaluate('PhosphorModel.name()')})")
+        ok(pg.evaluate("document.querySelector('#modelCamOwn').hidden"), "File's camera is offered for the Sample, which has none")
         ok(pg.evaluate("!document.querySelector('#modelRow').hidden"), 'the Model row is hidden while the Model shows')
         _, lum = c.picture('1-sample')
         ok(lum > 3, f'the Sample picture is black (brightness {lum:.1f})')
@@ -96,7 +97,7 @@ def main():
             ok(pg.evaluate("PhosphorModel.list().length") == 1, 'the model was not kept in this browser')
             ok(pg.evaluate("PhosphorModel.anims()") == 1, 'its animation was not found')
             ok(pg.evaluate("PhosphorModel.hasCamera()"), 'its camera was not found')
-            ok(pg.evaluate("!document.querySelector('#modelCam').hidden"), 'the Camera choice is hidden though the file has a camera')
+            ok(pg.evaluate("!document.querySelector('#modelCamOwn').hidden"), "File's camera is hidden though the file has a camera")
             ok(pg.evaluate("document.querySelector('#modelList [data-model][aria-pressed=true]').textContent.includes('spin-cube')"), 'the list does not show spin-cube as picked')
             c.wait_frames(20, 'model showing')
             _, lum = c.picture('2-model-wander')
@@ -113,6 +114,17 @@ def main():
             _, lum = c.picture('3-model-own-camera')
             ok(lum > 3, f"the file's-camera picture is black (brightness {lum:.1f})")
             pg.evaluate("document.querySelector('#modelCam [data-cam=wander]').click()")
+
+            # 4b. Still: the camera stops where it is, and goes on again with Wanders
+            pg.evaluate("document.querySelector('#modelCam [data-cam=still]').click()")
+            ok(pg.evaluate("PhosphorModel.camMode()") == 'still', 'Still did not get picked')
+            t0 = pg.evaluate("PhosphorModel.camTime('A')")
+            c.wait_frames(15, 'still camera')
+            ok(pg.evaluate("PhosphorModel.camTime('A')") == t0, 'the camera moved on while Still was picked')
+            c.picture('4-model-still')
+            pg.evaluate("document.querySelector('#modelCam [data-cam=wander]').click()")
+            c.wait_frames(5, 'wandering again')
+            ok(pg.evaluate("PhosphorModel.camTime('A')") != t0, 'the camera did not move on after Wanders was picked again')
 
         # 5. A broken file is turned away, the model stays
         bad = base64.b64encode(b'not a model at all').decode()

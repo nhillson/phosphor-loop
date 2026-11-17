@@ -451,11 +451,12 @@
               <div class="chips" id="modelList" role="group" aria-label="Which model"></div>
               <div class="chips"><button class="chip" id="modelAdd" title="Pick a .glb file. In Blender: File › Export › glTF 2.0, format glTF Binary (.glb). You can also drop a .glb on the picture.">+ Add a model…</button><span class="hint" id="modelBusy" hidden>Getting the model viewer ready…</span></div>
               <input type="file" id="modelFile" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden>
-              <div class="ctl" id="modelCam" hidden>
+              <div class="ctl" id="modelCam">
                 <span class="lbl">Camera</span>
-                <div class="seg seg-2" role="group" aria-label="Camera">
-                  <button data-cam="wander" aria-pressed="true">Wanders round it</button>
-                  <button data-cam="blender" aria-pressed="false">The file’s own camera</button>
+                <div class="seg seg-2" id="modelCamSeg" role="group" aria-label="Camera">
+                  <button data-cam="wander" aria-pressed="true" title="The camera circles the model, swoops in close and rolls">Wanders</button>
+                  <button data-cam="still" aria-pressed="false" title="The camera stops right where it is. Let it wander to an angle you like, then press Still. Input size still zooms.">Still</button>
+                  <button data-cam="blender" id="modelCamOwn" aria-pressed="false" hidden title="The camera saved in the model's file (Blender's), moving if it's animated there">File’s camera</button>
                 </div>
               </div>
             </div>
