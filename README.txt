@@ -308,8 +308,8 @@ TIPS
     through it, or as a Fly-through inside it. The Guide's "Dot sculpture"
     recipe sets it up. Keep it crisp (on to start with) keeps every pattern to
     the settings that come out sharp: whole numbers of corners averaged, no
-    more than the shape can take, Hop never too soft and Fractal corners at
-    most 30; the readouts show what's really used. Drift, New pattern and
+    more than the shape can take, Hop never too soft and Fractal corners
+    low enough to stay sharp (none with 1 corner averaged); the readouts show what's really used. Drift, New pattern and
     Autopilot stay inside those too. Switch it off for the full range. Autopilot always
     switches it on when it brings the Chaos game in, at that loop's Drift speed. The Guide's
     "Dot mandala" recipe sets it up.

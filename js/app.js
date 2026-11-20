@@ -1347,7 +1347,7 @@ function chaosDriftTick(dt) {
     // than the shape takes, Hop under its floor)
     const crispE = t.chaosCrisp !== false ? PCH.effective(t) : null;
     for (let [q, [lo, hi, sp, far]] of Object.entries(CHAOS_DRIFT)) {
-      if (crispE && q === 'chaosDeep') hi = 100 * PCH.DEEP_MAX;
+      if (crispE && q === 'chaosDeep') hi = crispE.deepMax;
       if (crispE && q === 'chaosMix') hi = Math.min(100, PCH.mixFor(crispE.cap) + 4);
       if (crispE && q === 'chaosJump') lo = Math.max(lo, 100 * PCH.hopFloor(crispE.k));
       if (hi - lo < 2) continue;

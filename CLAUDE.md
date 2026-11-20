@@ -220,10 +220,11 @@ file don't rebuild the app.
    (10 solids, 4 to 20 corners, each with `base` = what's left at which its copies touch), drawn by `VS_DOT3` (`uView` turn or camera, `uSlice`
    slab of `THICK`, near dots bigger in Fly-through and every dot's total kept the same by `FS_DOT3`); brightness evened by `C3_SLICE` / `C3_FLY`;
    `PCH.look()` picks 3D 4 times in 10. **Keep it crisp** (`chaosCrisp`, on to start with, `#chaosCrisp`; from a scored sweep of 180 still
-   patterns): `kCap` (10+ corners: 3, 8+: 4), `kSnap` (whole numbers, quick between), `hopFloor(k)`, `DEEP_MAX` 0.3, no K breathing; `PCH.effective`
+   patterns): `kCap` (10+ corners: 3, 8+: 4), `kSnap` (whole numbers, quick between), `hopFloor(k)`, `deepCap(k, corners)` (1 averaged: 0, 8+ corners: 15, else 30), no K breathing; `PCH.effective`
    for the readouts, drift ranges narrowed to match, `look(crisp)`. Crisp also: the high sounds brighten (uGain) instead of adding to K, the bass
    pulses the hop a third as much, and the flat build-up lasts 0.6 s (0.4 s with music) with a sharper show pass (`uCw` 8). Flat patterns are added
-   up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
+   up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). Crisp 3D: turning/sweeping/flying 0.4 as fast, build-up 0.15 s, near
+   dots at most 1.6 px wide (`uPsMax`). The pattern fits a tall screen's width (`fit`). Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
    `PCH.look()` = New pattern, Surprise and Autopilot. Every dot is
    worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, added up in an RGBA16F picture that
    fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
