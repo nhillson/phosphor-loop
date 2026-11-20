@@ -300,12 +300,13 @@ TIPS
     more organic. Drift the faders slowly moves Corners averaged, Hop,
     Fractal corners and Morph about by themselves, as fast as Drift speed
     says, and Corners too (a corner at a time) unless you switch off Corners
-    drift too. Colors has twelve sets, each shown as a strip of its colors; grab
+    drift too (Morph drifts too does the same for Morph). Colors has twelve sets, each shown as a strip of its colors; grab
     one any time and it carries on from where you let go.
     3D (beside Flat, at the top) hops the dots towards the corners of a solid
     instead: the Corners fader becomes Shape (a pyramid up to a dodecahedron),
     and 3D style shows the cloud Turning in front of you, as Slices sweeping
-    through it, or as a Fly-through inside it. The Guide's "Dot sculpture"
+    through it, or as a Fly-through inside it. Solid (3D only) draws Turning and Fly-through
+    as a solid object with outlines instead of a see-through glow. The Guide's "Dot sculpture"
     recipe sets it up. Keep it crisp (on to start with) keeps every pattern to
     the settings that come out sharp: whole numbers of corners averaged, no
     more than the shape can take, Hop never too soft and Fractal corners

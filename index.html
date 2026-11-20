@@ -570,6 +570,9 @@
             <div class="ctl">
               <button class="btn" id="chaosCrisp" aria-pressed="true" title="Keeps the pattern to the combinations that come out sharp and well defined: Corners averaged in whole numbers, and no more of them than the shape can take (12 corners: up to 3), Hop never too soft for it, Fractal corners at most 30. The readouts show what's really used. Switch off for the full range, smears included."><span class="led"></span>Keep it crisp</button>
             </div>
+            <div class="ctl" id="chaosSolidRow" hidden>
+              <button class="btn" id="chaosSolid" aria-pressed="false" title="3D Turning and Fly-through: draws the shape as a solid object (only the nearest dots show, shaded, with dark outlines) instead of a glow you can see through. Slices always glows."><span class="led"></span>Solid</button>
+            </div>
             <div class="ctl" id="chaosViewRow" hidden>
               <span class="lbl" id="chaosViewLbl" title="How the 3D cloud is shown. Turning: the whole solid turns in front of you, nearer dots brighter. Slices: a thin slice sweeps through it, so you see flat patterns that keep changing. Fly-through: a camera drifts around inside it.">3D style</span>
               <div class="seg seg-3" id="chaosView" role="group" aria-labelledby="chaosViewLbl">
@@ -607,6 +610,9 @@
             </div>
             <div class="ctl">
               <button class="btn" id="chaosDriftSides" aria-pressed="true" title="While Drift the faders is on, lets Corners drift too: one corner more or fewer every so often, each change taking a second or two. Off keeps the number of corners where you put it."><span class="led"></span>Corners drift too</button>
+            </div>
+            <div class="ctl">
+              <button class="btn" id="chaosDriftMove" aria-pressed="true" title="While Drift the faders is on, lets Morph drift too. Off keeps Morph where you put it."><span class="led"></span>Morph drifts too</button>
             </div>
             <div class="ctl">
               <div class="ctl-head"><label for="chaosSpeed" title="How fast Drift the faders moves them: from a few minutes to cross a fader, to a few seconds">Drift speed</label><output id="chaosSpeedOut" for="chaosSpeed"></output></div>

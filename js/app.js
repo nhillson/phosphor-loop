@@ -1348,8 +1348,11 @@ function syncChaosUI(t) {
   $$('#chaosDim button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (d3 ? 1 : 0))));
   $$('#chaosView button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosView | 0))));
   $('#chaosViewRow').hidden = !d3;
+  $('#chaosSolidRow').hidden = !d3;
+  $('#chaosSolid').setAttribute('aria-pressed', String(!!t.chaosSolid));
   $('label[for="chaosSides"]').textContent = d3 ? 'Shape' : 'Corners';
   $('#chaosDriftSides').setAttribute('aria-pressed', String(t.chaosDriftSides !== false));
+  $('#chaosDriftMove').setAttribute('aria-pressed', String(t.chaosDriftMove !== false));
 }
 // Drift the faders: Corners averaged, Hop, Fractal corners and Morph each wander to a spot picked at random, then on
 // to another, easing in and out, at Drift speed; Corners too (a corner at a time, much more slowly) unless its switch is off. A fader you're holding is left alone and carries on from where you let go.
@@ -1377,6 +1380,7 @@ function chaosDriftTick(dt) {
       const whole = q === 'chaosSides';
       const d = S[q] || (S[q] = { to: null, v: 0, x: null });
       if (whole && t.chaosDriftSides === false) { d.to = null; d.v = 0; d.x = null; continue; }
+      if (q === 'chaosMove' && t.chaosDriftMove === false) { d.to = null; d.v = 0; continue; }
       let x = +t[q]; if (!Number.isFinite(x)) x = PCH.DEFAULTS[q];
       // Corners is a whole number: its walk is kept apart (d.x) and the fader shows the nearest; moved by hand, the walk goes on from there
       if (whole) { if (d.x === null || Math.round(d.x) !== Math.round(x)) { d.x = x; d.to = null; } x = d.x; }
@@ -1415,12 +1419,26 @@ $$('#chaosView button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD('CHAOS GAME', '3D · ' + PCH.VIEWS[+b.dataset.v].toUpperCase());
 }));
+$('#chaosSolid').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosSolid = !t.chaosSolid;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosSolid ? 'SOLID' : 'GLOW');
+});
 $('#chaosCrisp').addEventListener('click', () => {
   takeOver('in1');
   const t = loops[edit].tgt;
   t.chaosCrisp = t.chaosCrisp === false;
   syncUI();
   showOSD('CHAOS GAME', t.chaosCrisp ? 'KEEP IT CRISP' : 'FULL RANGE');
+});
+$('#chaosDriftMove').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosDriftMove = t.chaosDriftMove === false;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosDriftMove ? 'MORPH DRIFTS' : 'MORPH STAYS');
 });
 $('#chaosDriftSides').addEventListener('click', () => {
   takeOver('in1');
@@ -3851,7 +3869,7 @@ function apFinish(sc, k, keep) {
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
   // Autopilot's Chaos game always drifts its faders, at the Drift speed that loop is set to
-  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); sc.chaosCrisp = !(loops[k] && loops[k].tgt.chaosCrisp === false); }
+  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); sc.chaosDriftMove = !(loops[k] && loops[k].tgt.chaosDriftMove === false); sc.chaosCrisp = !(loops[k] && loops[k].tgt.chaosCrisp === false); sc.chaosSolid = !!(loops[k] && loops[k].tgt.chaosSolid); }
   if (!keep || keep !== sc.in1) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
     if ((sc.in1 === 'bars' || sc.in1 === 'picture' || sc.in1 === 'genart') && sc.size == null) sc.size = 50;
