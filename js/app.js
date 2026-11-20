@@ -1359,7 +1359,13 @@ function chaosDriftTick(dt) {
       if (whole) { if (d.x === null || Math.round(d.x) !== Math.round(x)) { d.x = x; d.to = null; } x = d.x; }
       if (k === edit && chaosHeld === q) { d.to = null; d.v = 0; continue; }
       const near = (hi - lo) / 100;
-      if (d.to === null || Math.abs(d.to - x) < near) { do { d.to = lo + Math.random() * (hi - lo); } while (Math.abs(d.to - x) < far); }
+      if (d.to === null || Math.abs(d.to - x) < near) {
+        // A new spot at least `far` away, on whichever side has room (never more than 40% of the range, so a narrow
+        // range, like Fractal corners held to 0-15 by Keep it crisp, can't leave it searching for ever)
+        const gap = Math.min(far, 0.4 * (hi - lo)), up = hi - Math.max(x + gap, lo), down = Math.min(x - gap, hi) - lo;
+        if (up <= 0 && down <= 0) d.to = Math.random() < 0.5 ? lo : hi;
+        else { const r = Math.random() * (Math.max(up, 0) + Math.max(down, 0)); d.to = r < Math.max(up, 0) ? hi - r : lo + (r - Math.max(up, 0)); }
+      }
       // Its speed eases up after a turn and down as it nears the spot, so it never jerks
       const want = Math.sign(d.to - x) * rate * sp * Math.min(1, Math.abs(d.to - x) / (8 * near) + 0.15);
       d.v += (want - d.v) * (1 - Math.exp(-dt * 1.5));
