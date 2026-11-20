@@ -197,12 +197,12 @@ precision highp int;
 uniform vec3 uV[${MAX_V3}], uVb[${MAX_V3}];   // this solid's corners; the next one's (while Corners changes)
 uniform mat3 uR1, uR2, uView;
 uniform vec3 uCam;
-uniform float uN, uNb, uNmix, uK, uDeep, uDeep2, uSame, uFit, uAsp, uSize, uMode, uSlice, uThick, uPsMax;
+uniform float uN, uNb, uNmix, uK, uDeep, uDeep2, uSame, uFit, uAsp, uSize, uMode, uSlice, uThick, uPsMax, uSolid;
 uniform vec2 uLeft, uLeftB;
 uniform int uSteps;
 uniform uint uSeed;
 out vec3 vCol;
-out float vW, vPs;
+out float vW, vPs, vNear;
 uint pcg(uint v){ uint s=v*747796405u+2891336453u; uint w=((s>>((s>>28u)+4u))^s)*277803737u; return (w>>22u)^w; }
 vec3 corner(bool b, uint i){ return b?uVb[i]:uV[i]; }
 void main(){
@@ -226,11 +226,13 @@ void main(){
     }
     p=mix(t*(R/float(kc)), p, left);
   }
-  float w=1., ps=uSize; vec2 xy=vec2(0.); bool keep=true;
+  float w=1., ps=uSize, zN=0., near=0.; vec2 xy=vec2(0.); bool keep=true;
   if(uMode<.5){            // Turning: seen from 4 away, so the near side is a little bigger
     vec3 q=uView*p; float D=4.;
     xy=q.xy*(D/(D-q.z))*uFit*1.2*(D-1.)/D;
     w=mix(.3,1.45,clamp(q.z*.5+.5,0.,1.));
+    near=clamp(q.z*.42+.5,0.,1.); zN=clamp(-q.z*.8,-.99,.99);
+    if(uSolid>.5) ps=max(3.,uSize*2.6);
   } else if(uMode<1.5){    // Slices: a soft slab of the solid, square on
     vec3 q=uView*p; float d=abs(q.z-uSlice)/uThick;
     keep=d<1.; w=1.-d*d; xy=q.xy*uFit*1.2;
@@ -240,21 +242,27 @@ void main(){
     xy=q.xy*(1.15/max(q.z,.015));
     ps=clamp(uSize*.35/max(q.z,.01), uSize, uSize*uPsMax);
     w=1./(1.+q.z*q.z*.8);
+    near=1./(1.+q.z*1.6); zN=clamp(q.z/2.5,0.,1.)*1.98-.99;
+    if(uSolid>.5) ps=clamp(uSize*.6/max(q.z,.01), max(3.,uSize*2.6), uSize*10.);
   }
   vec2 c2=vec2(first.x+.55*first.z, first.y-.45*first.z);
   vCol=vec3(1., c2);
-  vW=keep?w:0.; vPs=ps;
-  gl_Position=keep?vec4(xy.x/uAsp, xy.y, 0., 1.):vec4(2.,2.,2.,1.);
+  vW=keep?w:0.; vPs=ps; vNear=near;
+  gl_Position=keep?vec4(xy.x/uAsp, xy.y, zN, 1.):vec4(2.,2.,2.,1.);
   gl_PointSize=ps;
 }`;
 // A 3D dot: soft and round when bigger than a pixel, adding up to the same in all whatever its size
 const FS_DOT3 = `#version 300 es
 precision highp float;
-uniform float uW;
-in vec3 vCol; in float vW, vPs; out vec4 o;
+uniform float uW, uSolid;
+in vec3 vCol; in float vW, vPs, vNear; out vec4 o;
 void main(){
+  vec2 q=gl_PointCoord*2.-1.;
+  // Solid: a round dot that hides whatever is behind it (the depth test keeps the nearest); it carries how near it is
+  // and which corner it came from, for the shading in FS_SHOW
+  if(uSolid>.5){ if(vPs>1.5 && dot(q,q)>1.) discard; o=vec4(vNear, vCol.y*.35+.5, vCol.z*.35+.5, 1.); return; }
   float w=uW*vW;
-  if(vPs>1.5){ vec2 q=gl_PointCoord*2.-1.; w*=max(0., 1.-dot(q,q))/(vPs*vPs*.39); }
+  if(vPs>1.5){ w*=max(0., 1.-dot(q,q))/(vPs*vPs*.39); }
   o=vec4(vCol*w, w);
 }`;
 const FS_FADE = `#version 300 es
@@ -269,11 +277,42 @@ precision highp float;
 uniform sampler2D uAcc;
 uniform vec3 uC[8];
 uniform float uNorm, uMode, uGain, uShift, uAsp, uCw;
+uniform float uSolid;
 uniform vec2 uRot;   // the flat pattern's turn: its dots are added up unturned, and turned only here, so turning never smears them
 out vec4 o;
 vec3 hue(float h){ return clamp(abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.)-1.,0.,1.); }
 void main(){
   ivec2 sz=textureSize(uAcc,0);
+  if(uSolid>.5){
+    // 3D drawn solid: lit by how near it is, with dark outlines wherever something nearer stands in front of something
+    // further back (or in front of nothing), which is what makes the edges crisp
+    ivec2 q=ivec2(gl_FragCoord.xy), m=sz-1;
+    vec4 c=texelFetch(uAcc,q,0);
+    if(c.a<.5){
+      // A pinhole between dots: filled from the nearest of its neighbours when most of them are lit
+      int lit=0; vec4 best=vec4(0.);
+      for(int i=0;i<4;i++){
+        ivec2 d=i==0?ivec2(1,0):i==1?ivec2(-1,0):i==2?ivec2(0,1):ivec2(0,-1);
+        vec4 b=texelFetch(uAcc,clamp(q+d,ivec2(0),m),0);
+        if(b.a>.5){ lit++; if(b.r>best.r) best=b; }
+      }
+      if(lit<3){ o=vec4(0.,0.,0.,1.); return; }
+      c=best;
+    }
+    float n=c.r, e=0.;
+    for(int i=0;i<4;i++){
+      ivec2 d=i==0?ivec2(1,0):i==1?ivec2(-1,0):i==2?ivec2(0,1):ivec2(0,-1);
+      vec4 b=texelFetch(uAcc,clamp(q+d*2,ivec2(0),m),0);
+      e=max(e, n-(b.a<.5?n-.4:b.r));
+    }
+    float edge=1.-.65*smoothstep(.015,.09,e);
+    vec3 base;
+    if(uMode<.5) base=mix(uC[2],uC[7],n);
+    else if(uMode<1.5) base=mix(vec3(.85),hue(atan(c.b-.5,c.g-.5)/6.2831853+uShift),.85);
+    else base=hue(n*.9+gl_FragCoord.y/float(sz.y)*.3+uShift);
+    o=vec4(base*(.45+.8*n)*edge*(uGain/2.2),1.);
+    return;
+  }
   vec2 px=1./vec2(sz), w=(gl_FragCoord.xy*px*2.-1.)*vec2(uAsp,1.);
   w=vec2(uRot.x*w.x+uRot.y*w.y, -uRot.y*w.x+uRot.x*w.y);
   vec2 uv=(w/vec2(uAsp,1.)+1.)*.5;
@@ -314,16 +353,16 @@ function create(gl) {
   // Dots are added up in a picture that can hold more than 255 a spot, where the graphics card can draw to one
   const deep = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
   const dot = program(VS_DOT, FS_DOT, ['uV', 'uVb', 'uLeftB', 'uNmix', 'uSub', 'uSub2', 'uN', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uLeft', 'uFit', 'uAsp', 'uSize', 'uSteps', 'uSeed', 'uSoft', 'uW']);
-  const dot3 = program(VS_DOT3, FS_DOT3, ['uV', 'uVb', 'uR1', 'uR2', 'uView', 'uCam', 'uN', 'uNb', 'uNmix', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uFit', 'uAsp', 'uSize', 'uMode', 'uSlice', 'uThick', 'uPsMax', 'uLeft', 'uLeftB', 'uSteps', 'uSeed', 'uW']);
+  const dot3 = program(VS_DOT3, FS_DOT3, ['uV', 'uVb', 'uR1', 'uR2', 'uView', 'uCam', 'uN', 'uNb', 'uNmix', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uFit', 'uAsp', 'uSize', 'uMode', 'uSlice', 'uThick', 'uPsMax', 'uSolid', 'uLeft', 'uLeftB', 'uSteps', 'uSeed', 'uW']);
   const fade = program(VS_TRI, FS_FADE, ['uKeep']);
-  const show = program(VS_TRI, FS_SHOW, ['uAcc', 'uNorm', 'uMode', 'uC', 'uGain', 'uShift', 'uAsp', 'uCw', 'uRot']);
+  const show = program(VS_TRI, FS_SHOW, ['uAcc', 'uNorm', 'uMode', 'uC', 'uGain', 'uShift', 'uAsp', 'uCw', 'uRot', 'uSolid']);
   const vao = gl.createVertexArray();
   const FIT = 0.95, RATE = 9e6, RATE3 = 14e6, TAU = 0.25, SAME = 0.3, THICK = 0.07;
   // Where 3D's dots would spread to if they were even, against Turning's disc: a Slice catches only about a tenth of
   // the dots, so it's as if they were spread ten times as thin; Fly-through fills the screen, with half behind the camera
   const C3_SLICE = 9, C3_FLY = 1.6;   // how much of the height it fills; dots a second; the glow's fade (seconds)
 
-  function target(w, h, deepOne) {
+  function target(w, h, deepOne, depth) {
     const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
     if (deepOne) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
     else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -331,8 +370,10 @@ function create(gl) {
     for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filt], [gl.TEXTURE_MAG_FILTER, filt], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
     const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    let d = null;
+    if (depth) { d = gl.createRenderbuffer(); gl.bindRenderbuffer(gl.RENDERBUFFER, d); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, h); gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, d); }
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    return { t, f, w, h };
+    return { t, f, w, h, d };
   }
   function state() {
     return { acc: null, out: null, total: 0, t: Math.random() * 600, turn: Math.random() * 6.283, sub: Math.random() * 6.283, kick: 0, kickV: 0,
@@ -341,7 +382,7 @@ function create(gl) {
   }
   function release(st) {
     if (!st) return;
-    for (const k of ['acc', 'out']) if (st[k]) { gl.deleteTexture(st[k].t); gl.deleteFramebuffer(st[k].f); st[k] = null; }
+    for (const k of ['acc', 'out']) if (st[k]) { gl.deleteTexture(st[k].t); gl.deleteFramebuffer(st[k].f); if (st[k].d) gl.deleteRenderbuffer(st[k].d); st[k] = null; }
     st.total = 0;
   }
 
@@ -352,7 +393,7 @@ function create(gl) {
     dt = Math.min(0.25, Math.max(1 / 240, dt || 1 / 60));
     if (!st.acc || st.acc.w !== outW || st.acc.h !== outH) {
       release(st);
-      st.acc = target(outW, outH, deep); st.out = target(outW, outH, false);
+      st.acc = target(outW, outH, deep, true); st.out = target(outW, outH, false);
     }
     s = clean(s);
     // The settings glide to where the faders are (the number of corners too: see the two polygons below)
@@ -408,7 +449,15 @@ function create(gl) {
     gl.viewport(0, 0, outW, outH);
     gl.enable(gl.BLEND);
     gl.blendEquation(gl.FUNC_ADD);
-    if (deep) {
+    // Keep it crisp in 3D, Turning and Fly-through: drawn solid, fresh every frame (nearest dot wins), so nothing builds
+    // up and nothing can smear. Slices stays a glow.
+    const solid = dim3 && crisp && s.chaosView !== 1;
+    const depthWas = gl.isEnabled(gl.DEPTH_TEST);
+    if (solid) {
+      gl.disable(gl.BLEND);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true);
+      gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    } else if (deep) {
       gl.blendFunc(gl.ZERO, gl.SRC_ALPHA);
       gl.useProgram(fade.p); gl.uniform1f(fade.u.uKeep, keep);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -425,7 +474,7 @@ function create(gl) {
       const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(Math.max(l0, nmix > 0 ? left3(k0, B) : 0)))));
       const view = s.chaosView;
       // (Crisp: slower, so the turning doesn't smear the dots as they build up)
-      const slow = crisp ? 0.4 : 1;
+      const slow = solid ? 0.8 : crisp ? 0.4 : 1;
       st.yaw += dt * (0.06 + 0.4 * mv) * slow; st.slice += dt * (0.05 + 0.35 * mv) * slow; st.fly += dt * (0.03 + 0.2 * mv) * slow;
       const yaw = st.yaw + st.kick * 0.3, pitch = 0.35 + 0.4 * Math.sin(st.t * 0.07);
       let M = m3.mul(m3.axis([1, 0, 0], pitch), m3.axis([0, 1, 0], yaw)), cam = [0, 0, 0];
@@ -450,11 +499,12 @@ function create(gl) {
       gl.uniform3f(dot3.u.uCam, cam[0], cam[1], cam[2]);
       gl.uniform1f(dot3.u.uK, K); gl.uniform1f(dot3.u.uDeep, deep1); gl.uniform1f(dot3.u.uDeep2, deep2); gl.uniform1f(dot3.u.uSame, SAME);
       gl.uniform1f(dot3.u.uFit, fit); gl.uniform1f(dot3.u.uAsp, outW / outH); gl.uniform1f(dot3.u.uSize, px);
-      gl.uniform1f(dot3.u.uMode, view); gl.uniform1f(dot3.u.uSlice, 0.75 * Math.sin(st.slice)); gl.uniform1f(dot3.u.uThick, THICK); gl.uniform1f(dot3.u.uPsMax, crisp ? 1.6 : 7);
+      gl.uniform1f(dot3.u.uMode, view); gl.uniform1f(dot3.u.uSlice, 0.75 * Math.sin(st.slice)); gl.uniform1f(dot3.u.uThick, THICK); gl.uniform1f(dot3.u.uPsMax, crisp ? 1.6 : 7); gl.uniform1f(dot3.u.uSolid, solid ? 1 : 0);
       gl.uniform1i(dot3.u.uSteps, steps); gl.uniform1ui(dot3.u.uSeed, seed);
       gl.uniform1f(dot3.u.uW, deep ? 1 : 2 / 255);
-      n = Math.round(Math.max(80000, Math.min(deep ? 320000 : 200000, RATE3 * dt)));
+      n = solid ? Math.round(Math.max(150000, Math.min(deep ? 450000 : 300000, 24e6 * dt))) : Math.round(Math.max(80000, Math.min(deep ? 320000 : 200000, RATE3 * dt)));
       gl.drawArrays(gl.POINTS, 0, n);
+      if (solid) gl.disable(gl.DEPTH_TEST);
       each = 1;
       cover = view === 0 ? disc * 1.1 : view === 1 ? disc * C3_SLICE : outW * outH * C3_FLY;
     } else {
@@ -489,6 +539,7 @@ function create(gl) {
     gl.uniform1f(show.u.uMode, P.mode || 0);
     if (P.c) gl.uniform3fv(show.u.uC, P.flat || (P.flat = new Float32Array(P.c.flat())));
     gl.uniform1f(show.u.uAsp, outW / outH); gl.uniform1f(show.u.uCw, crisp ? 8 : 4);
+    gl.uniform1f(show.u.uSolid, solid ? 1 : 0);
     gl.uniform2f(show.u.uRot, dim3 ? 1 : Math.cos(turn), dim3 ? 0 : Math.sin(turn));
     gl.uniform1f(show.u.uGain, 2.2 * (1 + 0.5 * st.bass + (crisp ? 0.4 * st.high : 0)));
     gl.uniform1f(show.u.uShift, P.mode === 1 ? st.t * 0.01 * mv : P.mode === 2 ? st.t * 0.03 : 0);
@@ -496,6 +547,7 @@ function create(gl) {
 
     gl.bindVertexArray(vaoWas);
     gl.blendFuncSeparate(bs, bd, bsa, bda);
+    if (depthWas) gl.enable(gl.DEPTH_TEST); else gl.disable(gl.DEPTH_TEST);
     if (blendWas) gl.enable(gl.BLEND);
     return st.out.t;
   }
