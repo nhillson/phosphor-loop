@@ -384,6 +384,14 @@ its pictures show fewer, more separate echoes than Nick sees at 60 frames a seco
    it mirrors, turning with `uFerro.w`. Music: `ferroTick` eases `ferroMus.bass` (snd.env.low) and `.high` (mostly snd.env.high) into `uFerro.yz`,
    0 for a loop that doesn't react; the bass swells, the highs raise the spikes. It lies over the trails (`gSpecA`). Check with
    `--shot "Magnet song"` (add `|click=#ferroStyle [data-v='1']` or `'2'` for the other styles).
+4z21. **Zebra** (input `zebra`, `SRC_ID.zebra = 38`, `seedZebra` / `zbInk` / `zbBlob` in js/shaders.js, drawn in the loop's own pass like
+   Ferrofluid; loop key `zebraStyle` 0 One blob / 1 Grid / 2 Fill, buttons `#zebraStyle` in `#row-zebra`; Autopilot picks with `zebraPick`).
+   Wavy stripes as bands of a field (a slowly turning direction plus a drifting swirl, `straight` deciding which wins), each band's
+   thickness wandering, rough stamped edges, a few black specks; the blob is a wobbly circle. Color `uZebra2.x` drifts round the rainbow,
+   `uZebra2.y` is the loop's seed. Music (`uZebra`): Ferrofluid's eased bass swells it, its highs buzz the stripes along their length,
+   each hit (`snd.hit.finder.last`) jumps them across (`zebraTick`, `zebraMus.step`), and it's in `LINE_INPUTS` so Sound on lines runs
+   the sound wave through the stripes. Check with `--shot "Zebra blob"` (add `|click=#zebraStyle [data-v='1']` or `'2'`); it's in
+   tests/sound_lines_check.py.
 4z20. **Model** (3D world `model`, `SRC_ID.model = 31`, Mount Ribbit's old slot; Mount Ribbit and its walker were removed at Nick's
    request, old looks with `ribbit` fall back to Wave). js/model.js = `window.PhosphorModel`: a .glb (Blender: File › Export › glTF 2.0,
    glTF Binary) drawn by three.js r170 (`vendor/three/three-gltf.js`, `window.PhosphorThree`, loaded on first use; rebuild steps in

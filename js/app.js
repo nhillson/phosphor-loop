@@ -159,16 +159,16 @@ if (swOK) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 const SRC_ID = { wave: 0, shape: 1, bars: 2, sparks: 3, picture: 4, genart: 4, video: 5, camera: 6, screen: 7, phone: 8, none: 9, loop: 10, ink: 11, patchwork: 12, cubes: 13, horizon: 14, cavern: 15,
                  blackhole: 16, aurora: 17, mercury: 18, fractal: 19, nebula: 21, spectro: 22, city: 23, text: 24,
-                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, model: 31, terrain: 32, topo: 33, life: 34, radar: 35, ferro: 36, cloud: 37, brush: 37, fwrap: 37, chaos: 37, machine: 37 };
+                 sponge: 25, mandelbulb: 26, mandelbox: 27, sierpinski: 28, julia3d: 29, kaleido: 30, model: 31, terrain: 32, topo: 33, life: 34, radar: 35, ferro: 36, zebra: 38, cloud: 37, brush: 37, fwrap: 37, chaos: 37, machine: 37 };
 const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks', ink: 'Ink', patchwork: 'Patchwork', text: 'Text', cubes: 'Cubes', horizon: 'Horizon', cavern: 'Cavern', spectro: 'Spectrograph', city: 'City',
-                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', model: 'Model', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', chaos: 'Chaos game', machine: 'Machinery', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
+                    blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', model: 'Model', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', zebra: 'Zebra', chaos: 'Chaos game', machine: 'Machinery', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
 const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
-  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, ferroStyle: 0, ...window.PhosphorChaos.DEFAULTS, ...window.PhosphorMachinery.DEFAULTS, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'tiles',
+  return { subject: 'off', in1: 'wave', in2: 'none', blend: 50, size: 100, motion: false, soft: true, form: 3, specRound: false, topoPic: false, lifeCells: 1, lifeSpeed: 1, lifeLoop: false, radarWind: false, ferroStyle: 0, zebraStyle: 0, ...window.PhosphorChaos.DEFAULTS, ...window.PhosphorMachinery.DEFAULTS, patch: null, cloudOf: 'picture', brushOf: 'self', fwOf: 'tiles',
            zoom: 0, spin: 0, trails: 88, color: 10, poster: 0, posterIn: false, posterTheme: 'own', halftone: 0, halftoneFinal: true, mirrorFinal: false, warpFinal: false, splitFinal: false, chromaFinal: false, warp: 0, flow: 0, melt: 0, push: 0, dye: 0, split: 0, mirror: 0, mirrorFx: 'melt', mirrorSpin: false, blur: 0, edge: 0, shiftX: 0, shiftY: 0, gain: 1,
            grow: 0, growSize: 1, growShape: 0, growStretch: 0, growDir: 3, growSplit: 0, time: 0, timeShape: 0, cam: 'glide',
            lookup: 0, chase: 0, breathe: 0, chroma: 0, restless: 0, grain: 0, julia: 0, crystal: 0,
@@ -1098,7 +1098,7 @@ function followSliders() {
 const in2Sel = $('#in2');
 function buildIn2() {
   in2Sel.innerHTML = '';
-  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['chaos', 'Chaos game'], ['machine', 'Machinery'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
+  const opts = [['none', 'No second input'], ['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink drops'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['zebra', 'Zebra'], ['chaos', 'Chaos game'], ['machine', 'Machinery'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text (your words)'], ['spectro', 'Spectrograph (sound)'], ...Object.keys(SCENES).map((k) => [k, `${SCENES[k].label} (${sceneGroup(k) === 'fractal' ? 'fractal' : '3D world'})`]),
                 ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'The other loop']];
   for (const [v, label] of opts) {
     if ((inArtifact && (DEVICE.includes(v) || v === 'spectro')) || (APP && v === 'screen') || (is3D(v) && !worldOK(v))) continue;
@@ -1282,6 +1282,29 @@ $$('#ferroStyle button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD('FERROFLUID', FERRO_STYLES[+b.dataset.v]);
 }));
+// Zebra: which of its three styles. Autopilot mostly picks the one big blob, sometimes the grid or the whole screen
+const ZEBRA_STYLES = ['ONE BLOB', 'GRID', 'FILL'];
+function zebraPick() { const r = Math.random(); return r < 0.6 ? 0 : r < 0.8 ? 1 : 2; }
+$$('#zebraStyle button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.zebraStyle = +b.dataset.v;
+  syncUI();
+  showOSD('ZEBRA', ZEBRA_STYLES[+b.dataset.v]);
+}));
+// Zebra hears the music through Ferrofluid's eased bass and highs (the bass swells the blob, the highs buzz the
+// stripes), and each hit jumps its stripes across by part of a stripe: `step` eases on towards `to`, which every new
+// hit pushes on, so the jump is quick but never a flicker. With no music the stripes just creep along by themselves.
+const zebraMus = { step: 0, to: 0, quiet: 0, last: -1 };
+function zebraTick(dt) {
+  zebraMus.quiet += dt * 0.06;
+  const F = snd.hit && snd.hit.finder;
+  if (snd.analyser && F && F.last > 0 && F.last !== zebraMus.last) {
+    zebraMus.last = F.last;
+    zebraMus.to += (reduceMotion ? 0.15 : 0.3) * Math.min(1.5, sndPower());
+  }
+  zebraMus.to += dt * 0.06;
+  zebraMus.step += (zebraMus.to - zebraMus.step) * (1 - Math.exp(-dt * 22));
+}
 // Ferrofluid listens to the music itself: the bass swells it and the highs shoot its spikes out. Both are eased
 // here (quick up, slower down) so the liquid moves like liquid; a loop that ignores the sound gets none of it.
 const ferroMus = { bass: 0, high: 0 };
@@ -1788,7 +1811,7 @@ function syncUI() {
   const usesHere = (s) => t.in1 === s || t.in2 === s;
   const cloudHere = usesHere('cloud') ? (t.cloudOf || 'picture') : null;
   const brushHere = usesHere('brush') ? t.brushOf : null, fwHere = usesHere('fwrap') ? (t.fwOf || 'tiles') : null;
-  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'cloud', 'brush', 'fwrap']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere && s !== brushHere && s !== fwHere;
+  for (const s of ['picture', 'genart', 'video', 'camera', 'screen', 'phone', 'loop', 'spectro', 'text', 'topo', 'life', 'radar', 'ferro', 'zebra', 'chaos', 'machine', 'cloud', 'brush', 'fwrap']) $('#row-' + s).hidden = !usesHere(s) && s !== cloudHere && s !== brushHere && s !== fwHere;
   $$('#fwOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.fwOf || 'tiles'))));
   $$('#cloudOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.cloudOf || 'picture'))));
   $$('#brushOf button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === (t.brushOf || 'self'))));
@@ -1797,6 +1820,7 @@ function syncUI() {
   syncLifeUI(t);
   $$('#radarShows button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === !!t.radarWind)));
   $$('#ferroStyle button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.ferroStyle | 0))));
+  $$('#zebraStyle button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.zebraStyle | 0))));
   syncChaosUI(t);
   syncMachUI(t);
   syncTextUI();
@@ -1880,7 +1904,7 @@ function patchLoop(k, p, force) {
   n.mirrorFx = L.tgt.mirrorFx in MIRROR_FX ? L.tgt.mirrorFx : 'melt';
   n.mirrorSpin = !!L.tgt.mirrorSpin;
   if (keep) { n.in1 = keep; n.specRound = p.specRound ?? L.tgt.specRound; n.topoPic = p.topoPic ?? L.tgt.topoPic;
-    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(PCH.DEFAULTS), ...Object.keys(PMA.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf']) n[q] = p[q] ?? L.tgt[q]; }
+    for (const q of ['lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', 'zebraStyle', ...Object.keys(PCH.DEFAULTS), ...Object.keys(PMA.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf']) n[q] = p[q] ?? L.tgt[q]; }
   // A look saved with an input that no longer exists falls back to Wave (or no second input)
   if (!(n.in1 in SRC_ID)) n.in1 = 'wave';
   if (!(n.in2 in SRC_ID)) n.in2 = 'none';
@@ -1920,10 +1944,10 @@ function surpriseSelf() {
 function randomLoop() {
   const zoom = Math.round(Math.random() < 0.25 ? rnd(-45, -10) : rnd(5, 65));
   // One chance each, so every 3D world and fractal comes up as often as Wave or Shape
-  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes(),
+  const in1 = pick(['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'zebra', 'chaos', 'machine', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes(),
                     ...(snd.analyser ? ['spectro'] : [])]);
   return {
-    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, ferroStyle: Math.floor(Math.random() * 3), ...PCH.look(),
+    in1, size: in1 === 'bars' || in1 === 'picture' || in1 === 'genart' ? 50 : in1 === 'text' ? 85 : 100, specRound: Math.random() < 0.5, topoPic: Math.random() < 0.35, ...lifeLook(), radarWind: Math.random() < 0.3, ferroStyle: Math.floor(Math.random() * 3), zebraStyle: zebraPick(), ...PCH.look(),
     form: 2 + Math.floor(Math.random() * 4),
     zoom,
     spin: Math.round(rnd(-60, 60)),
@@ -2653,7 +2677,7 @@ function neutral() {
   if (src === 'loop') src = loops.B.tgt.in1 === 'loop' ? 'wave' : loops.B.tgt.in1;
   const flat = {
     ...effectsOff(),
-    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'ferro' || src === 'chaos' || src === 'machine' || src === 'patch' || src === 'cloud' || src === 'brush' || src === 'fwrap' ? 100 : 50, motion: false,
+    in1: src, in2: 'none', blend: 50, size: IMAGE_INPUTS.includes(src) ? 78 : src === 'spectro' || src === 'text' || src === 'patchwork' || src === 'topo' || src === 'life' || src === 'radar' || src === 'ferro' || src === 'zebra' || src === 'chaos' || src === 'machine' || src === 'patch' || src === 'cloud' || src === 'brush' || src === 'fwrap' ? 100 : 50, motion: false,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: loops.A.tgt.form, specRound: loops.A.tgt.specRound, stack: [],
   };
@@ -2710,7 +2734,7 @@ function neutralLoop(k) {
   patchLoop(k, {
     ...effectsOff(),
     in1: src, in2: 'none', blend: 50, motion: false,
-    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'patch', 'cloud', 'brush', 'fwrap', 'loop'].includes(src) ? 100 : 50,
+    size: IMAGE_INPUTS.includes(src) ? 78 : ['spectro', 'text', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'zebra', 'chaos', 'machine', 'patch', 'cloud', 'brush', 'fwrap', 'loop'].includes(src) ? 100 : 50,
     zoom: 0, spin: 0, trails: 0, color: 0, warp: 0, mirror: 0, blur: 0, edge: 0, shift: [0, 0], gain: 1,
     form: L.tgt.form, specRound: L.tgt.specRound, topoPic: L.tgt.topoPic, stack: [],
   }, true);
@@ -2753,7 +2777,7 @@ window.__plNeutralLoop = neutralLoop;
 const ap = { due: 0, span: 1, on: false, next: 0, quick: 0, beatWait: null, pins: new Set(), pinVal: {}, picIn: 0, prep: null, glide: null, glideRedo: 0, rush: false };
 // What each pin holds. Pinning the main input keeps its pattern and Only movement too; pinning Zoom keeps its edges.
 const PINS = {
-  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(window.PhosphorChaos.DEFAULTS), ...Object.keys(window.PhosphorMachinery.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'motion'] },
+  in1: { name: 'Main input', fields: ['in1', 'form', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', 'zebraStyle', ...Object.keys(window.PhosphorChaos.DEFAULTS), ...Object.keys(window.PhosphorMachinery.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'motion'] },
   in2: { name: 'Second input', fields: ['in2'] },
   blend: { name: 'Blend', fields: ['blend'] },
   size: { name: 'Input size', fields: ['size'] },
@@ -2860,7 +2884,7 @@ function limStep(k, v, a, b) {
 const AP_KEY = 'phosphor-autopilot-v1';
 // Each kind of input Autopilot can bring in, and its toggle under Autopilot settings (all 3D worlds share one,
 // and all the fractals another)
-const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['chaos', 'Chaos game'], ['machine', 'Machinery'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text'], ['spectro', 'Spectrograph'],
+const AP_INPUTS = [['wave', 'Wave'], ['shape', 'Shape'], ['bars', 'Bars'], ['sparks', 'Sparks'], ['ink', 'Ink'], ['patchwork', 'Patchwork'], ['topo', 'Topo map'], ['life', 'Life'], ['radar', 'Doppler radar'], ['ferro', 'Ferrofluid'], ['zebra', 'Zebra'], ['chaos', 'Chaos game'], ['machine', 'Machinery'], ['patch', 'Patches'], ['cloud', 'Point cloud'], ['brush', 'Brushes'], ['fwrap', 'Fractal wrap'], ['text', 'Text'], ['spectro', 'Spectrograph'],
   ['world', '3D worlds'], ['fractal', 'Fractals'], ['picture', 'Picture'], ['genart', 'Generative art'], ['video', 'Video'], ['camera', 'Camera'], ['screen', 'Screen'], ['phone', 'Phone'], ['loop', 'Other loop']];
 const AP_INPUT_KEYS = AP_INPUTS.map(([k]) => k);
 const cleanOff = (v) => (Array.isArray(v) ? [...new Set(v.filter((k) => AP_INPUT_KEYS.includes(k)))].slice(0, AP_INPUT_KEYS.length - 1) : []);
@@ -3634,7 +3658,7 @@ function syncPins() {
 
 // The inputs Autopilot can bring in right now, one chance each (apPick then makes the 3D worlds and fractals rarer)
 function apPool() {
-  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'chaos', 'machine', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes()];
+  const pool = ['wave', 'shape', 'bars', 'sparks', 'ink', 'patchwork', 'topo', 'life', 'radar', 'ferro', 'zebra', 'chaos', 'machine', 'cloud', 'brush', 'fwrap', 'picture', 'genart', 'text', ...allScenes()];
   // Using the other loop as an input is one more way of mixing the loops, so Mix turned right up gives it an extra chance
   if (apSet.mix > 10) pool.push('loop');
   if (apSet.mix > 75) pool.push('loop');
@@ -3837,6 +3861,7 @@ function apFinish(sc, k, keep) {
     if (sc.in1 === 'life') sc.size = Math.round(rnd(60, 100));
     if (sc.in1 === 'radar') sc.size = Math.round(rnd(75, 100));
     if (sc.in1 === 'ferro') sc.size = Math.round(rnd(75, 100));
+    if (sc.in1 === 'zebra') sc.size = Math.round(rnd(80, 110));
     if (sc.in1 === 'cloud') sc.size = Math.round(rnd(80, 100));
     if (sc.in1 === 'brush' || sc.in1 === 'fwrap') sc.size = 100;
     if (sc.in1 === 'chaos') sc.size = Math.round(rnd(80, 100));
@@ -3849,6 +3874,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
     if ((sc.in1 === 'ferro' || sc.in2 === 'ferro') && !isPinned('in1', k)) sc.ferroStyle = Math.floor(Math.random() * 3);
+    if ((sc.in1 === 'zebra' || sc.in2 === 'zebra') && !isPinned('in1', k)) sc.zebraStyle = zebraPick();
     if ((sc.in1 === 'chaos' || sc.in2 === 'chaos') && !isPinned('in1', k)) Object.assign(sc, PCH.look(!(loops[k] && loops[k].tgt.chaosCrisp === false)));
     if ((sc.in1 === 'machine' || sc.in2 === 'machine') && !isPinned('in1', k)) Object.assign(sc, PMA.look());
     if ((sc.in1 === 'cloud' || sc.in2 === 'cloud') && !isPinned('in1', k)) sc.cloudOf = cloudApOf(k);
@@ -3914,7 +3940,7 @@ function glideLook(k) {
   if (Math.random() >= sw) { sc.mirror = L.tgt.mirror; sc.edge = L.tgt.edge; sc.form = L.tgt.form; }
   // Keeping its inputs (as often as How wild says), unless one of them has been switched off under Autopilot settings
   if (Math.random() >= sw && apAllowed(L.tgt.in1)) {
-    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', ...Object.keys(PCH.DEFAULTS), ...Object.keys(PMA.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'gain']) sc[f] = L.tgt[f];
+    for (const f of ['in1', 'in2', 'blend', 'size', 'motion', 'specRound', 'topoPic', 'lifeCells', 'lifeSpeed', 'lifeLoop', 'radarWind', 'ferroStyle', 'zebraStyle', ...Object.keys(PCH.DEFAULTS), ...Object.keys(PMA.DEFAULTS), 'patch', 'cloudOf', 'brushOf', 'fwOf', 'gain']) sc[f] = L.tgt[f];
     if (sc.in2 && sc.in2 !== 'none' && !apAllowed(sc.in2)) sc.in2 = 'none';
   }
   withPins(sc, k);
@@ -4890,6 +4916,7 @@ function tasteFeats(L) {
   if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
   if (L.in1 === 'ferro' || L.in2 === 'ferro') f.push('ferro:' + (L.ferroStyle | 0));
+  if (L.in1 === 'zebra' || L.in2 === 'zebra') f.push('zebra:' + (L.zebraStyle | 0));
   if (L.in1 === 'chaos' || L.in2 === 'chaos') f.push('chaos:' + (L.chaosDim === 1 ? '3d' + (L.chaosView | 0) + ':' : '') + (L.chaosSides | 0) + ((L.chaosMix ?? 50) < 25 ? 'g' : (L.chaosMix ?? 50) < 60 ? 'm' : 'o') + (L.chaosColor | 0));
   if (L.in1 === 'machine' || L.in2 === 'machine') f.push('machine:' + (L.machColor | 0));
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
@@ -9409,6 +9436,11 @@ const RECIPES = [
     how: 'FERROFLUID · TRAILS 70 · ZOOM 8',
     sw: 'radial-gradient(circle at 40% 35%,#c238ff 0 5%,transparent 14%),radial-gradient(circle at 64% 60%,#2fd6ff 0 4%,transparent 12%),radial-gradient(circle at 50% 50%,#05040a 0 36%,#8b1ab8 38%,#05040a 46%)',
     patch: { A: { in1: 'ferro', ferroStyle: 0, size: 100, zoom: 8, spin: 0, trails: 70, color: 0, blur: 0 } } },
+  { name: 'Zebra blob', after: 'Under Zebra, switch Style to Grid for a whole field of them, or Fill for stripes across the screen. Play music with React to sound listening and the stripes buzz and jump on the beat.',
+    text: 'A ragged blob of one color full of wavy zebra stripes that keep reshaping into swirls and islands, with soft echoes behind.',
+    how: 'ZEBRA · TRAILS 35',
+    sw: 'radial-gradient(circle at 50% 50%,transparent 0 40%,#0b0b0b 42%),repeating-linear-gradient(28deg,#2fe06a 0 7%,#0b0b0b 7% 13%)',
+    patch: { A: { in1: 'zebra', zebraStyle: 0, size: 100, zoom: 0, spin: 0, trails: 35, color: 0, blur: 0 } } },
   { name: 'Dot sculpture', after: 'Under Chaos game, 3D style picks Turning, Slices or Fly-through, and the Shape fader picks the solid. Switch on Drift the faders and it keeps changing by itself.',
     text: 'The chaos game in 3D: dots hopping towards the corners of a solid build a glowing crystal that turns in front of you.',
     how: 'CHAOS GAME · 3D · TURNING · ICOSAHEDRON',
@@ -13329,7 +13361,7 @@ function computeWave(t, form, reach = 0) {
 // reacts gets it at its own strength (uSndAmp, 0: plain lines).
 const SND_N = 96;
 const sndLine = new Float32Array(SND_N);
-const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo'];
+const LINE_INPUTS = ['wave', 'shape', 'bars', 'topo', 'zebra'];
 const usesLines = (t) => LINE_INPUTS.includes(t.in1) || LINE_INPUTS.includes(t.in2);
 let sndTD = null, sndLP = null, sndAgc = 0.05, sndLineOn = false;
 function sndLinesTick(dt) {
@@ -14410,6 +14442,12 @@ function runLoop(k, xf, brush, f) {
   if (t.in1 === 'ferro' || t.in2 === 'ferro') {
     const lf = U(fbProg, 'uFerro'), hears = reacts(k);
     if (lf) gl.uniform4f(lf, t.ferroStyle | 0, hears ? ferroMus.bass : 0, hears ? ferroMus.high : 0, (simT * 0.02 + 0.31 * LOOP_OFF[k]) % 1);
+  }
+  if (t.in1 === 'zebra' || t.in2 === 'zebra') {
+    const lz = U(fbProg, 'uZebra'), lz2 = U(fbProg, 'uZebra2'), hears = reacts(k);
+    if (lz) gl.uniform4f(lz, t.zebraStyle | 0, hears ? ferroMus.bass : 0, hears ? ferroMus.high : 0, (hears ? zebraMus.step : zebraMus.quiet) % 64);
+    // Its color slowly travels round the rainbow; each loop starts somewhere else and grows its own pattern
+    if (lz2) gl.uniform2f(lz2, (simT * 0.008 + 0.37 * LOOP_OFF[k] + 0.55) % 1, 3.1 + 2.7 * LOOP_OFF[k]);
   }
   if (traced) {
     const slot = t.in1 === 'topo' ? 2 : 1, fly = slot === 1 ? flyTex1 : flyTex2;
@@ -17714,6 +17752,7 @@ function frame() {
   analyzeSound(dt, now);
   sndLinesTick(dt);
   ferroTick(dt);
+  zebraTick(dt);
   sfxTick(dt);
   drawMeter();
   seqTick(now);

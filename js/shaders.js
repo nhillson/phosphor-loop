@@ -256,6 +256,8 @@ uniform int uTopoSrc;     // Topo map, Height from the picture: the input it tra
 uniform int uTopoPre;     // 1 while drawing that input's brightness, quarter size, ahead of the loop's own pass
 // That small softened brightness is read from uScene2 (see topoPre): this program already reads 16 pictures, the
 // most Windows graphics (Chrome and Edge there) allow in one program, so it can't have a 17th of its own
+uniform vec4 uZebra;        // Zebra: its style (0 one blob, 1 grid, 2 fill), the bass, the highs, and how far the stripes have stepped along (kicks jump it)
+uniform vec2 uZebra2;       // Zebra: its color (hue) and the loop's own seed, so each loop grows a different pattern
 uniform vec4 uFerro;        // Ferrofluid: its style (0 ball, 1 pool, 2 flat blobs), the bass, the highs, and how far its colors have turned
 uniform float uRadarWind;   // Doppler radar: 1 shows the wind (towards and away from the radar), 0 the rain
 uniform float uLifeT;    // Life: how far it is from one generation to the next (0 to 1), so cells glide in and out
@@ -1275,6 +1277,88 @@ vec3 seedFerro(vec2 p, float t) {
   gSpecA = 0.85 * tall * fog;
   return c * fog * mix(0.2, 1.0, tall);
 }
+// Zebra: a ragged blob of one color filled with wavy stripes, like a stamp or an agate slice, on black. The stripes run
+// across a direction that slowly turns and are bent by a drifting swirl; how much of each wins changes slowly too, so
+// the pattern goes from straight zebra stripes to swirls to blotchy islands and back. Every stripe's thickness wanders,
+// so some pinch off into dots and others swell together, and a few black specks open up inside the color. Music: the
+// bass swells the blob, the highs make the stripes buzz along their length, each kick jumps them across (uZebra.w),
+// and with Sound on lines the song's own sound wave runs through the stripes. Grid: a 5 by 5 field of them, each its own
+// color and pattern; Fill: the stripes across the whole screen.
+float zbFbm(vec2 q) {
+  float s = 0.0, a = 0.5;
+  mat2 R = mat2(0.8, -0.6, 0.6, 0.8);
+  for (int i = 0; i < 3; i++) { s += a * tnoise(q); q = R * q * 2.03 + 5.3; a *= 0.5; }
+  return s / 0.875;
+}
+// The stripes inside one blob: q is in blob units (the blob's radius about 0.42), seed picks this blob's own pattern.
+// Gives how much ink is here (0 to 1)
+float zbInk(vec2 q, float t, float seed, float b, float hi) {
+  float ang = seed * 6.283 + t * 0.045 + 0.9 * sin(t * 0.06 + seed * 4.0);
+  vec2 d = vec2(cos(ang), sin(ang)), pd = vec2(-d.y, d.x);
+  // How straight the stripes are (1) against how much the swirl wins (0), wandering slowly
+  float straight = 0.5 + 0.42 * sin(t * 0.07 + seed * 9.0) * sin(t * 0.031 + seed * 2.0 + 1.0);
+  vec2 w = q * 2.2 + seed * 31.0;
+  vec2 warp = vec2(zbFbm(w + vec2(t * 0.09, 0.0)), zbFbm(w + vec2(5.2, -t * 0.08))) - 0.5;
+  vec2 qq = q + warp * mix(0.75, 0.22, straight);
+  float f = dot(qq, d) * 10.5 * mix(0.75, 1.1, straight);
+  f += (zbFbm(q * 1.7 + seed * 13.0 + vec2(0.0, t * 0.05)) - 0.5) * mix(9.0, 1.5, straight);
+  // The highs: a quick buzz running along each stripe
+  float along = dot(q, pd);
+  f += hi * 0.55 * (tnoise(vec2(along * 24.0, t * 34.0 + seed * 50.0)) - 0.5);
+  // Sound on lines: the song's sound wave through the stripes, the stripes' length its time
+  float u = clamp(along / 0.9 + 0.5, 0.0, 1.0);
+  f += 9.0 * sndAt(u) * sndEnds(u);
+  // Ragged, stamped edges that don't flicker
+  f += 0.16 * (tnoise(q * 55.0 + seed * 7.0) - 0.5) + 0.08 * (tnoise(q * 140.0) - 0.5);
+  f += uZebra.w;
+  // Each stripe's thickness wanders: thin ones break into dots, fat ones join up
+  float duty = 0.5 + 0.34 * (zbFbm(q * 2.6 + seed * 3.0 - vec2(t * 0.04, 0.0)) - 0.5) * 2.0;
+  float fw = max(fwidth(f), 1e-4);
+  float ink = smoothstep(duty * 0.5 + fw, duty * 0.5 - fw, abs(fract(f) - 0.5));
+  // A few black specks inside the color
+  float sp = tnoise(q * 16.0 + seed * 9.0 + t * 0.03);
+  ink *= smoothstep(0.86 + fw, 0.86 - fw, sp);
+  return ink;
+}
+// The blob's outline: a wobbly circle with a rough edge. Gives how much of q is inside (0 to 1)
+float zbBlob(vec2 q, float R, float t, float seed) {
+  float r = length(q);
+  vec2 dir = q / max(r, 1e-4);
+  float e = R * (1.0 + 0.09 * (zbFbm(dir * 1.6 + seed * 11.0 + t * 0.04) - 0.5) * 2.0) + R * 0.035 * (tnoise(q / R * 30.0 + seed) - 0.5);
+  float fw = max(fwidth(r - e), 1e-4);
+  return smoothstep(fw, -fw, r - e);
+}
+vec3 seedZebra(vec2 p, float t) {
+  float sc = uScale / 2.5, b = uZebra.y, hi = uZebra.z, style = uZebra.x, seed = uZebra2.y;
+  vec2 q = p / sc;
+  t = t * 1.6;   // how quickly it reshapes
+  if (style > 1.5) {
+    // Fill: the stripes across the whole screen, a little bigger
+    float ink = zbInk(rot(t * 0.01) * q * 0.8, t, seed, b, hi);
+    gSpecA = 0.75;
+    return hsv(uZebra2.x, 0.78, 1.0) * ink;
+  }
+  if (style > 0.5) {
+    // Grid: 5 rows of blobs, each its own color and pattern
+    float cs = 0.2;
+    vec2 id = floor(q / cs + 0.5), lq = (q - id * cs) / cs * 2.4;
+    float h1 = hash(id + 0.37 + seed), h2 = hash(id * 1.7 + 9.1), h3 = hash(id + 4.4);
+    lq = rot(t * 0.02 * (h2 - 0.5)) * lq;
+    float R = 0.95 * (1.0 + 0.1 * b);
+    float m = zbBlob(lq, R, t, h1 * 10.0);
+    float ink = m > 0.0 ? zbInk(lq * 0.4, t, h1 * 10.0 + 1.0, b, hi) : 0.0;
+    gSpecA = 0.8 * m;
+    vec3 col = hsv(fract(h3 + uZebra2.x * 0.3 + t * 0.004), mix(0.45, 0.9, h2), mix(0.55, 1.0, hash(id + 2.2)));
+    return col * ink * m;
+  }
+  // One blob, turning slowly
+  q = rot(t * 0.015) * q;
+  float R = 0.42 * (1.0 + 0.12 * b);
+  float m = zbBlob(q, R, t, seed);
+  float ink = m > 0.0 ? zbInk(q / 0.84, t, seed, b, hi) : 0.0;
+  gSpecA = 0.8 * m;
+  return hsv(uZebra2.x, 0.78, 1.0) * ink * m;
+}
 vec3 source(int id, vec2 p, sampler2D scene) {
   vec2 g = p / uScale;
   if (id == 0) return seedWave(g, uTime);
@@ -1289,6 +1373,7 @@ vec3 source(int id, vec2 p, sampler2D scene) {
   if (id == 34) return seedLife(p, scene);
   if (id == 35) return seedRadar(p, uTime);
   if (id == 36) return seedFerro(p, uTime);
+  if (id == 38) return seedZebra(p, uTime);
   // The 3D worlds (Cubes to Nebula, City, and the Model at 31), the fractal flights (25 to 30) and a Patch's layers (37),
   // each drawn just before this pass (see draw3D, drawPatch) filling the screen
   if ((id >= 13 && id <= 21) || id == 23 || (id >= 25 && id <= 32) || id == 37) return uSceneK * texture(scene, clamp(p / vec2(uSim.x / uSim.y, 1.0) + 0.5, 0.0, 1.0)).rgb;

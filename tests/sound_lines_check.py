@@ -1,4 +1,4 @@
-"""Sound on lines (React to sound › Sound on lines, Line detail): Wave, Shape, Bars and Topo map carry the music's
+"""Sound on lines (React to sound › Sound on lines, Line detail): Wave, Shape, Bars, Topo map and Zebra carry the music's
 sound wave. Made-up music is fed in as raw sound (window.__plSnd.fake). Waits are frames, never seconds.
 
   python3 tests/sound_lines_check.py          (about 2 minutes; pictures go to <temp>/phosphor-sound-lines)
@@ -50,7 +50,7 @@ def main():
         pg.evaluate('__plSnd.fake()')
         pg.evaluate("""() => { const L = __plAp.loops; for (const k of ['A', 'B']) { Object.assign(L[k].tgt, { trails: 20, zoom: 0, spin: 0, warp: 0, mirror: 0, melt: 0, push: 0, dye: 0, flow: 0, in2: 'none' }); }
           L.B.tgt.in1 = 'none'; }""")
-        for inp in ['wave', 'shape', 'bars', 'topo']:
+        for inp in ['wave', 'shape', 'bars', 'topo', 'zebra']:
             pg.evaluate(f"__plAp.loops.A.tgt.in1 = '{inp}'")
             pg.evaluate('__plClear()')
             c.wait_frames(60, f'{inp} with sound')
