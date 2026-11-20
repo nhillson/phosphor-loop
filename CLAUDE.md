@@ -219,7 +219,9 @@ file don't rebuild the app.
    `tgt.chaosMix` / `chaosJump` (30-75) / `chaosDeep` / `chaosMove` (15-85) to random spots, and `chaosSides` too (25 times slower, a whole number; switch `chaosDriftSides`, on to start with; the engine changes corners over a second or two by sharing the dots between two polygons, `uNmix` / `uVb`), 0.4·60^(speed/100) fader steps a second, skipping a fader being held, `chaosHeld`); Autopilot's looks always have it on, at the loop's own speed (`apFinish`); **3D** (`chaosDim` 1, `#chaosDim`; `chaosView` 0 Turning / 1 Slices / 2 Fly-through, `#chaosViewRow`): `chaosSides` 3-12 picks one of `PCH.SHAPES`
    (10 solids, 4 to 20 corners, each with `base` = what's left at which its copies touch), drawn by `VS_DOT3` (`uView` turn or camera, `uSlice`
    slab of `THICK`, near dots bigger in Fly-through and every dot's total kept the same by `FS_DOT3`); brightness evened by `C3_SLICE` / `C3_FLY`;
-   `PCH.look()` picks 3D 4 times in 10. Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
+   `PCH.look()` picks 3D 4 times in 10. **Keep it crisp** (`chaosCrisp`, on to start with, `#chaosCrisp`; from a scored sweep of 180 still
+   patterns): `kCap` (10+ corners: 3, 8+: 4), `kSnap` (whole numbers, quick between), `hopFloor(k)`, `DEEP_MAX` 0.3, no K breathing; `PCH.effective`
+   for the readouts, drift ranges narrowed to match, `look(crisp)`. Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
    `PCH.look()` = New pattern, Surprise and Autopilot. Every dot is
    worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, added up in an RGBA16F picture that
    fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,

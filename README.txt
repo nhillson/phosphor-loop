@@ -306,7 +306,11 @@ TIPS
     instead: the Corners fader becomes Shape (a pyramid up to a dodecahedron),
     and 3D style shows the cloud Turning in front of you, as Slices sweeping
     through it, or as a Fly-through inside it. The Guide's "Dot sculpture"
-    recipe sets it up. Autopilot always
+    recipe sets it up. Keep it crisp (on to start with) keeps every pattern to
+    the settings that come out sharp: whole numbers of corners averaged, no
+    more than the shape can take, Hop never too soft and Fractal corners at
+    most 30; the readouts show what's really used. Drift, New pattern and
+    Autopilot stay inside those too. Switch it off for the full range. Autopilot always
     switches it on when it brings the Chaos game in, at that loop's Drift speed. The Guide's
     "Dot mandala" recipe sets it up.
   - Topo map: glowing contour lines, like a hiking map, seen from straight

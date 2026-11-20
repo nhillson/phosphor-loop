@@ -1299,6 +1299,14 @@ const chaosEls = {};
 for (const q of CHAOS_NUM) chaosEls[q] = { el: $('#' + q), out: $('#' + q + 'Out') };
 function chaosText(q, v) {
   if (q === 'chaosSides' && loops[edit].tgt.chaosDim === 1) return PCH.shapeName(v).toUpperCase();   // in 3D, the solid
+  const t = loops[edit].tgt;
+  if (t.chaosCrisp !== false && (q === 'chaosMix' || q === 'chaosJump' || q === 'chaosDeep')) {
+    // Keep it crisp: what's really used, marked when it isn't where the fader is
+    const e = PCH.effective({ ...t, [q]: v });
+    if (q === 'chaosMix') return e.k < 1 + 5 * Math.pow(v / 100, 1.3) - 0.5 && e.k === e.cap ? `${e.k} MAX` : String(e.k);
+    if (q === 'chaosJump') return e.jump > v ? `MIN ${Math.round(e.jump)}` : String(v);
+    return v === 0 ? 'PLAIN' : e.deep < v ? `${Math.round(e.deep)} MAX` : String(v);
+  }
   if (q === 'chaosMix') return (1 + 5 * Math.pow(v / 100, 1.3)).toFixed(1);   // how many corners that is
   if (q === 'chaosDeep') return v === 0 ? 'PLAIN' : String(v);
   if (q === 'chaosMove') return v === 0 ? 'STILL' : String(v);
@@ -1312,6 +1320,7 @@ function syncChaosUI(t) {
   $$('#chaosColor button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosColor | 0))));
   $('#chaosColorName').textContent = PCH.COLORS[t.chaosColor | 0] || PCH.COLORS[0];
   $('#chaosDrift').setAttribute('aria-pressed', String(!!t.chaosDrift));
+  $('#chaosCrisp').setAttribute('aria-pressed', String(t.chaosCrisp !== false));
   const d3 = t.chaosDim === 1;
   $$('#chaosDim button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (d3 ? 1 : 0))));
   $$('#chaosView button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosView | 0))));
@@ -1334,7 +1343,14 @@ function chaosDriftTick(dt) {
     const S = chaosDriftSt[k] || (chaosDriftSt[k] = {});
     // From about 4 minutes to cross a fader (Glacial) to about 4 seconds (Quick)
     const rate = 0.4 * Math.pow(60, clamp(t.chaosSpeed ?? 40, 0, 100) / 100) * (reduceMotion ? 0.5 : 1);
-    for (const [q, [lo, hi, sp, far]] of Object.entries(CHAOS_DRIFT)) {
+    // Keep it crisp: no wandering where it would make no difference (Fractal corners past its top, more corners averaged
+    // than the shape takes, Hop under its floor)
+    const crispE = t.chaosCrisp !== false ? PCH.effective(t) : null;
+    for (let [q, [lo, hi, sp, far]] of Object.entries(CHAOS_DRIFT)) {
+      if (crispE && q === 'chaosDeep') hi = 100 * PCH.DEEP_MAX;
+      if (crispE && q === 'chaosMix') hi = Math.min(100, PCH.mixFor(crispE.cap) + 4);
+      if (crispE && q === 'chaosJump') lo = Math.max(lo, 100 * PCH.hopFloor(crispE.k));
+      if (hi - lo < 2) continue;
       const whole = q === 'chaosSides';
       const d = S[q] || (S[q] = { to: null, v: 0, x: null });
       if (whole && t.chaosDriftSides === false) { d.to = null; d.v = 0; d.x = null; continue; }
@@ -1370,6 +1386,13 @@ $$('#chaosView button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD('CHAOS GAME', '3D · ' + PCH.VIEWS[+b.dataset.v].toUpperCase());
 }));
+$('#chaosCrisp').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosCrisp = t.chaosCrisp === false;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosCrisp ? 'KEEP IT CRISP' : 'FULL RANGE');
+});
 $('#chaosDriftSides').addEventListener('click', () => {
   takeOver('in1');
   const t = loops[edit].tgt;
@@ -1397,7 +1420,7 @@ $$('#chaosColor button').forEach((b) => b.addEventListener('click', () => {
 }));
 $('#chaosRoll').addEventListener('click', () => {
   takeOver('in1');
-  Object.assign(loops[edit].tgt, PCH.look());
+  Object.assign(loops[edit].tgt, PCH.look(loops[edit].tgt.chaosCrisp !== false));
   syncUI();
   showOSD('CHAOS GAME', 'NEW PATTERN');
 });
@@ -3798,7 +3821,7 @@ function apFinish(sc, k, keep) {
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
   // Autopilot's Chaos game always drifts its faders, at the Drift speed that loop is set to
-  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); }
+  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); sc.chaosCrisp = !(loops[k] && loops[k].tgt.chaosCrisp === false); }
   if (!keep || keep !== sc.in1) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
     if ((sc.in1 === 'bars' || sc.in1 === 'picture' || sc.in1 === 'genart') && sc.size == null) sc.size = 50;
@@ -3820,7 +3843,7 @@ function apFinish(sc, k, keep) {
     if ((sc.in1 === 'life' || sc.in2 === 'life') && !isPinned('in1', k)) Object.assign(sc, lifeLook());
     if ((sc.in1 === 'radar' || sc.in2 === 'radar') && !isPinned('in1', k)) sc.radarWind = Math.random() < 0.3;
     if ((sc.in1 === 'ferro' || sc.in2 === 'ferro') && !isPinned('in1', k)) sc.ferroStyle = Math.floor(Math.random() * 3);
-    if ((sc.in1 === 'chaos' || sc.in2 === 'chaos') && !isPinned('in1', k)) Object.assign(sc, PCH.look());
+    if ((sc.in1 === 'chaos' || sc.in2 === 'chaos') && !isPinned('in1', k)) Object.assign(sc, PCH.look(!(loops[k] && loops[k].tgt.chaosCrisp === false)));
     if ((sc.in1 === 'machine' || sc.in2 === 'machine') && !isPinned('in1', k)) Object.assign(sc, PMA.look());
     if ((sc.in1 === 'cloud' || sc.in2 === 'cloud') && !isPinned('in1', k)) sc.cloudOf = cloudApOf(k);
     if ((sc.in1 === 'brush' || sc.in2 === 'brush') && !isPinned('in1', k)) sc.brushOf = brushApOf();

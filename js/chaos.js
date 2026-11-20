@@ -14,7 +14,7 @@ window.PhosphorChaos = (() => {
 // A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100. Drift (the app's doing,
 // see chaosDrift in js/app.js) moves the faders about by themselves, at chaosSpeed; Corners too unless chaosDriftSides is off.
 const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, chaosDrift: false, chaosSpeed: 40, chaosDriftSides: true,
-  chaosDim: 0, chaosView: 0 };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
+  chaosDim: 0, chaosView: 0, chaosCrisp: true };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
 // The sets of colors. A ramp's eight colors run from where few dots land to where the most do; the dark ones in
 // between are what turn a soft heap of dots into a ring with a dark middle. Corners gives each dot the color of the
 // corner it last hopped towards; Rainbow is the Point cloud's rainbow (the whole color wheel, sliding along).
@@ -95,11 +95,37 @@ function clean(s) {
     chaosJump: num(s.chaosJump, DEFAULTS.chaosJump, 0, 100), chaosDeep: num(s.chaosDeep, DEFAULTS.chaosDeep, 0, 100),
     chaosMove: num(s.chaosMove, DEFAULTS.chaosMove, 0, 100), chaosColor: Math.round(num(s.chaosColor, 0, 0, COLORS.length - 1)),
     chaosDrift: !!s.chaosDrift, chaosSpeed: num(s.chaosSpeed, DEFAULTS.chaosSpeed, 0, 100), chaosDriftSides: s.chaosDriftSides !== false,
-    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)) };
+    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)), chaosCrisp: s.chaosCrisp !== false };
 }
-// A pattern picked at random (the dice button, Surprise me and Autopilot)
-function look() {
+// Keep it crisp: the rules found by scoring hundreds of patterns held still. The more corners the shape has, the fewer
+// can be averaged before it turns into a fuzzy ball (12 corners: up to 3; 8 or more: up to 4); only whole numbers are
+// averaged (in between, two patterns lie on top of each other); a soft Hop melts the fewer corners are averaged, so
+// Hop has a floor (1 corner averaged: 50, 2: 40, 3: 35, 4 and up: 25); Fractal corners above 30 blurs everything.
+const kOf = (mix) => 1 + (MAX_K - 1) * Math.pow(Math.max(0, Math.min(1, mix)), 1.3);   // mix 0-1
+const mixFor = (k) => 100 * Math.pow(Math.max(0, (k - 1) / (MAX_K - 1)), 1 / 1.3);     // the fader value for k corners
+const kCap = (corners) => corners >= 10 ? 3 : corners >= 8 ? 4 : MAX_K;
+const kSnap = (k) => { const f = k - Math.floor(k), x = Math.max(0, Math.min(1, (f - 0.45) / 0.1)); return Math.floor(k) + x * x * (3 - 2 * x); };
+const hopFloor = (k) => k <= 1 ? 0.5 : k <= 2 ? 0.5 - 0.1 * (k - 1) : k <= 3 ? 0.4 - 0.05 * (k - 2) : k <= 4 ? 0.35 - 0.1 * (k - 3) : 0.25;
+const DEEP_MAX = 0.3;
+const cornersOf = (s) => s.chaosDim === 1 ? (SHAPES[Math.round(s.chaosSides) - 3] || SHAPES[0]).n : Math.round(s.chaosSides);
+// What a loop's faders really give, held still (for the readouts): corners averaged, Hop and Fractal corners, 0-100
+function effective(s) {
+  s = clean(s);
+  let k = kOf(s.chaosMix / 100), jump = s.chaosJump, deep = s.chaosDeep;
+  if (s.chaosCrisp) { k = Math.round(Math.min(k, kCap(cornersOf(s)))); jump = Math.max(jump, 100 * hopFloor(k)); deep = Math.min(deep, 100 * DEEP_MAX); }
+  return { k, jump, deep, cap: s.chaosCrisp ? kCap(cornersOf(s)) : MAX_K };
+}
+// A pattern picked at random (the dice button, Surprise me and Autopilot); crisp (the default) keeps to the clean zones
+function look(crisp = true) {
   const r = (a, b) => Math.round(a + Math.random() * (b - a));
+  if (crisp) {
+    const dim = Math.random() < 0.4 ? 1 : 0, sides = [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)];
+    const corners = cornersOf({ chaosDim: dim, chaosSides: sides }), cap = kCap(corners);
+    // Two or three corners averaged most often (the cells and rings), now and then one (the classic fractals) or more
+    const k = Math.min(cap, [1, 2, 2, 3, 3, 3, 4, 5, 6][r(0, 8)]);
+    return { chaosSides: sides, chaosMix: Math.round(mixFor(k)), chaosJump: r(Math.max(45, 100 * hopFloor(k)), 75),
+      chaosDeep: Math.random() < 0.3 ? 0 : r(5, 30), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1), chaosDim: dim, chaosView: r(0, VIEWS.length - 1) };
+  }
   return { chaosSides: [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)], chaosMix: Math.random() < 0.25 ? r(0, 25) : r(25, 100), chaosJump: r(35, 70),
     chaosDeep: Math.random() < 0.25 ? 0 : r(15, 100), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1),
     chaosDim: Math.random() < 0.4 ? 1 : 0, chaosView: r(0, VIEWS.length - 1) };
@@ -349,18 +375,23 @@ function create(gl) {
     st.turn += dt * 0.045 * mv;
     st.sub += dt * 0.10 * mv;
     const turn = st.turn + st.kick * 0.25, subTurn = -(st.sub + st.kick * 0.6);
-    let K = 1 + (MAX_K - 1) * Math.pow(c.mix, 1.3) + 0.7 * mv * Math.sin(st.t * 0.083 + 1.3) + 1.2 * st.high;
+    const crisp = s.chaosCrisp;
+    // (Crisp: no breathing of the number averaged, which would hold it between whole numbers; the high sounds still
+    // push it up a whole corner at a time)
+    let K = kOf(c.mix) + (crisp ? 0 : 0.7 * mv * Math.sin(st.t * 0.083 + 1.3)) + 1.2 * st.high;
     K = Math.max(1, Math.min(MAX_K, K));
+    if (crisp) K = kSnap(Math.min(K, kCap(s.chaosDim === 1 ? (SHAPES[N - 3] || SHAPES[0]).n : N)));
     // The classic game's hop is the average of where the dot is and the corner picked. With more corners the dot's
     // own place counts for less the more corners there are to average and the more sides the polygon has (0.5 over
     // "touch" is the hop at which a polygon's copies of itself just touch: the triangle's and square's half, the
     // pentagon's 0.38 and so on). That's the middle of the Hop fader. Softer keeps more of the dot's own place (the
     // dots smear into each other), sharper less (tight separate dots).
     const touchOf = (n) => { let t = 1; for (let i = 1; i <= Math.floor(n / 4); i++) t += Math.cos(2 * Math.PI * i / n); return t; };
-    const hop = Math.pow(2, (0.5 - c.jump) * 3) * (1 + 0.14 * mv * Math.sin(st.t * 0.127)) * (1 - 0.22 * st.bass);
+    const jumpNow = crisp ? Math.max(c.jump, hopFloor(K)) : c.jump, deepNow = crisp ? Math.min(c.deep, DEEP_MAX) : c.deep;
+    const hop = Math.pow(2, (0.5 - jumpNow) * 3) * (1 + 0.14 * mv * Math.sin(st.t * 0.127)) * (1 - 0.22 * st.bass);
     const leftFor = (k, n) => Math.max(0.03, Math.min(0.8, (0.5 / touchOf(n) / Math.pow(k, 1.6)) * hop));
     const k0 = Math.floor(K + 1e-4), k1 = Math.min(MAX_K, k0 + 1), left0 = leftFor(k0, N), left1 = leftFor(k1, N);
-    const deep1 = 0.16 * c.deep * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1)), deep2 = Math.min(1, Math.max(0, (c.deep - 0.3) / 0.3));
+    const deep1 = 0.16 * deepNow * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1)), deep2 = Math.min(1, Math.max(0, (deepNow - 0.3) / 0.3));
     const dim3 = s.chaosDim === 1;
     const px = Math.max(1, Math.round(outH / 620)), soft = px > 1;
     const keep = deep ? Math.exp(-dt / TAU) : 0;
@@ -457,5 +488,5 @@ function create(gl) {
   }
   return { state, run, release, deep };
 }
-return { DEFAULTS, COLORS, PALETTES, VIEWS, SHAPES, shapeName, preview, clean, look, create };
+return { DEFAULTS, COLORS, PALETTES, VIEWS, SHAPES, shapeName, preview, clean, look, effective, mixFor, kCap, hopFloor, DEEP_MAX, create };
 })();
