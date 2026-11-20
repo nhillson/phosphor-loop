@@ -266,15 +266,18 @@ const FS_SHOW = `#version 300 es
 precision highp float;
 uniform sampler2D uAcc;
 uniform vec3 uC[8];
-uniform float uNorm, uMode, uGain, uShift;
+uniform float uNorm, uMode, uGain, uShift, uAsp, uCw;
+uniform vec2 uRot;   // the flat pattern's turn: its dots are added up unturned, and turned only here, so turning never smears them
 out vec4 o;
 vec3 hue(float h){ return clamp(abs(fract(h+vec3(0.,2./3.,1./3.))*6.-3.)-1.,0.,1.); }
 void main(){
-  ivec2 q=ivec2(gl_FragCoord.xy), sz=textureSize(uAcc,0), m=sz-1;
-  vec4 a=texelFetch(uAcc,q,0)*4.;
-  a+=texelFetch(uAcc,clamp(q+ivec2(1,0),ivec2(0),m),0)+texelFetch(uAcc,clamp(q-ivec2(1,0),ivec2(0),m),0);
-  a+=texelFetch(uAcc,clamp(q+ivec2(0,1),ivec2(0),m),0)+texelFetch(uAcc,clamp(q-ivec2(0,1),ivec2(0),m),0);
-  a/=8.;
+  ivec2 sz=textureSize(uAcc,0);
+  vec2 px=1./vec2(sz), w=(gl_FragCoord.xy*px*2.-1.)*vec2(uAsp,1.);
+  w=vec2(uRot.x*w.x+uRot.y*w.y, -uRot.y*w.x+uRot.x*w.y);
+  vec2 uv=(w/vec2(uAsp,1.)+1.)*.5;
+  vec4 a=texture(uAcc,uv)*uCw;
+  a+=texture(uAcc,uv+vec2(px.x,0.))+texture(uAcc,uv-vec2(px.x,0.))+texture(uAcc,uv+vec2(0.,px.y))+texture(uAcc,uv-vec2(0.,px.y));
+  a/=uCw+4.;
   float d=a.r*uNorm, x=log2(1.+d*uGain)/6.6;
   vec3 col;
   if(uMode<.5){        // a ramp of eight colors
@@ -311,7 +314,7 @@ function create(gl) {
   const dot = program(VS_DOT, FS_DOT, ['uV', 'uVb', 'uLeftB', 'uNmix', 'uSub', 'uSub2', 'uN', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uLeft', 'uFit', 'uAsp', 'uSize', 'uSteps', 'uSeed', 'uSoft', 'uW']);
   const dot3 = program(VS_DOT3, FS_DOT3, ['uV', 'uVb', 'uR1', 'uR2', 'uView', 'uCam', 'uN', 'uNb', 'uNmix', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uFit', 'uAsp', 'uSize', 'uMode', 'uSlice', 'uThick', 'uLeft', 'uLeftB', 'uSteps', 'uSeed', 'uW']);
   const fade = program(VS_TRI, FS_FADE, ['uKeep']);
-  const show = program(VS_TRI, FS_SHOW, ['uAcc', 'uNorm', 'uMode', 'uC', 'uGain', 'uShift']);
+  const show = program(VS_TRI, FS_SHOW, ['uAcc', 'uNorm', 'uMode', 'uC', 'uGain', 'uShift', 'uAsp', 'uCw', 'uRot']);
   const vao = gl.createVertexArray();
   const FIT = 0.95, RATE = 9e6, RATE3 = 14e6, TAU = 0.25, SAME = 0.3, THICK = 0.07;
   // Where 3D's dots would spread to if they were even, against Turning's disc: a Slice catches only about a tenth of
@@ -322,7 +325,7 @@ function create(gl) {
     const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
     if (deepOne) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
     else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    const filt = deepOne ? gl.NEAREST : gl.LINEAR;
+    const filt = gl.LINEAR;   // (half-float pictures can be read smoothly in WebGL2)
     for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, filt], [gl.TEXTURE_MAG_FILTER, filt], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
     const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
@@ -376,9 +379,9 @@ function create(gl) {
     st.sub += dt * 0.10 * mv;
     const turn = st.turn + st.kick * 0.25, subTurn = -(st.sub + st.kick * 0.6);
     const crisp = s.chaosCrisp;
-    // (Crisp: no breathing of the number averaged, which would hold it between whole numbers; the high sounds still
-    // push it up a whole corner at a time)
-    let K = kOf(c.mix) + (crisp ? 0 : 0.7 * mv * Math.sin(st.t * 0.083 + 1.3)) + 1.2 * st.high;
+    // (Crisp: no breathing of the number averaged, and the high sounds don't push it, which would hold it between whole
+    // numbers and flip patterns on every hi-hat; they brighten the picture instead)
+    let K = kOf(c.mix) + (crisp ? 0 : 0.7 * mv * Math.sin(st.t * 0.083 + 1.3) + 1.2 * st.high);
     K = Math.max(1, Math.min(MAX_K, K));
     if (crisp) K = kSnap(Math.min(K, kCap(s.chaosDim === 1 ? (SHAPES[N - 3] || SHAPES[0]).n : N)));
     // The classic game's hop is the average of where the dot is and the corner picked. With more corners the dot's
@@ -388,13 +391,14 @@ function create(gl) {
     // dots smear into each other), sharper less (tight separate dots).
     const touchOf = (n) => { let t = 1; for (let i = 1; i <= Math.floor(n / 4); i++) t += Math.cos(2 * Math.PI * i / n); return t; };
     const jumpNow = crisp ? Math.max(c.jump, hopFloor(K)) : c.jump, deepNow = crisp ? Math.min(c.deep, DEEP_MAX) : c.deep;
-    const hop = Math.pow(2, (0.5 - jumpNow) * 3) * (1 + 0.14 * mv * Math.sin(st.t * 0.127)) * (1 - 0.22 * st.bass);
+    const hop = Math.pow(2, (0.5 - jumpNow) * 3) * (1 + 0.14 * mv * Math.sin(st.t * 0.127)) * (1 - (crisp ? 0.07 : 0.22) * st.bass);
     const leftFor = (k, n) => Math.max(0.03, Math.min(0.8, (0.5 / touchOf(n) / Math.pow(k, 1.6)) * hop));
     const k0 = Math.floor(K + 1e-4), k1 = Math.min(MAX_K, k0 + 1), left0 = leftFor(k0, N), left1 = leftFor(k1, N);
     const deep1 = 0.16 * deepNow * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1)), deep2 = Math.min(1, Math.max(0, (deepNow - 0.3) / 0.3));
     const dim3 = s.chaosDim === 1;
     const px = Math.max(1, Math.round(outH / 620)), soft = px > 1;
-    const keep = deep ? Math.exp(-dt / TAU) : 0;
+    const tau = crisp && !dim3 ? (mOn ? 0.4 : 0.6) : TAU;
+    const keep = deep ? Math.exp(-dt / tau) : 0;
     const seed = (st.frame = (st.frame + 1) >>> 0) * 0x9E3779B9 >>> 0;
     gl.bindVertexArray(vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, st.acc.f);
@@ -448,7 +452,7 @@ function create(gl) {
       each = 1;
       cover = view === 0 ? disc * 1.1 : view === 1 ? disc * C3_SLICE : outW * outH * C3_FLY;
     } else {
-      const ring = (n) => { const V = new Float32Array(MAX_N * 2); for (let i = 0; i < n; i++) { const a = turn + Math.PI / 2 + (i / n) * 2 * Math.PI; V[i * 2] = Math.cos(a); V[i * 2 + 1] = Math.sin(a); } return V; };
+      const ring = (n) => { const V = new Float32Array(MAX_N * 2); for (let i = 0; i < n; i++) { const a = Math.PI / 2 + (i / n) * 2 * Math.PI; V[i * 2] = Math.cos(a); V[i * 2 + 1] = Math.sin(a); } return V; };
       const V = ring(N), Vb = ring(Nb);
       // Enough hops that where a dot started no longer shows
       const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(Math.max(left0, nmix > 0 ? leftFor(k0, Nb) : 0)))));
@@ -476,8 +480,11 @@ function create(gl) {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, st.acc.t); gl.uniform1i(show.u.uAcc, 0);
     gl.uniform1f(show.u.uNorm, (deep ? 1 : 255 / 2) * cover / (st.total * each));
     const P = PALETTES[s.chaosColor] || PALETTES[0];
-    gl.uniform1f(show.u.uMode, P.mode || 0); gl.uniform1f(show.u.uGain, 2.2 * (1 + 0.5 * st.bass));
+    gl.uniform1f(show.u.uMode, P.mode || 0);
     if (P.c) gl.uniform3fv(show.u.uC, P.flat || (P.flat = new Float32Array(P.c.flat())));
+    gl.uniform1f(show.u.uAsp, outW / outH); gl.uniform1f(show.u.uCw, crisp ? 8 : 4);
+    gl.uniform2f(show.u.uRot, dim3 ? 1 : Math.cos(turn), dim3 ? 0 : Math.sin(turn));
+    gl.uniform1f(show.u.uGain, 2.2 * (1 + 0.5 * st.bass + (crisp ? 0.4 * st.high : 0)));
     gl.uniform1f(show.u.uShift, P.mode === 1 ? st.t * 0.01 * mv : P.mode === 2 ? st.t * 0.03 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
