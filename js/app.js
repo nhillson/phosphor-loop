@@ -1298,6 +1298,7 @@ const CHAOS_NUM = ['chaosSides', 'chaosMix', 'chaosJump', 'chaosDeep', 'chaosMov
 const chaosEls = {};
 for (const q of CHAOS_NUM) chaosEls[q] = { el: $('#' + q), out: $('#' + q + 'Out') };
 function chaosText(q, v) {
+  if (q === 'chaosSides' && loops[edit].tgt.chaosDim === 1) return PCH.shapeName(v).toUpperCase();   // in 3D, the solid
   if (q === 'chaosMix') return (1 + 5 * Math.pow(v / 100, 1.3)).toFixed(1);   // how many corners that is
   if (q === 'chaosDeep') return v === 0 ? 'PLAIN' : String(v);
   if (q === 'chaosMove') return v === 0 ? 'STILL' : String(v);
@@ -1311,6 +1312,11 @@ function syncChaosUI(t) {
   $$('#chaosColor button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosColor | 0))));
   $('#chaosColorName').textContent = PCH.COLORS[t.chaosColor | 0] || PCH.COLORS[0];
   $('#chaosDrift').setAttribute('aria-pressed', String(!!t.chaosDrift));
+  const d3 = t.chaosDim === 1;
+  $$('#chaosDim button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (d3 ? 1 : 0))));
+  $$('#chaosView button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosView | 0))));
+  $('#chaosViewRow').hidden = !d3;
+  $('label[for="chaosSides"]').textContent = d3 ? 'Shape' : 'Corners';
   $('#chaosDriftSides').setAttribute('aria-pressed', String(t.chaosDriftSides !== false));
 }
 // Drift the faders: Corners averaged, Hop, Fractal corners and Morph each wander to a spot picked at random, then on
@@ -1351,6 +1357,19 @@ function chaosDriftTick(dt) {
     for (const q of Object.keys(CHAOS_DRIFT)) if (chaosHeld !== q) { const c = chaosEls[q], v = Math.round(loops[edit].tgt[q]); if (+c.el.value !== v) { c.el.value = v; fillTrack(c.el); c.out.textContent = chaosText(q, v); } }
   }
 }
+// Flat or 3D, and in 3D how it's shown
+$$('#chaosDim button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.chaosDim = +b.dataset.v;
+  syncUI();
+  showOSD('CHAOS GAME', +b.dataset.v ? '3D · ' + PCH.VIEWS[loops[edit].tgt.chaosView | 0].toUpperCase() : 'FLAT');
+}));
+$$('#chaosView button').forEach((b) => b.addEventListener('click', () => {
+  takeOver('in1');
+  loops[edit].tgt.chaosView = +b.dataset.v;
+  syncUI();
+  showOSD('CHAOS GAME', '3D · ' + PCH.VIEWS[+b.dataset.v].toUpperCase());
+}));
 $('#chaosDriftSides').addEventListener('click', () => {
   takeOver('in1');
   const t = loops[edit].tgt;
@@ -4842,7 +4861,7 @@ function tasteFeats(L) {
   if (L.in1 === 'life' || L.in2 === 'life') f.push('life:' + (L.lifeCells ?? 1) + (L.lifeSpeed ?? 1) + (L.lifeLoop ? 'p' : 'r'));
   if (L.in1 === 'radar' || L.in2 === 'radar') f.push('radar:' + (L.radarWind ? 'wind' : 'rain'));
   if (L.in1 === 'ferro' || L.in2 === 'ferro') f.push('ferro:' + (L.ferroStyle | 0));
-  if (L.in1 === 'chaos' || L.in2 === 'chaos') f.push('chaos:' + (L.chaosSides | 0) + ((L.chaosMix ?? 50) < 25 ? 'g' : (L.chaosMix ?? 50) < 60 ? 'm' : 'o') + (L.chaosColor | 0));
+  if (L.in1 === 'chaos' || L.in2 === 'chaos') f.push('chaos:' + (L.chaosDim === 1 ? '3d' + (L.chaosView | 0) + ':' : '') + (L.chaosSides | 0) + ((L.chaosMix ?? 50) < 25 ? 'g' : (L.chaosMix ?? 50) < 60 ? 'm' : 'o') + (L.chaosColor | 0));
   if (L.in1 === 'machine' || L.in2 === 'machine') f.push('machine:' + (L.machColor | 0));
   if (L.in1 === 'patch' || L.in2 === 'patch') f.push('patch:' + ((L.patch && L.patch.name) || 'none'));
   if (L.in1 === 'cloud' || L.in2 === 'cloud') f.push('cloud:' + (L.cloudOf || 'picture'));
@@ -9361,6 +9380,11 @@ const RECIPES = [
     how: 'FERROFLUID · TRAILS 70 · ZOOM 8',
     sw: 'radial-gradient(circle at 40% 35%,#c238ff 0 5%,transparent 14%),radial-gradient(circle at 64% 60%,#2fd6ff 0 4%,transparent 12%),radial-gradient(circle at 50% 50%,#05040a 0 36%,#8b1ab8 38%,#05040a 46%)',
     patch: { A: { in1: 'ferro', ferroStyle: 0, size: 100, zoom: 8, spin: 0, trails: 70, color: 0, blur: 0 } } },
+  { name: 'Dot sculpture', after: 'Under Chaos game, 3D style picks Turning, Slices or Fly-through, and the Shape fader picks the solid. Switch on Drift the faders and it keeps changing by itself.',
+    text: 'The chaos game in 3D: dots hopping towards the corners of a solid build a glowing crystal that turns in front of you.',
+    how: 'CHAOS GAME · 3D · TURNING · ICOSAHEDRON',
+    sw: 'radial-gradient(circle at 50% 50%,#f0c040 0 5%,transparent 7%),conic-gradient(from 30deg,#140d02,#c8901c,#140d02,#c8901c,#140d02,#c8901c,#140d02)',
+    patch: { A: { in1: 'chaos', chaosDim: 1, chaosView: 0, chaosSides: 9, chaosMix: 30, chaosJump: 50, chaosDeep: 20, chaosMove: 40, chaosColor: 9, chaosDrift: true, size: 100, zoom: 0, spin: 0, trails: 20, color: 0, blur: 0 } } },
   { name: 'Dot mandala', after: 'Under Chaos game, slide Corners averaged from Geometric to Organic, or press New pattern for one you haven’t seen. Play music with React to sound listening and the bass pulls the dots into bright knots.',
     text: 'The chaos game: dots hopping towards corners picked at random draw a mandala of rings and cells that slowly morphs, with soft echoes behind it.',
     how: 'CHAOS GAME · 12 CORNERS · TRAILS 25',

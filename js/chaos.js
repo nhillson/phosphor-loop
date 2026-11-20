@@ -13,7 +13,8 @@
 window.PhosphorChaos = (() => {
 // A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100. Drift (the app's doing,
 // see chaosDrift in js/app.js) moves the faders about by themselves, at chaosSpeed; Corners too unless chaosDriftSides is off.
-const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, chaosDrift: false, chaosSpeed: 40, chaosDriftSides: true };
+const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, chaosDrift: false, chaosSpeed: 40, chaosDriftSides: true,
+  chaosDim: 0, chaosView: 0 };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
 // The sets of colors. A ramp's eight colors run from where few dots land to where the most do; the dark ones in
 // between are what turn a soft heap of dots into a ring with a dark middle. Corners gives each dot the color of the
 // corner it last hopped towards; Rainbow is the Point cloud's rainbow (the whole color wheel, sliding along).
@@ -39,20 +40,69 @@ function preview(i) {
   if (P.mode === 2) return 'linear-gradient(90deg,#000 0 6%,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)';
   return 'linear-gradient(90deg,' + P.c.map((c) => `rgb(${c.map((v) => Math.round(v * 255)).join(',')})`).join(',') + ')';
 }
-const MAX_K = 6, MAX_N = 12;
+const MAX_K = 6, MAX_N = 12, MAX_V3 = 20;
+// 3D: the dots hop towards the corners of a solid instead of a flat polygon. The Corners fader (3 to 12) picks one of
+// ten solids, from the 4-cornered pyramid (the Sierpinski pyramid) to the 20-cornered dodecahedron. Each is scaled to
+// fit a ball of 1. "base" is what's left of a dot's own place at which the solid's copies of itself on its corners
+// about touch (nearest two corners apart, against the widest): the middle of the Hop fader, as touchOf is in 2D.
+const VIEWS = ['Turning', 'Slices', 'Fly-through'];
+const SHAPES = (() => {
+  const P = (1 + Math.sqrt(5)) / 2, pm = [-1, 1];
+  const ring = (n, y, r, a0 = 0) => Array.from({ length: n }, (_, i) => [r * Math.cos(a0 + 2 * Math.PI * i / n), y, r * Math.sin(a0 + 2 * Math.PI * i / n)]);
+  const cube = [], ico = [], cubo = [], dode = [];
+  for (const x of pm) for (const y of pm) for (const z of pm) cube.push([x, y, z]);
+  for (const a of pm) for (const b of pm) {
+    ico.push([0, a, b * P], [a, b * P, 0], [b * P, 0, a]);
+    cubo.push([a, b, 0], [a, 0, b], [0, a, b]);
+    dode.push([0, a / P, b * P], [a / P, b * P, 0], [a * P, 0, b / P]);
+  }
+  const axes = [[2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]];
+  const list = [
+    ['Pyramid', [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]],
+    ['Double pyramid', [[0, 1, 0], [0, -1, 0], ...ring(3, 0, 1)]],
+    ['Diamond', [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]],
+    ['Gem', [[0, 1, 0], [0, -1, 0], ...ring(5, 0, 1)]],
+    ['Cube', cube],
+    ['Twisted box', [...ring(4, 0.55, 0.835), ...ring(4, -0.55, 0.835, Math.PI / 4)]],
+    ['Icosahedron', ico],
+    ['Cuboctahedron', cubo],
+    ['Rhombic', [...cube, ...axes]],
+    ['Dodecahedron', [...cube, ...dode]],
+  ];
+  return list.map(([name, L]) => {
+    const r = Math.max(...L.map((v) => Math.hypot(...v)));
+    L = L.map((v) => v.map((x) => x / r));
+    let dmin = Infinity, dmax = 0;
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const d = Math.hypot(L[i][0] - L[j][0], L[i][1] - L[j][1], L[i][2] - L[j][2]); dmin = Math.min(dmin, d); dmax = Math.max(dmax, d); }
+    const v = new Float32Array(MAX_V3 * 3); L.forEach((p, i) => v.set(p, i * 3));
+    return { name, v, n: L.length, base: dmin / (dmin + dmax) };
+  });
+})();
+const shapeName = (sides) => (SHAPES[Math.round(sides) - 3] || SHAPES[0]).name;
+// 3 x 3 turns, as rows, and as GLSL wants them (by columns)
+const m3 = {
+  axis(ax, a) { const l = Math.hypot(...ax), x = ax[0] / l, y = ax[1] / l, z = ax[2] / l, c = Math.cos(a), s = Math.sin(a), t = 1 - c;
+    return [[t * x * x + c, t * x * y - s * z, t * x * z + s * y], [t * x * y + s * z, t * y * y + c, t * y * z - s * x], [t * x * z - s * y, t * y * z + s * x, t * z * z + c]]; },
+  mul(A, B) { return A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j])); },
+  gl(R) { return new Float32Array([R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]); },
+};
+const v3 = { sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  norm: (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; } };
 const num = (v, d, a, b) => { v = +v; return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
 function clean(s) {
   s = s || {};
   return { chaosSides: Math.round(num(s.chaosSides, DEFAULTS.chaosSides, 3, MAX_N)), chaosMix: num(s.chaosMix, DEFAULTS.chaosMix, 0, 100),
     chaosJump: num(s.chaosJump, DEFAULTS.chaosJump, 0, 100), chaosDeep: num(s.chaosDeep, DEFAULTS.chaosDeep, 0, 100),
     chaosMove: num(s.chaosMove, DEFAULTS.chaosMove, 0, 100), chaosColor: Math.round(num(s.chaosColor, 0, 0, COLORS.length - 1)),
-    chaosDrift: !!s.chaosDrift, chaosSpeed: num(s.chaosSpeed, DEFAULTS.chaosSpeed, 0, 100), chaosDriftSides: s.chaosDriftSides !== false };
+    chaosDrift: !!s.chaosDrift, chaosSpeed: num(s.chaosSpeed, DEFAULTS.chaosSpeed, 0, 100), chaosDriftSides: s.chaosDriftSides !== false,
+    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)) };
 }
 // A pattern picked at random (the dice button, Surprise me and Autopilot)
 function look() {
   const r = (a, b) => Math.round(a + Math.random() * (b - a));
   return { chaosSides: [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)], chaosMix: Math.random() < 0.25 ? r(0, 25) : r(25, 100), chaosJump: r(35, 70),
-    chaosDeep: Math.random() < 0.25 ? 0 : r(15, 100), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1) };
+    chaosDeep: Math.random() < 0.25 ? 0 : r(15, 100), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1),
+    chaosDim: Math.random() < 0.4 ? 1 : 0, chaosView: r(0, VIEWS.length - 1) };
 }
 
 const VS_TRI = `#version 300 es
@@ -110,6 +160,75 @@ void main(){
   if(uSoft>.5){ vec2 q=gl_PointCoord*2.-1.; w*=max(0., 1.-dot(q,q)); }
   o=vec4(vCol*w, w);
 }`;
+// One dot in 3D: the same hops, towards a solid's corners, with the little solids on each corner turned by uR1 / uR2.
+// Then how it's seen: Turning (the whole solid turning in front of you, nearer dots brighter), Slices (only the dots
+// in a thin slab sweeping through it) or Fly-through (a camera wandering inside the cloud, near dots bigger).
+const VS_DOT3 = `#version 300 es
+precision highp float;
+precision highp int;
+uniform vec3 uV[${MAX_V3}], uVb[${MAX_V3}];   // this solid's corners; the next one's (while Corners changes)
+uniform mat3 uR1, uR2, uView;
+uniform vec3 uCam;
+uniform float uN, uNb, uNmix, uK, uDeep, uDeep2, uSame, uFit, uAsp, uSize, uMode, uSlice, uThick;
+uniform vec2 uLeft, uLeftB;
+uniform int uSteps;
+uniform uint uSeed;
+out vec3 vCol;
+out float vW, vPs;
+uint pcg(uint v){ uint s=v*747796405u+2891336453u; uint w=((s>>((s>>28u)+4u))^s)*277803737u; return (w>>22u)^w; }
+vec3 corner(bool b, uint i){ return b?uVb[i]:uV[i]; }
+void main(){
+  uint h=pcg(uint(gl_VertexID)*2654435761u ^ uSeed);
+  bool nb=float(pcg(h^0x2c1b3c6du)>>8)/16777216.<uNmix;
+  uint n=uint(nb?uNb:uN);
+  float kf=floor(uK+1e-4), more=step(float(h>>8)/16777216., uK-kf);
+  int kc=int(kf+more);
+  vec2 lf=nb?uLeftB:uLeft;
+  float left=mix(lf.x, lf.y, more), s1=uDeep/float(kc), s2=s1*s1*uDeep2, R=1./(1.+s1+s2);
+  vec3 p=vec3(0.), first=vec3(0.);
+  for(int s=0;s<uSteps;s++){
+    vec3 t=vec3(0.); uint g=0u;
+    for(int j=0;j<${MAX_K};j++){
+      if(j>=kc) break;
+      h=pcg(h+uint(j)+1u);
+      if(j==0 || float(h>>8)/16777216.>=uSame) g=pcg(h^0x68bc21ebu);
+      vec3 a=corner(nb, g%n);
+      t+=a+s1*(uR1*corner(nb,(g/n)%n))+s2*(uR2*corner(nb,(g/(n*n))%n));
+      if(j==0) first=a;
+    }
+    p=mix(t*(R/float(kc)), p, left);
+  }
+  float w=1., ps=uSize; vec2 xy=vec2(0.); bool keep=true;
+  if(uMode<.5){            // Turning: seen from 4 away, so the near side is a little bigger
+    vec3 q=uView*p; float D=4.;
+    xy=q.xy*(D/(D-q.z))*uFit*1.2*(D-1.)/D;
+    w=mix(.3,1.45,clamp(q.z*.5+.5,0.,1.));
+  } else if(uMode<1.5){    // Slices: a soft slab of the solid, square on
+    vec3 q=uView*p; float d=abs(q.z-uSlice)/uThick;
+    keep=d<1.; w=1.-d*d; xy=q.xy*uFit*1.2;
+  } else {                 // Fly-through: a camera inside it
+    vec3 q=uView*(p-uCam);
+    keep=q.z>.015;
+    xy=q.xy*(1.15/max(q.z,.015));
+    ps=clamp(uSize*.35/max(q.z,.01), uSize, uSize*7.);
+    w=1./(1.+q.z*q.z*.8);
+  }
+  vec2 c2=vec2(first.x+.55*first.z, first.y-.45*first.z);
+  vCol=vec3(1., c2);
+  vW=keep?w:0.; vPs=ps;
+  gl_Position=keep?vec4(xy.x/uAsp, xy.y, 0., 1.):vec4(2.,2.,2.,1.);
+  gl_PointSize=ps;
+}`;
+// A 3D dot: soft and round when bigger than a pixel, adding up to the same in all whatever its size
+const FS_DOT3 = `#version 300 es
+precision highp float;
+uniform float uW;
+in vec3 vCol; in float vW, vPs; out vec4 o;
+void main(){
+  float w=uW*vW;
+  if(vPs>1.5){ vec2 q=gl_PointCoord*2.-1.; w*=max(0., 1.-dot(q,q))/(vPs*vPs*.39); }
+  o=vec4(vCol*w, w);
+}`;
 const FS_FADE = `#version 300 es
 precision highp float;
 uniform float uKeep; out vec4 o;
@@ -164,10 +283,14 @@ function create(gl) {
   // Dots are added up in a picture that can hold more than 255 a spot, where the graphics card can draw to one
   const deep = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
   const dot = program(VS_DOT, FS_DOT, ['uV', 'uVb', 'uLeftB', 'uNmix', 'uSub', 'uSub2', 'uN', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uLeft', 'uFit', 'uAsp', 'uSize', 'uSteps', 'uSeed', 'uSoft', 'uW']);
+  const dot3 = program(VS_DOT3, FS_DOT3, ['uV', 'uVb', 'uR1', 'uR2', 'uView', 'uCam', 'uN', 'uNb', 'uNmix', 'uK', 'uDeep', 'uDeep2', 'uSame', 'uFit', 'uAsp', 'uSize', 'uMode', 'uSlice', 'uThick', 'uLeft', 'uLeftB', 'uSteps', 'uSeed', 'uW']);
   const fade = program(VS_TRI, FS_FADE, ['uKeep']);
   const show = program(VS_TRI, FS_SHOW, ['uAcc', 'uNorm', 'uMode', 'uC', 'uGain', 'uShift']);
   const vao = gl.createVertexArray();
-  const FIT = 0.95, RATE = 9e6, TAU = 0.25, SAME = 0.3;   // how much of the height it fills; dots a second; the glow's fade (seconds)
+  const FIT = 0.95, RATE = 9e6, RATE3 = 14e6, TAU = 0.25, SAME = 0.3, THICK = 0.07;
+  // Where 3D's dots would spread to if they were even, against Turning's disc: a Slice catches only about a tenth of
+  // the dots, so it's as if they were spread ten times as thin; Fly-through fills the screen, with half behind the camera
+  const C3_SLICE = 9, C3_FLY = 1.6;   // how much of the height it fills; dots a second; the glow's fade (seconds)
 
   function target(w, h, deepOne) {
     const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -182,7 +305,8 @@ function create(gl) {
   }
   function state() {
     return { acc: null, out: null, total: 0, t: Math.random() * 600, turn: Math.random() * 6.283, sub: Math.random() * 6.283, kick: 0, kickV: 0,
-      bass: 0, high: 0, frame: (Math.random() * 1e6) | 0, cur: null };
+      bass: 0, high: 0, frame: (Math.random() * 1e6) | 0, cur: null,
+      yaw: Math.random() * 6.283, slice: Math.random() * 6.283, fly: Math.random() * 100 };
   }
   function release(st) {
     if (!st) return;
@@ -237,16 +361,10 @@ function create(gl) {
     const leftFor = (k, n) => Math.max(0.03, Math.min(0.8, (0.5 / touchOf(n) / Math.pow(k, 1.6)) * hop));
     const k0 = Math.floor(K + 1e-4), k1 = Math.min(MAX_K, k0 + 1), left0 = leftFor(k0, N), left1 = leftFor(k1, N);
     const deep1 = 0.16 * c.deep * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1)), deep2 = Math.min(1, Math.max(0, (c.deep - 0.3) / 0.3));
-    const ring = (n) => { const V = new Float32Array(MAX_N * 2); for (let i = 0; i < n; i++) { const a = turn + Math.PI / 2 + (i / n) * 2 * Math.PI; V[i * 2] = Math.cos(a); V[i * 2 + 1] = Math.sin(a); } return V; };
-    const V = ring(N), Vb = ring(Nb);
-    // Enough hops that where a dot started no longer shows
-    const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(Math.max(left0, nmix > 0 ? leftFor(k0, Nb) : 0)))));
-    // As many dots a second whatever the frame rate, so the picture is as thick at 30 frames a second as at 60
+    const dim3 = s.chaosDim === 1;
     const px = Math.max(1, Math.round(outH / 620)), soft = px > 1;
-    const n = Math.round(Math.max(60000, Math.min(deep ? 240000 : 200000, RATE * dt)));
     const keep = deep ? Math.exp(-dt / TAU) : 0;
-    const each = soft ? px * px * 0.39 : 1;   // what one dot adds in all (a soft round dot's average over its square)
-
+    const seed = (st.frame = (st.frame + 1) >>> 0) * 0x9E3779B9 >>> 0;
     gl.bindVertexArray(vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, st.acc.f);
     gl.viewport(0, 0, outW, outH);
@@ -258,17 +376,66 @@ function create(gl) {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     } else { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
     gl.blendFunc(gl.ONE, gl.ONE);
-    gl.useProgram(dot.p);
-    gl.uniform2fv(dot.u.uV, V); gl.uniform2fv(dot.u.uVb, Vb); gl.uniform1f(dot.u.uNmix, nmix);
-    gl.uniform2f(dot.u.uLeftB, leftFor(k0, Nb), leftFor(k1, Nb));
-    gl.uniform2f(dot.u.uSub, Math.cos(subTurn), Math.sin(subTurn));
-    gl.uniform2f(dot.u.uSub2, Math.cos(2.3 * subTurn), Math.sin(2.3 * subTurn));
-    gl.uniform1f(dot.u.uN, N); gl.uniform1f(dot.u.uK, K); gl.uniform2f(dot.u.uLeft, left0, left1);
-    gl.uniform1f(dot.u.uDeep, deep1); gl.uniform1f(dot.u.uDeep2, deep2); gl.uniform1f(dot.u.uSame, SAME);
-    gl.uniform1f(dot.u.uFit, FIT); gl.uniform1f(dot.u.uAsp, outW / outH); gl.uniform1f(dot.u.uSize, px);
-    gl.uniform1i(dot.u.uSteps, steps); gl.uniform1ui(dot.u.uSeed, (st.frame = (st.frame + 1) >>> 0) * 0x9E3779B9 >>> 0);
-    gl.uniform1f(dot.u.uSoft, soft ? 1 : 0); gl.uniform1f(dot.u.uW, deep ? 1 : 2 / 255);
-    gl.drawArrays(gl.POINTS, 0, n);
+    let n, each, cover;
+    const disc = Math.PI * Math.pow(FIT * outH / 2, 2) * 0.45;
+    if (dim3) {
+      // The solid (and the next one while Corners changes), the hop for each, and how it's seen
+      const A = SHAPES[N - 3] || SHAPES[0], B = SHAPES[Nb - 3] || A;
+      const left3 = (k, S) => Math.max(0.03, Math.min(0.8, (S.base / Math.pow(k, 1.6)) * hop));
+      const l0 = left3(k0, A);
+      const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(Math.max(l0, nmix > 0 ? left3(k0, B) : 0)))));
+      const view = s.chaosView;
+      st.yaw += dt * (0.06 + 0.4 * mv); st.slice += dt * (0.05 + 0.35 * mv); st.fly += dt * (0.03 + 0.2 * mv);
+      const yaw = st.yaw + st.kick * 0.3, pitch = 0.35 + 0.4 * Math.sin(st.t * 0.07);
+      let M = m3.mul(m3.axis([1, 0, 0], pitch), m3.axis([0, 1, 0], yaw)), cam = [0, 0, 0];
+      if (view === 2) {
+        // A wandering path inside the cloud, looking a little ahead and in towards the middle, rolling now and then
+        const at = (f) => [0.55 * Math.sin(f), 0.45 * Math.sin(f * 1.37 + 1.1), 0.55 * Math.sin(f * 0.83 + 2.3)];
+        cam = at(st.fly);
+        const ahead = at(st.fly + 0.5).map((x) => x * 0.7);
+        const fwd = v3.norm(v3.sub(ahead, cam));
+        let right = v3.norm(v3.cross(fwd, [0, 1, 0])), up = v3.cross(right, fwd);
+        const roll = 0.5 * Math.sin(st.fly * 0.41) + st.kick * 0.3, cr = Math.cos(roll), sr = Math.sin(roll);
+        [right, up] = [right.map((x, i) => x * cr + up[i] * sr), up.map((x, i) => x * cr - right[i] * sr)];
+        M = [right, up, fwd];
+      }
+      gl.useProgram(dot3.p);
+      gl.uniform3fv(dot3.u.uV, A.v); gl.uniform3fv(dot3.u.uVb, B.v);
+      gl.uniform1f(dot3.u.uN, A.n); gl.uniform1f(dot3.u.uNb, B.n); gl.uniform1f(dot3.u.uNmix, nmix);
+      gl.uniform2f(dot3.u.uLeft, l0, left3(k1, A)); gl.uniform2f(dot3.u.uLeftB, left3(k0, B), left3(k1, B));
+      gl.uniformMatrix3fv(dot3.u.uR1, false, m3.gl(m3.axis([1, 1, 0.3], subTurn)));
+      gl.uniformMatrix3fv(dot3.u.uR2, false, m3.gl(m3.axis([0.2, -1, 1], 2.3 * subTurn)));
+      gl.uniformMatrix3fv(dot3.u.uView, false, m3.gl(M));
+      gl.uniform3f(dot3.u.uCam, cam[0], cam[1], cam[2]);
+      gl.uniform1f(dot3.u.uK, K); gl.uniform1f(dot3.u.uDeep, deep1); gl.uniform1f(dot3.u.uDeep2, deep2); gl.uniform1f(dot3.u.uSame, SAME);
+      gl.uniform1f(dot3.u.uFit, FIT); gl.uniform1f(dot3.u.uAsp, outW / outH); gl.uniform1f(dot3.u.uSize, px);
+      gl.uniform1f(dot3.u.uMode, view); gl.uniform1f(dot3.u.uSlice, 0.75 * Math.sin(st.slice)); gl.uniform1f(dot3.u.uThick, THICK);
+      gl.uniform1i(dot3.u.uSteps, steps); gl.uniform1ui(dot3.u.uSeed, seed);
+      gl.uniform1f(dot3.u.uW, deep ? 1 : 2 / 255);
+      n = Math.round(Math.max(80000, Math.min(deep ? 320000 : 200000, RATE3 * dt)));
+      gl.drawArrays(gl.POINTS, 0, n);
+      each = 1;
+      cover = view === 0 ? disc * 1.1 : view === 1 ? disc * C3_SLICE : outW * outH * C3_FLY;
+    } else {
+      const ring = (n) => { const V = new Float32Array(MAX_N * 2); for (let i = 0; i < n; i++) { const a = turn + Math.PI / 2 + (i / n) * 2 * Math.PI; V[i * 2] = Math.cos(a); V[i * 2 + 1] = Math.sin(a); } return V; };
+      const V = ring(N), Vb = ring(Nb);
+      // Enough hops that where a dot started no longer shows
+      const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(Math.max(left0, nmix > 0 ? leftFor(k0, Nb) : 0)))));
+      n = Math.round(Math.max(60000, Math.min(deep ? 240000 : 200000, RATE * dt)));
+      each = soft ? px * px * 0.39 : 1;   // what one dot adds in all (a soft round dot's average over its square)
+      gl.useProgram(dot.p);
+      gl.uniform2fv(dot.u.uV, V); gl.uniform2fv(dot.u.uVb, Vb); gl.uniform1f(dot.u.uNmix, nmix);
+      gl.uniform2f(dot.u.uLeftB, leftFor(k0, Nb), leftFor(k1, Nb));
+      gl.uniform2f(dot.u.uSub, Math.cos(subTurn), Math.sin(subTurn));
+      gl.uniform2f(dot.u.uSub2, Math.cos(2.3 * subTurn), Math.sin(2.3 * subTurn));
+      gl.uniform1f(dot.u.uN, N); gl.uniform1f(dot.u.uK, K); gl.uniform2f(dot.u.uLeft, left0, left1);
+      gl.uniform1f(dot.u.uDeep, deep1); gl.uniform1f(dot.u.uDeep2, deep2); gl.uniform1f(dot.u.uSame, SAME);
+      gl.uniform1f(dot.u.uFit, FIT); gl.uniform1f(dot.u.uAsp, outW / outH); gl.uniform1f(dot.u.uSize, px);
+      gl.uniform1i(dot.u.uSteps, steps); gl.uniform1ui(dot.u.uSeed, seed);
+      gl.uniform1f(dot.u.uSoft, soft ? 1 : 0); gl.uniform1f(dot.u.uW, deep ? 1 : 2 / 255);
+      gl.drawArrays(gl.POINTS, 0, n);
+      cover = disc;
+    }
     st.total = st.total * keep + n;
 
     // Colors by how many dots landed there, against how many there'd be if they were spread evenly over the shape
@@ -276,7 +443,6 @@ function create(gl) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, st.out.f);
     gl.useProgram(show.p);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, st.acc.t); gl.uniform1i(show.u.uAcc, 0);
-    const cover = Math.PI * Math.pow(FIT * outH / 2, 2) * 0.45;
     gl.uniform1f(show.u.uNorm, (deep ? 1 : 255 / 2) * cover / (st.total * each));
     const P = PALETTES[s.chaosColor] || PALETTES[0];
     gl.uniform1f(show.u.uMode, P.mode || 0); gl.uniform1f(show.u.uGain, 2.2 * (1 + 0.5 * st.bass));
@@ -291,5 +457,5 @@ function create(gl) {
   }
   return { state, run, release, deep };
 }
-return { DEFAULTS, COLORS, PALETTES, preview, clean, look, create };
+return { DEFAULTS, COLORS, PALETTES, VIEWS, SHAPES, shapeName, preview, clean, look, create };
 })();

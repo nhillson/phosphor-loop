@@ -301,7 +301,12 @@ TIPS
     Fractal corners and Morph about by themselves, as fast as Drift speed
     says, and Corners too (a corner at a time) unless you switch off Corners
     drift too. Colors has twelve sets, each shown as a strip of its colors; grab
-    one any time and it carries on from where you let go. Autopilot always
+    one any time and it carries on from where you let go.
+    3D (beside Flat, at the top) hops the dots towards the corners of a solid
+    instead: the Corners fader becomes Shape (a pyramid up to a dodecahedron),
+    and 3D style shows the cloud Turning in front of you, as Slices sweeping
+    through it, or as a Fly-through inside it. The Guide's "Dot sculpture"
+    recipe sets it up. Autopilot always
     switches it on when it brings the Chaos game in, at that loop's Drift speed. The Guide's
     "Dot mandala" recipe sets it up.
   - Topo map: glowing contour lines, like a hiking map, seen from straight

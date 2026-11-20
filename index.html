@@ -549,6 +549,21 @@
 
           <div class="dev" id="row-chaos" hidden>
             <div class="ctl">
+              <span class="lbl" id="chaosDimLbl" title="Flat draws the pattern on a flat shape, as before. 3D hops the dots towards the corners of a solid (a pyramid, a cube, a dodecahedron…) and shows the cloud they make in 3D.">Space</span>
+              <div class="seg seg-2" id="chaosDim" role="group" aria-labelledby="chaosDimLbl">
+                <button data-v="0" aria-pressed="true">Flat</button>
+                <button data-v="1" aria-pressed="false">3D</button>
+              </div>
+            </div>
+            <div class="ctl" id="chaosViewRow" hidden>
+              <span class="lbl" id="chaosViewLbl" title="How the 3D cloud is shown. Turning: the whole solid turns in front of you, nearer dots brighter. Slices: a thin slice sweeps through it, so you see flat patterns that keep changing. Fly-through: a camera drifts around inside it.">3D style</span>
+              <div class="seg seg-3" id="chaosView" role="group" aria-labelledby="chaosViewLbl">
+                <button data-v="0" aria-pressed="true">Turning</button>
+                <button data-v="1" aria-pressed="false">Slices</button>
+                <button data-v="2" aria-pressed="false">Fly-through</button>
+              </div>
+            </div>
+            <div class="ctl">
               <div class="ctl-head"><label for="chaosSides" title="How many corners the shape has: 3 is the famous triangle, 6 a honeycomb, 12 a fine mandala">Corners</label><output id="chaosSidesOut" for="chaosSides"></output></div>
               <input type="range" id="chaosSides" min="3" max="12" step="1" value="12">
             </div>
