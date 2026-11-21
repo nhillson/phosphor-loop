@@ -228,7 +228,7 @@ file don't rebuild the app.
    2 px (`uMinPs`); turning/sweeping/flying 0.6 as fast. **Solid** switch (`chaosSolid`, off to start with, `#chaosSolid` in `#chaosSolidRow`,
    3D Turning and Fly-through only): depth test on the acc picture's own depth buffer, cleared every frame, nearest dot wins (`uSolid`), shaded
    in `FS_SHOW` by nearness with pinholes filled and dark outlines; Autopilot keeps the loop's choice. The pattern fits a tall screen's width (`fit`). Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
-   `PCH.look()` = New pattern, Surprise and Autopilot. Every dot is
+   `PCH.look(crisp, dim)` = New random (`#chaosRoll`), New flat (`#chaosRollFlat`, dim 0), New 3D (`#chaosRoll3D`, dim 1), Surprise and Autopilot. Every dot is
    worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, added up in an RGBA16F picture that
    fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
    `brushMus.hit` shoves the turning. Very slow in this workspace (about 2 frames a second). Check with `--shot "Dot mandala"`

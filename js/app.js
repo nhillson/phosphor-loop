@@ -1465,12 +1465,15 @@ $$('#chaosColor button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD('CHAOS GAME', PCH.COLORS[+b.dataset.v].toUpperCase());
 }));
-$('#chaosRoll').addEventListener('click', () => {
-  takeOver('in1');
-  Object.assign(loops[edit].tgt, PCH.look(loops[edit].tgt.chaosCrisp !== false));
-  syncUI();
-  showOSD('CHAOS GAME', 'NEW PATTERN');
-});
+// New flat / New 3D / New random
+for (const [id, dim, say] of [['#chaosRollFlat', 0, 'NEW FLAT'], ['#chaosRoll3D', 1, 'NEW 3D'], ['#chaosRoll', null, 'NEW PATTERN']]) {
+  $(id).addEventListener('click', () => {
+    takeOver('in1');
+    Object.assign(loops[edit].tgt, PCH.look(loops[edit].tgt.chaosCrisp !== false, dim));
+    syncUI();
+    showOSD('CHAOS GAME', say);
+  });
+}
 // Machinery: its colors, speed and dice belong to the loop being edited too
 const PMA = window.PhosphorMachinery;
 PMA.COLORS.forEach((name, i) => { const b = document.createElement('button'); b.dataset.v = i; b.title = name; b.setAttribute('aria-label', name); b.setAttribute('aria-pressed', 'false'); b.style.background = PMA.preview(i); $('#machColor').appendChild(b); });

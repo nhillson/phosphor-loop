@@ -117,11 +117,13 @@ function effective(s) {
   if (s.chaosCrisp) { k = Math.round(Math.min(k, kCap(cornersOf(s)))); jump = Math.max(jump, 100 * hopFloor(k)); deep = Math.min(deep, 100 * deepCap(k, cornersOf(s))); }
   return { k, jump, deep, cap: s.chaosCrisp ? kCap(cornersOf(s)) : MAX_K, deepMax: s.chaosCrisp ? 100 * deepCap(k, cornersOf(s)) : 100 };
 }
-// A pattern picked at random (the dice button, Surprise me and Autopilot); crisp (the default) keeps to the clean zones
-function look(crisp = true) {
+// A pattern picked at random (the dice buttons, Surprise me and Autopilot); crisp (the default) keeps to the clean zones;
+// dim 0 or 1 asks for a flat or a 3D one (New flat / New 3D), otherwise 3D comes 4 times in 10
+function look(crisp = true, dim = null) {
   const r = (a, b) => Math.round(a + Math.random() * (b - a));
+  if (dim !== 0 && dim !== 1) dim = Math.random() < 0.4 ? 1 : 0;
   if (crisp) {
-    const dim = Math.random() < 0.4 ? 1 : 0, sides = [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)];
+    const sides = [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)];
     const corners = cornersOf({ chaosDim: dim, chaosSides: sides }), cap = kCap(corners);
     // Two or three corners averaged most often (the cells and rings), now and then one (the classic fractals) or more
     const k = Math.min(cap, [1, 2, 2, 3, 3, 3, 4, 5, 6][r(0, 8)]);
@@ -130,7 +132,7 @@ function look(crisp = true) {
   }
   return { chaosSides: [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)], chaosMix: Math.random() < 0.25 ? r(0, 25) : r(25, 100), chaosJump: r(35, 70),
     chaosDeep: Math.random() < 0.25 ? 0 : r(15, 100), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1),
-    chaosDim: Math.random() < 0.4 ? 1 : 0, chaosView: r(0, VIEWS.length - 1) };
+    chaosDim: dim, chaosView: r(0, VIEWS.length - 1) };
 }
 
 const VS_TRI = `#version 300 es

@@ -623,7 +623,12 @@
               <div class="poster-colors"><span id="chaosColorLbl" title="Each strip shows a set of colors, from where few dots land (left) to where the most do (right). Corners gives every dot the color of the corner it last hopped towards; Rainbow is the Point cloud’s sliding rainbow.">Colors: <b id="chaosColorName">Neon</b></span><div class="chaos-colors" id="chaosColor" role="group" aria-labelledby="chaosColorLbl"></div></div>
             </div>
             <div class="ctl">
-              <button class="btn" id="chaosRoll" title="Rolls the dice on every setting above for a pattern you haven't seen">New pattern</button>
+              <span class="lbl">New pattern</span>
+              <div class="seg seg-3" role="group" aria-label="New pattern">
+                <button id="chaosRollFlat" title="Rolls the dice on every setting for a new flat pattern">New flat</button>
+                <button id="chaosRoll3D" title="Rolls the dice on every setting for a new 3D pattern (shape and 3D style too)">New 3D</button>
+                <button id="chaosRoll" title="Rolls the dice on every setting for a new pattern, flat or 3D">New random</button>
+              </div>
             </div>
             <span class="hint">The bass pulls the dots into bright knots and the high sounds make it more organic (switch on React to sound). With no music it morphs by itself.</span>
           </div>

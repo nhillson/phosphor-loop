@@ -294,8 +294,8 @@ TIPS
     Sierpinski triangle; slide towards Organic and each hop goes towards the
     average of several corners, so the picture turns into rings and cells.
     Hop goes from soft smears to sharp dots, Fractal corners turns every dot
-    into a ring of dots (a lot runs them together into cells), Morph sets how much it changes by itself, and New
-    pattern rolls the dice on all of them. With React to sound listening,
+    into a ring of dots (a lot runs them together into cells), Morph sets how much it changes by itself, and New flat,
+    New 3D and New random roll the dice on all of them. With React to sound listening,
     the bass pulls the dots into bright knots and the high sounds make it
     more organic. Drift the faders slowly moves Corners averaged, Hop,
     Fractal corners and Morph about by themselves, as fast as Drift speed
