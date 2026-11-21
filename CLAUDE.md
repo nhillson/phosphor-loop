@@ -225,7 +225,12 @@ file don't rebuild the app.
    pulses the hop a third as much, with a sharper show pass (`uCw` 8). **No build-up anywhere** (Nick: no dots slowly fading, flat or 3D; it
    smeared a halo behind anything moving): every frame is drawn from nothing (`keep` 0) from the same dots (fixed seed `st.seed3`, fixed count:
    flat 360k / 240k, 3D 300k / 200k, Slices 500k / 320k, solid 350k / 240k; more made tests/check.py time out here). Flat patterns are added
-   up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). 3D glow (`steady` in run; Slices with 1.6 times the slice): soft dots at least 2 px (`uMinPs`); crisp: turning/sweeping/flying 0.6 as fast. **Solid** switch (`chaosSolid`, off to start with, `#chaosSolid` in `#chaosSolidRow`,
+   up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). 3D glow (`steady` in run; Slices with 1.6 times the slice): soft dots at least 2 px (`uMinPs`); crisp: turning/sweeping/flying 0.6 as fast. **Mandala** switch (`chaosMandala`, on to start with, `#chaosMandala` in `#chaosMandalaRow`; `look()` 7 in 10):
+   the view looks straight down a symmetry axis of the solid (`symAxes` / `axesOf`: candidates from corners, pair middles and 3-corner plane normals,
+   kept with the most turns n ≥ 3 that map the corners onto themselves), turning only round it (`m3.axis([0,0,1], yaw)` after the quaternion
+   `st.man.q` taking the axis to the viewer); every 14-26 s (quicker with Morph) or on a new shape it glides 3 s (`qt.slerp`) to another axis,
+   preferring another n; the little solids turn round that axis too (`uR1` / `uR2`), keeping the symmetry; Slices cut across it, Fly-through rides
+   along it looking in. **Solid** switch (`chaosSolid`, off to start with, `#chaosSolid` in `#chaosSolidRow`,
    3D Turning and Fly-through only): depth test on the acc picture's own depth buffer, cleared every frame, nearest dot wins (`uSolid`), shaded
    in `FS_SHOW` by nearness with pinholes filled and dark outlines; Autopilot keeps the loop's choice. The pattern fits a tall screen's width (`fit`). Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
    `PCH.look(crisp, dim)` = New random (`#chaosRoll`), New flat (`#chaosRollFlat`, dim 0), New 3D (`#chaosRoll3D`, dim 1), Surprise and Autopilot. Every dot is

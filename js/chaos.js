@@ -14,7 +14,7 @@ window.PhosphorChaos = (() => {
 // A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100. Drift (the app's doing,
 // see chaosDrift in js/app.js) moves the faders about by themselves, at chaosSpeed; Corners too unless chaosDriftSides is off.
 const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, chaosDrift: false, chaosSpeed: 40, chaosDriftSides: true, chaosDriftMove: true,
-  chaosDim: 0, chaosView: 0, chaosCrisp: true, chaosSolid: false };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
+  chaosDim: 0, chaosView: 0, chaosCrisp: true, chaosSolid: false, chaosMandala: true };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
 // The sets of colors. A ramp's eight colors run from where few dots land to where the most do; the dark ones in
 // between are what turn a soft heap of dots into a ring with a dark middle. Corners gives each dot the color of the
 // corner it last hopped towards; Rainbow is the Point cloud's rainbow (the whole color wheel, sliding along).
@@ -86,6 +86,56 @@ const m3 = {
   mul(A, B) { return A.map((r) => [0, 1, 2].map((j) => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j])); },
   gl(R) { return new Float32Array([R[0][0], R[1][0], R[2][0], R[0][1], R[1][1], R[2][1], R[0][2], R[1][2], R[2][2]]); },
 };
+// Mandala view: each solid's symmetry axes, the directions to look along where it repeats evenly round the middle.
+// Candidates are the corners, the middles of pairs of corners and the normals of planes through three corners; an axis
+// is kept with the most turns (n, 3 to 12) that map the corners onto themselves.
+function symAxes(S) {
+  const V = []; for (let i = 0; i < S.n; i++) V.push([S.v[i * 3], S.v[i * 3 + 1], S.v[i * 3 + 2]]);
+  const cand = new Map();
+  const add = (a) => {
+    const l = Math.hypot(a[0], a[1], a[2]); if (l < 1e-6) return;
+    let u = a.map((x) => x / l);
+    if (u[2] < -1e-6 || (Math.abs(u[2]) < 1e-6 && (u[1] < -1e-6 || (Math.abs(u[1]) < 1e-6 && u[0] < 0)))) u = u.map((x) => -x);
+    const k = u.map((x) => x.toFixed(3)).join(); if (!cand.has(k)) cand.set(k, u);
+  };
+  const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  for (const v of V) add(v);
+  for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+    add([V[i][0] + V[j][0], V[i][1] + V[j][1], V[i][2] + V[j][2]]);
+    for (let k = j + 1; k < V.length; k++) add(cr(sub3(V[j], V[i]), sub3(V[k], V[i])));
+  }
+  const fold = (u) => {
+    for (let n = 12; n >= 3; n--) {
+      const R = m3.axis(u, 2 * Math.PI / n);
+      if (V.every((v) => { const w = [0, 1, 2].map((r) => R[r][0] * v[0] + R[r][1] * v[1] + R[r][2] * v[2]); return V.some((x) => Math.hypot(x[0] - w[0], x[1] - w[1], x[2] - w[2]) < 2e-3); })) return n;
+    }
+    return 0;
+  };
+  const out = [];
+  for (const u of cand.values()) { const n = fold(u); if (n >= 3) out.push({ a: u, n }); }
+  return out;
+}
+const AXES = [];   // worked out on first use, per solid
+const axesOf = (i) => AXES[i] || (AXES[i] = symAxes(SHAPES[i] || SHAPES[0]));
+// Quaternions for gliding from one axis to another
+const qt = {
+  fromTo(a, b) {   // the turn taking direction a to direction b
+    const d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    if (d < -0.99999) { const p = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]; const c = [a[1] * p[2] - a[2] * p[1], a[2] * p[0] - a[0] * p[2], a[0] * p[1] - a[1] * p[0]]; const l = Math.hypot(...c); return [0, c[0] / l, c[1] / l, c[2] / l]; }
+    const c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const q = [1 + d, c[0], c[1], c[2]], l = Math.hypot(...q); return q.map((x) => x / l);
+  },
+  slerp(a, b, t) {
+    let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+    if (d < 0) { b = b.map((x) => -x); d = -d; }
+    if (d > 0.9995) { const q = a.map((x, i) => x + (b[i] - x) * t), l = Math.hypot(...q); return q.map((x) => x / l); }
+    const th = Math.acos(d), s0 = Math.sin((1 - t) * th) / Math.sin(th), s1 = Math.sin(t * th) / Math.sin(th);
+    return a.map((x, i) => x * s0 + b[i] * s1);
+  },
+  mat([w, x, y, z]) {
+    return [[1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)], [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)], [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]];
+  },
+};
 const v3 = { sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
   norm: (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; } };
 const num = (v, d, a, b) => { v = +v; return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
@@ -95,7 +145,7 @@ function clean(s) {
     chaosJump: num(s.chaosJump, DEFAULTS.chaosJump, 0, 100), chaosDeep: num(s.chaosDeep, DEFAULTS.chaosDeep, 0, 100),
     chaosMove: num(s.chaosMove, DEFAULTS.chaosMove, 0, 100), chaosColor: Math.round(num(s.chaosColor, 0, 0, COLORS.length - 1)),
     chaosDrift: !!s.chaosDrift, chaosSpeed: num(s.chaosSpeed, DEFAULTS.chaosSpeed, 0, 100), chaosDriftSides: s.chaosDriftSides !== false, chaosDriftMove: s.chaosDriftMove !== false,
-    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)), chaosCrisp: s.chaosCrisp !== false, chaosSolid: !!s.chaosSolid };
+    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)), chaosCrisp: s.chaosCrisp !== false, chaosSolid: !!s.chaosSolid, chaosMandala: s.chaosMandala !== false };
 }
 // Keep it crisp: the rules found by scoring hundreds of patterns held still. The more corners the shape has, the fewer
 // can be averaged before it turns into a fuzzy ball (12 corners: up to 3; 8 or more: up to 4); only whole numbers are
@@ -128,7 +178,7 @@ function look(crisp = true, dim = null) {
     // Two or three corners averaged most often (the cells and rings), now and then one (the classic fractals) or more
     const k = Math.min(cap, [1, 2, 2, 3, 3, 3, 4, 5, 6][r(0, 8)]);
     return { chaosSides: sides, chaosMix: Math.round(mixFor(k)), chaosJump: r(Math.max(45, 100 * hopFloor(k)), 75),
-      chaosDeep: deepCap(k, corners) === 0 || Math.random() < 0.3 ? 0 : r(5, Math.round(100 * deepCap(k, corners))), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1), chaosDim: dim, chaosView: r(0, VIEWS.length - 1) };
+      chaosDeep: deepCap(k, corners) === 0 || Math.random() < 0.3 ? 0 : r(5, Math.round(100 * deepCap(k, corners))), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1), chaosMandala: Math.random() < 0.7, chaosDim: dim, chaosView: r(0, VIEWS.length - 1) };
   }
   return { chaosSides: [3, 4, 5, 6, 6, 8, 8, 10, 12, 12, 12][r(0, 10)], chaosMix: Math.random() < 0.25 ? r(0, 25) : r(25, 100), chaosJump: r(35, 70),
     chaosDeep: Math.random() < 0.25 ? 0 : r(15, 100), chaosMove: r(25, 70), chaosColor: r(0, COLORS.length - 1),
@@ -487,7 +537,37 @@ function create(gl) {
       st.yaw += dt * (0.06 + 0.4 * mv) * slow; st.slice += dt * (0.05 + 0.35 * mv) * slow; st.fly += dt * (0.03 + 0.2 * mv) * slow;
       const yaw = st.yaw + st.kick * 0.3, pitch = 0.35 + 0.4 * Math.sin(st.t * 0.07);
       let M = m3.mul(m3.axis([1, 0, 0], pitch), m3.axis([0, 1, 0], yaw)), cam = [0, 0, 0];
-      if (view === 2) {
+      // Mandala: look straight down one of the solid's symmetry axes (so it repeats evenly round the middle), turn only
+      // round that axis, and every so often glide over to another axis (often one with a different number of repeats)
+      const man = s.chaosMandala;
+      let manAxis = null;
+      if (man) {
+        const si = Math.max(0, Math.min(SHAPES.length - 1, N - 3)), list = axesOf(si);
+        const pickAxis = (avoidN) => {
+          const ns = [...new Set(list.map((x) => x.n))], pool = ns.length > 1 && avoidN ? ns.filter((n) => n !== avoidN) : ns;
+          const n = pool[Math.floor(Math.random() * pool.length)], of = list.filter((x) => x.n === n);
+          return of[Math.floor(Math.random() * of.length)];
+        };
+        const M0 = st.man;
+        if (!M0 || M0.shape !== si) {
+          const ax = pickAxis(M0 && M0.ax ? M0.ax.n : 0), q = qt.fromTo(ax.a, [0, 0, 1]);
+          st.man = { shape: si, ax, from: M0 ? M0.q : q, to: q, q: M0 ? M0.q : q, t: M0 ? 0 : 1, next: st.t + 14 + Math.random() * 12 };
+        } else if (st.t >= M0.next && M0.t >= 1) {
+          const ax = pickAxis(M0.ax.n);
+          Object.assign(M0, { ax, from: M0.q, to: qt.fromTo(ax.a, [0, 0, 1]), t: 0, next: st.t + (14 + Math.random() * 12) / (0.5 + mv) });
+        }
+        const G = st.man;
+        if (G.t < 1) { G.t = Math.min(1, G.t + dt / 3); const e = G.t * G.t * (3 - 2 * G.t); G.q = qt.slerp(G.from, G.to, e); }
+        manAxis = G.ax.a;
+        const Al = qt.mat(G.q);   // takes the axis to straight at the viewer
+        M = m3.mul(m3.axis([0, 0, 1], yaw), Al);
+      }
+      if (man && view === 2) {
+        // Down the axis like a tunnel: the camera rides in and out along it, looking towards the middle, slowly turning
+        const r0 = M[0], r1 = M[1], ax = M[2], d = 0.55 + 0.4 * Math.cos(st.fly * 0.7);
+        cam = ax.map((x) => x * d);
+        M = [r0, r1.map((x) => -x), ax.map((x) => -x)];
+      } else if (view === 2) {
         // A wandering path inside the cloud, looking a little ahead and in towards the middle, rolling now and then
         const at = (f) => [0.55 * Math.sin(f), 0.45 * Math.sin(f * 1.37 + 1.1), 0.55 * Math.sin(f * 0.83 + 2.3)];
         cam = at(st.fly);
@@ -502,8 +582,9 @@ function create(gl) {
       gl.uniform3fv(dot3.u.uV, A.v); gl.uniform3fv(dot3.u.uVb, B.v);
       gl.uniform1f(dot3.u.uN, A.n); gl.uniform1f(dot3.u.uNb, B.n); gl.uniform1f(dot3.u.uNmix, nmix);
       gl.uniform2f(dot3.u.uLeft, l0, left3(k1, A)); gl.uniform2f(dot3.u.uLeftB, left3(k0, B), left3(k1, B));
-      gl.uniformMatrix3fv(dot3.u.uR1, false, m3.gl(m3.axis([1, 1, 0.3], subTurn)));
-      gl.uniformMatrix3fv(dot3.u.uR2, false, m3.gl(m3.axis([0.2, -1, 1], 2.3 * subTurn)));
+      // (In a mandala the little solids turn round the same axis, so they keep its symmetry)
+      gl.uniformMatrix3fv(dot3.u.uR1, false, m3.gl(m3.axis(manAxis || [1, 1, 0.3], subTurn)));
+      gl.uniformMatrix3fv(dot3.u.uR2, false, m3.gl(m3.axis(manAxis || [0.2, -1, 1], 2.3 * subTurn)));
       gl.uniformMatrix3fv(dot3.u.uView, false, m3.gl(M));
       gl.uniform3f(dot3.u.uCam, cam[0], cam[1], cam[2]);
       gl.uniform1f(dot3.u.uK, K); gl.uniform1f(dot3.u.uDeep, deep1); gl.uniform1f(dot3.u.uDeep2, deep2); gl.uniform1f(dot3.u.uSame, SAME);
@@ -563,5 +644,5 @@ function create(gl) {
   }
   return { state, run, release, deep };
 }
-return { DEFAULTS, COLORS, PALETTES, VIEWS, SHAPES, shapeName, preview, clean, look, effective, mixFor, kCap, hopFloor, DEEP_MAX, deepCap, create };
+return { DEFAULTS, COLORS, PALETTES, VIEWS, SHAPES, axesOf, shapeName, preview, clean, look, effective, mixFor, kCap, hopFloor, DEEP_MAX, deepCap, create };
 })();

@@ -305,7 +305,9 @@ TIPS
     3D (beside Flat, at the top) hops the dots towards the corners of a solid
     instead: the Corners fader becomes Shape (a pyramid up to a dodecahedron),
     and 3D style shows the cloud Turning in front of you, as Slices sweeping
-    through it, or as a Fly-through inside it. Solid (3D only) draws Turning and Fly-through
+    through it, or as a Fly-through inside it. Mandala (3D, on to start with) looks straight
+    down one of the shape's symmetry axes, so it repeats evenly round the middle,
+    and glides to another axis every so often. Solid (3D only) draws Turning and Fly-through
     as a solid object with outlines instead of a see-through glow. The Guide's "Dot sculpture"
     recipe sets it up. Keep it crisp (on to start with) keeps every pattern to
     the settings that come out sharp: whole numbers of corners averaged, no

@@ -1349,6 +1349,8 @@ function syncChaosUI(t) {
   $$('#chaosView button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosView | 0))));
   $('#chaosViewRow').hidden = !d3;
   $('#chaosSolidRow').hidden = !d3;
+  $('#chaosMandalaRow').hidden = !d3;
+  $('#chaosMandala').setAttribute('aria-pressed', String(t.chaosMandala !== false));
   $('#chaosSolid').setAttribute('aria-pressed', String(!!t.chaosSolid));
   $('label[for="chaosSides"]').textContent = d3 ? 'Shape' : 'Corners';
   $('#chaosDriftSides').setAttribute('aria-pressed', String(t.chaosDriftSides !== false));
@@ -1419,6 +1421,13 @@ $$('#chaosView button').forEach((b) => b.addEventListener('click', () => {
   syncUI();
   showOSD('CHAOS GAME', '3D · ' + PCH.VIEWS[+b.dataset.v].toUpperCase());
 }));
+$('#chaosMandala').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosMandala = t.chaosMandala === false;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosMandala ? 'MANDALA' : 'TUMBLING');
+});
 $('#chaosSolid').addEventListener('click', () => {
   takeOver('in1');
   const t = loops[edit].tgt;
