@@ -1344,6 +1344,7 @@ function syncChaosUI(t) {
   $('#chaosColorName').textContent = PCH.COLORS[t.chaosColor | 0] || PCH.COLORS[0];
   $('#chaosDrift').setAttribute('aria-pressed', String(!!t.chaosDrift));
   $('#chaosCrisp').setAttribute('aria-pressed', String(t.chaosCrisp !== false));
+  $('#chaosShimmer').setAttribute('aria-pressed', String(!!t.chaosShimmer));
   const d3 = t.chaosDim === 1;
   $$('#chaosDim button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (d3 ? 1 : 0))));
   $$('#chaosView button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.v === (t.chaosView | 0))));
@@ -1434,6 +1435,13 @@ $('#chaosSolid').addEventListener('click', () => {
   t.chaosSolid = !t.chaosSolid;
   syncUI();
   showOSD('CHAOS GAME', t.chaosSolid ? 'SOLID' : 'GLOW');
+});
+$('#chaosShimmer').addEventListener('click', () => {
+  takeOver('in1');
+  const t = loops[edit].tgt;
+  t.chaosShimmer = !t.chaosShimmer;
+  syncUI();
+  showOSD('CHAOS GAME', t.chaosShimmer ? 'SHIMMER' : 'STEADY');
 });
 $('#chaosCrisp').addEventListener('click', () => {
   takeOver('in1');
@@ -3881,7 +3889,7 @@ function apFinish(sc, k, keep) {
   withPins(sc, k, ['in1', 'in2']);
   if (sc.in2 && sc.in2 === sc.in1 && !isPinned('in2', k)) sc.in2 = 'none';
   // Autopilot's Chaos game always drifts its faders, at the Drift speed that loop is set to
-  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); sc.chaosDriftMove = !(loops[k] && loops[k].tgt.chaosDriftMove === false); sc.chaosCrisp = !(loops[k] && loops[k].tgt.chaosCrisp === false); sc.chaosSolid = !!(loops[k] && loops[k].tgt.chaosSolid); }
+  if (sc.in1 === 'chaos' || sc.in2 === 'chaos') { sc.chaosDrift = true; sc.chaosSpeed = (loops[k] && loops[k].tgt.chaosSpeed) ?? PCH.DEFAULTS.chaosSpeed; sc.chaosDriftSides = !(loops[k] && loops[k].tgt.chaosDriftSides === false); sc.chaosDriftMove = !(loops[k] && loops[k].tgt.chaosDriftMove === false); sc.chaosCrisp = !(loops[k] && loops[k].tgt.chaosCrisp === false); sc.chaosSolid = !!(loops[k] && loops[k].tgt.chaosSolid); sc.chaosShimmer = !!(loops[k] && loops[k].tgt.chaosShimmer); }
   if (!keep || keep !== sc.in1) {
     if (sc.in1 === 'loop') sc.size = Math.round(rnd(35, 60));
     if ((sc.in1 === 'bars' || sc.in1 === 'picture' || sc.in1 === 'genart') && sc.size == null) sc.size = 50;

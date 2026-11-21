@@ -309,7 +309,8 @@ TIPS
     down one of the shape's symmetry axes, so it repeats evenly round the middle,
     and glides to another axis every so often. Solid (3D only) draws Turning and Fly-through
     as a solid object with outlines instead of a see-through glow. The Guide's "Dot sculpture"
-    recipe sets it up. Keep it crisp (on to start with) keeps every pattern to
+    recipe sets it up. Shimmer (off to start with) draws
+    every frame from fresh random dots, so the pattern sparkles. Keep it crisp (on to start with) keeps every pattern to
     the settings that come out sharp: whole numbers of corners averaged, no
     more than the shape can take, Hop never too soft and Fractal corners
     low enough to stay sharp (none with 1 corner averaged); the readouts show what's really used. Drift, New pattern and

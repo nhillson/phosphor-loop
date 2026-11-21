@@ -14,7 +14,7 @@ window.PhosphorChaos = (() => {
 // A loop's settings (the app keeps them with the loop's look): sides 3-12, the rest 0-100. Drift (the app's doing,
 // see chaosDrift in js/app.js) moves the faders about by themselves, at chaosSpeed; Corners too unless chaosDriftSides is off.
 const DEFAULTS = { chaosSides: 12, chaosMix: 50, chaosJump: 50, chaosDeep: 30, chaosMove: 40, chaosColor: 0, chaosDrift: false, chaosSpeed: 40, chaosDriftSides: true, chaosDriftMove: true,
-  chaosDim: 0, chaosView: 0, chaosCrisp: true, chaosSolid: false, chaosMandala: true };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
+  chaosDim: 0, chaosView: 0, chaosCrisp: true, chaosSolid: false, chaosMandala: true, chaosShimmer: false };   // Flat (0) or 3D (1); in 3D: 0 Turning, 1 Slices, 2 Fly-through
 // The sets of colors. A ramp's eight colors run from where few dots land to where the most do; the dark ones in
 // between are what turn a soft heap of dots into a ring with a dark middle. Corners gives each dot the color of the
 // corner it last hopped towards; Rainbow is the Point cloud's rainbow (the whole color wheel, sliding along).
@@ -145,7 +145,7 @@ function clean(s) {
     chaosJump: num(s.chaosJump, DEFAULTS.chaosJump, 0, 100), chaosDeep: num(s.chaosDeep, DEFAULTS.chaosDeep, 0, 100),
     chaosMove: num(s.chaosMove, DEFAULTS.chaosMove, 0, 100), chaosColor: Math.round(num(s.chaosColor, 0, 0, COLORS.length - 1)),
     chaosDrift: !!s.chaosDrift, chaosSpeed: num(s.chaosSpeed, DEFAULTS.chaosSpeed, 0, 100), chaosDriftSides: s.chaosDriftSides !== false, chaosDriftMove: s.chaosDriftMove !== false,
-    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)), chaosCrisp: s.chaosCrisp !== false, chaosSolid: !!s.chaosSolid, chaosMandala: s.chaosMandala !== false };
+    chaosDim: num(s.chaosDim, 0, 0, 1) >= 0.5 ? 1 : 0, chaosView: Math.round(num(s.chaosView, 0, 0, VIEWS.length - 1)), chaosCrisp: s.chaosCrisp !== false, chaosSolid: !!s.chaosSolid, chaosMandala: s.chaosMandala !== false, chaosShimmer: !!s.chaosShimmer };
 }
 // Keep it crisp: the rules found by scoring hundreds of patterns held still. The more corners the shape has, the fewer
 // can be averaged before it turns into a fuzzy ball (12 corners: up to 3; 8 or more: up to 4); only whole numbers are
@@ -499,7 +499,8 @@ function create(gl) {
     // pattern is still and a moving one moves cleanly instead of shimmering with new random dots
     const keep = 0;
     if (st.seed3 === undefined) st.seed3 = (Math.random() * 4294967296) >>> 0;
-    const seed = st.seed3;
+    // Shimmer (a switch): a fresh random set of dots every frame instead, so the pattern sparkles (still no build-up)
+    const seed = s.chaosShimmer ? (st.frame = (st.frame + 1) >>> 0) * 0x9E3779B9 >>> 0 : st.seed3;
     gl.bindVertexArray(vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, st.acc.f);
     gl.viewport(0, 0, outW, outH);

@@ -223,7 +223,8 @@ file don't rebuild the app.
    patterns): `kCap` (10+ corners: 3, 8+: 4), `kSnap` (whole numbers, quick between), `hopFloor(k)`, `deepCap(k, corners)` (1 averaged: 0, 8+ corners: 15, else 30), no K breathing; `PCH.effective`
    for the readouts, drift ranges narrowed to match, `look(crisp)`. Crisp also: the high sounds brighten (uGain) instead of adding to K, the bass
    pulses the hop a third as much, with a sharper show pass (`uCw` 8). **No build-up anywhere** (Nick: no dots slowly fading, flat or 3D; it
-   smeared a halo behind anything moving): every frame is drawn from nothing (`keep` 0) from the same dots (fixed seed `st.seed3`, fixed count:
+   smeared a halo behind anything moving): every frame is drawn from nothing (`keep` 0) from the same dots (fixed seed `st.seed3`, unless the **Shimmer** switch `chaosShimmer`,
+   `#chaosShimmer`, off to start with, takes a fresh seed every frame; Autopilot keeps the loop's choice; fixed count:
    flat 360k / 240k, 3D 300k / 200k, Slices 500k / 320k, solid 350k / 240k; more made tests/check.py time out here). Flat patterns are added
    up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). 3D glow (`steady` in run; Slices with 1.6 times the slice): soft dots at least 2 px (`uMinPs`); crisp: turning/sweeping/flying 0.6 as fast. **Mandala** switch (`chaosMandala`, on to start with, `#chaosMandala` in `#chaosMandalaRow`; `look()` 7 in 10):
    the view looks straight down a symmetry axis of the solid (`symAxes` / `axesOf`: candidates from corners, pair middles and 3-corner plane normals,
