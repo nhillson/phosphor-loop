@@ -588,7 +588,7 @@
               </div>
             </div>
             <div class="ctl">
-              <div class="ctl-head"><label for="chaosSides" title="How many corners the shape has: 3 is the famous triangle, 6 a honeycomb, 12 a fine mandala">Corners</label><output id="chaosSidesOut" for="chaosSides"></output></div>
+              <div class="ctl-head"><label for="chaosSides" title="How many corners the shape has: 3 is the famous triangle, 6 a honeycomb, 12 a fine mandala">Corners</label><button class="btn drift-mini" id="chaosDriftSides" aria-pressed="true" title="While Drift the faders is on, lets Corners drift too: one corner more or fewer every so often, each change taking a second or two. Off keeps the number of corners where you put it."><span class="led"></span>drift</button><output id="chaosSidesOut" for="chaosSides"></output></div>
               <input type="range" id="chaosSides" min="3" max="12" step="1" value="12">
             </div>
             <div class="ctl">
@@ -607,18 +607,12 @@
               <div class="ends"><span>Plain</span><span>Lots</span></div>
             </div>
             <div class="ctl">
-              <div class="ctl-head"><label for="chaosMove" title="How much the pattern changes by itself: it turns, the little shapes turn the other way, and the hop and the number of corners averaged slowly breathe">Morph</label><output id="chaosMoveOut" for="chaosMove"></output></div>
+              <div class="ctl-head"><label for="chaosMove" title="How much the pattern changes by itself: it turns, the little shapes turn the other way, and the hop and the number of corners averaged slowly breathe">Morph</label><button class="btn drift-mini" id="chaosDriftMove" aria-pressed="true" title="While Drift the faders is on, lets Morph drift too. Off keeps Morph where you put it."><span class="led"></span>drift</button><output id="chaosMoveOut" for="chaosMove"></output></div>
               <input type="range" id="chaosMove" min="0" max="100" step="1" value="40">
               <div class="ends"><span>Still</span><span>Restless</span></div>
             </div>
             <div class="ctl">
               <button class="btn" id="chaosDrift" aria-pressed="false" title="Slowly moves Corners averaged, Hop, Fractal corners and Morph about by themselves (and Corners, if its switch is on), so the pattern never settles. Grab a fader any time: it carries on from where you leave it."><span class="led"></span>Drift the faders</button>
-            </div>
-            <div class="ctl">
-              <button class="btn" id="chaosDriftSides" aria-pressed="true" title="While Drift the faders is on, lets Corners drift too: one corner more or fewer every so often, each change taking a second or two. Off keeps the number of corners where you put it."><span class="led"></span>Corners drift too</button>
-            </div>
-            <div class="ctl">
-              <button class="btn" id="chaosDriftMove" aria-pressed="true" title="While Drift the faders is on, lets Morph drift too. Off keeps Morph where you put it."><span class="led"></span>Morph drifts too</button>
             </div>
             <div class="ctl">
               <div class="ctl-head"><label for="chaosSpeed" title="How fast Drift the faders moves them: from a few minutes to cross a fader, to a few seconds">Drift speed</label><output id="chaosSpeedOut" for="chaosSpeed"></output></div>

@@ -630,6 +630,9 @@
   .pin.both { width: auto; padding: 0 7px; grid-auto-flow: column; gap: 4px; }
   .pin.both .pin-ab { display: block; }
   .ctl-head:has(.pin) { align-items: center; }
+  .ctl-head:has(.drift-mini) { align-items: center; }
+  .ctl-head .drift-mini { min-height: 22px; padding: 2px 8px; font-size: 11.5px; gap: 5px; margin-right: auto; }
+  .ctl-head .drift-mini .led { width: 6px; height: 6px; }
   .ap-state { margin: 0; font-size: 14px; color: var(--dim); }
   .ap-state b { color: var(--ink); font-weight: 600; }
   .ap-state .live { background: var(--loop-a); box-shadow: 0 0 8px var(--amber-glow); }

@@ -299,8 +299,8 @@ TIPS
     the bass pulls the dots into bright knots and the high sounds make it
     more organic. Drift the faders slowly moves Corners averaged, Hop,
     Fractal corners and Morph about by themselves, as fast as Drift speed
-    says, and Corners too (a corner at a time) unless you switch off Corners
-    drift too (Morph drifts too does the same for Morph). Colors has twelve sets, each shown as a strip of its colors; grab
+    says, and Corners too (a corner at a time) unless you switch off the little
+    "drift" switch on Corners' title line (Morph has one too). Colors has twelve sets, each shown as a strip of its colors; grab
     one any time and it carries on from where you let go.
     3D (beside Flat, at the top) hops the dots towards the corners of a solid
     instead: the Corners fader becomes Shape (a pyramid up to a dodecahedron),
