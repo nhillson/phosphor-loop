@@ -1852,8 +1852,8 @@
           <div class="seg seg-3" id="brushColor" role="group" aria-labelledby="brushColorLbl">
             <button data-v="0" title="Picked up from the picture under each brush">Picture</button><button data-v="1">Rainbow</button><button data-v="2">Purple</button><button data-v="3">Fire</button><button data-v="4">Ice</button><button data-v="5">White</button><button data-v="6" title="Blue strokes with orange tips">Ember &amp; ice</button><button data-v="7" title="Deep purple to pink to cream">Orchid</button><button data-v="8" title="Dark green to pale green">Moss</button><button data-v="9" title="Deep teal to cyan to white">Lagoon</button>
           </div>
-          <div class="chips"><button class="chip" id="brushGlow" aria-pressed="false"><span class="led"></span>Glowing strokes</button></div>
-          <span class="hint">The last four change along each stroke, dark where it starts and bright at its tip. Glowing strokes add up into light where they cross, instead of lying over each other.</span>
+          <div class="chips"><button class="chip" id="brushGlow" aria-pressed="false"><span class="led"></span>Glowing strokes</button><button class="chip" id="brushSoft" aria-pressed="true" title="Where strokes cross, the brighter one shows instead of them stacking up, like a loop’s Soft trails. On to start with."><span class="led"></span>Soft trails</button></div>
+          <span class="hint">The last four change along each stroke, dark where it starts and bright at its tip. Glowing strokes add up into light where they cross, instead of lying over each other. Soft trails stops strokes stacking up: the brighter one shows.</span>
         </div>
         <div class="ctl">
           <span class="lbl" id="brushCountLbl">How many brushes</span>
@@ -2154,7 +2154,7 @@
             <dt>Second input and Blend</dt><dd>Mix two inputs into the same loop.</dd>
             <dt>Input size</dt><dd>How big the input sits on screen, up to filling it.</dd>
             <dt>Only movement</dt><dd>For live inputs and video: only what moves gets in.</dd>
-            <dt>Soft trails</dt><dd>Under the Trails fader, for video, camera, screen, phone, the other loop and Generative art; on unless you turn it off: each spot shows the brighter of the new frame and its fading echoes instead of adding them up, so a video can’t pile up into white at high Trails. Moving things still leave echoes. It stays through every new look.</dd>
+            <dt>Soft trails</dt><dd>Under the Trails fader, for video, camera, screen, phone, the other loop, Generative art and Brushes; on unless you turn it off: each spot shows the brighter of the new frame and its fading echoes instead of adding them up, so a video can’t pile up into white at high Trails. Moving things still leave echoes. It stays through every new look.</dd>
             <dt>Adjust the picture</dt><dd>Under each picture, video or live input: Tracking (worn-tape wobble), Brightness, Contrast, Color, Cut out dark parts, and Hold this frame.</dd>
           </dl></div>
           <div class="g-card"><h3>Effects</h3><dl>

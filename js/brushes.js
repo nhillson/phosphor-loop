@@ -20,7 +20,7 @@ const COLORS = ['Picture', 'Rainbow', 'Purple', 'Fire', 'Ice', 'White', 'Ember &
 // What the brushes follow when no picture steers them: the shapes Math Chaos Patterns' gallery grows
 const SHAPES = ['Currents', 'Cells', 'Burst', 'Spiral', 'Rings', 'Formula'];
 const DEFAULTS = { bAmt: 0, bShape: 0, bSense: 0, bSteer: 2, bCount: 1, bSpeed: 35, bSwirl: 40, bChange: 25, bWidth: 8, bLength: 45, bDry: 75,
-  bOpacity: 60, bBristle: 50, bColor: 0, bGlow: false, bMusic: true, bOnly: false };
+  bOpacity: 60, bBristle: 50, bColor: 0, bGlow: false, bSoft: true, bMusic: true, bOnly: false };
 // Recipes leave Steered by alone unless they need it. The first ones grow the gallery's organic forms: hair-fine lines
 // in masses, glowing where they bunch up; the later ones are broad bristled strokes.
 const HAIR = { bWidth: 1, bBristle: 0, bGlow: true, bCount: 3 };
@@ -217,7 +217,7 @@ void main(){
 }`;
 const FS_STROKE = `#version 300 es
 precision highp float;
-uniform float uBristle, uGlow;
+uniform float uBristle, uGlow, uSoftS;
 in vec2 vQ; in vec3 vC; in float vA; in float vS; out vec4 o;
 void main(){
   float s=abs(vQ.y);
@@ -227,7 +227,8 @@ void main(){
   float b=fract(sin(lane*91.3+vS*317.)*437.58);
   a*=mix(1., .2+.8*b, uBristle)*vA;
   if(a<.002) discard;
-  o = uGlow>.5 ? vec4(vC*a*.7, 1.) : vec4(vC, a);
+  // Soft trails: where strokes cross, the brighter one shows (blended with MAX), so they never stack up into a solid mass
+  o = uSoftS>.5 ? vec4(vC*min(1., a*1.6), a) : uGlow>.5 ? vec4(vC*a*.7, 1.) : vec4(vC, a);
 }`;
 const FS_DRY = `#version 300 es
 precision highp float; uniform sampler2D uTo; uniform float uRate, uHasTo; in vec2 vUv; out vec4 o;
@@ -316,7 +317,7 @@ function create(gl) {
   // strength about 0.4 to 1.5 this frame) } }
   function run(st, src, aspect, outW, outH, s, dt, opt = {}) {
     const vaoWas = gl.getParameter(gl.VERTEX_ARRAY_BINDING), blendWas = gl.isEnabled(gl.BLEND);
-    const bs = gl.getParameter(gl.BLEND_SRC_RGB), bd = gl.getParameter(gl.BLEND_DST_RGB), bsa = gl.getParameter(gl.BLEND_SRC_ALPHA), bda = gl.getParameter(gl.BLEND_DST_ALPHA);
+    const beq = gl.getParameter(gl.BLEND_EQUATION_RGB), bs = gl.getParameter(gl.BLEND_SRC_RGB), bd = gl.getParameter(gl.BLEND_DST_RGB), bsa = gl.getParameter(gl.BLEND_SRC_ALPHA), bda = gl.getParameter(gl.BLEND_DST_ALPHA);
     gl.bindVertexArray(vao);
     const raw = Math.min(0.25, Math.max(1 / 240, dt || 1 / 60));
     st.time += raw;
@@ -394,7 +395,12 @@ function create(gl) {
     }
     // The strokes, from where each brush was to where it is
     if (!fresh && strokeA > 0.001) {
-      if (s.bGlow) gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
+      // Soft trails (on to start with): glowing strokes, and any strokes on the black canvas of the input, take the brighter
+      // of themselves and what's already there, like a loop's Soft trails, instead of adding up or piling over each other.
+      // Plain strokes smearing the picture (the whole-picture effect) still lie over it, or dark smears would vanish.
+      const soft = s.bSoft !== false && (s.bGlow || !opt.effect);
+      if (soft) gl.blendEquation(gl.MAX);
+      else if (s.bGlow) gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
       else gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
       gl.useProgram(PS.p);
       const u = PS.u, oldS = g.sets[1 - g.cur], newS = g.sets[g.cur];
@@ -405,9 +411,12 @@ function create(gl) {
       // Lines thinner than a pixel are drawn a pixel wide and fainter, so the picture looks the same at any size;
       // with many brushes each is fainter, so a swarm glows where they bunch up rather than turning the screen white
       gl.uniform1f(u.uWidth, s.bWidth * outH / 1080 * 1.5);
-      gl.uniform1f(u.uOpacity, s.bOpacity / 100 * strokeA * Math.min(1.5, Math.sqrt(40000 / g.N)));
-      gl.uniform1f(u.uBristle, s.bBristle / 100); gl.uniform1f(u.uGlow, s.bGlow ? 1 : 0);
+      // (Soft: nothing adds up, so many brushes needn't be fainter; a little brighter, as no cores build up)
+      gl.uniform1f(u.uOpacity, soft ? Math.min(1, s.bOpacity / 100 * 2.5) * strokeA
+        : s.bOpacity / 100 * strokeA * Math.min(1.5, Math.sqrt(40000 / g.N)));
+      gl.uniform1f(u.uBristle, s.bBristle / 100); gl.uniform1f(u.uGlow, s.bGlow ? 1 : 0); gl.uniform1f(u.uSoftS, soft ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, g.N * 6);
+      if (soft) gl.blendEquation(gl.FUNC_ADD);
     }
     gl.disable(gl.BLEND);
     // Out: over the original by Amount
@@ -421,7 +430,7 @@ function create(gl) {
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindVertexArray(vaoWas);
-    gl.blendFuncSeparate(bs, bd, bsa, bda);
+    gl.blendFuncSeparate(bs, bd, bsa, bda); gl.blendEquation(beq);
     if (blendWas) gl.enable(gl.BLEND);
     return st.out.t;
   }

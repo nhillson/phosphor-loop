@@ -164,7 +164,7 @@ const SRC_LABEL = { wave: 'Wave', shape: 'Shape', bars: 'Bars', sparks: 'Sparks'
                     blackhole: 'Black hole', aurora: 'Aurora', mercury: 'Mercury', fractal: 'Fractal', nebula: 'Nebula', model: 'Model', terrain: 'Terrain', topo: 'Topo map', life: 'Life', radar: 'Doppler radar', ferro: 'Ferrofluid', zebra: 'Zebra', chaos: 'Chaos game', machine: 'Machinery', cloud: 'Point cloud', brush: 'Brushes', fwrap: 'Fractal wrap',
                     sponge: 'Menger sponge', mandelbulb: 'Mandelbulb', mandelbox: 'Mandelbox', sierpinski: 'Sierpinski', julia3d: 'Julia', kaleido: 'Kaleidoscope', picture: 'Picture', genart: 'Generative art', video: 'Video', camera: 'Camera', screen: 'Screen', phone: 'Phone', none: 'Nothing', loop: 'Other loop' };
 const LIVE = ['video', 'camera', 'screen', 'phone', 'loop'];   // inputs that can use Only movement
-const SOFT_SRC = [...LIVE, 'genart'];   // inputs Soft trails works on (moving pictures that would pile up into white)
+const SOFT_SRC = [...LIVE, 'genart', 'brush'];   // inputs Soft trails works on (moving pictures that would pile up into white)
 const DEVICE = ['camera', 'screen', 'phone'];
 
 function loopDefaults() {
@@ -11927,7 +11927,7 @@ const BRUSH_KEY = 'phosphor-brush-v1';
 const BRUSH_DEF = { ...PBR.DEFAULTS };
 const BRUSH_NUM = ['bAmt', 'bSense', 'bSpeed', 'bSwirl', 'bChange', 'bWidth', 'bLength', 'bDry', 'bOpacity', 'bBristle'];
 const BRUSH_SEG = { bShape: '#brushShape', bSteer: '#brushSteer', bCount: '#brushCount', bColor: '#brushColor' };
-const BRUSH_CHIP = { bGlow: '#brushGlow', bMusic: '#brushMusic', bOnly: '#brushOnly' };
+const BRUSH_CHIP = { bGlow: '#brushGlow', bSoft: '#brushSoft', bMusic: '#brushMusic', bOnly: '#brushOnly' };
 const brush = { ...BRUSH_DEF };
 const brushEls = {};
 for (const k of BRUSH_NUM) brushEls[k] = { el: $('#' + k), out: $('#' + k + 'Out') };
@@ -11946,6 +11946,7 @@ function cleanBrush(c) {
   if (Number.isInteger(c.bCount)) out.bCount = clamp(c.bCount, 0, PBR.COUNT.length - 1);
   if (Number.isInteger(c.bColor)) out.bColor = clamp(c.bColor, 0, PBR.COLORS.length - 1);
   out.bGlow = c.bGlow === true;
+  out.bSoft = c.bSoft !== false;
   out.bMusic = c.bMusic !== false;
   out.bOnly = c.bOnly === true;
   return out;
@@ -11964,6 +11965,10 @@ for (const [k, { el, out }] of Object.entries(brushEls)) {
 }
 for (const [k, sel] of Object.entries(BRUSH_SEG)) $$(sel + ' button').forEach((b) => b.addEventListener('click', () => setBrush({ ...brush, [k]: +b.dataset.v })));
 $('#brushGlow').addEventListener('click', () => setBrush({ ...brush, bGlow: !brush.bGlow }));
+$('#brushSoft').addEventListener('click', () => {
+  setBrush({ ...brush, bSoft: !brush.bSoft });
+  toast(brush.bSoft ? 'Soft trails: where strokes cross, the brighter one shows, so they don’t stack up.' : 'Strokes stack up over each other again.');
+});
 $('#brushMusic').addEventListener('click', () => {
   setBrush({ ...brush, bMusic: !brush.bMusic });
   toast(brush.bMusic ? 'The music moves the brushes (with React to sound on).' : 'The music leaves the brushes alone now.');
