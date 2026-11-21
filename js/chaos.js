@@ -444,12 +444,12 @@ function create(gl) {
     const deep1 = 0.16 * deepNow * (1 + 0.3 * mv * Math.sin(st.t * 0.061 + 2.1)), deep2 = Math.min(1, Math.max(0, (deepNow - 0.3) / 0.3));
     const dim3 = s.chaosDim === 1;
     const px = Math.max(1, Math.round(outH / 620)), soft = px > 1;
-    const dim3Steady = dim3 && crisp && !(s.chaosSolid && s.chaosView !== 1);
-    const tau = crisp ? (dim3 ? 0.15 : mOn ? 0.4 : 0.6) : TAU;
-    const keep = deep && !dim3Steady ? Math.exp(-dt / tau) : 0;
+    // Every frame is drawn from nothing (Nick: no dots slowly fading out, flat or 3D: a fading build-up leaves a smear
+    // behind anything that moves), always from the very same dots (same seed, same count every frame), so a still
+    // pattern is still and a moving one moves cleanly instead of shimmering with new random dots
+    const keep = 0;
     if (st.seed3 === undefined) st.seed3 = (Math.random() * 4294967296) >>> 0;
-    // (the solid uses the same fixed dots too, so it doesn't shimmer either)
-    const seed = dim3Steady || (dim3 && s.chaosSolid && s.chaosView !== 1) ? st.seed3 : (st.frame = (st.frame + 1) >>> 0) * 0x9E3779B9 >>> 0;
+    const seed = st.seed3;
     gl.bindVertexArray(vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, st.acc.f);
     gl.viewport(0, 0, outW, outH);
@@ -460,7 +460,7 @@ function create(gl) {
     // smoothly instead of shimmering with new random dots each frame
     // Solid (a switch, 3D Turning and Fly-through only): fresh every frame, nearest dot wins, shaded with outlines
     const solid = dim3 && s.chaosSolid && s.chaosView !== 1;
-    const steady = dim3 && crisp && !solid;
+    const steady = dim3 && !solid;
     const depthWas = gl.isEnabled(gl.DEPTH_TEST);
     if (solid) {
       gl.disable(gl.BLEND);
@@ -512,7 +512,7 @@ function create(gl) {
       gl.uniform1i(dot3.u.uSteps, steps); gl.uniform1ui(dot3.u.uSeed, seed);
       gl.uniform1f(dot3.u.uW, deep ? 1 : 2 / 255);
       // (steady Slices catch only the dots near the slice, from one frame's worth: more dots and a thicker slice)
-      n = solid ? (deep ? 450000 : 300000) : steady ? (view === 1 ? (deep ? 700000 : 420000) : (deep ? 400000 : 260000)) : Math.round(Math.max(80000, Math.min(deep ? 320000 : 200000, RATE3 * dt)));
+      n = solid ? (deep ? 350000 : 240000) : view === 1 ? (deep ? 500000 : 320000) : (deep ? 300000 : 200000);
       gl.drawArrays(gl.POINTS, 0, n);
       if (solid) gl.disable(gl.DEPTH_TEST);
       each = 1;
@@ -522,7 +522,7 @@ function create(gl) {
       const V = ring(N), Vb = ring(Nb);
       // Enough hops that where a dot started no longer shows
       const steps = Math.max(5, Math.min(22, Math.ceil(Math.log(0.0015) / Math.log(Math.max(left0, nmix > 0 ? leftFor(k0, Nb) : 0)))));
-      n = Math.round(Math.max(60000, Math.min(deep ? 240000 : 200000, RATE * dt)));
+      n = deep ? 360000 : 240000;   // (one frame's worth has to fill the pattern by itself)
       each = soft ? px * px * 0.39 : 1;   // what one dot adds in all (a soft round dot's average over its square)
       gl.useProgram(dot.p);
       gl.uniform2fv(dot.u.uV, V); gl.uniform2fv(dot.u.uVb, Vb); gl.uniform1f(dot.u.uNmix, nmix);

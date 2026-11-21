@@ -222,15 +222,14 @@ file don't rebuild the app.
    `PCH.look()` picks 3D 4 times in 10. **Keep it crisp** (`chaosCrisp`, on to start with, `#chaosCrisp`; from a scored sweep of 180 still
    patterns): `kCap` (10+ corners: 3, 8+: 4), `kSnap` (whole numbers, quick between), `hopFloor(k)`, `deepCap(k, corners)` (1 averaged: 0, 8+ corners: 15, else 30), no K breathing; `PCH.effective`
    for the readouts, drift ranges narrowed to match, `look(crisp)`. Crisp also: the high sounds brighten (uGain) instead of adding to K, the bass
-   pulses the hop a third as much, and the flat build-up lasts 0.6 s (0.4 s with music) with a sharper show pass (`uCw` 8). Flat patterns are added
-   up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). Crisp 3D (`steady` in run; Slices with 1.6 times the slice and more dots): a glow redrawn from nothing every frame (keep 0,
-   so no smear) from the very same dots every frame (fixed seed `st.seed3`, fixed count 400k / 260k), so it doesn't shimmer; soft dots at least
-   2 px (`uMinPs`); turning/sweeping/flying 0.6 as fast. **Solid** switch (`chaosSolid`, off to start with, `#chaosSolid` in `#chaosSolidRow`,
+   pulses the hop a third as much, with a sharper show pass (`uCw` 8). **No build-up anywhere** (Nick: no dots slowly fading, flat or 3D; it
+   smeared a halo behind anything moving): every frame is drawn from nothing (`keep` 0) from the same dots (fixed seed `st.seed3`, fixed count:
+   flat 360k / 240k, 3D 300k / 200k, Slices 500k / 320k, solid 350k / 240k; more made tests/check.py time out here). Flat patterns are added
+   up unturned and turned only in `FS_SHOW` (`uRot`), so Morph's turning and music shoves never smear them (acc pictures read LINEAR). 3D glow (`steady` in run; Slices with 1.6 times the slice): soft dots at least 2 px (`uMinPs`); crisp: turning/sweeping/flying 0.6 as fast. **Solid** switch (`chaosSolid`, off to start with, `#chaosSolid` in `#chaosSolidRow`,
    3D Turning and Fly-through only): depth test on the acc picture's own depth buffer, cleared every frame, nearest dot wins (`uSolid`), shaded
    in `FS_SHOW` by nearness with pinholes filled and dark outlines; Autopilot keeps the loop's choice. The pattern fits a tall screen's width (`fit`). Check with `--shot "Dot sculpture"` (add `|click=#chaosView [data-v='1']` or `'2'`).
    `PCH.look(crisp, dim)` = New random (`#chaosRoll`), New flat (`#chaosRollFlat`, dim 0), New 3D (`#chaosRoll3D`, dim 1), Surprise and Autopilot. Every dot is
-   worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, added up in an RGBA16F picture that
-   fades over 0.25 s; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
+   worked out afresh in the vertex shader (no state): 9 million a second, 60-240 thousand a frame, drawn into an RGBA16F picture afresh each frame; the color is by log density (`FS_SHOW`). Music: `ferroMus.bass` shortens what's left (knots), `.high` adds to K,
    `brushMus.hit` shoves the turning. Very slow in this workspace (about 2 frames a second). Check with `--shot "Dot mandala"`
    (add `|chaosSides=12|chaosMix=70|click=#chaosColor [data-v='1']` or `|click=#chaosRoll` for others).
 4z19. **Machinery** (input `machine`, js/machinery.js = `window.PhosphorMachinery`, read through the 3D world slot as the Chaos game is,
